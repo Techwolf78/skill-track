@@ -3,11 +3,9 @@
  import { TooltipProvider } from "@/components/ui/tooltip";
  import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
  import { BrowserRouter, Routes, Route } from "react-router-dom";
- import Index from "./pages/Index";
  import Login from "./pages/Login";
  import NotFound from "./pages/NotFound";
- 
- // Admin Pages
+import NationalLandingPage from "./pages/NationalLandingPage";
  import { AdminLayout } from "./components/layout/AdminLayout";
  import AdminDashboard from "./pages/admin/Dashboard";
  import Colleges from "./pages/admin/Colleges";
@@ -15,14 +13,14 @@
  import QuestionBank from "./pages/admin/QuestionBank";
  import Tests from "./pages/admin/Tests";
  import TestCreate from "./pages/admin/TestCreate";
- import Reports from "./pages/admin/Reports";
  import Settings from "./pages/admin/Settings";
+ import DSAPlayground from "./pages/admin/DSAPlayground";
+ import Reports from "./pages/admin/Reports";
  
  // Test Taking
  import TestInterface from "./pages/test/TestInterface";
- 
+import TestResults from "./pages/test/TestResults";
  const queryClient = new QueryClient();
- 
  const App = () => (
    <QueryClientProvider client={queryClient}>
      <TooltipProvider>
@@ -30,7 +28,7 @@
        <Sonner />
        <BrowserRouter>
          <Routes>
-           <Route path="/" element={<Index />} />
+           <Route path="/" element={<NationalLandingPage />} />
            <Route path="/login" element={<Login />} />
            
            {/* Admin Routes */}
@@ -39,6 +37,7 @@
              <Route path="colleges" element={<Colleges />} />
              <Route path="students" element={<Students />} />
              <Route path="questions" element={<QuestionBank />} />
+             <Route path="questions/playground/:id" element={<DSAPlayground />} />
              <Route path="tests" element={<Tests />} />
              <Route path="tests/create" element={<TestCreate />} />
              <Route path="reports" element={<Reports />} />
@@ -47,6 +46,7 @@
  
            {/* Student Test Taking */}
            <Route path="/test/:testId" element={<TestInterface />} />
+           <Route path="/test/:testId/results" element={<TestResults />} />
            
            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
            <Route path="*" element={<NotFound />} />

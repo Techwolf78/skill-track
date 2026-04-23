@@ -1,4 +1,4 @@
- import { NavLink, useLocation } from "react-router-dom";
+ import { NavLink, useLocation, useNavigate } from "react-router-dom";
  import { cn } from "@/lib/utils";
  import {
    LayoutDashboard,
@@ -28,6 +28,12 @@
  export function AdminSidebar() {
    const [collapsed, setCollapsed] = useState(false);
    const location = useLocation();
+   const navigate = useNavigate();
+
+   const handleLogout = () => {
+     // For now, just navigate to login since auth is simulated
+     navigate("/login");
+   };
  
    return (
      <aside
@@ -74,6 +80,7 @@
        <div className="p-3 border-t border-sidebar-border space-y-2">
          <Button
            variant="ghost"
+           onClick={handleLogout}
            className={cn(
              "w-full justify-start text-sidebar-foreground hover:text-destructive hover:bg-destructive/10",
              collapsed && "justify-center px-0"

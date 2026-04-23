@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+﻿import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -18,20 +18,10 @@ import {
 import { cn } from "@/lib/utils";
 import { useNavigate, useParams } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
-import { Clock, ChevronLeft, ChevronRight, Flag, Send, AlertTriangle, CheckCircle, Play, Terminal, XCircle } from "lucide-react";
+import { Clock, ChevronLeft, ChevronRight, Flag, Send, AlertTriangle, CheckCircle } from "lucide-react";
 import Editor from "@monaco-editor/react";
 import { db } from "@/lib/firebase";
 import { collection, getDocs, doc, getDoc } from "firebase/firestore";
-import { 
-  createSubmission, 
-  pollSubmission, 
-  createBatchSubmissions,
-  pollBatchSubmissions,
-  LANGUAGE_MAP, 
-  SubmissionResponse, 
-  inferMetadataFromSnippets, 
-  QuestionMetadata 
-} from "@/lib/judge0";
 
 interface Question {
   id: string;
@@ -42,10 +32,6 @@ interface Question {
   sampleInput?: string;
   sampleOutput?: string;
   marks: number;
-  metadata?: QuestionMetadata;
-  codeSnippets?: { code: string; lang: string; langSlug: string }[];
-  sampleTestCases?: any[];
-  hiddenTestCases?: any[];
 }
 
 const mockQuestions: Question[] = [
@@ -53,7 +39,7 @@ const mockQuestions: Question[] = [
     id: "1",
     type: "mcq",
     question: "What is the time complexity of binary search algorithm?",
-    options: ["O(n)", "O(log n)", "O(n�)", "O(1)"],
+    options: ["O(n)", "O(log n)", "O(n²)", "O(1)"],
     marks: 2,
   },
   {
@@ -71,8 +57,7 @@ Return the answer in any order.`,
   },
 ];
 
-export default function TestInterface() {
-  const [questions, setQuestions] = useState<Question[]>(mockQuestions);
+const [questions, setQuestions] = useState<Question[]>(mockQuestions);
   const [loading, setLoading] = useState(true);
   const { testId } = useParams<{ testId: string }>();
   const navigate = useNavigate();
@@ -86,13 +71,6 @@ export default function TestInterface() {
   const [code, setCode] = useState("# Write your solution here\n");
   const [language, setLanguage] = useState("python");
   const [isSubmitted, setIsSubmitted] = useState(false);
-  const [isRunning, setIsRunning] = useState(false);
-  const [isSubmittingCode, setIsSubmittingCode] = useState(false);
-  const [lastResult, setLastResult] = useState<SubmissionResponse | null>(null);
-  const [submissionPhase, setSubmissionPhase] = useState<'idle' | 'compiling' | 'running' | 'hidden' | 'result'>('idle');
-  const [testCaseResults, setTestCaseResults] = useState<any[]>([]);
-  const [verdict, setVerdict] = useState<{ type: 'success' | 'fail', title: string, message: string } | null>(null);
-  const [consoleOutput, setConsoleOutput] = useState("");
 
   useEffect(() => {
     const fetchQuestions = async () => {
@@ -109,11 +87,7 @@ export default function TestInterface() {
             sampleInput: data.sampleTestCase || "",
             sampleOutput: (data.sampleTestCases && data.sampleTestCases[0]?.expected) || "",
             marks: data.difficulty === "Easy" ? 10 : data.difficulty === "Medium" ? 20 : 30,
-            options: data.options || [],
-            metadata: data.metadata || inferMetadataFromSnippets(data.codeSnippets || []),
-            codeSnippets: data.codeSnippets || [],
-            sampleTestCases: data.sampleTestCases || [],
-            hiddenTestCases: data.hiddenTestCases || []
+            options: data.options || []
           });
         });
         if (fetchedQuestions.length > 0) {
@@ -134,32 +108,6 @@ export default function TestInterface() {
     fetchQuestions();
   }, [toast]);
 
-  const question = questions[currentQuestion];
-  const answered = Object.keys(answers).length;
-  const total = questions.length;
-
-  useEffect(() => {
-    if (question?.codeSnippets && question.codeSnippets.length > 0) {
-      const snippet = question.codeSnippets.find(s => s.langSlug === language) || 
-                      question.codeSnippets.find(s => s.langSlug === 'python3' || s.langSlug === 'python') || 
-                      question.codeSnippets[0];
-      
-      setCode(snippet.code);
-      if (snippet.langSlug !== language) {
-        setLanguage(snippet.langSlug);
-      }
-    } else {
-      setCode(language === 'python' ? "# Write your solution here\n" : "// Write your solution here\n");
-    }
-  }, [currentQuestion, question?.id]);
-
-  useEffect(() => {
-    if (question?.codeSnippets) {
-      const snippet = question.codeSnippets.find(s => s.langSlug === language);
-      if (snippet) setCode(snippet.code);
-    }
-  }, [language]);
-
   useEffect(() => {
     const timer = setInterval(() => {
       setTimeLeft((prev) => Math.max(0, prev - 1));
@@ -167,142 +115,14 @@ export default function TestInterface() {
     return () => clearInterval(timer);
   }, []);
 
+  const question = questions[currentQuestion];
+  const answered = Object.keys(answers).length;
+  const total = questions.length;
+
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
     return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
-  };
-
-  const handleRunCode = async () => {
-    if (isRunning || isSubmittingCode) return;
-    setIsRunning(true);
-    setSubmissionPhase('compiling');
-    setConsoleOutput("> Initializing execution...\n> Compiling source code...\n");
-    setVerdict(null);
-    setTestCaseResults([]);
-
-    try {
-      const languageId = LANGUAGE_MAP[language];
-      const sampleCases = question.sampleTestCases || [];
-      
-      if (sampleCases.length === 0) {
-        // Fallback to single sampleInput if no array
-        const token = await createSubmission(
-          code,
-          languageId,
-          question.metadata || { functionName: "solve", parameterTypes: [], returnType: { type: "auto" }, category: "array" as any },
-          question.sampleInput
-        );
-        const result = await pollSubmission(token);
-        setLastResult(result);
-        setSubmissionPhase('result');
-        return;
-      }
-
-      const tokens = await createBatchSubmissions(
-        code, 
-        languageId, 
-        question.metadata || { functionName: "solve", parameterTypes: [], returnType: { type: "auto" }, category: "array" as any }, 
-        sampleCases.map(tc => tc.input)
-      );
-
-      setSubmissionPhase('running');
-      setConsoleOutput(prev => prev + "> Running sample test cases...\n");
-      
-      const results = await pollBatchSubmissions(tokens);
-      
-      const isCorrect = (actual: string, expected: string) => {
-        const clean = (s: string) => s.replace(/\s+/g, '').replace(/,$/, '');
-        return clean(actual) === clean(expected);
-      };
-
-      const mappedResults = results.map((res, idx) => ({
-        status: res.status.description,
-        input: sampleCases[idx].input,
-        output: res.stdout || res.stderr || res.compile_output || "",
-        expected: sampleCases[idx].expected,
-        id: res.status.id
-      }));
-
-      setTestCaseResults(mappedResults);
-      const passedCount = mappedResults.filter(r => r.id === 3 && isCorrect(r.output, r.expected)).length;
-      
-      if (passedCount === sampleCases.length) {
-        setVerdict({ type: 'success', title: 'Finished', message: 'All sample cases passed!' });
-      } else {
-        setVerdict({ type: 'fail', title: 'Wrong Answer', message: `Failed on ${sampleCases.length - passedCount} sample cases.` });
-      }
-      
-      setSubmissionPhase('result');
-    } catch (error: any) {
-      console.error("Error running code:", error);
-      setConsoleOutput(prev => prev + `> Error: ${error.message}\n`);
-      setVerdict({ type: 'fail', title: 'Error', message: error.message });
-    } finally {
-      setIsRunning(false);
-    }
-  };
-
-  const handleSubmitQuestion = async () => {
-    if (isRunning || isSubmittingCode) return;
-    setIsSubmittingCode(true);
-    setSubmissionPhase('compiling');
-    setConsoleOutput("> Submitting code for full evaluation...\n> Compiling source code...\n");
-    setVerdict(null);
-
-    try {
-      const languageId = LANGUAGE_MAP[language];
-      const sampleCases = question.sampleTestCases || [];
-      const hiddenCases = question.hiddenTestCases || [];
-      const allCases = [...sampleCases, ...hiddenCases];
-
-      const tokens = await createBatchSubmissions(
-        code, 
-        languageId, 
-        question.metadata || { functionName: "solve", parameterTypes: [], returnType: { type: "auto" }, category: "array" as any }, 
-        allCases.map(tc => tc.input)
-      );
-
-      setSubmissionPhase('hidden');
-      setConsoleOutput(prev => prev + "> Sample cases passed. Verifying hidden constraints...\n");
-      
-      const results = await pollBatchSubmissions(tokens);
-      
-      const isCorrect = (actual: string, expected: string) => {
-        const clean = (s: string) => s.replace(/\s+/g, '').replace(/,$/, '');
-        return clean(actual) === clean(expected);
-      };
-
-      const finalResults = results.map((res, idx) => ({
-        status: res.status.description,
-        input: idx < sampleCases.length ? allCases[idx].input : "[HIDDEN]",
-        output: idx < sampleCases.length ? (res.stdout || res.stderr || "") : (res.status.id === 3 ? "Correct" : "Incorrect"),
-        expected: idx < sampleCases.length ? allCases[idx].expected : "[HIDDEN]",
-        id: res.status.id,
-        isHidden: idx >= sampleCases.length
-      }));
-
-      setTestCaseResults(finalResults);
-      const failIdx = finalResults.findIndex(r => r.id !== 3 || (!r.isHidden && !isCorrect(r.output, r.expected)));
-
-      if (failIdx === -1) {
-        setVerdict({ 
-          type: 'success', 
-          title: 'Accepted', 
-          message: `Runtime: ${Math.floor(Math.random() * 50) + 1} ms | Memory: ${Math.floor(Math.random() * 10) + 4} MB` 
-        });
-        // Store answer status
-        setAnswers({ ...answers, [question.id]: "ACCEPTED" });
-      } else {
-        setVerdict({ type: 'fail', title: 'Rejected', message: `Failed on case #${failIdx + 1}` });
-      }
-      
-      setSubmissionPhase('result');
-    } catch (error: any) {
-      setVerdict({ type: 'fail', title: 'Error', message: error.message });
-    } finally {
-      setIsSubmittingCode(false);
-    }
   };
 
   const handleSubmit = () => {
@@ -339,7 +159,7 @@ export default function TestInterface() {
       <header className="sticky top-0 z-40 border-b bg-card/90 backdrop-blur px-6 py-4 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
           <h1 className="text-2xl font-semibold">Test Interface</h1>
-          <p className="text-sm text-muted-foreground">Student exam experience only � no authoring tools here.</p>
+          <p className="text-sm text-muted-foreground">Student exam experience only — no authoring tools here.</p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
           <div className="rounded-lg bg-muted px-3 py-2 text-sm font-medium">
@@ -401,7 +221,7 @@ export default function TestInterface() {
                   ) : (
                     <div className="space-y-6">
                       <div className="rounded-2xl border bg-muted p-6">
-                        <p className="whitespace-pre-line text-sm leading-6 text-muted-foreground" dangerouslySetInnerHTML={{ __html: question.problemStatement || "" }} />
+                        <p className="whitespace-pre-line text-sm leading-6 text-muted-foreground">{question.problemStatement}</p>
                         <div className="mt-4 grid gap-3 md:grid-cols-2">
                           <div className="rounded-xl bg-background px-4 py-3 text-sm">
                             <div className="font-semibold">Input</div>
@@ -433,64 +253,6 @@ export default function TestInterface() {
                           theme="vs-dark"
                           options={{ minimap: { enabled: false }, fontSize: 14, scrollBeyondLastLine: false }}
                         />
-                        <div className="flex items-center justify-between p-3 border-t bg-muted/30">
-                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                            <Terminal className="w-3 h-3" /> Console Output
-                          </div>
-                          <Button size="sm" onClick={handleRunCode} disabled={isRunning || isSubmittingCode || isSubmitted} variant="secondary">
-                            <Play className="w-3 h-3 mr-2" /> Run
-                          </Button>
-                          <Button size="sm" onClick={handleSubmitQuestion} disabled={isRunning || isSubmittingCode || isSubmitted} className="bg-primary hover:bg-primary/90 text-white">
-                            <Send className="w-3 h-3 mr-2" /> Submit
-                          </Button>
-                        </div>
-                        
-                        {(submissionPhase !== 'idle' || verdict) && (
-                          <div className="border-t bg-muted/10">
-                            <div className="p-4 space-y-4">
-                              {verdict && (
-                                <div className={cn(
-                                  "p-4 rounded-xl border flex items-center justify-between",
-                                  verdict.type === 'success' ? "bg-green-500/10 border-green-500/20 text-green-700" : "bg-red-500/10 border-red-500/20 text-red-700"
-                                )}>
-                                  <div className="flex items-center gap-3">
-                                    {verdict.type === 'success' ? <CheckCircle className="w-5 h-5" /> : <AlertTriangle className="w-5 h-5" />}
-                                    <div>
-                                      <div className="font-bold">{verdict.title}</div>
-                                      <div className="text-xs opacity-80">{verdict.message}</div>
-                                    </div>
-                                  </div>
-                                </div>
-                              )}
-                              
-                              <div className="space-y-2">
-                                <div className="text-xs font-semibold text-muted-foreground flex items-center gap-2">
-                                  <Terminal className="w-3 h-3" /> Console
-                                </div>
-                                <pre className="text-[10px] font-mono bg-black/5 p-3 rounded-lg overflow-auto max-h-[120px] whitespace-pre-wrap">
-                                  {consoleOutput}
-                                  {(submissionPhase === 'compiling' || submissionPhase === 'running' || submissionPhase === 'hidden') && (
-                                    <span className="animate-pulse">_</span>
-                                  )}
-                                </pre>
-                              </div>
-
-                              {testCaseResults.length > 0 && (
-                                <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                                  {testCaseResults.map((res, idx) => (
-                                    <div key={idx} className={cn(
-                                      "p-2 rounded-lg border text-[10px] flex items-center justify-between",
-                                      res.id === 3 ? "bg-green-500/5 border-green-500/10" : "bg-red-500/5 border-red-500/10"
-                                    )}>
-                                      <span>Case {idx + 1}</span>
-                                      {res.id === 3 ? <CheckCircle className="w-3 h-3 text-green-500" /> : <XCircle className="w-3 h-3 text-red-500" />}
-                                    </div>
-                                  ))}
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        )}
                       </div>
                     </div>
                   )}

@@ -1,4 +1,4 @@
- import { useState } from "react";
+ import { useState, type FormEvent } from "react";
  import { motion } from "framer-motion";
  import { Button } from "@/components/ui/button";
  import { Input } from "@/components/ui/input";
@@ -6,6 +6,7 @@
  import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
  import { useNavigate } from "react-router-dom";
  import { GraduationCap, Shield, BookOpen, CheckCircle2 } from "lucide-react";
+ import { useToast } from "@/hooks/use-toast";
  
  const features = [
    "MCQ & Coding Assessments",
@@ -16,7 +17,12 @@
  
  export default function Login() {
    const navigate = useNavigate();
+   const { toast } = useToast();
    const [isLoading, setIsLoading] = useState(false);
+   const [adminEmail, setAdminEmail] = useState("admin@company.com");
+   const [adminPassword, setAdminPassword] = useState("");
+   const [studentCode, setStudentCode] = useState("");
+   const [studentEmail, setStudentEmail] = useState("");
  
    const handleAdminLogin = (e: React.FormEvent) => {
      e.preventDefault();
@@ -33,8 +39,22 @@
      setIsLoading(true);
      setTimeout(() => {
        setIsLoading(false);
+       toast({
+         title: "Access Granted!",
+         description: "Starting your test session...",
+       });
        navigate("/test/demo");
      }, 1000);
+   };
+ 
+   const fillAdminCredentials = () => {
+     setAdminEmail("admin@company.com");
+     setAdminPassword("Admin@123");
+   };
+ 
+   const fillStudentCredentials = () => {
+     setStudentCode("TEST-2024-001");
+     setStudentEmail("student@company.com");
    };
  
    return (
@@ -132,24 +152,38 @@
              </TabsList>
  
              <TabsContent value="admin" className="mt-6">
+               <div className="flex items-center justify-between gap-3 mb-4">
+                 <p className="text-sm text-muted-foreground">Use quick-fill credentials for demo login.</p>
+                 <button
+                   type="button"
+                   onClick={fillAdminCredentials}
+                   className="text-sm font-medium text-primary hover:underline"
+                 >
+                   Fill Admin
+                 </button>
+               </div>
                <form onSubmit={handleAdminLogin} className="space-y-4">
                  <div className="space-y-2">
-                   <Label htmlFor="email">Email</Label>
+                   <Label htmlFor="adminEmail">Email</Label>
                    <Input
-                     id="email"
+                     id="adminEmail"
                      type="email"
                      placeholder="admin@company.com"
                      className="h-12"
+                     value={adminEmail}
+                     onChange={(event) => setAdminEmail(event.target.value)}
                      required
                    />
                  </div>
                  <div className="space-y-2">
-                   <Label htmlFor="password">Password</Label>
+                   <Label htmlFor="adminPassword">Password</Label>
                    <Input
-                     id="password"
+                     id="adminPassword"
                      type="password"
                      placeholder="••••••••"
                      className="h-12"
+                     value={adminPassword}
+                     onChange={(event) => setAdminPassword(event.target.value)}
                      required
                    />
                  </div>
@@ -175,6 +209,16 @@
              </TabsContent>
  
              <TabsContent value="student" className="mt-6">
+               <div className="flex items-center justify-between gap-3 mb-4">
+                 <p className="text-sm text-muted-foreground">Need a sample student login? Use quick fill.</p>
+                 <button
+                   type="button"
+                   onClick={fillStudentCredentials}
+                   className="text-sm font-medium text-primary hover:underline"
+                 >
+                   Fill Student
+                 </button>
+               </div>
                <form onSubmit={handleStudentAccess} className="space-y-4">
                  <div className="space-y-2">
                    <Label htmlFor="testCode">Test Access Code</Label>
@@ -183,6 +227,8 @@
                      type="text"
                      placeholder="Enter test code (e.g., TEST-2024-001)"
                      className="h-12 font-mono uppercase tracking-wider"
+                     value={studentCode}
+                     onChange={(event) => setStudentCode(event.target.value)}
                      required
                    />
                  </div>
@@ -193,6 +239,8 @@
                      type="email"
                      placeholder="student@email.com"
                      className="h-12"
+                     value={studentEmail}
+                     onChange={(event) => setStudentEmail(event.target.value)}
                      required
                    />
                  </div>
