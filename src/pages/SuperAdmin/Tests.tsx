@@ -1,0 +1,532 @@
+import { useState, useEffect } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {
+  Plus,
+  Search,
+  Users,
+  Clock,
+  MoreVertical,
+  Play,
+  Eye,
+  Copy,
+  Trash2,
+  Loader2,
+  FileQuestion,
+  Target,
+  Edit,
+  Archive,
+  RefreshCw,
+} from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { testService, TestViewModel } from "@/lib/test-service";
+import { useToast } from "@/hooks/use-toast";
+
+export default function Tests() {
+  const navigate = useNavigate();
+  const [searchTerm, setSearchTerm] = useState("");
+  const [tests, setTests] = useState<TestViewModel[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState("all");
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [selectedTest, setSelectedTest] = useState<TestViewModel | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [currentUserId, setCurrentUserId] = useState<string>("");
+  const { toast } = useToast();
+
+  useEffect(() => {
+    const user = JSON.parse(localStorage.getItem("user") || "{}");
+    setCurrentUserId(user.id || "");
+    fetchTests();
+  }, []);
+
+  const fetchTests = async () => {
+    try {
+      setLoading(true);
+      const data = await testService.getAllTests();
+      const viewModels = data.map(testService.toViewModel);
+      setTests(viewModels);
+    } catch (error: any) {
+      console.error("Failed to fetch tests:", error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to load tests. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeleteClick = (test: TestViewModel) => {
+    setSelectedTest(test);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!selectedTest) return;
+
+    setDeleting(true);
+    try {
+      await testService.deleteTest(selectedTest.id);
+      toast({
+        title: "Success",
+        description: `"${selectedTest.name}" has been deleted successfully.`,
+      });
+      await fetchTests();
+    } catch (error: any) {
+      console.error("Failed to delete test:", error);
+      toast({
+        title: "Error",
+        description:
+          error.message || "Failed to delete test. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setDeleting(false);
+      setDeleteDialogOpen(false);
+      setSelectedTest(null);
+    }
+  };
+
+  const handleDuplicate = async (test: TestViewModel) => {
+    try {
+      if (!currentUserId) {
+        toast({
+          title: "Error",
+          description: "User not authenticated. Please log in.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const createRequest = {
+        createdById: currentUserId,
+        title: `${test.name} (Copy)`,
+        description: test.description,
+        durationMins: test.duration,
+        difficulty: test.difficulty.toUpperCase() as "EASY" | "MEDIUM" | "HARD",
+        instructions: {},
+        status: "DRAFT" as const,
+        passMark: test.passMark,
+      };
+
+      await testService.createTest(createRequest);
+      toast({
+        title: "Success",
+        description: `"${test.name}" has been duplicated successfully.`,
+      });
+      await fetchTests();
+    } catch (error: any) {
+      console.error("Failed to duplicate test:", error);
+      toast({
+        title: "Error",
+        description:
+          error.message || "Failed to duplicate test. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Using updateTest instead of dedicated publish endpoint
+  const handlePublish = async (test: TestViewModel) => {
+    try {
+      await testService.updateTest(test.id, {
+        status: "PUBLISHED",
+      });
+      toast({
+        title: "Test Published",
+        description: `"${test.name}" has been published successfully.`,
+      });
+      await fetchTests();
+    } catch (error: any) {
+      console.error("Failed to publish test:", error);
+      toast({
+        title: "Error",
+        description:
+          error.message || "Failed to publish test. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Using updateTest instead of dedicated archive endpoint
+  const handleArchive = async (test: TestViewModel) => {
+    try {
+      await testService.updateTest(test.id, {
+        status: "ARCHIVED",
+      });
+      toast({
+        title: "Test Archived",
+        description: `"${test.name}" has been archived successfully.`,
+      });
+      await fetchTests();
+    } catch (error: any) {
+      console.error("Failed to archive test:", error);
+      toast({
+        title: "Error",
+        description:
+          error.message || "Failed to archive test. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Move test back to draft from archived or published
+  const handleMoveToDraft = async (test: TestViewModel) => {
+    try {
+      await testService.updateTest(test.id, {
+        status: "DRAFT",
+      });
+      toast({
+        title: "Test Moved to Draft",
+        description: `"${test.name}" has been moved to drafts.`,
+      });
+      await fetchTests();
+    } catch (error: any) {
+      console.error("Failed to move test to draft:", error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update test status.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleViewDetails = (test: TestViewModel) => {
+    navigate(`/admin/tests/${test.id}`);
+  };
+
+  const handleEdit = (test: TestViewModel) => {
+    navigate(`/admin/tests/edit/${test.id}`);
+  };
+
+  const formatStatus = (status: string): string => {
+    return status.charAt(0).toUpperCase() + status.slice(1);
+  };
+
+  const filteredTests = tests.filter((test) =>
+    test.name.toLowerCase().includes(searchTerm.toLowerCase()),
+  );
+
+  const getFilteredTests = (statusFilter: string) => {
+    if (statusFilter === "all") return filteredTests;
+    return filteredTests.filter((test) => test.status === statusFilter);
+  };
+
+  const getStatusCount = (statusFilter: string) => {
+    if (statusFilter === "all") return tests.length;
+    return tests.filter((test) => test.status === statusFilter).length;
+  };
+
+  const renderTestCards = (statusFilter: string) => {
+    const filtered = getFilteredTests(statusFilter);
+
+    if (filtered.length === 0) {
+      return (
+        <div className="text-center py-12 text-muted-foreground">
+          <FileQuestion className="w-12 h-12 mx-auto mb-4 opacity-50" />
+          <p>No tests found.</p>
+          <p className="text-sm mt-2">
+            {searchTerm
+              ? "Try a different search term."
+              : "Create your first test to get started."}
+          </p>
+          {!searchTerm && statusFilter === "all" && (
+            <Link to="/admin/tests/create" className="mt-4 inline-block">
+              <Button variant="outline" size="sm">
+                <Plus className="w-4 h-4 mr-2" />
+                Create Test
+              </Button>
+            </Link>
+          )}
+        </div>
+      );
+    }
+
+    return (
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {filtered.map((test) => (
+          <Card key={test.id} className="card-hover group">
+            <CardHeader className="pb-3">
+              <div className="flex items-start justify-between">
+                <div className="space-y-1 flex-1">
+                  <CardTitle className="text-lg line-clamp-1">
+                    {test.name}
+                  </CardTitle>
+                  <CardDescription className="line-clamp-2">
+                    {test.description || "No description provided"}
+                  </CardDescription>
+                </div>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      <MoreVertical className="w-4 h-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={() => handleViewDetails(test)}>
+                      <Eye className="w-4 h-4 mr-2" />
+                      View Details
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => handleEdit(test)}>
+                      <Edit className="w-4 h-4 mr-2" />
+                      Edit
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+
+                    {test.status === "draft" && (
+                      <>
+                        <DropdownMenuItem onClick={() => handlePublish(test)}>
+                          <Play className="w-4 h-4 mr-2" />
+                          Publish
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleDuplicate(test)}>
+                          <Copy className="w-4 h-4 mr-2" />
+                          Duplicate
+                        </DropdownMenuItem>
+                      </>
+                    )}
+
+                    {test.status === "published" && (
+                      <>
+                        <DropdownMenuItem onClick={() => handleArchive(test)}>
+                          <Archive className="w-4 h-4 mr-2" />
+                          Archive
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => handleMoveToDraft(test)}
+                        >
+                          <RefreshCw className="w-4 h-4 mr-2" />
+                          Move to Draft
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleDuplicate(test)}>
+                          <Copy className="w-4 h-4 mr-2" />
+                          Duplicate
+                        </DropdownMenuItem>
+                      </>
+                    )}
+
+                    {test.status === "archived" && (
+                      <>
+                        <DropdownMenuItem
+                          onClick={() => handleMoveToDraft(test)}
+                        >
+                          <RefreshCw className="w-4 h-4 mr-2" />
+                          Restore to Draft
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleDuplicate(test)}>
+                          <Copy className="w-4 h-4 mr-2" />
+                          Duplicate
+                        </DropdownMenuItem>
+                      </>
+                    )}
+
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      className="text-destructive"
+                      onClick={() => handleDeleteClick(test)}
+                    >
+                      <Trash2 className="w-4 h-4 mr-2" />
+                      Delete
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center gap-2 flex-wrap">
+                <Badge className={testService.getTypeStyle(test.type)}>
+                  {test.type}
+                </Badge>
+                <Badge
+                  variant="outline"
+                  className={testService.getStatusStyle(test.status)}
+                >
+                  {formatStatus(test.status)}
+                </Badge>
+                <Badge
+                  className={testService.getDifficultyStyle(test.difficulty)}
+                >
+                  {test.difficulty.charAt(0).toUpperCase() +
+                    test.difficulty.slice(1)}
+                </Badge>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4 py-3 border-y">
+                <div className="text-center">
+                  <div className="flex items-center justify-center gap-2">
+                    <Clock className="w-4 h-4 text-muted-foreground" />
+                    <p className="text-2xl font-bold">{test.duration}</p>
+                  </div>
+                  <p className="text-xs text-muted-foreground">Minutes</p>
+                </div>
+                <div className="text-center">
+                  <div className="flex items-center justify-center gap-2">
+                    <Target className="w-4 h-4 text-muted-foreground" />
+                    <p className="text-2xl font-bold">{test.passMark}%</p>
+                  </div>
+                  <p className="text-xs text-muted-foreground">Passing Mark</p>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between text-sm">
+                <span className="flex items-center gap-2 text-muted-foreground">
+                  <FileQuestion className="w-4 h-4" />
+                  {test.questions || 0} Questions
+                </span>
+                <span className="flex items-center gap-2 text-muted-foreground">
+                  <Users className="w-4 h-4" />
+                  {test.participants || 0} Participants
+                </span>
+              </div>
+
+              {test.totalMarks > 0 && (
+                <div className="text-xs text-muted-foreground text-center pt-2 border-t">
+                  Total Marks: {test.totalMarks}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    );
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="p-8 space-y-6 animate-fade-in">
+      <div className="flex items-center justify-between flex-wrap gap-4">
+        <div>
+          <h1 className="text-3xl font-heading font-bold">Tests</h1>
+          <p className="text-muted-foreground mt-1">
+            Create, manage, and track assessments
+          </p>
+        </div>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={fetchTests}>
+            <RefreshCw className="w-4 h-4 mr-2" />
+            Refresh
+          </Button>
+          <Link to="/admin/tests/create">
+            <Button>
+              <Plus className="w-4 h-4 mr-2" />
+              Create Test
+            </Button>
+          </Link>
+        </div>
+      </div>
+
+      <div className="relative max-w-md">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+        <Input
+          placeholder="Search tests by name..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="pl-10"
+        />
+      </div>
+
+      <Tabs
+        defaultValue="all"
+        value={activeTab}
+        onValueChange={setActiveTab}
+        className="w-full"
+      >
+        <TabsList className="flex-wrap">
+          <TabsTrigger value="all">
+            All Tests ({getStatusCount("all")})
+          </TabsTrigger>
+          <TabsTrigger value="published">
+            Published ({getStatusCount("published")})
+          </TabsTrigger>
+          <TabsTrigger value="draft">
+            Drafts ({getStatusCount("draft")})
+          </TabsTrigger>
+          <TabsTrigger value="archived">
+            Archived ({getStatusCount("archived")})
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="all" className="mt-6">
+          {renderTestCards("all")}
+        </TabsContent>
+        <TabsContent value="published" className="mt-6">
+          {renderTestCards("published")}
+        </TabsContent>
+        <TabsContent value="draft" className="mt-6">
+          {renderTestCards("draft")}
+        </TabsContent>
+        <TabsContent value="archived" className="mt-6">
+          {renderTestCards("archived")}
+        </TabsContent>
+      </Tabs>
+
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete the test "{selectedTest?.name}". This
+              action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteConfirm}
+              disabled={deleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleting ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                "Delete"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
+  );
+}

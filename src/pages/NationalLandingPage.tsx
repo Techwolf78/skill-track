@@ -71,7 +71,7 @@ const testimonials = [
   {
     name: "Dr. Rajesh Kumar",
     role: "Director, IIT Delhi",
-    content: "AssessHub has revolutionized our assessment process. The anti-cheating features and detailed analytics have helped us maintain academic integrity while providing valuable insights.",
+    content: "RxOne has revolutionized our assessment process. The anti-cheating features and detailed analytics have helped us maintain academic integrity while providing valuable insights.",
     rating: 5
   },
   {
@@ -143,9 +143,9 @@ export default function NationalLandingPage() {
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-gradient-primary flex items-center justify-center shadow-primary">
-                <span className="text-lg font-bold text-primary-foreground">A</span>
+                <span className="text-lg font-bold text-primary-foreground">R</span>
               </div>
-              <span className="font-heading font-bold text-xl">AssessHub</span>
+              <span className="font-heading font-bold text-xl">RxOne</span>
             </div>
             <div className="flex items-center gap-4">
               <Button variant="ghost" onClick={() => navigate("/login")}>
@@ -289,7 +289,7 @@ export default function NationalLandingPage() {
               What Our Partners Say
             </h2>
             <p className="text-xl text-muted-foreground">
-              Join hundreds of institutions already using AssessHub
+              Join hundreds of institutions already using RxOne
             </p>
           </div>
 
@@ -372,7 +372,7 @@ export default function NationalLandingPage() {
                 <CardContent className="space-y-4">
                   <div className="flex items-center gap-3">
                     <Mail className="w-5 h-5 text-primary" />
-                    <span>sales@assesshub.com</span>
+                    <span>sales@rxone.com</span>
                   </div>
                   <div className="flex items-center gap-3">
                     <Phone className="w-5 h-5 text-primary" />
@@ -386,7 +386,7 @@ export default function NationalLandingPage() {
               </Card>
 
               <div className="mt-8">
-                <h3 className="text-lg font-semibold mb-4">Why Choose AssessHub?</h3>
+                <h3 className="text-lg font-semibold mb-4">Why Choose RxOne?</h3>
                 <div className="space-y-3">
                   {[
                     "Pan-India presence with 500+ partners",
@@ -480,9 +480,9 @@ export default function NationalLandingPage() {
             <div>
               <div className="flex items-center gap-3 mb-4">
                 <div className="w-8 h-8 rounded-lg bg-gradient-primary flex items-center justify-center">
-                  <span className="text-sm font-bold text-primary-foreground">A</span>
+                  <span className="text-sm font-bold text-primary-foreground">R</span>
                 </div>
-                <span className="font-heading font-bold">AssessHub</span>
+                <span className="font-heading font-bold">RxOne</span>
               </div>
               <p className="text-muted-foreground">
                 India's premier skill assessment platform, trusted by institutions nationwide.
@@ -517,7 +517,7 @@ export default function NationalLandingPage() {
             </div>
           </div>
           <div className="border-t mt-8 pt-8 text-center text-muted-foreground">
-            <p>&copy; 2024 AssessHub. All rights reserved. Made with ❤️ for India's education sector.</p>
+            <p>&copy; 2024 RxOne. All rights reserved. Made with ❤️ for India's education sector.</p>
           </div>
         </div>
       </footer>

@@ -1,16 +1,16 @@
-﻿ @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Montserrat:wght@500;600;700;800&display=swap');
- 
- @tailwind base;
- @tailwind components;
- @tailwind utilities;
- 
- /* AssessHub Design System
-    Primary: Sunset Orange #FF5733
-    Accent: Aqua Blue #00D4FF
-    Background: Soft White #FDFDFD
- */
- 
- @layer base {
+ @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Montserrat:wght@500;600;700;800&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* RxOne Design System
+   Primary: Sunset Orange #FF5733
+   Accent: Aqua Blue #00D4FF
+   Background: Soft White #FDFDFD
+*/
+
+@layer base {
    :root {
      /* Sunset Orange - Primary */
      --primary: 11 100% 60%;

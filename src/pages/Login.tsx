@@ -1,266 +1,374 @@
- import { useState, type FormEvent } from "react";
- import { motion } from "framer-motion";
- import { Button } from "@/components/ui/button";
- import { Input } from "@/components/ui/input";
- import { Label } from "@/components/ui/label";
- import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
- import { useNavigate } from "react-router-dom";
- import { GraduationCap, Shield, BookOpen, CheckCircle2 } from "lucide-react";
- import { useToast } from "@/hooks/use-toast";
- 
- const features = [
-   "MCQ & Coding Assessments",
-   "Anti-Cheating Detection",
-   "Auto-Evaluation",
-   "Detailed Analytics",
- ];
- 
- export default function Login() {
-   const navigate = useNavigate();
-   const { toast } = useToast();
-   const [isLoading, setIsLoading] = useState(false);
-   const [adminEmail, setAdminEmail] = useState("admin@company.com");
-   const [adminPassword, setAdminPassword] = useState("");
-   const [studentCode, setStudentCode] = useState("");
-   const [studentEmail, setStudentEmail] = useState("");
- 
-   const handleAdminLogin = (e: React.FormEvent) => {
-     e.preventDefault();
-     setIsLoading(true);
-     // Simulate login
-     setTimeout(() => {
-       setIsLoading(false);
-       navigate("/admin");
-     }, 1000);
-   };
- 
-   const handleStudentAccess = (e: React.FormEvent) => {
-     e.preventDefault();
-     setIsLoading(true);
-     setTimeout(() => {
-       setIsLoading(false);
-       toast({
-         title: "Access Granted!",
-         description: "Starting your test session...",
-       });
-       navigate("/test/demo");
-     }, 1000);
-   };
- 
-   const fillAdminCredentials = () => {
-     setAdminEmail("admin@company.com");
-     setAdminPassword("Admin@123");
-   };
- 
-   const fillStudentCredentials = () => {
-     setStudentCode("TEST-2024-001");
-     setStudentEmail("student@company.com");
-   };
- 
-   return (
-     <div className="min-h-screen flex">
-       {/* Left Panel - Hero */}
-       <motion.div 
-         className="hidden lg:flex lg:w-1/2 bg-gradient-hero p-12 flex-col justify-between relative overflow-hidden"
-         initial={{ opacity: 0, x: -50 }}
-         animate={{ opacity: 1, x: 0 }}
-         transition={{ duration: 0.6 }}
-       >
-         {/* Background decoration */}
-         <div className="absolute inset-0 opacity-10">
-           <div className="absolute top-20 left-10 w-72 h-72 bg-primary rounded-full blur-3xl" />
-           <div className="absolute bottom-20 right-10 w-96 h-96 bg-accent rounded-full blur-3xl" />
-         </div>
- 
-         <div className="relative z-10">
-           <div className="flex items-center gap-3 mb-2">
-             <div className="w-12 h-12 rounded-xl bg-gradient-primary flex items-center justify-center shadow-primary">
-               <span className="text-2xl font-bold text-primary-foreground">A</span>
-             </div>
-             <span className="font-heading font-bold text-2xl text-white">AssessHub</span>
-           </div>
-           <p className="text-white/60 text-sm">Skill Assessment Platform</p>
-         </div>
- 
-         <div className="relative z-10 space-y-8">
-           <div>
-             <h1 className="text-4xl lg:text-5xl font-heading font-bold text-white leading-tight">
-               Assess Skills.
-               <br />
-               <span className="text-gradient-primary">Build Talent.</span>
-             </h1>
-             <p className="text-white/70 mt-4 text-lg max-w-md">
-               Comprehensive assessment platform for training institutes and placement companies.
-             </p>
-           </div>
- 
-           <div className="grid grid-cols-2 gap-4">
-             {features.map((feature, index) => (
-               <motion.div
-                 key={feature}
-                 className="flex items-center gap-2 text-white/80"
-                 initial={{ opacity: 0, y: 20 }}
-                 animate={{ opacity: 1, y: 0 }}
-                 transition={{ delay: 0.3 + index * 0.1 }}
-               >
-                 <CheckCircle2 className="w-5 h-5 text-primary" />
-                 <span className="text-sm">{feature}</span>
-               </motion.div>
-             ))}
-           </div>
-         </div>
- 
-         <div className="relative z-10 flex items-center gap-8 text-white/40 text-sm">
-           <div className="flex items-center gap-2">
-             <GraduationCap className="w-5 h-5" />
-             <span>12+ Colleges</span>
-           </div>
-           <div className="flex items-center gap-2">
-             <BookOpen className="w-5 h-5" />
-             <span>2,500+ Students</span>
-           </div>
-           <div className="flex items-center gap-2">
-             <Shield className="w-5 h-5" />
-             <span>Secure Platform</span>
-           </div>
-         </div>
-       </motion.div>
- 
-       {/* Right Panel - Login Forms */}
-       <motion.div 
-         className="flex-1 flex items-center justify-center p-8 bg-background"
-         initial={{ opacity: 0, x: 50 }}
-         animate={{ opacity: 1, x: 0 }}
-         transition={{ duration: 0.6, delay: 0.2 }}
-       >
-         <div className="w-full max-w-md space-y-8">
-           <div className="text-center lg:text-left">
-             <h2 className="text-2xl font-heading font-bold">Welcome Back</h2>
-             <p className="text-muted-foreground mt-1">Choose your portal to continue</p>
-           </div>
- 
-           <Tabs defaultValue="admin" className="w-full">
-             <TabsList className="grid w-full grid-cols-2 h-12">
-               <TabsTrigger value="admin" className="text-sm font-medium">
-                 <Shield className="w-4 h-4 mr-2" />
-                 Admin / Trainer
-               </TabsTrigger>
-               <TabsTrigger value="student" className="text-sm font-medium">
-                 <GraduationCap className="w-4 h-4 mr-2" />
-                 Student
-               </TabsTrigger>
-             </TabsList>
- 
-             <TabsContent value="admin" className="mt-6">
-               <div className="flex items-center justify-between gap-3 mb-4">
-                 <p className="text-sm text-muted-foreground">Use quick-fill credentials for demo login.</p>
-                 <button
-                   type="button"
-                   onClick={fillAdminCredentials}
-                   className="text-sm font-medium text-primary hover:underline"
-                 >
-                   Fill Admin
-                 </button>
-               </div>
-               <form onSubmit={handleAdminLogin} className="space-y-4">
-                 <div className="space-y-2">
-                   <Label htmlFor="adminEmail">Email</Label>
-                   <Input
-                     id="adminEmail"
-                     type="email"
-                     placeholder="admin@company.com"
-                     className="h-12"
-                     value={adminEmail}
-                     onChange={(event) => setAdminEmail(event.target.value)}
-                     required
-                   />
-                 </div>
-                 <div className="space-y-2">
-                   <Label htmlFor="adminPassword">Password</Label>
-                   <Input
-                     id="adminPassword"
-                     type="password"
-                     placeholder="••••••••"
-                     className="h-12"
-                     value={adminPassword}
-                     onChange={(event) => setAdminPassword(event.target.value)}
-                     required
-                   />
-                 </div>
-                 <div className="flex items-center justify-between text-sm">
-                   <label className="flex items-center gap-2 cursor-pointer">
-                     <input type="checkbox" className="rounded border-input" />
-                     <span className="text-muted-foreground">Remember me</span>
-                   </label>
-                   <a href="#" className="text-primary hover:underline">
-                     Forgot password?
-                   </a>
-                 </div>
-                 <Button 
-                   type="submit" 
-                   variant="hero" 
-                   size="lg" 
-                   className="w-full"
-                   disabled={isLoading}
-                 >
-                   {isLoading ? "Signing in..." : "Sign in as Admin"}
-                 </Button>
-               </form>
-             </TabsContent>
- 
-             <TabsContent value="student" className="mt-6">
-               <div className="flex items-center justify-between gap-3 mb-4">
-                 <p className="text-sm text-muted-foreground">Need a sample student login? Use quick fill.</p>
-                 <button
-                   type="button"
-                   onClick={fillStudentCredentials}
-                   className="text-sm font-medium text-primary hover:underline"
-                 >
-                   Fill Student
-                 </button>
-               </div>
-               <form onSubmit={handleStudentAccess} className="space-y-4">
-                 <div className="space-y-2">
-                   <Label htmlFor="testCode">Test Access Code</Label>
-                   <Input
-                     id="testCode"
-                     type="text"
-                     placeholder="Enter test code (e.g., TEST-2024-001)"
-                     className="h-12 font-mono uppercase tracking-wider"
-                     value={studentCode}
-                     onChange={(event) => setStudentCode(event.target.value)}
-                     required
-                   />
-                 </div>
-                 <div className="space-y-2">
-                   <Label htmlFor="studentEmail">Your Email</Label>
-                   <Input
-                     id="studentEmail"
-                     type="email"
-                     placeholder="student@email.com"
-                     className="h-12"
-                     value={studentEmail}
-                     onChange={(event) => setStudentEmail(event.target.value)}
-                     required
-                   />
-                 </div>
-                 <Button 
-                   type="submit" 
-                   variant="hero" 
-                   size="lg" 
-                   className="w-full"
-                   disabled={isLoading}
-                 >
-                   {isLoading ? "Verifying..." : "Start Test"}
-                 </Button>
-                 <p className="text-center text-sm text-muted-foreground">
-                   Enter the test code provided by your trainer
-                 </p>
-               </form>
-             </TabsContent>
-           </Tabs>
-         </div>
-       </motion.div>
-     </div>
-   );
- }
+import { useState } from "react";
+import axios from "axios";
+import { motion } from "framer-motion";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useNavigate, Link } from "react-router-dom";
+import {
+  GraduationCap,
+  Shield,
+  BookOpen,
+  CheckCircle2,
+  Eye,
+  EyeOff,
+} from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { authService } from "@/lib/auth-service";
+
+const features = [
+  "MCQ & Coding Assessments",
+  "Anti-Cheating Detection",
+  "Auto-Evaluation",
+  "Detailed Analytics",
+];
+
+export default function Login() {
+  const navigate = useNavigate();
+  const { toast } = useToast();
+  const [isLoading, setIsLoading] = useState(false);
+  const [adminEmail, setAdminEmail] = useState("admin@company.com");
+  const [adminPassword, setAdminPassword] = useState("");
+  const [studentCode, setStudentCode] = useState("");
+  const [studentEmail, setStudentEmail] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+
+  const handleAdminLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+    try {
+      const response = await authService.login({
+        email: adminEmail,
+        password: adminPassword,
+      });
+
+      // The authService now handles storing the token and user
+      // But let's verify it was stored
+      console.log("Login response:", response);
+      console.log("Stored token:", localStorage.getItem("token"));
+      console.log("Stored user:", localStorage.getItem("user"));
+
+      toast({
+        title: "Login Successful",
+        description: `Welcome back, ${response.user.name || adminEmail}!`,
+      });
+
+      // Navigate based on role
+      if (
+        response.user.role === "SUPERADMIN" ||
+        response.user.role === "ADMIN"
+      ) {
+        navigate("/admin");
+      } else {
+        navigate("/dashboard");
+      }
+    } catch (error: unknown) {
+      console.error("Login failed:", error);
+      let errorMessage = "Invalid credentials. Please try again.";
+      if (axios.isAxiosError(error)) {
+        errorMessage =
+          error.response?.data?.message ||
+          error.response?.data?.data?.message ||
+          error.message;
+      } else if (error instanceof Error) {
+        errorMessage = error.message;
+      }
+      toast({
+        title: "Login Failed",
+        description: errorMessage,
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleStudentAccess = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+    try {
+      // Assuming students use their email as login for now
+      const response = await authService.login({
+        email: studentEmail,
+        password: "password", // Default or handled by backend
+      });
+
+      localStorage.setItem("token", response.accessToken);
+      localStorage.setItem("user", JSON.stringify(response.user));
+
+      toast({
+        title: "Access Granted!",
+        description: "Starting your test session...",
+      });
+      navigate(`/test/${studentCode}`);
+    } catch (error: unknown) {
+      let errorMessage = "Invalid test code or email.";
+      if (axios.isAxiosError(error)) {
+        errorMessage =
+          error.response?.data?.message ||
+          error.response?.data ||
+          error.message;
+      } else if (error instanceof Error) {
+        errorMessage = error.message;
+      }
+      toast({
+        title: "Access Denied",
+        description: errorMessage,
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const fillAdminCredentials = () => {
+    setAdminEmail("admin@company.com");
+    setAdminPassword("Admin@123");
+  };
+
+  const fillStudentCredentials = () => {
+    setStudentCode("TEST-2024-001");
+    setStudentEmail("student@company.com");
+  };
+
+  return (
+    <div className="min-h-screen flex">
+      {/* Left Panel - Hero */}
+      <motion.div
+        className="hidden lg:flex lg:w-1/2 bg-gradient-hero p-12 flex-col justify-between relative overflow-hidden"
+        initial={{ opacity: 0, x: -50 }}
+        animate={{ opacity: 1, x: 0 }}
+        transition={{ duration: 0.6 }}
+      >
+        {/* Background decoration */}
+        <div className="absolute inset-0 opacity-10">
+          <div className="absolute top-20 left-10 w-72 h-72 bg-primary rounded-full blur-3xl" />
+          <div className="absolute bottom-20 right-10 w-96 h-96 bg-accent rounded-full blur-3xl" />
+        </div>
+
+        <div className="relative z-10">
+          <div className="flex items-center gap-3 mb-2">
+            <div className="w-12 h-12 rounded-xl bg-gradient-primary flex items-center justify-center shadow-primary">
+              <span className="text-2xl font-bold text-primary-foreground">
+                R
+              </span>
+            </div>
+            <span className="font-heading font-bold text-2xl text-white">
+              RxOne
+            </span>
+          </div>
+          <p className="text-white/60 text-sm">Skill Assessment Platform</p>
+        </div>
+
+        <div className="relative z-10 space-y-8">
+          <div>
+            <h1 className="text-4xl lg:text-5xl font-heading font-bold text-white leading-tight">
+              Assess Skills.
+              <br />
+              <span className="text-gradient-primary">Build Talent.</span>
+            </h1>
+            <p className="text-white/70 mt-4 text-lg max-w-md">
+              Comprehensive assessment platform for training institutes and
+              placement companies.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            {features.map((feature, index) => (
+              <motion.div
+                key={feature}
+                className="flex items-center gap-2 text-white/80"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.3 + index * 0.1 }}
+              >
+                <CheckCircle2 className="w-5 h-5 text-primary" />
+                <span className="text-sm">{feature}</span>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+
+        <div className="relative z-10 flex items-center gap-8 text-white/40 text-sm">
+          <div className="flex items-center gap-2">
+            <GraduationCap className="w-5 h-5" />
+            <span>12+ Colleges</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <BookOpen className="w-5 h-5" />
+            <span>2,500+ Students</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <Shield className="w-5 h-5" />
+            <span>Secure Platform</span>
+          </div>
+        </div>
+      </motion.div>
+
+      {/* Right Panel - Login Forms */}
+      <motion.div
+        className="flex-1 flex items-center justify-center p-8 bg-background"
+        initial={{ opacity: 0, x: 50 }}
+        animate={{ opacity: 1, x: 0 }}
+        transition={{ duration: 0.6, delay: 0.2 }}
+      >
+        <div className="w-full max-w-md space-y-8">
+          <div className="text-center lg:text-left">
+            <h2 className="text-2xl font-heading font-bold">Welcome Back</h2>
+            <p className="text-muted-foreground mt-1">
+              Choose your portal to continue
+            </p>
+          </div>
+
+          <Tabs defaultValue="admin" className="w-full">
+            <TabsList className="grid w-full grid-cols-2 h-12">
+              <TabsTrigger value="admin" className="text-sm font-medium">
+                <Shield className="w-4 h-4 mr-2" />
+                Admin / Trainer
+              </TabsTrigger>
+              <TabsTrigger value="student" className="text-sm font-medium">
+                <GraduationCap className="w-4 h-4 mr-2" />
+                Student
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="admin" className="mt-6">
+              <div className="flex items-center justify-between gap-3 mb-4">
+                <p className="text-sm text-muted-foreground">
+                  Use quick-fill credentials for demo login.
+                </p>
+                <button
+                  type="button"
+                  onClick={fillAdminCredentials}
+                  className="text-sm font-medium text-primary hover:underline"
+                >
+                  Fill Admin
+                </button>
+              </div>
+              <form onSubmit={handleAdminLogin} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="adminEmail">Email</Label>
+                  <Input
+                    id="adminEmail"
+                    type="email"
+                    placeholder="admin@company.com"
+                    className="h-12"
+                    value={adminEmail}
+                    onChange={(event) => setAdminEmail(event.target.value)}
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="adminPassword">Password</Label>
+                  <div className="relative">
+                    <Input
+                      id="adminPassword"
+                      type={showPassword ? "text" : "password"}
+                      placeholder="••••••••"
+                      className="h-12 pr-10"
+                      value={adminPassword}
+                      onChange={(event) => setAdminPassword(event.target.value)}
+                      required
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      {showPassword ? (
+                        <EyeOff className="w-5 h-5" />
+                      ) : (
+                        <Eye className="w-5 h-5" />
+                      )}
+                    </button>
+                  </div>
+                </div>
+                <div className="flex items-center justify-between text-sm">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" className="rounded border-input" />
+                    <span className="text-muted-foreground">Remember me</span>
+                  </label>
+                  <a href="#" className="text-primary hover:underline">
+                    Forgot password?
+                  </a>
+                </div>
+                <Button
+                  type="submit"
+                  variant="hero"
+                  size="lg"
+                  className="w-full"
+                  disabled={isLoading}
+                >
+                  {isLoading ? "Signing in..." : "Sign in as Admin"}
+                </Button>
+                <p className="text-center text-sm text-muted-foreground mt-4">
+                  Don't have an account?{" "}
+                  <Link
+                    to="/register"
+                    className="text-primary font-semibold hover:underline"
+                  >
+                    Create one here
+                  </Link>
+                </p>
+              </form>
+            </TabsContent>
+
+            <TabsContent value="student" className="mt-6">
+              <div className="flex items-center justify-between gap-3 mb-4">
+                <p className="text-sm text-muted-foreground">
+                  Need a sample student login? Use quick fill.
+                </p>
+                <button
+                  type="button"
+                  onClick={fillStudentCredentials}
+                  className="text-sm font-medium text-primary hover:underline"
+                >
+                  Fill Student
+                </button>
+              </div>
+              <form onSubmit={handleStudentAccess} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="testCode">Test Access Code</Label>
+                  <Input
+                    id="testCode"
+                    type="text"
+                    placeholder="Enter test code (e.g., TEST-2024-001)"
+                    className="h-12 font-mono uppercase tracking-wider"
+                    value={studentCode}
+                    onChange={(event) => setStudentCode(event.target.value)}
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="studentEmail">Your Email</Label>
+                  <Input
+                    id="studentEmail"
+                    type="email"
+                    placeholder="student@email.com"
+                    className="h-12"
+                    value={studentEmail}
+                    onChange={(event) => setStudentEmail(event.target.value)}
+                    required
+                  />
+                </div>
+                <Button
+                  type="submit"
+                  variant="hero"
+                  size="lg"
+                  className="w-full"
+                  disabled={isLoading}
+                >
+                  {isLoading ? "Verifying..." : "Start Test"}
+                </Button>
+                <p className="text-center text-sm text-muted-foreground">
+                  Enter the test code provided by your trainer
+                </p>
+              </form>
+            </TabsContent>
+          </Tabs>
+        </div>
+      </motion.div>
+    </div>
+  );
+}
