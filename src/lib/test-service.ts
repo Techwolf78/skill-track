@@ -180,6 +180,34 @@ export interface CreateTestScheduleRequest {
   status: string;
 }
 
+// Test Case Interface
+
+// Test Cases
+export interface TestCase {
+  id?: string;
+  input: string;
+  expectedOutput: string;
+  sample: boolean;
+  weight: number;
+  questionId?: string;
+}
+
+export interface CreateTestCaseRequest {
+  input: string;
+  expectedOutput: string;
+  sample?: boolean;
+  weight?: number;
+  questionId: string;
+}
+
+export interface UpdateTestCaseRequest {
+  input?: string;
+  expectedOutput?: string;
+  sample?: boolean;
+  weight?: number;
+  questionId?: string;
+}
+
 // ==================== Helper to unwrap BaseResponse ====================
 const unwrapResponse = <T>(response: { data: BaseResponse<T> | T }): T => {
   const data = response.data;
@@ -362,16 +390,51 @@ export const testService = {
   ): Promise<Question> => {
     const apiDto = {
       ...dto,
+      ...(dto.type && { questionType: dto.type }),
       ...(dto.subjectId && { subject_id: dto.subjectId }),
       ...(dto.topicId && { topic_id: dto.topicId }),
       ...(dto.subtopicId && { subtopic_id: dto.subtopicId }),
     };
-    const response = await apiClient.put<Question>(`/questions/${id}`, apiDto);
+    const response = await apiClient.patch<Question>(`/questions/${id}`, apiDto);
     return unwrapResponse(response);
   },
 
   deleteQuestion: async (id: string): Promise<void> => {
     await apiClient.delete(`/questions/${id}`);
+  },
+
+  // Add to test-service.ts inside the testService object
+
+  // ==================== Test Case APIs ====================
+  getAllTestCases: async (): Promise<TestCase[]> => {
+    const response = await apiClient.get<TestCase[]>("/test-cases");
+    return response.data || [];
+  },
+
+  getTestCasesByQuestion: async (questionId: string): Promise<TestCase[]> => {
+    const allTestCases = await testService.getAllTestCases();
+    return allTestCases.filter((tc) => tc.questionId === questionId);
+  },
+
+  createTestCase: async (dto: CreateTestCaseRequest): Promise<TestCase> => {
+    const response = await apiClient.post<TestCase>("/test-cases", dto);
+    return response.data;
+  },
+
+  updateTestCase: async (
+    id: string,
+    dto: UpdateTestCaseRequest,
+  ): Promise<TestCase> => {
+    const response = await apiClient.patch<TestCase>(
+      `/test-cases/update/${id}`,
+      dto,
+    );
+    return response.data;
+  },
+
+  deleteTestCase: async (id: string): Promise<string> => {
+    const response = await apiClient.delete<string>(`/test-cases/delete/${id}`);
+    return response.data;
   },
 
   // ==================== Test APIs ====================

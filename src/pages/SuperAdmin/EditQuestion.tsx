@@ -20,6 +20,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import {
   ArrowLeft,
@@ -29,6 +30,8 @@ import {
   Trash2,
   Code,
   ListChecks,
+  Eye,
+  AlertCircle,
 } from "lucide-react";
 import {
   testService,
@@ -36,12 +39,21 @@ import {
   Topic,
   Subtopic,
   Question,
+  TestCase,
 } from "@/lib/test-service";
 import { useToast } from "@/hooks/use-toast";
 
 interface McqOption {
   text: string;
   isCorrect: boolean;
+}
+
+interface TestCaseForm {
+  id?: string;
+  input: string;
+  expectedOutput: string;
+  sample: boolean;
+  weight: number;
 }
 
 export default function EditQuestion() {
@@ -70,14 +82,19 @@ export default function EditQuestion() {
     { text: "", isCorrect: false },
   ]);
 
+  // Test cases state for coding questions
+  const [testCases, setTestCases] = useState<TestCaseForm[]>([]);
+
   const fetchData = useCallback(async () => {
     try {
       setLoading(true);
-      const [questionData, allSubjects, allTopicsData] = await Promise.all([
-        testService.getQuestionById(id!),
-        testService.getAllSubjects(),
-        testService.getAllTopics(),
-      ]);
+      const [questionData, allSubjects, allTopicsData, allTestCases] =
+        await Promise.all([
+          testService.getQuestionById(id!),
+          testService.getAllSubjects(),
+          testService.getAllTopics(),
+          testService.getAllTestCases(),
+        ]);
 
       setSubjects(allSubjects);
       setAllTopics(allTopicsData);
@@ -88,7 +105,8 @@ export default function EditQuestion() {
 
       // Handle question type
       const qType = questionData.questionType || questionData.type;
-      setQuestionType(qType === "CODING" ? "CODING" : "MCQ");
+      const questionTypeValue = qType === "CODING" ? "CODING" : "MCQ";
+      setQuestionType(questionTypeValue);
 
       // Extract IDs - handle both object and direct ID
       const subjectId = questionData.subject?.id || questionData.subjectId;
@@ -129,6 +147,30 @@ export default function EditQuestion() {
           }),
         );
         setMcqOptions(parsedOptions);
+      }
+
+      // Handle test cases for coding questions
+      if (questionTypeValue === "CODING") {
+        const questionTestCases = allTestCases.filter(
+          (tc) => tc.questionId === id,
+        );
+
+        if (questionTestCases.length > 0) {
+          setTestCases(
+            questionTestCases.map((tc) => ({
+              id: tc.id,
+              input: tc.input,
+              expectedOutput: tc.expectedOutput,
+              sample: tc.sample,
+              weight: tc.weight,
+            })),
+          );
+        } else {
+          // Default test case if none exist
+          setTestCases([
+            { input: "", expectedOutput: "", sample: true, weight: 100 },
+          ]);
+        }
       }
     } catch (error) {
       console.error("Failed to fetch data:", error);
@@ -215,6 +257,41 @@ export default function EditQuestion() {
     setMcqOptions(updated);
   };
 
+  // Test case handlers
+  const addTestCase = () => {
+    setTestCases([
+      ...testCases,
+      { input: "", expectedOutput: "", sample: false, weight: 0 },
+    ]);
+  };
+
+  const removeTestCase = (index: number) => {
+    if (testCases.length <= 1) {
+      toast({
+        title: "Error",
+        description: "At least one test case is required",
+        variant: "destructive",
+      });
+      return;
+    }
+    const updated = testCases.filter((_, i) => i !== index);
+    setTestCases(updated);
+  };
+
+  const updateTestCase = (
+    index: number,
+    field: keyof TestCaseForm,
+    value: any,
+  ) => {
+    const updated = [...testCases];
+    updated[index] = { ...updated[index], [field]: value };
+    setTestCases(updated);
+  };
+
+  const getTotalWeight = () => {
+    return testCases.reduce((sum, tc) => sum + tc.weight, 0);
+  };
+
   const handleUpdate = async () => {
     // Validation
     if (!prompt.trim()) {
@@ -266,10 +343,45 @@ export default function EditQuestion() {
       }
     }
 
+    if (questionType === "CODING") {
+      const hasEmptyInput = testCases.some((tc) => !tc.input.trim());
+      const hasEmptyOutput = testCases.some((tc) => !tc.expectedOutput.trim());
+
+      if (hasEmptyInput || hasEmptyOutput) {
+        toast({
+          title: "Validation Error",
+          description: "All test cases must have input and expected output",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const totalWeight = getTotalWeight();
+      if (totalWeight !== 100) {
+        toast({
+          title: "Validation Error",
+          description: `Total test case weight must be 100%. Current total: ${totalWeight}%`,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const hasSample = testCases.some((tc) => tc.sample);
+      if (!hasSample) {
+        toast({
+          title: "Validation Error",
+          description: "At least one sample test case is required",
+          variant: "destructive",
+        });
+        return;
+      }
+    }
+
     setSaving(true);
     try {
+      // Update question
       const questionData = {
-        questionType: questionType,
+        type: questionType,
         prompt: prompt,
         subjectId: selectedSubject,
         topicId: selectedTopic || undefined,
@@ -283,7 +395,50 @@ export default function EditQuestion() {
         }),
       };
 
+      console.log("Updating question with data:", questionData);
       await testService.updateQuestion(id!, questionData);
+
+      // If coding question, update test cases
+      if (questionType === "CODING") {
+        // Get existing test cases
+        const existingTestCases = await testService.getTestCasesByQuestion(id!);
+
+        // Delete test cases that were removed
+        const existingIds = new Set(existingTestCases.map((tc) => tc.id));
+        const currentIds = new Set(
+          testCases.filter((tc) => tc.id).map((tc) => tc.id),
+        );
+        const idsToDelete = [...existingIds].filter(
+          (testId) => !currentIds.has(testId),
+        );
+
+        for (const testCaseId of idsToDelete) {
+          await testService.deleteTestCase(testCaseId);
+        }
+
+        // Create or update test cases
+        for (const testCase of testCases) {
+          if (testCase.id) {
+            // Update existing
+            await testService.updateTestCase(testCase.id, {
+              input: testCase.input,
+              expectedOutput: testCase.expectedOutput,
+              sample: testCase.sample,
+              weight: testCase.weight,
+              questionId: id,
+            });
+          } else {
+            // Create new
+            await testService.createTestCase({
+              input: testCase.input,
+              expectedOutput: testCase.expectedOutput,
+              sample: testCase.sample,
+              weight: testCase.weight,
+              questionId: id!,
+            });
+          }
+        }
+      }
 
       toast({
         title: "Success",
@@ -294,13 +449,16 @@ export default function EditQuestion() {
       console.error("Failed to update question:", error);
       toast({
         title: "Error",
-        description: "Failed to update question",
+        description:
+          error instanceof Error ? error.message : "Failed to update question",
         variant: "destructive",
       });
     } finally {
       setSaving(false);
     }
   };
+
+  const totalWeight = getTotalWeight();
 
   if (loading) {
     return (
@@ -506,9 +664,11 @@ export default function EditQuestion() {
                 {mcqOptions.map((option, index) => (
                   <div key={index} className="flex items-center gap-3">
                     <RadioGroup
-                      value={mcqOptions
-                        .findIndex((opt) => opt.isCorrect)
-                        .toString()}
+                      value={
+                        mcqOptions.findIndex((opt) => opt.isCorrect) === index
+                          ? index.toString()
+                          : ""
+                      }
                       onValueChange={() => handleCorrectOptionChange(index)}
                     >
                       <RadioGroupItem
@@ -543,21 +703,176 @@ export default function EditQuestion() {
             </Card>
           )}
 
-          {/* Coding Question Placeholder */}
+          {/* Coding Question Test Cases */}
           {questionType === "CODING" && (
             <Card>
               <CardHeader>
-                <CardTitle>Coding Question Setup</CardTitle>
-                <CardDescription>
-                  Coding questions require additional configuration
-                </CardDescription>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle>Test Cases</CardTitle>
+                    <CardDescription>
+                      Define test cases to validate student solutions
+                    </CardDescription>
+                    {totalWeight !== 100 && testCases.length > 0 && (
+                      <p
+                        className={`text-sm mt-2 ${totalWeight !== 100 ? "text-yellow-600" : "text-green-600"}`}
+                      >
+                        Total weight: {totalWeight}%{" "}
+                        {totalWeight !== 100 && "(must be 100%)"}
+                      </p>
+                    )}
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={addTestCase}
+                  >
+                    <Plus className="w-4 h-4 mr-1" />
+                    Add Test Case
+                  </Button>
+                </div>
               </CardHeader>
-              <CardContent>
-                <div className="bg-muted/30 rounded-lg p-6 text-center">
-                  <Code className="w-12 h-12 mx-auto mb-3 text-muted-foreground" />
-                  <p className="text-muted-foreground">
-                    Coding question editing coming soon!
-                  </p>
+              <CardContent className="space-y-6">
+                {testCases.map((testCase, index) => (
+                  <div
+                    key={index}
+                    className="border rounded-lg p-4 space-y-3 relative"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline">Test Case #{index + 1}</Badge>
+                        {testCase.sample && (
+                          <Badge
+                            variant="secondary"
+                            className="bg-green-500/10 text-green-500"
+                          >
+                            <Eye className="w-3 h-3 mr-1" />
+                            Sample
+                          </Badge>
+                        )}
+                      </div>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => removeTestCase(index)}
+                      >
+                        <Trash2 className="w-4 h-4 text-destructive" />
+                      </Button>
+                    </div>
+
+                    <div className="space-y-3">
+                      <div className="space-y-2">
+                        <Label>Input</Label>
+                        <Textarea
+                          value={testCase.input}
+                          onChange={(e) =>
+                            updateTestCase(index, "input", e.target.value)
+                          }
+                          placeholder="Enter test input (e.g., 2 3)"
+                          rows={2}
+                          className="font-mono text-sm"
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label>Expected Output</Label>
+                        <Textarea
+                          value={testCase.expectedOutput}
+                          onChange={(e) =>
+                            updateTestCase(
+                              index,
+                              "expectedOutput",
+                              e.target.value,
+                            )
+                          }
+                          placeholder="Enter expected output (e.g., 5)"
+                          rows={2}
+                          className="font-mono text-sm"
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="flex items-center space-x-2">
+                          <Checkbox
+                            id={`sample-${index}`}
+                            checked={testCase.sample}
+                            onCheckedChange={(checked) =>
+                              updateTestCase(index, "sample", checked)
+                            }
+                          />
+                          <Label
+                            htmlFor={`sample-${index}`}
+                            className="cursor-pointer"
+                          >
+                            Sample Test Case (visible to students)
+                          </Label>
+                        </div>
+
+                        <div className="space-y-1">
+                          <Label>Weight (%)</Label>
+                          <Input
+                            type="number"
+                            value={testCase.weight}
+                            onChange={(e) =>
+                              updateTestCase(
+                                index,
+                                "weight",
+                                parseInt(e.target.value) || 0,
+                              )
+                            }
+                            min={0}
+                            max={100}
+                            step={5}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+
+                {testCases.length === 0 && (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <AlertCircle className="w-12 h-12 mx-auto mb-3" />
+                    <p>No test cases added</p>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={addTestCase}
+                      className="mt-4"
+                    >
+                      <Plus className="w-4 h-4 mr-2" />
+                      Add Your First Test Case
+                    </Button>
+                  </div>
+                )}
+
+                <div className="bg-muted/30 rounded-lg p-4">
+                  <div className="flex items-start gap-3">
+                    <Code className="w-5 h-5 text-muted-foreground mt-0.5" />
+                    <div>
+                      <p className="text-sm font-medium">About Test Cases</p>
+                      <ul className="text-sm text-muted-foreground mt-1 space-y-1">
+                        <li>
+                          • <strong>Sample test cases</strong> are visible to
+                          students and help them understand requirements
+                        </li>
+                        <li>
+                          • <strong>Hidden test cases</strong> are used for
+                          final evaluation
+                        </li>
+                        <li>
+                          • <strong>Weight</strong> determines how much each
+                          test case contributes to the score
+                        </li>
+                        <li>
+                          • Total weight of all test cases must equal{" "}
+                          <strong>100%</strong>
+                        </li>
+                      </ul>
+                    </div>
+                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -615,6 +930,26 @@ export default function EditQuestion() {
                         )}
                       </div>
                     ))}
+                  </div>
+                </div>
+              )}
+              {questionType === "CODING" && testCases.length > 0 && (
+                <div className="rounded-lg bg-muted/30 p-4">
+                  <p className="text-sm font-medium mb-2">Test Cases:</p>
+                  <div className="space-y-2">
+                    <p className="text-sm text-muted-foreground">
+                      {testCases.filter((tc) => tc.sample).length} Sample,{" "}
+                      {testCases.filter((tc) => !tc.sample).length} Hidden
+                    </p>
+                    <div className="w-full bg-gray-200 rounded-full h-2">
+                      <div
+                        className="bg-green-500 h-2 rounded-full transition-all"
+                        style={{ width: `${totalWeight}%` }}
+                      />
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Total weight: {totalWeight}%
+                    </p>
                   </div>
                 </div>
               )}
