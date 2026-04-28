@@ -1,33 +1,17 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import {
-  Plus,
-  Search,
-  Users,
-  Clock,
-  MoreVertical,
-  Play,
-  Eye,
-  Copy,
-  Trash2,
-  Loader2,
-  FileQuestion,
-  Target,
-  Edit,
-  Archive,
-  RefreshCw,
-} from "lucide-react";
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -45,6 +29,23 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Plus,
+  Search,
+  MoreVertical,
+  Play,
+  Eye,
+  Copy,
+  Trash2,
+  Loader2,
+  Edit,
+  Archive,
+  RefreshCw,
+  Clock,
+  Target,
+  FileQuestion,
+  Users,
+} from "lucide-react";
 import { testService, TestViewModel } from "@/lib/test-service";
 import { useToast } from "@/hooks/use-toast";
 
@@ -66,23 +67,27 @@ export default function Tests() {
     fetchTests();
   }, []);
 
-  const fetchTests = async () => {
+  const fetchTests = useCallback(async () => {
     try {
       setLoading(true);
       const data = await testService.getAllTests();
       const viewModels = data.map(testService.toViewModel);
       setTests(viewModels);
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage =
+        error instanceof Error
+          ? error.message
+          : "Failed to load tests. Please try again.";
       console.error("Failed to fetch tests:", error);
       toast({
         title: "Error",
-        description: error.message || "Failed to load tests. Please try again.",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
       setLoading(false);
     }
-  };
+  }, [toast]);
 
   const handleDeleteClick = (test: TestViewModel) => {
     setSelectedTest(test);
@@ -100,12 +105,15 @@ export default function Tests() {
         description: `"${selectedTest.name}" has been deleted successfully.`,
       });
       await fetchTests();
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage =
+        error instanceof Error
+          ? error.message
+          : "Failed to delete test. Please try again.";
       console.error("Failed to delete test:", error);
       toast({
         title: "Error",
-        description:
-          error.message || "Failed to delete test. Please try again.",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
@@ -143,18 +151,20 @@ export default function Tests() {
         description: `"${test.name}" has been duplicated successfully.`,
       });
       await fetchTests();
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage =
+        error instanceof Error
+          ? error.message
+          : "Failed to duplicate test. Please try again.";
       console.error("Failed to duplicate test:", error);
       toast({
         title: "Error",
-        description:
-          error.message || "Failed to duplicate test. Please try again.",
+        description: errorMessage,
         variant: "destructive",
       });
     }
   };
 
-  // Using updateTest instead of dedicated publish endpoint
   const handlePublish = async (test: TestViewModel) => {
     try {
       await testService.updateTest(test.id, {
@@ -165,18 +175,20 @@ export default function Tests() {
         description: `"${test.name}" has been published successfully.`,
       });
       await fetchTests();
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage =
+        error instanceof Error
+          ? error.message
+          : "Failed to publish test. Please try again.";
       console.error("Failed to publish test:", error);
       toast({
         title: "Error",
-        description:
-          error.message || "Failed to publish test. Please try again.",
+        description: errorMessage,
         variant: "destructive",
       });
     }
   };
 
-  // Using updateTest instead of dedicated archive endpoint
   const handleArchive = async (test: TestViewModel) => {
     try {
       await testService.updateTest(test.id, {
@@ -187,18 +199,20 @@ export default function Tests() {
         description: `"${test.name}" has been archived successfully.`,
       });
       await fetchTests();
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage =
+        error instanceof Error
+          ? error.message
+          : "Failed to archive test. Please try again.";
       console.error("Failed to archive test:", error);
       toast({
         title: "Error",
-        description:
-          error.message || "Failed to archive test. Please try again.",
+        description: errorMessage,
         variant: "destructive",
       });
     }
   };
 
-  // Move test back to draft from archived or published
   const handleMoveToDraft = async (test: TestViewModel) => {
     try {
       await testService.updateTest(test.id, {
@@ -209,11 +223,15 @@ export default function Tests() {
         description: `"${test.name}" has been moved to drafts.`,
       });
       await fetchTests();
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage =
+        error instanceof Error
+          ? error.message
+          : "Failed to update test status.";
       console.error("Failed to move test to draft:", error);
       toast({
         title: "Error",
-        description: error.message || "Failed to update test status.",
+        description: errorMessage,
         variant: "destructive",
       });
     }
@@ -245,7 +263,7 @@ export default function Tests() {
     return tests.filter((test) => test.status === statusFilter).length;
   };
 
-  const renderTestCards = (statusFilter: string) => {
+  const renderTestsTable = (statusFilter: string) => {
     const filtered = getFilteredTests(statusFilter);
 
     if (filtered.length === 0) {
@@ -271,154 +289,173 @@ export default function Tests() {
     }
 
     return (
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {filtered.map((test) => (
-          <Card key={test.id} className="card-hover group">
-            <CardHeader className="pb-3">
-              <div className="flex items-start justify-between">
-                <div className="space-y-1 flex-1">
-                  <CardTitle className="text-lg line-clamp-1">
-                    {test.name}
-                  </CardTitle>
-                  <CardDescription className="line-clamp-2">
-                    {test.description || "No description provided"}
-                  </CardDescription>
-                </div>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="opacity-0 group-hover:opacity-100 transition-opacity"
-                    >
-                      <MoreVertical className="w-4 h-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={() => handleViewDetails(test)}>
-                      <Eye className="w-4 h-4 mr-2" />
-                      View Details
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => handleEdit(test)}>
-                      <Edit className="w-4 h-4 mr-2" />
-                      Edit
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-
-                    {test.status === "draft" && (
-                      <>
-                        <DropdownMenuItem onClick={() => handlePublish(test)}>
-                          <Play className="w-4 h-4 mr-2" />
-                          Publish
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleDuplicate(test)}>
-                          <Copy className="w-4 h-4 mr-2" />
-                          Duplicate
-                        </DropdownMenuItem>
-                      </>
+      <div className="border rounded-lg">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Test Name</TableHead>
+              <TableHead>Type</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead>Difficulty</TableHead>
+              <TableHead>Duration</TableHead>
+              <TableHead>Questions</TableHead>
+              <TableHead>Pass Mark</TableHead>
+              <TableHead>Total Marks</TableHead>
+              <TableHead>Participants</TableHead>
+              <TableHead className="w-[50px]"></TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {filtered.map((test) => (
+              <TableRow key={test.id} className="group">
+                <TableCell className="font-medium">
+                  <div>
+                    <div>{test.name}</div>
+                    {test.description && (
+                      <div className="text-xs text-muted-foreground mt-1">
+                        {test.description.length > 50
+                          ? test.description.substring(0, 50) + "..."
+                          : test.description}
+                      </div>
                     )}
-
-                    {test.status === "published" && (
-                      <>
-                        <DropdownMenuItem onClick={() => handleArchive(test)}>
-                          <Archive className="w-4 h-4 mr-2" />
-                          Archive
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={() => handleMoveToDraft(test)}
-                        >
-                          <RefreshCw className="w-4 h-4 mr-2" />
-                          Move to Draft
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleDuplicate(test)}>
-                          <Copy className="w-4 h-4 mr-2" />
-                          Duplicate
-                        </DropdownMenuItem>
-                      </>
-                    )}
-
-                    {test.status === "archived" && (
-                      <>
-                        <DropdownMenuItem
-                          onClick={() => handleMoveToDraft(test)}
-                        >
-                          <RefreshCw className="w-4 h-4 mr-2" />
-                          Restore to Draft
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleDuplicate(test)}>
-                          <Copy className="w-4 h-4 mr-2" />
-                          Duplicate
-                        </DropdownMenuItem>
-                      </>
-                    )}
-
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem
-                      className="text-destructive"
-                      onClick={() => handleDeleteClick(test)}
-                    >
-                      <Trash2 className="w-4 h-4 mr-2" />
-                      Delete
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center gap-2 flex-wrap">
-                <Badge className={testService.getTypeStyle(test.type)}>
-                  {test.type}
-                </Badge>
-                <Badge
-                  variant="outline"
-                  className={testService.getStatusStyle(test.status)}
-                >
-                  {formatStatus(test.status)}
-                </Badge>
-                <Badge
-                  className={testService.getDifficultyStyle(test.difficulty)}
-                >
-                  {test.difficulty.charAt(0).toUpperCase() +
-                    test.difficulty.slice(1)}
-                </Badge>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4 py-3 border-y">
-                <div className="text-center">
-                  <div className="flex items-center justify-center gap-2">
-                    <Clock className="w-4 h-4 text-muted-foreground" />
-                    <p className="text-2xl font-bold">{test.duration}</p>
                   </div>
-                  <p className="text-xs text-muted-foreground">Minutes</p>
-                </div>
-                <div className="text-center">
-                  <div className="flex items-center justify-center gap-2">
-                    <Target className="w-4 h-4 text-muted-foreground" />
-                    <p className="text-2xl font-bold">{test.passMark}%</p>
+                </TableCell>
+                <TableCell>
+                  <Badge className={testService.getTypeStyle(test.type)}>
+                    {test.type}
+                  </Badge>
+                </TableCell>
+                <TableCell>
+                  <Badge
+                    variant="outline"
+                    className={testService.getStatusStyle(test.status)}
+                  >
+                    {formatStatus(test.status)}
+                  </Badge>
+                </TableCell>
+                <TableCell>
+                  <Badge
+                    className={testService.getDifficultyStyle(test.difficulty)}
+                  >
+                    {test.difficulty.charAt(0).toUpperCase() +
+                      test.difficulty.slice(1)}
+                  </Badge>
+                </TableCell>
+                <TableCell>
+                  <div className="flex items-center gap-1">
+                    <Clock className="w-3 h-3 text-muted-foreground" />
+                    <span>{test.duration} min</span>
                   </div>
-                  <p className="text-xs text-muted-foreground">Passing Mark</p>
-                </div>
-              </div>
+                </TableCell>
+                <TableCell>
+                  <div className="flex items-center gap-1">
+                    <FileQuestion className="w-3 h-3 text-muted-foreground" />
+                    <span>{test.questions}</span>
+                  </div>
+                </TableCell>
+                <TableCell>
+                  <div className="flex items-center gap-1">
+                    <Target className="w-3 h-3 text-muted-foreground" />
+                    <span>{test.passMark}%</span>
+                  </div>
+                </TableCell>
+                <TableCell>{test.totalMarks}</TableCell>
+                <TableCell>
+                  <div className="flex items-center gap-1">
+                    <Users className="w-3 h-3 text-muted-foreground" />
+                    <span>{test.participants || 0}</span>
+                  </div>
+                </TableCell>
+                <TableCell>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity"
+                      >
+                        <MoreVertical className="w-4 h-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={() => handleViewDetails(test)}>
+                        <Eye className="w-4 h-4 mr-2" />
+                        View Details
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => handleEdit(test)}>
+                        <Edit className="w-4 h-4 mr-2" />
+                        Edit
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
 
-              <div className="flex items-center justify-between text-sm">
-                <span className="flex items-center gap-2 text-muted-foreground">
-                  <FileQuestion className="w-4 h-4" />
-                  {test.questions || 0} Questions
-                </span>
-                <span className="flex items-center gap-2 text-muted-foreground">
-                  <Users className="w-4 h-4" />
-                  {test.participants || 0} Participants
-                </span>
-              </div>
+                      {test.status === "draft" && (
+                        <>
+                          <DropdownMenuItem onClick={() => handlePublish(test)}>
+                            <Play className="w-4 h-4 mr-2" />
+                            Publish
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => handleDuplicate(test)}
+                          >
+                            <Copy className="w-4 h-4 mr-2" />
+                            Duplicate
+                          </DropdownMenuItem>
+                        </>
+                      )}
 
-              {test.totalMarks > 0 && (
-                <div className="text-xs text-muted-foreground text-center pt-2 border-t">
-                  Total Marks: {test.totalMarks}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        ))}
+                      {test.status === "published" && (
+                        <>
+                          <DropdownMenuItem onClick={() => handleArchive(test)}>
+                            <Archive className="w-4 h-4 mr-2" />
+                            Archive
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => handleMoveToDraft(test)}
+                          >
+                            <RefreshCw className="w-4 h-4 mr-2" />
+                            Move to Draft
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => handleDuplicate(test)}
+                          >
+                            <Copy className="w-4 h-4 mr-2" />
+                            Duplicate
+                          </DropdownMenuItem>
+                        </>
+                      )}
+
+                      {test.status === "archived" && (
+                        <>
+                          <DropdownMenuItem
+                            onClick={() => handleMoveToDraft(test)}
+                          >
+                            <RefreshCw className="w-4 h-4 mr-2" />
+                            Restore to Draft
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => handleDuplicate(test)}
+                          >
+                            <Copy className="w-4 h-4 mr-2" />
+                            Duplicate
+                          </DropdownMenuItem>
+                        </>
+                      )}
+
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem
+                        className="text-destructive"
+                        onClick={() => handleDeleteClick(test)}
+                      >
+                        <Trash2 className="w-4 h-4 mr-2" />
+                        Delete
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
       </div>
     );
   };
@@ -486,16 +523,16 @@ export default function Tests() {
         </TabsList>
 
         <TabsContent value="all" className="mt-6">
-          {renderTestCards("all")}
+          {renderTestsTable("all")}
         </TabsContent>
         <TabsContent value="published" className="mt-6">
-          {renderTestCards("published")}
+          {renderTestsTable("published")}
         </TabsContent>
         <TabsContent value="draft" className="mt-6">
-          {renderTestCards("draft")}
+          {renderTestsTable("draft")}
         </TabsContent>
         <TabsContent value="archived" className="mt-6">
-          {renderTestCards("archived")}
+          {renderTestsTable("archived")}
         </TabsContent>
       </Tabs>
 

@@ -8,7 +8,7 @@ import { useNavigate, Link } from "react-router-dom";
 import { Shield, CheckCircle2, Building2, Eye, EyeOff } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { authService } from "@/lib/auth-service";
-import { organisationService, OrganisationResponse } from "@/lib/data-service";
+import { organisationService, OrganisationResponse } from "@/lib/organisation-service";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus } from "lucide-react";
 import {

@@ -35,7 +35,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { organisationService, type OrganisationResponse } from "@/lib/data-service";
+import { organisationService, type OrganisationResponse } from "@/lib/organisation-service";
 import { useToast } from "@/hooks/use-toast";
 
 export default function Organisations() {

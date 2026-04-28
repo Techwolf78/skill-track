@@ -30,25 +30,8 @@ import {
   Code,
   ListChecks,
 } from "lucide-react";
-import { testService } from "@/lib/test-service";
+import { testService, Subject, Topic, Subtopic } from "@/lib/test-service";
 import { useToast } from "@/hooks/use-toast";
-
-interface Subject {
-  id: string;
-  name: string;
-}
-
-interface Topic {
-  id: string;
-  name: string;
-  subjectId?: string;
-}
-
-interface Subtopic {
-  id: string;
-  name: string;
-  subjectId?: string;
-}
 
 interface McqOption {
   text: string;
@@ -63,14 +46,14 @@ export default function AddQuestion() {
   const [topics, setTopics] = useState<Topic[]>([]);
   const [subtopics, setSubtopics] = useState<Subtopic[]>([]);
   const [allTopics, setAllTopics] = useState<Topic[]>([]);
-  const [allSubtopics, setAllSubtopics] = useState<Subtopic[]>([]);
 
   // Form state
-  const [questionType, setQuestionType] = useState<"MCQ" | "CODE">("MCQ");
+  const [questionType, setQuestionType] = useState<"MCQ" | "CODING">("MCQ");
   const [selectedSubject, setSelectedSubject] = useState("");
   const [selectedTopic, setSelectedTopic] = useState("");
   const [selectedSubtopic, setSelectedSubtopic] = useState("");
   const [prompt, setPrompt] = useState("");
+  const [marks, setMarks] = useState<number>(5);
   const [mcqOptions, setMcqOptions] = useState<McqOption[]>([
     { text: "", isCorrect: false },
     { text: "", isCorrect: false },
@@ -85,23 +68,20 @@ export default function AddQuestion() {
 
   const fetchInitialData = async () => {
     try {
-      const [allSubjects, allTopicsData, allSubtopicsData] = await Promise.all([
+      const [allSubjects, allTopicsData] = await Promise.all([
         testService.getAllSubjects(),
         testService.getAllTopics(),
-        testService.getAllSubtopics(),
       ]);
 
       setSubjects(allSubjects);
       setAllTopics(allTopicsData);
-      setAllSubtopics(allSubtopicsData);
-
-      console.log("All Topics:", allTopicsData);
-      console.log("All Subtopics:", allSubtopicsData);
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage =
+        error instanceof Error ? error.message : "Failed to load data";
       console.error("Failed to fetch initial data:", error);
       toast({
         title: "Error",
-        description: "Failed to load data",
+        description: errorMessage,
         variant: "destructive",
       });
     }
@@ -113,27 +93,33 @@ export default function AddQuestion() {
     setSelectedSubtopic("");
 
     // Filter topics based on selected subject
-    // Check if topic has subjectId field directly or subject object
     const filteredTopics = allTopics.filter((topic) => {
-      return (
-        (topic as any).subjectId === subjectId ||
-        (topic as any).subject?.id === subjectId
-      );
+      return topic.subjectId === subjectId || topic.subject?.id === subjectId;
     });
-
-    // Filter subtopics based on selected subject
-    const filteredSubtopics = allSubtopics.filter((subtopic) => {
-      return (
-        (subtopic as any).subjectId === subjectId ||
-        (subtopic as any).subject?.id === subjectId
-      );
-    });
-
-    console.log("Filtered Topics:", filteredTopics);
-    console.log("Filtered Subtopics:", filteredSubtopics);
 
     setTopics(filteredTopics);
-    setSubtopics(filteredSubtopics);
+    setSubtopics([]);
+  };
+
+  const handleTopicChange = (topicId: string) => {
+    setSelectedTopic(topicId);
+    setSelectedSubtopic("");
+
+    // Fetch subtopics for this topic
+    if (topicId) {
+      fetchSubtopicsForTopic(topicId);
+    } else {
+      setSubtopics([]);
+    }
+  };
+
+  const fetchSubtopicsForTopic = async (topicId: string) => {
+    try {
+      const subtopicsData = await testService.getSubtopicsByTopic(topicId);
+      setSubtopics(subtopicsData);
+    } catch (error: unknown) {
+      console.error("Failed to fetch subtopics:", error);
+    }
   };
 
   const handleMcqOptionChange = (index: number, text: string) => {
@@ -195,6 +181,15 @@ export default function AddQuestion() {
       return;
     }
 
+    if (marks <= 0) {
+      toast({
+        title: "Validation Error",
+        description: "Marks must be greater than 0",
+        variant: "destructive",
+      });
+      return;
+    }
+
     if (questionType === "MCQ") {
       const hasEmptyOption = mcqOptions.some((opt) => !opt.text.trim());
       if (hasEmptyOption) {
@@ -219,34 +214,37 @@ export default function AddQuestion() {
 
     setLoading(true);
     try {
-      const questionData: any = {
-        subjectId: selectedSubject,
-        topicId: selectedTopic || null,
-        subtopicId: selectedSubtopic || null,
+      const questionData = {
         type: questionType,
         prompt: prompt,
+        subjectId: selectedSubject,
+        topicId: selectedTopic || undefined,
+        subtopicId: selectedSubtopic || undefined,
+        marks: marks,
+        ...(questionType === "MCQ" && {
+          mcqOptions: mcqOptions.map((opt) => ({
+            text: opt.text,
+            isCorrect: opt.isCorrect,
+          })),
+        }),
       };
 
-      if (questionType === "MCQ") {
-        questionData.mcqOptions = mcqOptions.map((opt) => ({
-          text: opt.text,
-          isCorrect: opt.isCorrect,
-        }));
-      }
-
       console.log("Submitting question:", questionData);
-      await testService.createQuestion(questionData);
+      const response = await testService.createQuestion(questionData);
+      console.log("Question created:", response);
+
       toast({
         title: "Success",
         description: "Question added successfully",
       });
       navigate("/admin/questions");
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Failed to create question:", error);
+      const errorMessage =
+        error instanceof Error ? error.message : "Failed to add question";
       toast({
         title: "Error",
-        description:
-          error.response?.data || error.message || "Failed to add question",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
@@ -285,7 +283,9 @@ export default function AddQuestion() {
             <CardContent>
               <RadioGroup
                 value={questionType}
-                onValueChange={(val) => setQuestionType(val as "MCQ" | "CODE")}
+                onValueChange={(val) =>
+                  setQuestionType(val as "MCQ" | "CODING")
+                }
                 className="flex gap-6"
               >
                 <div className="flex items-center space-x-2">
@@ -296,8 +296,8 @@ export default function AddQuestion() {
                   </Label>
                 </div>
                 <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="CODE" id="code" />
-                  <Label htmlFor="code" className="flex items-center gap-2">
+                  <RadioGroupItem value="CODING" id="coding" />
+                  <Label htmlFor="coding" className="flex items-center gap-2">
                     <Code className="w-4 h-4" />
                     Coding Question
                   </Label>
@@ -340,8 +340,9 @@ export default function AddQuestion() {
                   <Select
                     value={selectedTopic || "none"}
                     onValueChange={(value) =>
-                      setSelectedTopic(value === "none" ? "" : value)
+                      handleTopicChange(value === "none" ? "" : value)
                     }
+                    disabled={!selectedSubject}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Select topic" />
@@ -350,7 +351,9 @@ export default function AddQuestion() {
                       <SelectItem value="none">None</SelectItem>
                       {topics.length === 0 ? (
                         <div className="px-2 py-1.5 text-sm text-muted-foreground">
-                          No topics available
+                          {selectedSubject
+                            ? "No topics available"
+                            : "Select a subject first"}
                         </div>
                       ) : (
                         topics.map((topic) => (
@@ -370,6 +373,7 @@ export default function AddQuestion() {
                     onValueChange={(value) =>
                       setSelectedSubtopic(value === "none" ? "" : value)
                     }
+                    disabled={!selectedTopic}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Select subtopic" />
@@ -378,7 +382,9 @@ export default function AddQuestion() {
                       <SelectItem value="none">None</SelectItem>
                       {subtopics.length === 0 ? (
                         <div className="px-2 py-1.5 text-sm text-muted-foreground">
-                          No subtopics available
+                          {selectedTopic
+                            ? "No subtopics available"
+                            : "Select a topic first"}
                         </div>
                       ) : (
                         subtopics.map((subtopic) => (
@@ -390,6 +396,18 @@ export default function AddQuestion() {
                     </SelectContent>
                   </Select>
                 </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Marks *</Label>
+                <Input
+                  type="number"
+                  value={marks}
+                  onChange={(e) => setMarks(parseInt(e.target.value) || 0)}
+                  min={1}
+                  max={100}
+                  placeholder="e.g., 5"
+                />
               </div>
 
               <div className="space-y-2">
@@ -431,9 +449,11 @@ export default function AddQuestion() {
                 {mcqOptions.map((option, index) => (
                   <div key={index} className="flex items-center gap-3">
                     <RadioGroup
-                      value={mcqOptions
-                        .findIndex((opt) => opt.isCorrect)
-                        .toString()}
+                      value={
+                        mcqOptions.findIndex((opt) => opt.isCorrect) === index
+                          ? index.toString()
+                          : ""
+                      }
                       onValueChange={() => handleCorrectOptionChange(index)}
                     >
                       <RadioGroupItem
@@ -469,7 +489,7 @@ export default function AddQuestion() {
           )}
 
           {/* Coding Question Placeholder */}
-          {questionType === "CODE" && (
+          {questionType === "CODING" && (
             <Card>
               <CardHeader>
                 <CardTitle>Coding Question Setup</CardTitle>
@@ -506,6 +526,12 @@ export default function AddQuestion() {
                   {prompt || "Your question will appear here"}
                 </p>
               </div>
+              {marks > 0 && (
+                <div className="rounded-lg bg-muted/30 p-4">
+                  <p className="text-sm font-medium mb-2">Marks:</p>
+                  <Badge variant="outline">{marks} marks</Badge>
+                </div>
+              )}
               {questionType === "MCQ" && mcqOptions.some((opt) => opt.text) && (
                 <div className="rounded-lg bg-muted/30 p-4">
                   <p className="text-sm font-medium mb-2">Options:</p>

@@ -13,6 +13,7 @@ export interface UserResponse {
   };
   testsCompleted?: number;
   avgScore?: number;
+  provider?: string;
   createdAt: string;
   updatedAt: string;
 }

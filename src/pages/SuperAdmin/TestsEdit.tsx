@@ -1,5 +1,5 @@
 // src/pages/admin/tests/TestsEdit.tsx
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -55,6 +55,7 @@ export default function TestsEdit() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [test, setTest] = useState<Test | null>(null);
+  const [questionsData, setQuestionsData] = useState<any[]>([]);
 
   // Form state
   const [formData, setFormData] = useState<Partial<CreateTestRequest>>({
@@ -67,19 +68,24 @@ export default function TestsEdit() {
     instructions: {},
   });
 
-  useEffect(() => {
-    if (id) {
-      fetchTest();
-    } else {
-      navigate("/admin/tests");
-    }
-  }, [id]);
-
-  const fetchTest = async () => {
+  const fetchTest = useCallback(async () => {
     try {
       setLoading(true);
       const data = await testService.getTestById(id!);
       setTest(data);
+
+      // Fetch full question details for each question in the test
+      if (data.questions && data.questions.length > 0) {
+        const allQuestions = await testService.getAllQuestions();
+        const enrichedQuestions = data.questions.map((tq) => ({
+          ...tq,
+          question: allQuestions.find((q) => q.id === tq.questionId),
+        }));
+        setQuestionsData(enrichedQuestions);
+      } else {
+        setQuestionsData([]);
+      }
+
       // Populate form with test data
       setFormData({
         title: data.title,
@@ -90,18 +96,30 @@ export default function TestsEdit() {
         status: data.status,
         instructions: data.instructions || {},
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage =
+        error instanceof Error
+          ? error.message
+          : "Failed to load test. Please try again.";
       console.error("Failed to fetch test:", error);
       toast({
         title: "Error",
-        description: error.message || "Failed to load test. Please try again.",
+        description: errorMessage,
         variant: "destructive",
       });
       navigate("/admin/tests");
     } finally {
       setLoading(false);
     }
-  };
+  }, [id, navigate, toast]);
+
+  useEffect(() => {
+    if (id) {
+      fetchTest();
+    } else {
+      navigate("/admin/tests");
+    }
+  }, [id, fetchTest]);
 
   const handleInputChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
@@ -236,6 +254,8 @@ export default function TestsEdit() {
     );
   }
 
+  const questionCount = test.questions?.length || 0;
+
   return (
     <div className="p-8 space-y-6 animate-fade-in">
       {/* Header */}
@@ -282,7 +302,7 @@ export default function TestsEdit() {
         <TabsList>
           <TabsTrigger value="basic">Basic Information</TabsTrigger>
           <TabsTrigger value="questions">
-            Questions ({test.testQuestions?.length || 0})
+            Questions ({questionCount})
           </TabsTrigger>
           <TabsTrigger value="settings">Settings</TabsTrigger>
         </TabsList>
@@ -441,29 +461,68 @@ export default function TestsEdit() {
               </div>
             </CardHeader>
             <CardContent>
-              {test.testQuestions && test.testQuestions.length > 0 ? (
+              {questionsData.length > 0 ? (
                 <div className="space-y-4">
-                  {test.testQuestions
+                  {questionsData
                     .sort((a, b) => a.orderIndex - b.orderIndex)
                     .map((tq, index) => (
                       <div
-                        key={tq.id || tq.questionId}
-                        className="flex items-start justify-between p-4 border rounded-lg"
+                        key={tq.id}
+                        className="flex items-start justify-between p-4 border rounded-lg hover:bg-muted/30 transition-colors"
                       >
                         <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-2">
+                          <div className="flex items-center gap-2 mb-2 flex-wrap">
                             <Badge variant="outline">Q{index + 1}</Badge>
-                            <Badge>{tq.marks} marks</Badge>
+                            <Badge variant="secondary">{tq.marks} marks</Badge>
                             {tq.timeLimitSecs > 0 && (
                               <Badge variant="outline">
-                                {tq.timeLimitSecs}s
+                                {tq.timeLimitSecs} seconds
                               </Badge>
                             )}
+                            <Badge variant="outline">
+                              {tq.question?.questionType ||
+                                tq.question?.type ||
+                                "MCQ"}
+                            </Badge>
                           </div>
-                          <p className="text-sm">
+                          <p className="text-sm font-medium">
                             {tq.question?.prompt ||
                               `Question ID: ${tq.questionId}`}
                           </p>
+                          {tq.question?.subjectId && (
+                            <p className="text-xs text-muted-foreground mt-1">
+                              Subject ID: {tq.question.subjectId}
+                            </p>
+                          )}
+                        </div>
+                        <div className="flex gap-2">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="text-destructive hover:text-destructive"
+                            onClick={async () => {
+                              if (
+                                confirm("Remove this question from the test?")
+                              ) {
+                                try {
+                                  await testService.deleteTestQuestion(tq.id);
+                                  toast({
+                                    title: "Success",
+                                    description: "Question removed from test.",
+                                  });
+                                  fetchTest();
+                                } catch (error) {
+                                  toast({
+                                    title: "Error",
+                                    description: "Failed to remove question.",
+                                    variant: "destructive",
+                                  });
+                                }
+                              }
+                            }}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
                         </div>
                       </div>
                     ))}

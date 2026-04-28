@@ -3,7 +3,6 @@ import { BaseResponse } from "./auth-service";
 
 // ==================== Request DTOs ====================
 export interface CreateTestRequest {
-  createdById: string;
   title: string;
   description?: string;
   durationMins: number;
@@ -11,6 +10,12 @@ export interface CreateTestRequest {
   instructions?: Record<string, unknown>;
   status: "DRAFT" | "PUBLISHED" | "ARCHIVED";
   passMark: number;
+  questions?: Array<{
+    questionId: string;
+    orderIndex: number;
+    marks: number;
+    timeLimitSecs: number;
+  }>;
 }
 
 export interface CreateTestQuestionRequest {
@@ -21,7 +26,19 @@ export interface CreateTestQuestionRequest {
   timeLimitSecs: number;
 }
 
+export interface BulkAddQuestionsRequest {
+  testId: string;
+  questionIds: string[];
+  startOrderIndex: number;
+  defaultMarks: number;
+  defaultTimeLimitSecs: number;
+}
+
 export interface CreateSubjectRequest {
+  name: string;
+}
+
+export interface UpdateSubjectRequest {
   name: string;
 }
 
@@ -30,52 +47,84 @@ export interface CreateTopicRequest {
   subjectId: string;
 }
 
-export interface CreateSubtopicRequest {
+export interface UpdateTopicRequest {
   name: string;
   subjectId: string;
 }
 
-// ==================== Models ====================
+export interface CreateSubtopicRequest {
+  name: string;
+  topicId: string;
+}
+
+export interface UpdateSubtopicRequest {
+  name: string;
+  topicId: string;
+}
+
+export interface CreateQuestionRequest {
+  type: "MCQ" | "CODING";
+  prompt: string;
+  subjectId: string;
+  topicId?: string;
+  subtopicId?: string;
+  marks: number;
+  mcqOptions?: Array<{ text: string; isCorrect: boolean }>;
+}
+
+// ==================== Response Models ====================
 export interface Subject {
   id: string;
   name: string;
-  topics?: Topic[];
-  subtopics?: Subtopic[];
-  questions?: Question[];
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface Topic {
   id: string;
   name: string;
+  subjectId?: string;
   subject?: Subject;
-  questions?: Question[];
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface Subtopic {
   id: string;
   name: string;
-  subject?: Subject;
-  questions?: Question[];
+  topicId?: string;
+  topic?: Topic;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface Question {
   id: string;
-  subjectId: string;
-  topicId: string;
-  subtopicId: string;
-  type: "MCQ" | "TEXT" | "CODE";
+  questionType: "MCQ" | "CODING";
+  type?: "MCQ" | "CODING";
   prompt: string;
-  mcqOptions?: Array<Record<string, unknown>>;
+  subjectId: string;
+  topicId?: string;
+  subtopicId?: string;
+  marks?: number;
+  mcqOptions?: Array<{ text: string; isCorrect: boolean }>;
+  subject?: Subject;
+  topic?: Topic;
+  subtopic?: Subtopic;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface TestQuestion {
-  id?: string;
+  id: string;
   testId: string;
   questionId: string;
   orderIndex: number;
   marks: number;
   timeLimitSecs: number;
   question?: Question;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface User {
@@ -96,6 +145,7 @@ export interface Test {
   createdBy?: User;
   createdAt?: string;
   updatedAt?: string;
+  questions?: TestQuestion[];
   testQuestions?: TestQuestion[];
 }
 
@@ -108,241 +158,387 @@ export interface TestViewModel {
   questions: number;
   totalMarks: number;
   passingMarks?: number;
-  batch?: string;
-  college?: string;
-  scheduledFor?: string;
   status: string;
   participants?: number;
   difficulty: string;
   passMark: number;
 }
 
+export interface TestSchedule {
+  id: string;
+  testId: string;
+  startTime: string;
+  endTime: string;
+  status: string;
+  test?: Test;
+}
+
+export interface CreateTestScheduleRequest {
+  testId: string;
+  startTime: string;
+  endTime: string;
+  status: string;
+}
+
+// ==================== Helper to unwrap BaseResponse ====================
+const unwrapResponse = <T>(response: { data: BaseResponse<T> | T }): T => {
+  const data = response.data;
+  // Check if it's a BaseResponse with data property
+  if (data && typeof data === "object" && "data" in data && "success" in data) {
+    return (data as BaseResponse<T>).data;
+  }
+  // Otherwise return as is
+  return data as T;
+};
+
+const unwrapArrayResponse = <T>(response: {
+  data: BaseResponse<T[]> | T[];
+}): T[] => {
+  const data = response.data;
+  if (Array.isArray(data)) {
+    return data;
+  }
+  if (
+    data &&
+    typeof data === "object" &&
+    "data" in data &&
+    Array.isArray((data as BaseResponse<T[]>).data)
+  ) {
+    return (data as BaseResponse<T[]>).data;
+  }
+  return [];
+};
+
 // ==================== Service ====================
 export const testService = {
   // ==================== Subject APIs ====================
-  // FIXED: Backend returns direct array, not wrapped in BaseResponse
   getAllSubjects: async (): Promise<Subject[]> => {
     const response = await apiClient.get<Subject[]>("/subjects");
-    return response.data || [];
+    return unwrapArrayResponse(response);
   },
 
   getSubjectById: async (id: string): Promise<Subject> => {
     const response = await apiClient.get<Subject>(`/subjects/${id}`);
-    return response.data;
+    return unwrapResponse(response);
   },
 
-  createSubject: async (name: string): Promise<string> => {
-    const response = await apiClient.post<string>("/subjects", { name });
-    return response.data;
+  createSubject: async (name: string): Promise<Subject> => {
+    const response = await apiClient.post<Subject>("/subjects", { name });
+    return unwrapResponse(response);
   },
 
-  deleteSubject: async (id: string): Promise<string> => {
-    const response = await apiClient.delete<string>(`/subjects/${id}`);
-    return response.data;
+  updateSubject: async (id: string, name: string): Promise<Subject> => {
+    const response = await apiClient.put<Subject>(`/subjects/${id}`, { name });
+    return unwrapResponse(response);
+  },
+
+  deleteSubject: async (id: string): Promise<void> => {
+    await apiClient.delete(`/subjects/${id}`);
   },
 
   // ==================== Topic APIs ====================
-  // FIXED: Backend returns direct array
   getAllTopics: async (): Promise<Topic[]> => {
     const response = await apiClient.get<Topic[]>("/topics");
-    return response.data || [];
+    return unwrapArrayResponse(response);
   },
 
   getTopicById: async (id: string): Promise<Topic> => {
     const response = await apiClient.get<Topic>(`/topics/${id}`);
-    return response.data;
+    return unwrapResponse(response);
   },
 
-  createTopic: async (name: string, subjectId: string): Promise<string> => {
-    const response = await apiClient.post<string>("/topics", {
+  getTopicsBySubject: async (subjectId: string): Promise<Topic[]> => {
+    const response = await apiClient.get<Topic[]>(
+      `/topics/subject/${subjectId}`,
+    );
+    return unwrapArrayResponse(response);
+  },
+
+  createTopic: async (name: string, subjectId: string): Promise<Topic> => {
+    const response = await apiClient.post<Topic>("/topics", {
       name,
-      subjectId,
+      subject_id: subjectId,
     });
-    return response.data;
+    return unwrapResponse(response);
   },
 
-  deleteTopic: async (id: string): Promise<string> => {
-    const response = await apiClient.delete<string>(`/topics/${id}`);
-    return response.data;
+  updateTopic: async (
+    id: string,
+    name: string,
+    subjectId: string,
+  ): Promise<Topic> => {
+    const response = await apiClient.put<Topic>(`/topics/${id}`, {
+      name,
+      subject_id: subjectId,
+    });
+    return unwrapResponse(response);
+  },
+
+  deleteTopic: async (id: string): Promise<void> => {
+    await apiClient.delete(`/topics/${id}`);
   },
 
   // ==================== Subtopic APIs ====================
-  // FIXED: Backend returns direct array
   getAllSubtopics: async (): Promise<Subtopic[]> => {
     const response = await apiClient.get<Subtopic[]>("/subtopics");
-    return response.data || [];
+    return unwrapArrayResponse(response);
   },
 
   getSubtopicById: async (id: string): Promise<Subtopic> => {
     const response = await apiClient.get<Subtopic>(`/subtopics/${id}`);
-    return response.data;
+    return unwrapResponse(response);
   },
 
-  createSubtopic: async (name: string, subjectId: string): Promise<string> => {
-    const response = await apiClient.post<string>("/subtopics", {
+  getSubtopicsByTopic: async (topicId: string): Promise<Subtopic[]> => {
+    const response = await apiClient.get<Subtopic[]>(
+      `/subtopics/topic/${topicId}`,
+    );
+    return unwrapArrayResponse(response);
+  },
+
+  // In test-service.ts - fix createSubtopic to use topic_id (snake_case)
+  createSubtopic: async (name: string, topicId: string): Promise<Subtopic> => {
+    const response = await apiClient.post<Subtopic>("/subtopics", {
       name,
-      subjectId,
+      topic_id: topicId, // Backend expects snake_case
     });
-    return response.data;
+    return unwrapResponse(response);
   },
 
-  deleteSubtopic: async (id: string): Promise<string> => {
-    const response = await apiClient.delete<string>(`/subtopics/${id}`);
-    return response.data;
+  updateSubtopic: async (
+    id: string,
+    name: string,
+    topicId: string,
+  ): Promise<Subtopic> => {
+    const response = await apiClient.put<Subtopic>(`/subtopics/${id}`, {
+      name,
+      topic_id: topicId,
+    });
+    return unwrapResponse(response);
+  },
+
+  deleteSubtopic: async (id: string): Promise<void> => {
+    await apiClient.delete(`/subtopics/${id}`);
+  },
+
+  // ==================== Question APIs ====================
+  // ==================== Question APIs ====================
+  getAllQuestions: async (
+    subjectId?: string,
+    topicId?: string,
+    subtopicId?: string,
+  ): Promise<Question[]> => {
+    const params = new URLSearchParams();
+    if (subjectId) params.append("subjectId", subjectId);
+    if (topicId) params.append("topicId", topicId);
+    if (subtopicId) params.append("subtopicId", subtopicId);
+
+    const url = `/questions${params.toString() ? `?${params.toString()}` : ""}`;
+    const response = await apiClient.get<Question[]>(url);
+    const questions = unwrapArrayResponse(response);
+
+    // Just return the questions as-is, they already have questionType
+    return questions;
+  },
+
+  getQuestionById: async (id: string): Promise<Question> => {
+    const response = await apiClient.get<Question>(`/questions/${id}`);
+    return unwrapResponse(response);
+  },
+
+  createQuestion: async (dto: CreateQuestionRequest): Promise<Question> => {
+    const apiDto = {
+      ...dto,
+      subject_id: dto.subjectId,
+      topic_id: dto.topicId,
+      subtopic_id: dto.subtopicId,
+    };
+    const response = await apiClient.post<Question>("/questions", apiDto);
+    return unwrapResponse(response);
+  },
+  updateQuestion: async (
+    id: string,
+    dto: Partial<CreateQuestionRequest>,
+  ): Promise<Question> => {
+    const apiDto = {
+      ...dto,
+      ...(dto.subjectId && { subject_id: dto.subjectId }),
+      ...(dto.topicId && { topic_id: dto.topicId }),
+      ...(dto.subtopicId && { subtopic_id: dto.subtopicId }),
+    };
+    const response = await apiClient.put<Question>(`/questions/${id}`, apiDto);
+    return unwrapResponse(response);
+  },
+
+  deleteQuestion: async (id: string): Promise<void> => {
+    await apiClient.delete(`/questions/${id}`);
   },
 
   // ==================== Test APIs ====================
   getAllTests: async (): Promise<Test[]> => {
-    const response = await apiClient.get<Test[]>("/tests/all");
-    return response.data || [];
+    const response = await apiClient.get<Test[]>("/tests");
+    return unwrapArrayResponse(response);
   },
 
   getTestById: async (id: string): Promise<Test> => {
     const response = await apiClient.get<Test>(`/tests/${id}`);
-    return response.data;
+    return unwrapResponse(response);
   },
 
-  createTest: async (test: CreateTestRequest): Promise<string> => {
-    const response = await apiClient.post<string>("/tests/create", test);
-    return response.data;
+  createTest: async (test: CreateTestRequest): Promise<Test> => {
+    const response = await apiClient.post<Test>("/tests", test);
+    return unwrapResponse(response);
   },
 
   updateTest: async (
     id: string,
     test: Partial<CreateTestRequest>,
-  ): Promise<string> => {
-    const response = await apiClient.put<string>(`/tests/update/${id}`, test);
-    return response.data;
+  ): Promise<Test> => {
+    const response = await apiClient.patch<Test>(`/tests/${id}`, test);
+    return unwrapResponse(response);
   },
 
-  deleteTest: async (id: string): Promise<string> => {
-    const response = await apiClient.delete<string>(`/tests/delete/${id}`);
-    return response.data;
-  },
-
-  publishTest: async (id: string): Promise<string> => {
-    return testService.updateTest(id, { status: "PUBLISHED" });
-  },
-
-  archiveTest: async (id: string): Promise<string> => {
-    return testService.updateTest(id, { status: "ARCHIVED" });
-  },
-
-  getTestsByStatus: async (status: string): Promise<Test[]> => {
-    const allTests = await testService.getAllTests();
-    return allTests.filter((test) => test.status === status.toUpperCase());
-  },
-
-  getTestsByCreator: async (creatorId: string): Promise<Test[]> => {
-    const allTests = await testService.getAllTests();
-    return allTests.filter((test) => test.createdBy?.id === creatorId);
+  deleteTest: async (id: string): Promise<void> => {
+    await apiClient.delete(`/tests/${id}`);
   },
 
   // ==================== Test Question APIs ====================
-  addQuestionToTest: async (
+  createTestQuestion: async (
     dto: CreateTestQuestionRequest,
-  ): Promise<string> => {
-    console.warn("addQuestionToTest endpoint not implemented in backend");
-    return "Not implemented";
+  ): Promise<TestQuestion> => {
+    const response = await apiClient.post<TestQuestion>("/test-questions", dto);
+    return unwrapResponse(response);
   },
 
-  getTestQuestions: async (testId: string): Promise<TestQuestion[]> => {
-    console.warn("getTestQuestions endpoint not implemented in backend");
-    return [];
+  getTestQuestions: async (
+    testId?: string,
+    questionId?: string,
+  ): Promise<TestQuestion[]> => {
+    const params = new URLSearchParams();
+    if (testId) params.append("testId", testId);
+    if (questionId) params.append("questionId", questionId);
+
+    const url = `/test-questions${params.toString() ? `?${params.toString()}` : ""}`;
+    const response = await apiClient.get<TestQuestion[]>(url);
+    return unwrapArrayResponse(response);
+  },
+
+  getTestQuestionById: async (id: string): Promise<TestQuestion> => {
+    const response = await apiClient.get<TestQuestion>(`/test-questions/${id}`);
+    return unwrapResponse(response);
   },
 
   updateTestQuestion: async (
-    testId: string,
-    questionId: string,
+    id: string,
     dto: Partial<CreateTestQuestionRequest>,
-  ): Promise<string> => {
-    console.warn("updateTestQuestion endpoint not implemented in backend");
-    return "Not implemented";
+  ): Promise<TestQuestion> => {
+    const response = await apiClient.put<TestQuestion>(
+      `/test-questions/${id}`,
+      dto,
+    );
+    return unwrapResponse(response);
   },
 
-  removeQuestionFromTest: async (
+  deleteTestQuestion: async (id: string): Promise<void> => {
+    await apiClient.delete(`/test-questions/${id}`);
+  },
+
+  // Helper: Add question to test
+  addQuestionToTest: async (
     testId: string,
     questionId: string,
-  ): Promise<string> => {
-    console.warn("removeQuestionFromTest endpoint not implemented in backend");
-    return "Not implemented";
+    orderIndex: number,
+    marks: number,
+    timeLimitSecs: number,
+  ): Promise<TestQuestion> => {
+    return testService.createTestQuestion({
+      testId,
+      questionId,
+      orderIndex,
+      marks,
+      timeLimitSecs,
+    });
   },
 
-  reorderTestQuestions: async (
-    testId: string,
-    questionOrders: Array<{ questionId: string; orderIndex: number }>,
-  ): Promise<string> => {
-    console.warn("reorderTestQuestions endpoint not implemented in backend");
-    return "Not implemented";
-  },
-
-  bulkAddQuestionsToTest: async (
-    testId: string,
-    questions: CreateTestQuestionRequest[],
-  ): Promise<string> => {
-    console.warn("bulkAddQuestionsToTest endpoint not implemented in backend");
-    return "Not implemented";
-  },
-
-  // ==================== Question APIs ====================
-  getAllQuestions: async (): Promise<Question[]> => {
-    const response = await apiClient.get<Question[]>("/questions");
-    return response.data || [];
-  },
-
-  getQuestionById: async (id: string): Promise<Question> => {
-    const response = await apiClient.get<Question>(`/questions/${id}`);
-    return response.data;
-  },
-
-  createQuestion: async (dto: any): Promise<string> => {
-    const response = await apiClient.post<string>("/questions", dto);
-    return response.data;
-  },
-
-  updateQuestion: async (id: string, dto: any): Promise<string> => {
-    const response = await apiClient.put<string>(`/questions/${id}`, dto);
-    return response.data;
-  },
-
-  deleteQuestion: async (id: string): Promise<string> => {
-    const response = await apiClient.delete<string>(`/questions/${id}`);
-    return response.data;
+  // Helper: Remove question from test
+  removeQuestionFromTest: async (testQuestionId: string): Promise<void> => {
+    await testService.deleteTestQuestion(testQuestionId);
   },
 
   // ==================== Helper Methods ====================
   toViewModel: (test: Test): TestViewModel => {
+    const status = (test.status || "DRAFT").toLowerCase();
+    const difficulty = (test.difficulty || "MEDIUM").toLowerCase();
+    const passMark = test.passMark || 40;
+    const duration = test.durationMins || 60;
+
+    const questions = test.questions || test.testQuestions || [];
+
     let type = "Mixed";
-    if (test.testQuestions && test.testQuestions.length > 0) {
-      const types = new Set(test.testQuestions.map((tq) => tq.question?.type));
+    if (questions.length > 0) {
+      const types = new Set(questions.map((tq) => tq.question?.type));
       if (types.size === 1) {
         const questionType = Array.from(types)[0];
         type =
           questionType === "MCQ"
             ? "MCQ"
-            : questionType === "CODE"
+            : questionType === "CODING"
               ? "Coding"
               : "Mixed";
       }
     }
 
     const totalMarks =
-      test.testQuestions?.reduce((sum, tq) => sum + tq.marks, 0) || 0;
+      questions.reduce((sum, tq) => sum + (tq.marks || 0), 0) || 0;
 
     return {
       id: test.id,
       name: test.title,
       description: test.description,
       type,
-      duration: test.durationMins,
-      questions: test.testQuestions?.length || 0,
-      totalMarks: totalMarks,
-      passingMarks: test.passMark,
-      status: test.status.toLowerCase(),
+      duration,
+      questions: questions.length,
+      totalMarks,
+      passingMarks: passMark,
+      status,
       participants: 0,
-      difficulty: test.difficulty.toLowerCase(),
-      passMark: test.passMark,
+      difficulty,
+      passMark,
     };
+  },
+
+  // Add this method to testService in test-service.ts (around line 500, after deleteTestQuestion)
+
+  // Add bulkAddQuestionsToTest method
+  bulkAddQuestionsToTest: async (
+    dto: BulkAddQuestionsRequest,
+  ): Promise<TestQuestion[]> => {
+    const response = await apiClient.post<TestQuestion[]>(
+      `/test-questions/bulk`,
+      dto,
+    );
+    return unwrapArrayResponse(response);
+  },
+
+  // Helper: Get questions for a test
+  getQuestionsForTest: async (testId: string): Promise<Question[]> => {
+    const testQuestions = await testService.getTestQuestions(testId);
+    const questionIds = testQuestions.map((tq) => tq.questionId);
+    if (questionIds.length === 0) return [];
+
+    const allQuestions = await testService.getAllQuestions();
+    return allQuestions.filter((q) => questionIds.includes(q.id));
+  },
+
+  // Helper: Get available questions not in test
+  getAvailableQuestions: async (testId: string): Promise<Question[]> => {
+    const [allQuestions, testQuestions] = await Promise.all([
+      testService.getAllQuestions(),
+      testService.getTestQuestions(testId),
+    ]);
+
+    const testQuestionIds = new Set(testQuestions.map((tq) => tq.questionId));
+    return allQuestions.filter((q) => !testQuestionIds.has(q.id));
   },
 
   getStatusStyle: (status: string): string => {
@@ -372,24 +568,16 @@ export const testService = {
     return styles[difficulty.toLowerCase()] || styles.medium;
   },
 
-  getFullTestDetails: async (testId: string): Promise<Test> => {
-    return testService.getTestById(testId);
+  // ==================== Test Schedule APIs ====================
+  getAllSchedules: async (): Promise<TestSchedule[]> => {
+    const response = await apiClient.get<TestSchedule[]>("/schedules/all");
+    // This endpoint returns raw JSON list
+    return response.data || [];
   },
 
-  getAvailableQuestionsForTest: async (testId: string): Promise<Question[]> => {
-    console.warn(
-      "getAvailableQuestionsForTest endpoint not implemented in backend",
-    );
-    return [];
-  },
-
-  getTestTotalMarks: async (testId: string): Promise<number> => {
-    const test = await testService.getTestById(testId);
-    return test.testQuestions?.reduce((sum, q) => sum + q.marks, 0) || 0;
-  },
-
-  getTestTotalDuration: async (testId: string): Promise<number> => {
-    const test = await testService.getTestById(testId);
-    return test.durationMins;
+  createSchedule: async (dto: CreateTestScheduleRequest): Promise<string> => {
+    const response = await apiClient.post<string>("/schedules/create", dto);
+    // This endpoint returns plain text
+    return response.data;
   },
 };

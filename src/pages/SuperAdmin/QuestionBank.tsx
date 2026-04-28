@@ -23,6 +23,7 @@ import {
   Trash2,
   Eye,
   Loader2,
+  FolderTree,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -33,6 +34,7 @@ import {
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -43,24 +45,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { testService } from "@/lib/test-service";
+import {
+  testService,
+  Subject,
+  Question,
+  Topic,
+  Subtopic,
+} from "@/lib/test-service";
 import { useToast } from "@/hooks/use-toast";
-
-// Types for new backend
-interface Question {
-  id: string;
-  subjectId: string;
-  topicId: string;
-  subtopicId: string;
-  type: "MCQ" | "TEXT" | "CODE";
-  prompt: string;
-  mcqOptions?: Array<Record<string, unknown>>;
-}
-
-interface Subject {
-  id: string;
-  name: string;
-}
 
 const difficultyColors = {
   Easy: "bg-green-500/10 text-green-500 border-green-500/20",
@@ -74,37 +66,44 @@ export default function QuestionBank() {
   const [searchTerm, setSearchTerm] = useState("");
   const [questions, setQuestions] = useState<Question[]>([]);
   const [subjects, setSubjects] = useState<Subject[]>([]);
+  const [topics, setTopics] = useState<Topic[]>([]);
+  const [subtopics, setSubtopics] = useState<Subtopic[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<"mcq" | "coding">("mcq");
   const [difficultyFilter, setDifficultyFilter] = useState<
     "All" | "Easy" | "Medium" | "Hard"
   >("All");
 
+  // Filter states
+  const [filterSubject, setFilterSubject] = useState<string>("all");
+  const [filterTopic, setFilterTopic] = useState<string>("all");
+  const [filterSubtopic, setFilterSubtopic] = useState<string>("all");
+  const [filterDialogOpen, setFilterDialogOpen] = useState(false);
+
   // Fetch questions and subjects from backend
   const fetchData = async () => {
     try {
       setLoading(true);
 
-      const [allQuestions, allSubjects] = await Promise.all([
-        testService.getAllQuestions(),
-        testService.getAllSubjects(),
-      ]);
-
-      console.log("Subjects API:", allSubjects);
-
-      // Normalize subjects
-      const normalizedSubjects = allSubjects.map((s: any) => ({
-        id: s.id || s._id,
-        name: s.name || s.title,
-      }));
+      const [allQuestions, allSubjects, allTopics, allSubtopics] =
+        await Promise.all([
+          testService.getAllQuestions(),
+          testService.getAllSubjects(),
+          testService.getAllTopics(),
+          testService.getAllSubtopics(),
+        ]);
 
       setQuestions(allQuestions);
-      setSubjects(normalizedSubjects);
-    } catch (error: any) {
+      setSubjects(allSubjects);
+      setTopics(allTopics);
+      setSubtopics(allSubtopics);
+    } catch (error: unknown) {
+      const errorMessage =
+        error instanceof Error ? error.message : "Failed to load questions";
       console.error("Failed to fetch data:", error);
       toast({
         title: "Error",
-        description: error.message || "Failed to load questions",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
@@ -126,10 +125,12 @@ export default function QuestionBank() {
         description: "Question deleted successfully",
       });
       fetchData();
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage =
+        error instanceof Error ? error.message : "Failed to delete question";
       toast({
         title: "Error",
-        description: error.message || "Failed to delete question",
+        description: errorMessage,
         variant: "destructive",
       });
     }
@@ -140,9 +141,9 @@ export default function QuestionBank() {
   };
 
   const handlePreview = (question: Question) => {
-    // Show preview dialog or navigate
+    // Show preview dialog
     toast({
-      title: "Preview",
+      title: "Question Preview",
       description: question.prompt,
     });
   };
@@ -151,40 +152,110 @@ export default function QuestionBank() {
     navigate(`/admin/questions/playground/${id}`);
   };
 
-  const getSubjectName = (subjectId: string) => {
-    const subject = subjects.find(
-      (s: any) =>
-        s.id === subjectId || s._id === subjectId || s.subjectId === subjectId,
-    );
+  const getSubjectName = (subjectId?: string) => {
+    if (!subjectId) return "No Subject";
+    const subject = subjects.find((s) => s.id === subjectId);
+    return subject?.name || "Unknown";
+  };
 
-    return subject?.name || subject?.title || "Unknown";
+  const getTopicName = (topicId?: string) => {
+    if (!topicId) return "No Topic";
+    const topic = topics.find((t) => t.id === topicId);
+    return topic?.name || "Unknown";
+  };
+
+  const getSubtopicName = (subtopicId?: string) => {
+    if (!subtopicId) return "No Subtopic";
+    const subtopic = subtopics.find((s) => s.id === subtopicId);
+    return subtopic?.name || "Unknown";
   };
 
   const getDifficultyFromQuestion = (question: Question): string => {
-    // You might want to add a difficulty field to your Question model
-    // For now, return based on subject or random
+    // You can add a difficulty field to your Question model later
+    // For now, return based on marks or default
+    if (question.marks) {
+      if (question.marks <= 2) return "Easy";
+      if (question.marks <= 5) return "Medium";
+      return "Hard";
+    }
     return "Medium";
   };
 
+  // Apply filters to questions
+  const filterQuestions = (questionsList: Question[]) => {
+    return questionsList.filter((q) => {
+      // Search filter
+      const matchesSearch = q.prompt
+        .toLowerCase()
+        .includes(searchTerm.toLowerCase());
+
+      // Subject filter
+      const matchesSubject =
+        filterSubject === "all" || q.subjectId === filterSubject;
+
+      // Topic filter
+      const matchesTopic = filterTopic === "all" || q.topicId === filterTopic;
+
+      // Subtopic filter
+      const matchesSubtopic =
+        filterSubtopic === "all" || q.subtopicId === filterSubtopic;
+
+      // Difficulty filter
+      const matchesDifficulty =
+        difficultyFilter === "All" ||
+        getDifficultyFromQuestion(q) === difficultyFilter;
+
+      return (
+        matchesSearch &&
+        matchesSubject &&
+        matchesTopic &&
+        matchesSubtopic &&
+        matchesDifficulty
+      );
+    });
+  };
+
+  // Get available topics for selected subject
+  const getTopicsForSubject = (subjectId: string) => {
+    if (subjectId === "all") return topics;
+    return topics.filter((t) => t.subjectId === subjectId);
+  };
+
+  // Get available subtopics for selected topic
+  const getSubtopicsForTopic = (topicId: string) => {
+    if (topicId === "all") return subtopics;
+    return subtopics.filter((s) => s.topicId === topicId);
+  };
+
+  // Handle subject filter change
+  const handleSubjectFilterChange = (subjectId: string) => {
+    setFilterSubject(subjectId);
+    setFilterTopic("all");
+    setFilterSubtopic("all");
+  };
+
+  // Handle topic filter change
+  const handleTopicFilterChange = (topicId: string) => {
+    setFilterTopic(topicId);
+    setFilterSubtopic("all");
+  };
+
+  // Reset all filters
+  const resetFilters = () => {
+    setFilterSubject("all");
+    setFilterTopic("all");
+    setFilterSubtopic("all");
+    setDifficultyFilter("All");
+    setSearchTerm("");
+  };
+
   // Filter MCQ questions (type === "MCQ")
-  const mcqQuestions = questions.filter((q) => q.type === "MCQ");
+  const mcqQuestions = questions.filter((q) => q.questionType === "MCQ");
+  const filteredMCQ = filterQuestions(mcqQuestions);
 
-  // Filter Coding questions (type === "CODE")
-  const codingQuestions = questions.filter((q) => q.type === "CODE");
-
-  const filteredMCQ = mcqQuestions.filter((q) =>
-    q.prompt.toLowerCase().includes(searchTerm.toLowerCase()),
-  );
-
-  const filteredCoding = codingQuestions.filter((q) => {
-    const matchesSearch = q.prompt
-      .toLowerCase()
-      .includes(searchTerm.toLowerCase());
-    const matchesDifficulty =
-      difficultyFilter === "All" ||
-      getDifficultyFromQuestion(q) === difficultyFilter;
-    return matchesSearch && matchesDifficulty;
-  });
+  // Filter Coding questions (type === "CODING")
+  const codingQuestions = questions.filter((q) => q.questionType === "CODING");
+  const filteredCoding = filterQuestions(codingQuestions);
 
   if (loading) {
     return (
@@ -197,7 +268,7 @@ export default function QuestionBank() {
   return (
     <div className="p-8 space-y-6 animate-fade-in">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
           <h1 className="text-3xl font-heading font-bold">Question Bank</h1>
           <p className="text-muted-foreground mt-1">
@@ -205,22 +276,25 @@ export default function QuestionBank() {
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <Select
-            value={difficultyFilter}
-            onValueChange={(value) =>
-              setDifficultyFilter(value as "All" | "Easy" | "Medium" | "Hard")
-            }
+          <Button variant="outline" onClick={() => setFilterDialogOpen(true)}>
+            <Search className="w-4 h-4 mr-2" />
+            Advanced Filters
+            {(filterSubject !== "all" ||
+              filterTopic !== "all" ||
+              filterSubtopic !== "all" ||
+              difficultyFilter !== "All") && (
+              <Badge variant="secondary" className="ml-2">
+                Active
+              </Badge>
+            )}
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => navigate("/admin/subjects/manage")}
           >
-            <SelectTrigger className="h-10 w-40">
-              <SelectValue placeholder="Difficulty" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="All">All</SelectItem>
-              <SelectItem value="Easy">Easy</SelectItem>
-              <SelectItem value="Medium">Medium</SelectItem>
-              <SelectItem value="Hard">Hard</SelectItem>
-            </SelectContent>
-          </Select>
+            <FolderTree className="w-4 h-4 mr-2" />
+            Manage Subjects
+          </Button>
           <Button
             variant="hero"
             onClick={() => navigate("/admin/questions/create")}
@@ -231,16 +305,54 @@ export default function QuestionBank() {
         </div>
       </div>
 
-      {/* Search */}
+      {/* Search Bar */}
       <div className="relative max-w-md">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
         <Input
-          placeholder="Search questions..."
+          placeholder="Search questions by text..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           className="pl-10"
         />
       </div>
+
+      {/* Active Filters Display */}
+      {(filterSubject !== "all" ||
+        filterTopic !== "all" ||
+        filterSubtopic !== "all" ||
+        difficultyFilter !== "All") && (
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-sm text-muted-foreground">Active filters:</span>
+          {filterSubject !== "all" && (
+            <Badge variant="secondary" className="gap-1">
+              Subject: {getSubjectName(filterSubject)}
+            </Badge>
+          )}
+          {filterTopic !== "all" && (
+            <Badge variant="secondary" className="gap-1">
+              Topic: {getTopicName(filterTopic)}
+            </Badge>
+          )}
+          {filterSubtopic !== "all" && (
+            <Badge variant="secondary" className="gap-1">
+              Subtopic: {getSubtopicName(filterSubtopic)}
+            </Badge>
+          )}
+          {difficultyFilter !== "All" && (
+            <Badge variant="secondary" className="gap-1">
+              Difficulty: {difficultyFilter}
+            </Badge>
+          )}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={resetFilters}
+            className="h-7 px-2"
+          >
+            Clear all
+          </Button>
+        </div>
+      )}
 
       {/* Tabs */}
       <Tabs
@@ -253,14 +365,14 @@ export default function QuestionBank() {
             <ListChecks className="w-4 h-4" />
             MCQ Questions
             <Badge variant="secondary" className="ml-1">
-              {mcqQuestions.length}
+              {filteredMCQ.length}
             </Badge>
           </TabsTrigger>
           <TabsTrigger value="coding" className="gap-2 px-6">
             <Code className="w-4 h-4" />
             Coding Questions
             <Badge variant="secondary" className="ml-1">
-              {codingQuestions.length}
+              {filteredCoding.length}
             </Badge>
           </TabsTrigger>
         </TabsList>
@@ -271,11 +383,12 @@ export default function QuestionBank() {
             <Table>
               <TableHeader>
                 <TableRow className="bg-muted/50">
-                  <TableHead className="font-semibold w-[50%]">
+                  <TableHead className="font-semibold w-[40%]">
                     Question
                   </TableHead>
                   <TableHead className="font-semibold">Subject</TableHead>
-                  <TableHead className="font-semibold">Difficulty</TableHead>
+                  <TableHead className="font-semibold">Topic</TableHead>
+                  <TableHead className="font-semibold">Marks</TableHead>
                   <TableHead className="font-semibold">Options</TableHead>
                   <TableHead className="font-semibold text-right">
                     Actions
@@ -286,7 +399,7 @@ export default function QuestionBank() {
                 {filteredMCQ.length === 0 ? (
                   <TableRow>
                     <TableCell
-                      colSpan={5}
+                      colSpan={6}
                       className="text-center py-8 text-muted-foreground"
                     >
                       No MCQ questions found
@@ -298,25 +411,19 @@ export default function QuestionBank() {
                       key={q.id}
                       className="hover:bg-muted/30 transition-colors"
                     >
-                      <TableCell className="font-medium">{q.prompt}</TableCell>
+                      <TableCell className="font-medium line-clamp-2">
+                        {q.prompt}
+                      </TableCell>
                       <TableCell>
                         <Badge variant="outline">
                           {getSubjectName(q.subjectId)}
                         </Badge>
                       </TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {getTopicName(q.topicId)}
+                      </TableCell>
                       <TableCell>
-                        <Badge
-                          variant="outline"
-                          className={
-                            difficultyColors[
-                              getDifficultyFromQuestion(
-                                q,
-                              ) as keyof typeof difficultyColors
-                            ]
-                          }
-                        >
-                          {getDifficultyFromQuestion(q)}
-                        </Badge>
+                        <Badge variant="secondary">{q.marks || 0} marks</Badge>
                       </TableCell>
                       <TableCell>
                         <Badge variant="secondary">
@@ -363,9 +470,12 @@ export default function QuestionBank() {
             <Table>
               <TableHeader>
                 <TableRow className="bg-muted/50">
-                  <TableHead className="font-semibold">Question</TableHead>
+                  <TableHead className="font-semibold w-[40%]">
+                    Question
+                  </TableHead>
                   <TableHead className="font-semibold">Subject</TableHead>
-                  <TableHead className="font-semibold">Difficulty</TableHead>
+                  <TableHead className="font-semibold">Topic</TableHead>
+                  <TableHead className="font-semibold">Marks</TableHead>
                   <TableHead className="font-semibold text-right">
                     Actions
                   </TableHead>
@@ -375,7 +485,7 @@ export default function QuestionBank() {
                 {filteredCoding.length === 0 ? (
                   <TableRow>
                     <TableCell
-                      colSpan={4}
+                      colSpan={5}
                       className="text-center py-8 text-muted-foreground"
                     >
                       No coding questions found
@@ -387,25 +497,19 @@ export default function QuestionBank() {
                       key={q.id}
                       className="hover:bg-muted/30 transition-colors"
                     >
-                      <TableCell className="font-medium">{q.prompt}</TableCell>
+                      <TableCell className="font-medium line-clamp-2">
+                        {q.prompt}
+                      </TableCell>
                       <TableCell>
                         <Badge variant="outline">
                           {getSubjectName(q.subjectId)}
                         </Badge>
                       </TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {getTopicName(q.topicId)}
+                      </TableCell>
                       <TableCell>
-                        <Badge
-                          variant="outline"
-                          className={
-                            difficultyColors[
-                              getDifficultyFromQuestion(
-                                q,
-                              ) as keyof typeof difficultyColors
-                            ]
-                          }
-                        >
-                          {getDifficultyFromQuestion(q)}
-                        </Badge>
+                        <Badge variant="secondary">{q.marks || 0} marks</Badge>
                       </TableCell>
                       <TableCell className="text-right">
                         <DropdownMenu>
@@ -447,6 +551,125 @@ export default function QuestionBank() {
           </div>
         </TabsContent>
       </Tabs>
+
+      {/* Advanced Filters Dialog */}
+      <Dialog open={filterDialogOpen} onOpenChange={setFilterDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Advanced Filters</DialogTitle>
+            <DialogDescription>
+              Filter questions by subject, topic, or subtopic
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Subject</Label>
+              <Select
+                value={filterSubject}
+                onValueChange={handleSubjectFilterChange}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="All Subjects" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Subjects</SelectItem>
+                  {subjects.map((s) => (
+                    <SelectItem key={s.id} value={s.id}>
+                      {s.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Topic</Label>
+              <Select
+                value={filterTopic}
+                onValueChange={handleTopicFilterChange}
+                disabled={filterSubject === "all"}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="All Topics" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Topics</SelectItem>
+                  {getTopicsForSubject(filterSubject).map((t) => (
+                    <SelectItem key={t.id} value={t.id}>
+                      {t.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Subtopic</Label>
+              <Select
+                value={filterSubtopic}
+                onValueChange={setFilterSubtopic}
+                disabled={filterTopic === "all"}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="All Subtopics" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Subtopics</SelectItem>
+                  {getSubtopicsForTopic(filterTopic).map((s) => (
+                    <SelectItem key={s.id} value={s.id}>
+                      {s.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Difficulty</Label>
+              <Select
+                value={difficultyFilter}
+                onValueChange={(v) => setDifficultyFilter(v as any)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="All Difficulties" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="All">All Difficulties</SelectItem>
+                  <SelectItem value="Easy">Easy</SelectItem>
+                  <SelectItem value="Medium">Medium</SelectItem>
+                  <SelectItem value="Hard">Hard</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={resetFilters} className="flex-1">
+              Reset All
+            </Button>
+            <Button
+              onClick={() => setFilterDialogOpen(false)}
+              className="flex-1"
+            >
+              Apply Filters
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
+
+// Label component since it's missing
+const Label = ({
+  children,
+  className,
+}: {
+  children: React.ReactNode;
+  className?: string;
+}) => (
+  <label
+    className={`text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 ${className || ""}`}
+  >
+    {children}
+  </label>
+);

@@ -1,8 +1,13 @@
-// src/pages/SuperAdmin/TestQuestions.tsx
 import { useState, useEffect } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
@@ -21,35 +26,46 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
-import { 
-  ArrowLeft, 
-  Plus, 
-  Search, 
+import {
+  ArrowLeft,
+  Plus,
+  Search,
   Loader2,
   Check,
   BookOpen,
   Code,
   FileText,
-  X
+  X,
 } from "lucide-react";
-import { testService, Test, Question } from "@/lib/test-service";
+import {
+  testService,
+  Test,
+  Question,
+  Subject,
+  Topic,
+} from "@/lib/test-service";
 import { useToast } from "@/hooks/use-toast";
 
 export default function TestQuestions() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { toast } = useToast();
-  
+
   const [loading, setLoading] = useState(true);
   const [test, setTest] = useState<Test | null>(null);
   const [questions, setQuestions] = useState<Question[]>([]);
-  const [selectedQuestions, setSelectedQuestions] = useState<Set<string>>(new Set());
+  const [subjects, setSubjects] = useState<Subject[]>([]);
+  const [selectedQuestions, setSelectedQuestions] = useState<Set<string>>(
+    new Set(),
+  );
   const [searchTerm, setSearchTerm] = useState("");
   const [adding, setAdding] = useState(false);
   const [subjectFilter, setSubjectFilter] = useState<string>("all");
-  const [subjects, setSubjects] = useState<any[]>([]);
+
+  // Marks and time limit for selected questions
+  const [defaultMarks, setDefaultMarks] = useState<number>(5);
+  const [defaultTimeLimit, setDefaultTimeLimit] = useState<number>(60);
 
   useEffect(() => {
     if (id) {
@@ -63,9 +79,9 @@ export default function TestQuestions() {
       const [testData, allQuestions, allSubjects] = await Promise.all([
         testService.getTestById(id!),
         testService.getAllQuestions(),
-        testService.getAllSubjects()
+        testService.getAllSubjects(),
       ]);
-      
+
       setTest(testData);
       setQuestions(allQuestions);
       setSubjects(allSubjects);
@@ -103,25 +119,25 @@ export default function TestQuestions() {
 
     setAdding(true);
     try {
-      // Add selected questions to test
-      const orderIndex = test?.testQuestions?.length || 0;
-      const promises = Array.from(selectedQuestions).map((questionId, index) =>
-        testService.addQuestionToTest({
-          testId: id!,
-          questionId: questionId,
-          orderIndex: orderIndex + index,
-          marks: 5,
-          timeLimitSecs: 60,
-        })
-      );
-      
-      await Promise.all(promises);
-      
+      // Get current max order index
+      const currentQuestions = test?.questions || [];
+      const maxOrderIndex = currentQuestions.length;
+
+      // Use bulk add endpoint
+      await testService.bulkAddQuestionsToTest({
+        testId: id!,
+        questionIds: Array.from(selectedQuestions),
+        startOrderIndex: maxOrderIndex + 1,
+        defaultMarks: defaultMarks,
+        defaultTimeLimitSecs: defaultTimeLimit,
+      });
+
       toast({
         title: "Success",
         description: `${selectedQuestions.size} question(s) added to test.`,
       });
-      
+
+      // Navigate back to test edit page
       navigate(`/admin/tests/edit/${id}`);
     } catch (error: any) {
       console.error("Failed to add questions:", error);
@@ -139,7 +155,7 @@ export default function TestQuestions() {
     switch (type) {
       case "MCQ":
         return <FileText className="w-4 h-4" />;
-      case "CODE":
+      case "CODING":
         return <Code className="w-4 h-4" />;
       default:
         return <BookOpen className="w-4 h-4" />;
@@ -147,20 +163,29 @@ export default function TestQuestions() {
   };
 
   const getSubjectName = (subjectId: string) => {
-    const subject = subjects.find(s => s.id === subjectId);
+    const subject = subjects.find((s) => s.id === subjectId);
     return subject?.name || "Unknown Subject";
   };
 
-  // Filter questions
-  const filteredQuestions = questions.filter(q => {
-    const matchesSearch = q.prompt.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesSubject = subjectFilter === "all" || q.subjectId === subjectFilter;
-    const notAdded = !test?.testQuestions?.some(tq => tq.questionId === q.id);
-    return matchesSearch && matchesSubject && notAdded;
+  // Filter questions - only show ones not already in test
+  const alreadyAddedIds = new Set(
+    test?.questions?.map((q) => q.questionId) || [],
+  );
+  const availableQuestions = questions.filter(
+    (q) => !alreadyAddedIds.has(q.id),
+  );
+
+  const filteredQuestions = availableQuestions.filter((q) => {
+    const matchesSearch = q.prompt
+      .toLowerCase()
+      .includes(searchTerm.toLowerCase());
+    const matchesSubject =
+      subjectFilter === "all" || q.subjectId === subjectFilter;
+    return matchesSearch && matchesSubject;
   });
 
   // Get already added questions count
-  const alreadyAddedCount = test?.testQuestions?.length || 0;
+  const alreadyAddedCount = test?.questions?.length || 0;
 
   if (loading) {
     return (
@@ -191,19 +216,6 @@ export default function TestQuestions() {
           <Badge variant="outline" className="px-3 py-1">
             Already Added: {alreadyAddedCount}
           </Badge>
-          <Button onClick={handleAddQuestions} disabled={adding || selectedQuestions.size === 0}>
-            {adding ? (
-              <>
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Adding...
-              </>
-            ) : (
-              <>
-                <Plus className="w-4 h-4 mr-2" />
-                Add Selected ({selectedQuestions.size})
-              </>
-            )}
-          </Button>
         </div>
       </div>
 
@@ -246,10 +258,10 @@ export default function TestQuestions() {
             {filteredQuestions.length === 0 ? (
               <div className="text-center py-12 text-muted-foreground">
                 <BookOpen className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                <p>No questions found.</p>
+                <p>No questions available to add.</p>
                 <p className="text-sm mt-2">
-                  {searchTerm || subjectFilter !== "all" 
-                    ? "Try different search or filter criteria." 
+                  {searchTerm || subjectFilter !== "all"
+                    ? "Try different search or filter criteria."
                     : "Create questions in the Question Bank first."}
                 </p>
                 {!searchTerm && subjectFilter === "all" && (
@@ -277,25 +289,29 @@ export default function TestQuestions() {
                     />
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-2 flex-wrap">
-                        <Badge variant="outline" className="flex items-center gap-1">
-                          {getQuestionTypeIcon(question.type)}
-                          {question.type}
+                        <Badge
+                          variant="outline"
+                          className="flex items-center gap-1"
+                        >
+                          {getQuestionTypeIcon(
+                            question.questionType || question.type || "MCQ",
+                          )}
+                          {question.questionType || question.type || "MCQ"}
                         </Badge>
                         <Badge variant="outline">
                           {getSubjectName(question.subjectId)}
                         </Badge>
-                        {question.topicId && (
-                          <Badge variant="secondary" className="text-xs">
-                            Topic ID: {question.topicId.substring(0, 8)}...
-                          </Badge>
-                        )}
+                        <Badge variant="secondary">
+                          {question.marks || 0} marks
+                        </Badge>
                       </div>
                       <p className="text-sm font-medium">{question.prompt}</p>
-                      {question.type === "MCQ" && question.mcqOptions && (
-                        <div className="mt-2 text-xs text-muted-foreground">
-                          {question.mcqOptions.length} options available
-                        </div>
-                      )}
+                      {question.mcqOptions &&
+                        question.mcqOptions.length > 0 && (
+                          <div className="mt-2 text-xs text-muted-foreground">
+                            {question.mcqOptions.length} options available
+                          </div>
+                        )}
                     </div>
                   </div>
                 ))}
@@ -305,22 +321,58 @@ export default function TestQuestions() {
         </CardContent>
       </Card>
 
-      {/* Selected Summary */}
+      {/* Selected Summary with Marks and Time Limit */}
       {selectedQuestions.size > 0 && (
         <div className="fixed bottom-6 right-6 bg-primary text-primary-foreground rounded-lg shadow-lg p-4">
-          <div className="flex items-center gap-4">
-            <div>
-              <p className="font-semibold">{selectedQuestions.size} Question(s) Selected</p>
-              <p className="text-xs opacity-80">Click "Add Selected" to continue</p>
+          <div className="space-y-3">
+            <div className="flex items-center gap-4">
+              <div>
+                <p className="font-semibold">
+                  {selectedQuestions.size} Question(s) Selected
+                </p>
+                <p className="text-xs opacity-80">
+                  Configure marks and time limit
+                </p>
+              </div>
             </div>
-            <Button 
-              size="sm" 
-              variant="secondary" 
-              onClick={handleAddQuestions}
-              disabled={adding}
-            >
-              {adding ? <Loader2 className="w-4 h-4 animate-spin" /> : "Add Now"}
-            </Button>
+            <div className="flex gap-2">
+              <div className="flex items-center gap-2">
+                <Label className="text-xs text-white/80">Marks:</Label>
+                <Input
+                  type="number"
+                  value={defaultMarks}
+                  onChange={(e) =>
+                    setDefaultMarks(parseInt(e.target.value) || 0)
+                  }
+                  className="w-20 h-8 text-sm bg-white/10 text-white border-white/20"
+                  min={1}
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <Label className="text-xs text-white/80">Time (sec):</Label>
+                <Input
+                  type="number"
+                  value={defaultTimeLimit}
+                  onChange={(e) =>
+                    setDefaultTimeLimit(parseInt(e.target.value) || 0)
+                  }
+                  className="w-20 h-8 text-sm bg-white/10 text-white border-white/20"
+                  min={30}
+                />
+              </div>
+              <Button
+                size="default"
+                variant="secondary"
+                onClick={handleAddQuestions}
+                disabled={adding}
+              >
+                {adding ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  "Add Selected"
+                )}
+              </Button>
+            </div>
           </div>
         </div>
       )}

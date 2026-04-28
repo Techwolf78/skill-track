@@ -30,7 +30,6 @@ import {
   ShieldCheck,
   User,
   Building2,
-  Lock,
   Trash2,
   AlertTriangle,
 } from "lucide-react";
@@ -54,14 +53,17 @@ import { userService, type UserResponse } from "@/lib/user-service";
 import {
   organisationService,
   type OrganisationResponse,
-} from "@/lib/data-service";
+} from "@/lib/organisation-service";
 import { useToast } from "@/hooks/use-toast";
+import * as XLSX from "xlsx";
+import { saveAs } from "file-saver";
 
 export default function Users() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState("");
   const [roleFilter, setRoleFilter] = useState("all");
+  const [viewUser, setViewUser] = useState<UserResponse | null>(null);
 
   // Add User Form State
   const [isAddUserOpen, setIsAddUserOpen] = useState(false);
@@ -75,10 +77,23 @@ export default function Users() {
     organisation_id: "",
   });
 
-  // Edit Role State
-  const [editingUser, setEditingUser] = useState<UserResponse | null>(null);
-  const [newRole, setNewRole] = useState<string>("");
-  const [isUpdatingRole, setIsUpdatingRole] = useState(false);
+  // Edit User Form State
+  const [editUser, setEditUser] = useState<UserResponse | null>(null);
+  const [isUpdating, setIsUpdating] = useState(false);
+
+  const [editForm, setEditForm] = useState({
+    name: "",
+    phoneNumber: "",
+  });
+
+  useEffect(() => {
+    if (editUser) {
+      setEditForm({
+        name: editUser.name || "",
+        phoneNumber: editUser.phoneNumber || "",
+      });
+    }
+  }, [editUser]);
 
   // Delete User State
   const [userToDelete, setUserToDelete] = useState<UserResponse | null>(null);
@@ -169,19 +184,26 @@ export default function Users() {
     }
   };
 
-  const handleUpdateRole = async () => {
-    if (!editingUser || !newRole) return;
-    setIsUpdatingRole(true);
+  const handleUpdateUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editUser) return;
+
+    setIsUpdating(true);
     try {
-      await userService.patchUser(editingUser.id, { role: newRole });
-      toast({
-        title: "Role Updated",
-        description: `${editingUser.name}'s role is now ${newRole}.`,
+      await userService.patchUser(editUser.id, {
+        name: editForm.name,
+        phoneNumber: editForm.phoneNumber,
       });
-      setEditingUser(null);
+
+      toast({
+        title: "User Updated",
+        description: "Profile updated successfully.",
+      });
+
+      setEditUser(null);
       queryClient.invalidateQueries({ queryKey: ["users"] });
     } catch (error: unknown) {
-      let errorMessage = "Failed to update role.";
+      let errorMessage = "Failed to update user.";
       if (axios.isAxiosError(error)) {
         errorMessage = error.response?.data?.message || error.message;
       }
@@ -191,7 +213,7 @@ export default function Users() {
         variant: "destructive",
       });
     } finally {
-      setIsUpdatingRole(false);
+      setIsUpdating(false);
     }
   };
 
@@ -219,6 +241,73 @@ export default function Users() {
     } finally {
       setIsDeleting(false);
     }
+  };
+
+  const handleExportUsers = () => {
+    if (filteredUsers.length === 0) {
+      toast({
+        title: "No Data",
+        description: "No users match current filters.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Format data nicely
+    const formattedData = filteredUsers.map((user) => ({
+      Name: user.name || "N/A",
+      Email: user.email,
+      Role: user.role,
+      Organisation: user.organisation?.name || "Global / None",
+      Phone: user.phoneNumber || "N/A",
+      Provider: user.provider || "LOCAL",
+      "Joined Date": new Date(user.createdAt).toISOString().split("T")[0],
+    }));
+
+    if (formattedData.length === 0) {
+      toast({
+        title: "No Data",
+        description: "No users match current filters.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Convert JSON → worksheet
+    const worksheet = XLSX.utils.json_to_sheet(formattedData);
+
+    // Add header styling (basic)
+    worksheet["!autofilter"] = { ref: "A1:G1" };
+
+    // Create workbook
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Users");
+
+    // Auto column width (important for "nicely formatted")
+    const colWidths = Object.keys(formattedData[0]).map((key) => {
+      const maxLength = Math.max(
+        key.length,
+        ...formattedData.map(
+          (row) => String(row[key as keyof typeof row]).length,
+        ),
+      );
+      return { wch: maxLength + 2 };
+    });
+    worksheet["!cols"] = colWidths;
+
+    // Generate file
+    const excelBuffer = XLSX.write(workbook, {
+      bookType: "xlsx",
+      type: "array",
+    });
+
+    const file = new Blob([excelBuffer], {
+      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    });
+
+    const date = new Date().toISOString().split("T")[0];
+
+    saveAs(file, `Users_${date}.xlsx`);
   };
 
   const getRoleIcon = (role: string) => {
@@ -256,7 +345,7 @@ export default function Users() {
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <Button variant="outline">
+          <Button variant="outline" onClick={handleExportUsers}>
             <Download className="w-4 h-4 mr-2" />
             Export Users
           </Button>
@@ -528,17 +617,15 @@ export default function Users() {
                           <MoreVertical className="w-4 h-4" />
                         </Button>
                       </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="w-40">
-                        <DropdownMenuItem>View Details</DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={() => {
-                            setEditingUser(user);
-                            setNewRole(user.role);
-                          }}
-                        >
-                          <Lock className="w-4 h-4 mr-2" />
-                          Edit Permissions
+                      <DropdownMenuContent align="end" className="w-44">
+                        <DropdownMenuItem onClick={() => setViewUser(user)}>
+                          View Details
                         </DropdownMenuItem>
+
+                        <DropdownMenuItem onClick={() => setEditUser(user)}>
+                          Edit Profile
+                        </DropdownMenuItem>
+
                         <DropdownMenuItem
                           className="text-destructive font-medium"
                           onClick={() => setUserToDelete(user)}
@@ -555,57 +642,6 @@ export default function Users() {
           </TableBody>
         </Table>
       </div>
-
-      {/* Edit Role Dialog */}
-      <Dialog
-        open={!!editingUser}
-        onOpenChange={(open) => !open && setEditingUser(null)}
-      >
-        <DialogContent className="sm:max-w-[400px]">
-          <DialogHeader>
-            <DialogTitle>Edit Permissions</DialogTitle>
-            <DialogDescription>
-              Update system access for <strong>{editingUser?.name}</strong>.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="py-6 space-y-4">
-            <div className="space-y-2">
-              <Label>Current Role: {editingUser?.role}</Label>
-              <Select value={newRole} onValueChange={setNewRole}>
-                <SelectTrigger className="h-11">
-                  <SelectValue placeholder="Select New Role" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="SUPERADMIN">Super Admin</SelectItem>
-                  <SelectItem value="ADMIN">Admin</SelectItem>
-                  <SelectItem value="TRAINER">Trainer</SelectItem>
-                  <SelectItem value="STUDENT">Student</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="p-4 bg-muted rounded-lg flex items-start gap-3">
-              <Shield className="w-5 h-5 text-primary mt-0.5" />
-              <p className="text-xs text-muted-foreground leading-relaxed">
-                Changing a user's role affects their access to administrative
-                tools, question banks, and student data. Please proceed with
-                caution.
-              </p>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setEditingUser(null)}>
-              Cancel
-            </Button>
-            <Button
-              variant="hero"
-              onClick={handleUpdateRole}
-              disabled={isUpdatingRole}
-            >
-              {isUpdatingRole ? "Updating..." : "Update Permissions"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       {/* Delete Confirmation Dialog */}
       <Dialog
@@ -640,6 +676,220 @@ export default function Users() {
               disabled={isDeleting}
             >
               {isDeleting ? "Deleting..." : "Delete Permanently"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit User Profile Dialog */}
+      <Dialog
+        open={!!editUser}
+        onOpenChange={(open) => !open && setEditUser(null)}
+      >
+        <DialogContent className="sm:max-w-[500px]">
+          <form onSubmit={handleUpdateUser}>
+            <DialogHeader>
+              <DialogTitle>Edit Profile</DialogTitle>
+              <DialogDescription>
+                Update user profile information. Some fields are locked.
+              </DialogDescription>
+            </DialogHeader>
+
+            {editUser && (
+              <div className="space-y-4 py-4">
+                {/* Name */}
+                <div className="space-y-2">
+                  <Label>Full Name</Label>
+                  <Input
+                    value={editForm.name}
+                    onChange={(e) =>
+                      setEditForm({ ...editForm, name: e.target.value })
+                    }
+                    required
+                  />
+                </div>
+
+                {/* Phone */}
+                <div className="space-y-2">
+                  <Label>Phone Number</Label>
+                  <Input
+                    value={editForm.phoneNumber}
+                    onChange={(e) =>
+                      setEditForm({
+                        ...editForm,
+                        phoneNumber: e.target.value,
+                      })
+                    }
+                    placeholder="+91..."
+                  />
+                </div>
+
+                <div className="space-y-2 opacity-60 col-span-2">
+                  <Label>Organisation</Label>
+                  <Input
+                    value={editUser.organisation?.name || "Global / None"}
+                    disabled
+                  />
+                </div>
+
+                {/* Locked Fields */}
+                <div className="grid grid-cols-2 gap-4 pt-2">
+                  <div className="space-y-2 opacity-60">
+                    <Label>Email</Label>
+                    <Input value={editUser.email} disabled />
+                  </div>
+
+                  <div className="space-y-2 opacity-60">
+                    <Label>Role</Label>
+                    <Input value={editUser.role} disabled />
+                    <p className="text-xs text-muted-foreground">
+                      Role cannot be changed
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setEditUser(null)}
+              >
+                Cancel
+              </Button>
+              <Button type="submit" variant="hero" disabled={isUpdating}>
+                {isUpdating ? "Saving..." : "Save Changes"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* View User Details Dialog */}
+      <Dialog
+        open={!!viewUser}
+        onOpenChange={(open) => !open && setViewUser(null)}
+      >
+        <DialogContent className="sm:max-w-[650px] max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>User Details</DialogTitle>
+            <DialogDescription>
+              Complete profile and account information.
+            </DialogDescription>
+          </DialogHeader>
+
+          {viewUser && (
+            <div className="space-y-6 py-4">
+              {/* Profile Header */}
+              <div className="flex items-center gap-4">
+                <div className="w-16 h-16 rounded-full bg-gradient-primary flex items-center justify-center text-lg font-bold text-primary-foreground shadow">
+                  {viewUser.name
+                    ?.split(" ")
+                    .map((n: string) => n[0])
+                    .join("")
+                    .toUpperCase() || "U"}
+                </div>
+                <div>
+                  <h3 className="text-xl font-semibold">
+                    {viewUser.name || "Anonymous User"}
+                  </h3>
+                  <p className="text-sm text-muted-foreground">
+                    {viewUser.email}
+                  </p>
+                </div>
+              </div>
+
+              {/* Core Info */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="p-4 rounded-lg border bg-muted/40">
+                  <p className="text-xs text-muted-foreground mb-1">User ID</p>
+                  <p className="text-xs font-mono break-all">{viewUser.id}</p>
+                </div>
+
+                <div className="p-4 rounded-lg border bg-muted/40">
+                  <p className="text-xs text-muted-foreground mb-1">Role</p>
+                  <div className="flex items-center gap-2">
+                    {getRoleIcon(viewUser.role)}
+                    <Badge variant={getRoleBadgeVariant(viewUser.role)}>
+                      {viewUser.role}
+                    </Badge>
+                  </div>
+                </div>
+
+                <div className="p-4 rounded-lg border bg-muted/40">
+                  <p className="text-xs text-muted-foreground mb-1">
+                    Organisation
+                  </p>
+                  <p className="text-sm font-medium">
+                    {viewUser.organisation?.name || "Global / None"}
+                  </p>
+                </div>
+
+                <div className="p-4 rounded-lg border bg-muted/40">
+                  <p className="text-xs text-muted-foreground mb-1">Provider</p>
+                  <Badge variant="outline">
+                    {viewUser.provider || "LOCAL"}
+                  </Badge>
+                </div>
+              </div>
+
+              {/* Contact Info */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="p-4 rounded-lg border bg-muted/40">
+                  <p className="text-xs text-muted-foreground mb-1">Email</p>
+                  <div className="flex items-center gap-2 text-sm">
+                    <Mail className="w-4 h-4 text-muted-foreground" />
+                    {viewUser.email}
+                  </div>
+                </div>
+
+                <div className="p-4 rounded-lg border bg-muted/40">
+                  <p className="text-xs text-muted-foreground mb-1">
+                    Phone Number
+                  </p>
+                  <div className="flex items-center gap-2 text-sm">
+                    <Phone className="w-4 h-4 text-muted-foreground" />
+                    {viewUser.phoneNumber || "Not Provided"}
+                  </div>
+                </div>
+              </div>
+
+              {/* Timeline */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="p-4 rounded-lg border bg-muted/40">
+                  <p className="text-xs text-muted-foreground mb-1">
+                    Created At
+                  </p>
+                  <p className="text-sm">
+                    {new Date(viewUser.createdAt).toLocaleString()}
+                  </p>
+                </div>
+
+                <div className="p-4 rounded-lg border bg-muted/40">
+                  <p className="text-xs text-muted-foreground mb-1">
+                    Last Updated
+                  </p>
+                  <p className="text-sm">
+                    {new Date(viewUser.updatedAt).toLocaleString()}
+                  </p>
+                </div>
+              </div>
+
+              {/* System Notice */}
+              <div className="p-4 rounded-lg bg-muted flex items-start gap-3">
+                <Shield className="w-5 h-5 text-primary mt-0.5" />
+                <p className="text-xs text-muted-foreground">
+                  This user’s role and authentication provider are fixed after
+                  account creation and cannot be modified.
+                </p>
+              </div>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setViewUser(null)}>
+              Close
             </Button>
           </DialogFooter>
         </DialogContent>

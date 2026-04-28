@@ -30,25 +30,14 @@ import {
   Code,
   ListChecks,
 } from "lucide-react";
-import { testService } from "@/lib/test-service";
+import {
+  testService,
+  Subject,
+  Topic,
+  Subtopic,
+  Question,
+} from "@/lib/test-service";
 import { useToast } from "@/hooks/use-toast";
-
-interface Subject {
-  id: string;
-  name: string;
-}
-
-interface Topic {
-  id: string;
-  name: string;
-  subjectId?: string;
-}
-
-interface Subtopic {
-  id: string;
-  name: string;
-  subjectId?: string;
-}
 
 interface McqOption {
   text: string;
@@ -66,14 +55,14 @@ export default function EditQuestion() {
   const [topics, setTopics] = useState<Topic[]>([]);
   const [subtopics, setSubtopics] = useState<Subtopic[]>([]);
   const [allTopics, setAllTopics] = useState<Topic[]>([]);
-  const [allSubtopics, setAllSubtopics] = useState<Subtopic[]>([]);
 
   // Form state
-  const [questionType, setQuestionType] = useState<"MCQ" | "CODE">("MCQ");
+  const [questionType, setQuestionType] = useState<"MCQ" | "CODING">("MCQ");
   const [selectedSubject, setSelectedSubject] = useState("");
   const [selectedTopic, setSelectedTopic] = useState("");
   const [selectedSubtopic, setSelectedSubtopic] = useState("");
   const [prompt, setPrompt] = useState("");
+  const [marks, setMarks] = useState<number>(5);
   const [mcqOptions, setMcqOptions] = useState<McqOption[]>([
     { text: "", isCorrect: false },
     { text: "", isCorrect: false },
@@ -84,53 +73,54 @@ export default function EditQuestion() {
   const fetchData = useCallback(async () => {
     try {
       setLoading(true);
-      const [questionData, allSubjects, allTopicsData, allSubtopicsData] =
-        await Promise.all([
-          testService.getQuestionById(id!),
-          testService.getAllSubjects(),
-          testService.getAllTopics(),
-          testService.getAllSubtopics(),
-        ]);
+      const [questionData, allSubjects, allTopicsData] = await Promise.all([
+        testService.getQuestionById(id!),
+        testService.getAllSubjects(),
+        testService.getAllTopics(),
+      ]);
 
       setSubjects(allSubjects);
       setAllTopics(allTopicsData);
-      setAllSubtopics(allSubtopicsData);
 
-      setPrompt(questionData.prompt);
-      // Ensure type is either "MCQ" or "CODE"
-      const qType = questionData.type === "TEXT" ? "MCQ" : questionData.type;
-      setQuestionType(qType === "CODE" ? "CODE" : "MCQ");
+      // Set form data from fetched question
+      setPrompt(questionData.prompt || "");
+      setMarks(questionData.marks || 5);
 
-      // Extract IDs - backend sends objects, not just IDs
-      const subjectId =
-        (questionData as any).subject?.id || questionData.subjectId;
-      const topicId = (questionData as any).topic?.id || questionData.topicId;
-      const subtopicId =
-        (questionData as any).subtopic?.id || questionData.subtopicId;
+      // Handle question type
+      const qType = questionData.questionType || questionData.type;
+      setQuestionType(qType === "CODING" ? "CODING" : "MCQ");
+
+      // Extract IDs - handle both object and direct ID
+      const subjectId = questionData.subject?.id || questionData.subjectId;
+      const topicId = questionData.topic?.id || questionData.topicId;
+      const subtopicId = questionData.subtopic?.id || questionData.subtopicId;
 
       setSelectedSubject(subjectId || "");
 
       if (subjectId) {
+        // Filter topics for this subject
         const filteredTopics = allTopicsData.filter((topic) => {
           return (
-            (topic as any).subjectId === subjectId ||
-            (topic as any).subject?.id === subjectId
+            topic.subjectId === subjectId || topic.subject?.id === subjectId
           );
         });
         setTopics(filteredTopics);
-
-        const filteredSubtopics = allSubtopicsData.filter((subtopic) => {
-          return (
-            (subtopic as any).subjectId === subjectId ||
-            (subtopic as any).subject?.id === subjectId
-          );
-        });
-        setSubtopics(filteredSubtopics);
-
         setSelectedTopic(topicId || "");
         setSelectedSubtopic(subtopicId || "");
+
+        // Fetch subtopics if topic is selected
+        if (topicId) {
+          try {
+            const subtopicsData =
+              await testService.getSubtopicsByTopic(topicId);
+            setSubtopics(subtopicsData);
+          } catch (error) {
+            console.error("Failed to fetch subtopics:", error);
+          }
+        }
       }
 
+      // Handle MCQ options
       if (questionData.mcqOptions && questionData.mcqOptions.length > 0) {
         const parsedOptions = questionData.mcqOptions.map(
           (opt: { text: string; isCorrect: boolean }) => ({
@@ -157,27 +147,33 @@ export default function EditQuestion() {
     fetchData();
   }, [fetchData]);
 
-  const handleSubjectChange = (subjectId: string) => {
+  const handleSubjectChange = async (subjectId: string) => {
     setSelectedSubject(subjectId);
     setSelectedTopic("");
     setSelectedSubtopic("");
+    setSubtopics([]);
 
     const filteredTopics = allTopics.filter((topic) => {
-      return (
-        (topic as any).subjectId === subjectId ||
-        (topic as any).subject?.id === subjectId
-      );
+      return topic.subjectId === subjectId || topic.subject?.id === subjectId;
     });
-
-    const filteredSubtopics = allSubtopics.filter((subtopic) => {
-      return (
-        (subtopic as any).subjectId === subjectId ||
-        (subtopic as any).subject?.id === subjectId
-      );
-    });
-
     setTopics(filteredTopics);
-    setSubtopics(filteredSubtopics);
+  };
+
+  const handleTopicChange = async (topicId: string) => {
+    setSelectedTopic(topicId);
+    setSelectedSubtopic("");
+
+    if (topicId) {
+      try {
+        const subtopicsData = await testService.getSubtopicsByTopic(topicId);
+        setSubtopics(subtopicsData);
+      } catch (error) {
+        console.error("Failed to fetch subtopics:", error);
+        setSubtopics([]);
+      }
+    } else {
+      setSubtopics([]);
+    }
   };
 
   const handleMcqOptionChange = (index: number, text: string) => {
@@ -220,6 +216,7 @@ export default function EditQuestion() {
   };
 
   const handleUpdate = async () => {
+    // Validation
     if (!prompt.trim()) {
       toast({
         title: "Validation Error",
@@ -233,6 +230,15 @@ export default function EditQuestion() {
       toast({
         title: "Validation Error",
         description: "Please select a subject",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (marks <= 0) {
+      toast({
+        title: "Validation Error",
+        description: "Marks must be greater than 0",
         variant: "destructive",
       });
       return;
@@ -263,18 +269,18 @@ export default function EditQuestion() {
     setSaving(true);
     try {
       const questionData = {
-        subjectId: selectedSubject,
-        topicId: selectedTopic || null,
-        subtopicId: selectedSubtopic || null,
-        type: questionType,
+        questionType: questionType,
         prompt: prompt,
-        mcqOptions:
-          questionType === "MCQ"
-            ? mcqOptions.map((opt) => ({
-                text: opt.text,
-                isCorrect: opt.isCorrect,
-              }))
-            : undefined,
+        subjectId: selectedSubject,
+        topicId: selectedTopic || undefined,
+        subtopicId: selectedSubtopic || undefined,
+        marks: marks,
+        ...(questionType === "MCQ" && {
+          mcqOptions: mcqOptions.map((opt) => ({
+            text: opt.text,
+            isCorrect: opt.isCorrect,
+          })),
+        }),
       };
 
       await testService.updateQuestion(id!, questionData);
@@ -334,7 +340,9 @@ export default function EditQuestion() {
             <CardContent>
               <RadioGroup
                 value={questionType}
-                onValueChange={(val) => setQuestionType(val as "MCQ" | "CODE")}
+                onValueChange={(val) =>
+                  setQuestionType(val as "MCQ" | "CODING")
+                }
                 className="flex gap-6"
               >
                 <div className="flex items-center space-x-2">
@@ -345,7 +353,7 @@ export default function EditQuestion() {
                   </Label>
                 </div>
                 <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="CODE" id="code" />
+                  <RadioGroupItem value="CODING" id="code" />
                   <Label htmlFor="code" className="flex items-center gap-2">
                     <Code className="w-4 h-4" />
                     Coding Question
@@ -389,19 +397,28 @@ export default function EditQuestion() {
                   <Select
                     value={selectedTopic || "none"}
                     onValueChange={(value) =>
-                      setSelectedTopic(value === "none" ? "" : value)
+                      handleTopicChange(value === "none" ? "" : value)
                     }
+                    disabled={!selectedSubject}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Select topic" />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="none">None</SelectItem>
-                      {topics.map((topic) => (
-                        <SelectItem key={topic.id} value={topic.id}>
-                          {topic.name}
-                        </SelectItem>
-                      ))}
+                      {topics.length === 0 ? (
+                        <div className="px-2 py-1.5 text-sm text-muted-foreground">
+                          {selectedSubject
+                            ? "No topics available"
+                            : "Select a subject first"}
+                        </div>
+                      ) : (
+                        topics.map((topic) => (
+                          <SelectItem key={topic.id} value={topic.id}>
+                            {topic.name}
+                          </SelectItem>
+                        ))
+                      )}
                     </SelectContent>
                   </Select>
                 </div>
@@ -413,20 +430,41 @@ export default function EditQuestion() {
                     onValueChange={(value) =>
                       setSelectedSubtopic(value === "none" ? "" : value)
                     }
+                    disabled={!selectedTopic}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Select subtopic" />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="none">None</SelectItem>
-                      {subtopics.map((subtopic) => (
-                        <SelectItem key={subtopic.id} value={subtopic.id}>
-                          {subtopic.name}
-                        </SelectItem>
-                      ))}
+                      {subtopics.length === 0 ? (
+                        <div className="px-2 py-1.5 text-sm text-muted-foreground">
+                          {selectedTopic
+                            ? "No subtopics available"
+                            : "Select a topic first"}
+                        </div>
+                      ) : (
+                        subtopics.map((subtopic) => (
+                          <SelectItem key={subtopic.id} value={subtopic.id}>
+                            {subtopic.name}
+                          </SelectItem>
+                        ))
+                      )}
                     </SelectContent>
                   </Select>
                 </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Marks *</Label>
+                <Input
+                  type="number"
+                  value={marks}
+                  onChange={(e) => setMarks(parseInt(e.target.value) || 0)}
+                  min={1}
+                  max={100}
+                  placeholder="e.g., 5"
+                />
               </div>
 
               <div className="space-y-2">
@@ -506,7 +544,7 @@ export default function EditQuestion() {
           )}
 
           {/* Coding Question Placeholder */}
-          {questionType === "CODE" && (
+          {questionType === "CODING" && (
             <Card>
               <CardHeader>
                 <CardTitle>Coding Question Setup</CardTitle>
@@ -540,6 +578,12 @@ export default function EditQuestion() {
                   {prompt || "Your question will appear here"}
                 </p>
               </div>
+              {marks > 0 && (
+                <div className="rounded-lg bg-muted/30 p-4">
+                  <p className="text-sm font-medium mb-2">Marks:</p>
+                  <Badge variant="outline">{marks} marks</Badge>
+                </div>
+              )}
               {questionType === "MCQ" && mcqOptions.some((opt) => opt.text) && (
                 <div className="rounded-lg bg-muted/30 p-4">
                   <p className="text-sm font-medium mb-2">Options:</p>
