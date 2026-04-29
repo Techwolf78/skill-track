@@ -26,6 +26,17 @@ import DSAPlayground from "./pages/SuperAdmin/DSAPlayground";
 import Reports from "./pages/SuperAdmin/Reports";
 import { AuthProvider } from "./lib/auth-context";
 import ErrorBoundary from "./components/ErrorBoundary";
+import { ProtectedRoute } from "./components/ProtectedRoute";
+import { ROLES } from "./lib/roles";
+
+// Admin pages
+import AdminDashboardAdmin from "./pages/Admin/Dashboard";
+import AdminCandidates from "./pages/Admin/AdminCandidates";
+import AdminQuestionBank from "./pages/Admin/QuestionBank";
+import AdminTests from "./pages/Admin/Tests";
+import AdminTestCreate from "./pages/Admin/TestCreate";
+import AdminTestsEdit from "./pages/Admin/TestsEdit";
+import AdminTestDetails from "./pages/Admin/TestDetails";
 
 // Test Taking
 import TestInterface from "./pages/test/TestInterface";
@@ -54,9 +65,17 @@ const App = () => (
               <Route path="/" element={<NationalLandingPage />} />
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
+              <Route path="/unauthorized" element={<NotFound />} />
 
-              {/* Admin Routes */}
-              <Route path="/admin" element={<AdminLayout />}>
+              {/* SuperAdmin Routes (SUPERADMIN role only) */}
+              <Route
+                path="/superadmin"
+                element={
+                  <ProtectedRoute requiredRoles={[ROLES.SUPERADMIN]}>
+                    <AdminLayout />
+                  </ProtectedRoute>
+                }
+              >
                 <Route index element={<AdminDashboard />} />
                 <Route path="organisations" element={<Organisations />} />
                 <Route path="users" element={<Users />} />
@@ -69,8 +88,7 @@ const App = () => (
                 <Route path="tests" element={<Tests />} />
                 <Route path="tests/create" element={<TestCreate />} />
                 <Route path="tests/edit/:id" element={<TestsEdit />} />
-                <Route path="tests/:id" element={<TestDetails />} />{" "}
-                {/* Add this route - IMPORTANT: place before the /tests/:id/questions route */}
+                <Route path="tests/:id" element={<TestDetails />} />
                 <Route path="tests/:id/questions" element={<TestQuestions />} />
                 <Route path="questions/add" element={<AddQuestion />} />
                 <Route path="questions/create" element={<AddQuestion />} />
@@ -78,6 +96,24 @@ const App = () => (
                 <Route path="reports" element={<Reports />} />
                 <Route path="settings" element={<Settings />} />
                 <Route path="subjects/manage" element={<ManageSubjects />} />
+              </Route>
+
+              {/* Admin Routes (ADMIN role only) */}
+              <Route
+                path="/admin"
+                element={
+                  <ProtectedRoute requiredRoles={[ROLES.ADMIN]}>
+                    <AdminLayout />
+                  </ProtectedRoute>
+                }
+              >
+                <Route index element={<AdminDashboardAdmin />} />
+                <Route path="candidates" element={<AdminCandidates />} />
+                <Route path="questions" element={<AdminQuestionBank />} />
+                <Route path="tests" element={<AdminTests />} />
+                <Route path="tests/create" element={<AdminTestCreate />} />
+                <Route path="tests/edit/:id" element={<AdminTestsEdit />} />
+                <Route path="tests/:id" element={<AdminTestDetails />} />
               </Route>
 
               {/* Student Test Taking */}

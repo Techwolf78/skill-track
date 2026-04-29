@@ -16,6 +16,8 @@ import {
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { authService } from "@/lib/auth-service";
+import { getRedirectPathForRole } from "@/lib/auth-utils";
+import { useAuth } from "@/lib/auth-context";
 
 const features = [
   "MCQ & Coding Assessments",
@@ -27,6 +29,7 @@ const features = [
 export default function Login() {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { login: loginToContext } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [adminEmail, setAdminEmail] = useState("admin@company.com");
   const [adminPassword, setAdminPassword] = useState("");
@@ -49,20 +52,19 @@ export default function Login() {
       console.log("Stored token:", localStorage.getItem("token"));
       console.log("Stored user:", localStorage.getItem("user"));
 
+      // Use the login function from AuthContext to update React state immediately
+      // This prevents the race condition where ProtectedRoute checks isAuthenticated before state updates
+      loginToContext(response.accessToken, response.user);
+
       toast({
         title: "Login Successful",
         description: `Welcome back, ${response.user.name || adminEmail}!`,
       });
 
       // Navigate based on role
-      if (
-        response.user.role === "SUPERADMIN" ||
-        response.user.role === "ADMIN"
-      ) {
-        navigate("/admin");
-      } else {
-        navigate("/dashboard");
-      }
+      const redirectPath = getRedirectPathForRole(response.user.role);
+      console.log("Redirecting to:", redirectPath);
+      navigate(redirectPath);
     } catch (error: unknown) {
       console.error("Login failed:", error);
       let errorMessage = "Invalid credentials. Please try again.";
@@ -94,8 +96,8 @@ export default function Login() {
         password: "password", // Default or handled by backend
       });
 
-      localStorage.setItem("token", response.accessToken);
-      localStorage.setItem("user", JSON.stringify(response.user));
+      // Use the login function from AuthContext to update React state immediately
+      loginToContext(response.accessToken, response.user);
 
       toast({
         title: "Access Granted!",

@@ -1,10 +1,16 @@
  import { Outlet } from "react-router-dom";
- import { AdminSidebar } from "./AdminSidebar";
+ import { SuperAdminSidebar } from "./SuperAdminSidebar";
+ import { AdminSidebar } from "./AdminSidebarNew";
+ import { useAuth } from "@/lib/auth-context";
+ import { ROLES } from "@/lib/roles";
  
  export function AdminLayout() {
+   const { user } = useAuth();
+   const isSuperAdmin = user?.role === ROLES.SUPERADMIN;
+
    return (
      <div className="flex min-h-screen bg-background">
-       <AdminSidebar />
+       {isSuperAdmin ? <SuperAdminSidebar /> : <AdminSidebar />}
        <main className="flex-1 overflow-auto">
          <Outlet />
        </main>

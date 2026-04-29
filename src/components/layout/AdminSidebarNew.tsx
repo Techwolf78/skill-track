@@ -1,50 +1,34 @@
-import React, { useState, useEffect } from "react";
-import { NavLink, useNavigate, useLocation } from "react-router-dom";
+import { NavLink, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import {
   LayoutDashboard,
-  Building2,
   Users,
   FileQuestion,
   ClipboardList,
-  BarChart3,
-  Settings,
   LogOut,
   ChevronLeft,
   ChevronRight,
-  UserRound,
 } from "lucide-react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { useAuth } from "@/lib/auth-context";
 
 const navItems = [
   { icon: LayoutDashboard, label: "Dashboard", path: "/admin", end: true },
-  { icon: Building2, label: "Organisations", path: "/admin/organisations", end: false },
-  { icon: UserRound, label: "Users", path: "/admin/users", end: false },
-  { icon: Users, label: "Students", path: "/admin/students", end: false },
-  { icon: FileQuestion, label: "Question Bank", path: "/admin/questions", end: false },
-  { icon: ClipboardList, label: "Tests", path: "/admin/tests", end: false },
-  { icon: BarChart3, label: "Reports", path: "/admin/reports", end: false },
-  { icon: Settings, label: "Settings", path: "/admin/settings", end: false },
+  { icon: Users, label: "Candidates", path: "/admin/candidates" },
+  { icon: FileQuestion, label: "Question Bank", path: "/admin/questions" },
+  { icon: ClipboardList, label: "Tests", path: "/admin/tests" },
 ];
 
 export function AdminSidebar() {
   const [collapsed, setCollapsed] = useState(false);
   const navigate = useNavigate();
-  const location = useLocation();
+  const { user } = useAuth();
 
   const handleLogout = () => {
     localStorage.removeItem("token");
     localStorage.removeItem("user");
     navigate("/login");
-  };
-
-  // Check if a route is active for child routes
-  const isRouteActive = (itemPath: string, end: boolean = false) => {
-    if (end) {
-      return location.pathname === itemPath;
-    }
-    // For non-end routes, check if the current path starts with the item path
-    return location.pathname.startsWith(itemPath);
   };
 
   return (
@@ -60,40 +44,39 @@ export function AdminSidebar() {
           <span className="text-xl font-bold text-primary-foreground">R</span>
         </div>
         {!collapsed && (
-          <span className="font-heading font-bold text-xl text-sidebar-foreground">
-            RxOne
-          </span>
+          <>
+            <span className="font-heading font-bold text-xl text-sidebar-foreground">
+              RxOne
+            </span>
+            {user?.organisationData && (
+              <div className="ml-auto text-xs bg-sidebar-accent/50 px-2 py-1 rounded">
+                {user.organisationData.name}
+              </div>
+            )}
+          </>
         )}
       </div>
 
       {/* Navigation */}
       <nav className="flex-1 py-6 px-3 space-y-1 overflow-y-auto">
-        {navItems.map((item) => {
-          const isActive = isRouteActive(item.path, item.end);
-          
-          return (
-            <NavLink
-              key={item.path}
-              to={item.path}
-              end={item.end}
-              onClick={() => console.log(`📍 Clicked: ${item.label} → ${item.path}`)}
-              className={cn(
+        {navItems.map((item) => (
+          <NavLink
+            key={item.path}
+            to={item.path}
+            end={item.end}
+            className={({ isActive }) =>
+              cn(
                 "flex items-center gap-3 px-3 py-3 rounded-lg transition-all duration-200 group",
                 isActive
-                  ? "bg-primary text-primary-foreground shadow-primary"
+                  ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-primary"
                   : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-              )}
-              onMouseEnter={() => {
-                if (isActive) {
-                  console.log(`🟢 HIGHLIGHT: ${item.label} is currently ACTIVE`);
-                }
-              }}
-            >
-              <item.icon className={cn("w-5 h-5 flex-shrink-0", collapsed && "mx-auto")} />
-              {!collapsed && <span className="font-medium">{item.label}</span>}
-            </NavLink>
-          );
-        })}
+              )
+            }
+          >
+            <item.icon className={cn("w-5 h-5 flex-shrink-0", collapsed && "mx-auto")} />
+            {!collapsed && <span className="font-medium">{item.label}</span>}
+          </NavLink>
+        ))}
       </nav>
 
       {/* Bottom section */}
