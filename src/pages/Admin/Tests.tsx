@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -30,69 +30,121 @@ import {
   Target,
   FileQuestion,
   Users,
+  Loader2,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-
-// Sample test data for Admin
-const sampleTests = [
-  {
-    id: "1",
-    title: "JavaScript Fundamentals",
-    description: "Basic JavaScript concepts and syntax",
-    status: "Published",
-    candidates: 25,
-    submissions: 18,
-    questionsCount: 20,
-    duration: 60,
-    createdAt: "2024-04-10",
-  },
-  {
-    id: "2",
-    title: "React Advanced",
-    description: "Advanced React patterns and hooks",
-    status: "Draft",
-    candidates: 12,
-    submissions: 5,
-    questionsCount: 15,
-    duration: 90,
-    createdAt: "2024-04-12",
-  },
-  {
-    id: "3",
-    title: "System Design Concepts",
-    description: "Architecture and design patterns",
-    status: "Published",
-    candidates: 8,
-    submissions: 8,
-    questionsCount: 10,
-    duration: 120,
-    createdAt: "2024-04-15",
-  },
-];
+import { testService, Test, TestViewModel } from "@/lib/test-service";
 
 export default function AdminTests() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState("");
-  const [tests, setTests] = useState(sampleTests);
+  const [tests, setTests] = useState<Test[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const fetchTests = useCallback(async () => {
+    try {
+      setLoading(true);
+      const data = await testService.getAllTests();
+      setTests(data);
+    } catch (error: any) {
+      console.error("Failed to fetch tests:", error);
+      toast({
+        title: "Error",
+        description: error.response?.data?.message || "Failed to load tests",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  }, [toast]);
+
+  useEffect(() => {
+    fetchTests();
+  }, [fetchTests]);
 
   const filteredTests = tests.filter(
     (test) =>
       test.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      test.description.toLowerCase().includes(searchTerm.toLowerCase())
+      (test.description && test.description.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
-  const handleDelete = (testId: string) => {
-    setTests(tests.filter((t) => t.id !== testId));
-    toast({
-      title: "Test Deleted",
-      description: "The test has been deleted successfully.",
-    });
+  const handleDelete = async (testId: string) => {
+    try {
+      await testService.deleteTest(testId);
+      toast({
+        title: "Test Deleted",
+        description: "The test has been deleted successfully.",
+      });
+      fetchTests(); // Refresh the list
+    } catch (error: any) {
+      console.error("Failed to delete test:", error);
+      toast({
+        title: "Error",
+        description: error.response?.data?.message || "Failed to delete test",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleDuplicate = async (test: Test) => {
+    try {
+      // Create a duplicate test with "Copy" suffix
+      const duplicateTest = {
+        title: `${test.title} (Copy)`,
+        description: test.description,
+        durationMins: test.durationMins,
+        difficulty: test.difficulty,
+        status: "DRAFT" as const,
+        passMark: test.passMark,
+        isActive: false,
+      };
+      
+      const newTest = await testService.createTest(duplicateTest);
+      toast({
+        title: "Test Duplicated",
+        description: "The test has been duplicated successfully.",
+      });
+      
+      // Navigate to edit the new test
+      navigate(`/admin/tests/edit/${newTest.id}`);
+    } catch (error: any) {
+      console.error("Failed to duplicate test:", error);
+      toast({
+        title: "Error",
+        description: error.response?.data?.message || "Failed to duplicate test",
+        variant: "destructive",
+      });
+    }
   };
 
   const getStatusColor = (status: string) => {
-    return status === "Published" ? "bg-success/10 text-success" : "bg-warning/10 text-warning";
+    return status === "PUBLISHED" 
+      ? "bg-green-500/10 text-green-500" 
+      : status === "DRAFT" 
+        ? "bg-yellow-500/10 text-yellow-500"
+        : "bg-gray-500/10 text-gray-500";
   };
+
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case "PUBLISHED":
+        return "Published";
+      case "DRAFT":
+        return "Draft";
+      case "ARCHIVED":
+        return "Archived";
+      default:
+        return status;
+    }
+  };
+
+  // Calculate total submissions (if you have this data from backend)
+  const totalSubmissions = tests.reduce((sum, test) => {
+    // If you have submissions count in your test object
+    // return sum + (test.submissions || 0);
+    return sum; // Placeholder until you have submissions data
+  }, 0);
 
   return (
     <div className="p-8 space-y-6 animate-fade-in">
@@ -135,12 +187,18 @@ export default function AdminTests() {
               <TableHead className="font-semibold">Status</TableHead>
               <TableHead className="font-semibold text-center">Questions</TableHead>
               <TableHead className="font-semibold text-center">Duration</TableHead>
-              <TableHead className="font-semibold text-center">Submissions</TableHead>
+              <TableHead className="font-semibold text-center">Difficulty</TableHead>
               <TableHead className="font-semibold text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filteredTests.length === 0 ? (
+            {loading ? (
+              <TableRow>
+                <TableCell colSpan={6} className="text-center py-10">
+                  <Loader2 className="w-6 h-6 animate-spin mx-auto" />
+                </TableCell>
+              </TableRow>
+            ) : filteredTests.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={6} className="text-center py-10 text-muted-foreground">
                   No tests found
@@ -152,30 +210,35 @@ export default function AdminTests() {
                   <TableCell>
                     <div>
                       <p className="font-medium">{test.title}</p>
-                      <p className="text-sm text-muted-foreground line-clamp-1">
-                        {test.description}
-                      </p>
+                      {test.description && (
+                        <p className="text-sm text-muted-foreground line-clamp-1">
+                          {test.description}
+                        </p>
+                      )}
                     </div>
                   </TableCell>
                   <TableCell>
                     <Badge className={getStatusColor(test.status)}>
-                      {test.status}
+                      {getStatusBadge(test.status)}
                     </Badge>
                   </TableCell>
                   <TableCell className="text-center">
                     <div className="flex items-center justify-center gap-1">
                       <FileQuestion className="w-4 h-4 text-muted-foreground" />
-                      {test.questionsCount}
+                      {test.questions?.length || test.testQuestions?.length || 0}
                     </div>
                   </TableCell>
                   <TableCell className="text-center">
                     <div className="flex items-center justify-center gap-1">
                       <Clock className="w-4 h-4 text-muted-foreground" />
-                      {test.duration}m
+                      {test.durationMins}m
                     </div>
                   </TableCell>
                   <TableCell className="text-center">
-                    <Badge variant="secondary">{test.submissions}</Badge>
+                    <div className="flex items-center justify-center gap-1">
+                      <Target className="w-4 h-4 text-muted-foreground" />
+                      {test.difficulty}
+                    </div>
                   </TableCell>
                   <TableCell className="text-right">
                     <DropdownMenu>
@@ -197,7 +260,9 @@ export default function AdminTests() {
                           <Edit className="w-4 h-4 mr-2" />
                           Edit Test
                         </DropdownMenuItem>
-                        <DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => handleDuplicate(test)}
+                        >
                           <Copy className="w-4 h-4 mr-2" />
                           Duplicate Test
                         </DropdownMenuItem>
@@ -237,24 +302,24 @@ export default function AdminTests() {
             <div>
               <p className="text-sm text-muted-foreground">Published</p>
               <p className="text-2xl font-bold">
-                {tests.filter((t) => t.status === "Published").length}
+                {tests.filter((t) => t.status === "PUBLISHED").length}
               </p>
             </div>
-            <div className="w-10 h-10 rounded-lg bg-success/10 flex items-center justify-center">
-              <Badge className="w-5 h-5 text-success">✓</Badge>
+            <div className="w-10 h-10 rounded-lg bg-green-500/10 flex items-center justify-center">
+              <Badge className="w-5 h-5 text-green-500">✓</Badge>
             </div>
           </div>
         </div>
         <div className="rounded-xl border bg-card p-4">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-muted-foreground">Total Submissions</p>
+              <p className="text-sm text-muted-foreground">Draft</p>
               <p className="text-2xl font-bold">
-                {tests.reduce((sum, t) => sum + t.submissions, 0)}
+                {tests.filter((t) => t.status === "DRAFT").length}
               </p>
             </div>
-            <div className="w-10 h-10 rounded-lg bg-accent/10 flex items-center justify-center">
-              <Users className="w-5 h-5 text-accent" />
+            <div className="w-10 h-10 rounded-lg bg-yellow-500/10 flex items-center justify-center">
+              <Edit className="w-5 h-5 text-yellow-500" />
             </div>
           </div>
         </div>

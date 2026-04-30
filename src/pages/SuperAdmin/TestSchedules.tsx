@@ -45,6 +45,7 @@ import {
   Play,
   CheckCircle,
   XCircle,
+  RefreshCw,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { testService, Test, TestScheduleExtended } from "@/lib/test-service";
@@ -82,71 +83,83 @@ export default function TestSchedules() {
   const { toast } = useToast();
   const navigate = useNavigate();
 
-const fetchData = useCallback(async () => {
-  try {
-    setLoading(true);
-    const [schedulesData, testsData, orgsData, invitationsResponse] = await Promise.all([
-      testService.getAllTestSchedules(),
-      testService.getAllTests(),
-      apiClient.get("/organisations").then((res) => res.data.data || []),
-      apiClient.get("/candidate-invitations").catch(() => ({ data: { data: [] } })),
-    ]);
+  const fetchData = useCallback(async () => {
+    try {
+      setLoading(true);
+      const [schedulesData, testsData, orgsData, invitationsResponse] =
+        await Promise.all([
+          testService.getAllTestSchedules(),
+          testService.getAllTests(),
+          apiClient.get("/organisations").then((res) => res.data.data || []),
+          apiClient
+            .get("/candidate-invitations")
+            .catch(() => ({ data: { data: [] } })),
+        ]);
 
-    const invitations = invitationsResponse.data.data || [];
+      const invitations = invitationsResponse.data.data || [];
 
-    console.log("📋 Loaded Schedules:", schedulesData);
-    console.log("📋 Loaded Tests:", testsData);
-    console.log("📋 Loaded Organisations:", orgsData);
-    console.log("📋 Loaded Invitations:", invitations);
+      console.log("📋 Loaded Schedules:", schedulesData);
+      console.log("📋 Loaded Tests:", testsData);
+      console.log("📋 Loaded Organisations:", orgsData);
+      console.log("📋 Loaded Invitations:", invitations);
 
-    // Create a quick map of organisationId to name from orgsData
-    const orgMap = new Map();
-    orgsData.forEach((org: Organisation) => {
-      orgMap.set(org.id, org.name);
-    });
+      // Create a quick map of organisationId to name from orgsData
+      const orgMap = new Map();
+      orgsData.forEach((org: Organisation) => {
+        orgMap.set(org.id, org.name);
+      });
 
-    const schedulesWithOrg = schedulesData.map((schedule) => {
-      const test = testsData.find((t) => t.id === schedule.testId);
-      
-      // Get organisation name from test.organisationId using the orgMap
-      let organisationName = "Unknown Organisation";
-      
-      // First try to get from test.organisationId
-      if (test?.organisationId && orgMap.has(test.organisationId)) {
-        organisationName = orgMap.get(test.organisationId);
-      } 
-      // Fallback to schedule.organisationId if available
-      else if (schedule.organisationId && orgMap.has(schedule.organisationId)) {
-        organisationName = orgMap.get(schedule.organisationId);
-      }
-      
-      // Count invitations for this schedule
-      const invitedCount = invitations.filter((inv: any) => inv.testScheduleId === schedule.id || inv.scheduleId === schedule.id).length;
+      const schedulesWithOrg = schedulesData.map((schedule) => {
+        const test = testsData.find((t) => t.id === schedule.testId);
 
-      console.log(`Schedule ${schedule.id} -> Test: ${test?.title}, Org: ${organisationName}, Invited: ${invitedCount}`);
-      
-      return {
-        ...schedule,
-        test,
-        organisationName,
-        invitedCount,
-      };
-    });
+        // Get organisation name from test.organisationId using the orgMap
+        let organisationName = "Unknown Organisation";
 
-    setSchedules(schedulesWithOrg);
-    setTests(testsData.filter((t) => t.status === "PUBLISHED"));
-    setOrganisations(orgsData);
-  } catch (error) {
-    console.error("Failed to fetch data:", error);
-    toast({
-      title: "Error",
-      description: "Failed to load test schedules",
-      variant: "destructive",
-    });
-  } finally {
-    setLoading(false);
-  }
-}, [toast]);
+        // First try to get from test.organisationId
+        if (test?.organisationId && orgMap.has(test.organisationId)) {
+          organisationName = orgMap.get(test.organisationId);
+        }
+        // Fallback to schedule.organisationId if available
+        else if (
+          schedule.organisationId &&
+          orgMap.has(schedule.organisationId)
+        ) {
+          organisationName = orgMap.get(schedule.organisationId);
+        }
+
+        // Count invitations for this schedule
+        const invitedCount = invitations.filter(
+          (inv: any) =>
+            inv.testScheduleId === schedule.id ||
+            inv.scheduleId === schedule.id,
+        ).length;
+
+        console.log(
+          `Schedule ${schedule.id} -> Test: ${test?.title}, Org: ${organisationName}, Invited: ${invitedCount}`,
+        );
+
+        return {
+          ...schedule,
+          test,
+          organisationName,
+          invitedCount,
+        };
+      });
+
+      setSchedules(schedulesWithOrg);
+      setTests(testsData.filter((t) => t.status === "PUBLISHED"));
+      setOrganisations(orgsData);
+    } catch (error) {
+      console.error("Failed to fetch data:", error);
+      toast({
+        title: "Error",
+        description: "Failed to load test schedules",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  }, [toast]);
 
   useEffect(() => {
     fetchData();
@@ -259,10 +272,8 @@ const fetchData = useCallback(async () => {
   const getStatusBadge = (status: string) => {
     const styles: Record<string, string> = {
       SCHEDULED: "bg-yellow-500/10 text-yellow-500",
-      ACCEPTED: "bg-blue-500/10 text-blue-500",
       LIVE: "bg-green-500/10 text-green-500",
       COMPLETED: "bg-gray-500/10 text-gray-500",
-      EXPIRED: "bg-red-500/10 text-red-500",
     };
     return styles[status] || styles.SCHEDULED;
   };
@@ -272,38 +283,128 @@ const fetchData = useCallback(async () => {
   };
 
   // Get available actions based on current status
+  // Get available actions based on current status
   const getAvailableActions = (currentStatus: string) => {
     switch (currentStatus) {
       case "SCHEDULED":
         return [
-          { label: "Make Live", value: "LIVE", icon: Play, color: "text-green-600" },
-          { label: "Mark as Completed", value: "COMPLETED", icon: CheckCircle, color: "text-blue-600" },
+          {
+            label: "Make Live",
+            value: "LIVE",
+            icon: Play,
+            color: "text-green-600",
+          },
+          {
+            label: "Mark as Completed",
+            value: "COMPLETED",
+            icon: CheckCircle,
+            color: "text-blue-600",
+          },
         ];
       case "LIVE":
         return [
-          { label: "Mark as Completed", value: "COMPLETED", icon: CheckCircle, color: "text-blue-600" },
+          {
+            label: "Mark as Completed",
+            value: "COMPLETED",
+            icon: CheckCircle,
+            color: "text-blue-600",
+          },
         ];
       case "COMPLETED":
-        return [
-          { label: "Mark as Expired", value: "EXPIRED", icon: XCircle, color: "text-red-600" },
-        ];
-      case "EXPIRED":
-        return [
-          { label: "View Details", value: "view", icon: Eye, color: "text-gray-600" },
-        ];
+        return []; // No actions for completed
       default:
-        return [
-          { label: "View Details", value: "view", icon: Eye, color: "text-gray-600" },
-        ];
+        return [];
     }
   };
 
   const filteredSchedules = schedules.filter((schedule) => {
     const matchesSearch =
       schedule.test?.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      schedule.organisationName?.toLowerCase().includes(searchTerm.toLowerCase());
+      schedule.organisationName
+        ?.toLowerCase()
+        .includes(searchTerm.toLowerCase());
     return matchesSearch;
   });
+
+  // Auto-status checker - only calls API when status actually changes
+  const autoCheckAndUpdateStatuses = useCallback(async () => {
+    const now = new Date();
+    const schedulesToUpdate: {
+      id: string;
+      currentStatus: string;
+      newStatus: string;
+    }[] = [];
+
+    // Check locally first - NO API CALLS
+    for (const schedule of schedules) {
+      const startTime = new Date(schedule.startTime);
+      const endTime = new Date(schedule.endTime);
+
+      // SCHEDULED -> LIVE
+      if (
+        schedule.status === "SCHEDULED" &&
+        now >= startTime &&
+        now <= endTime
+      ) {
+        schedulesToUpdate.push({
+          id: schedule.id,
+          currentStatus: schedule.status,
+          newStatus: "LIVE",
+        });
+      }
+      // SCHEDULED/LIVE -> COMPLETED
+      else if (
+        (schedule.status === "SCHEDULED" || schedule.status === "LIVE") &&
+        now > endTime
+      ) {
+        schedulesToUpdate.push({
+          id: schedule.id,
+          currentStatus: schedule.status,
+          newStatus: "COMPLETED",
+        });
+      }
+    }
+
+    // If no updates needed, exit without any API calls
+    if (schedulesToUpdate.length === 0) {
+      return;
+    }
+
+    console.log(
+      `🔄 Need to update ${schedulesToUpdate.length} schedules:`,
+      schedulesToUpdate,
+    );
+
+    // Only update schedules that actually need status change
+    let updatedCount = 0;
+    for (const update of schedulesToUpdate) {
+      try {
+        await testService.updateTestScheduleStatus(update.id, update.newStatus);
+        console.log(
+          `✅ Updated schedule ${update.id}: ${update.currentStatus} → ${update.newStatus}`,
+        );
+        updatedCount++;
+      } catch (error) {
+        console.error(`Failed to update schedule ${update.id}:`, error);
+      }
+    }
+
+    // Refresh data once if any updates succeeded
+    if (updatedCount > 0) {
+      await fetchData();
+    }
+  }, [schedules, fetchData]);
+
+  // Run auto-check periodically
+  useEffect(() => {
+    // Check immediately on mount
+    autoCheckAndUpdateStatuses();
+
+    // Check every 2 minutes (less frequent = even less server load)
+    const interval = setInterval(autoCheckAndUpdateStatuses, 120000); // 2 minutes
+
+    return () => clearInterval(interval);
+  }, [autoCheckAndUpdateStatuses]);
 
   return (
     <div className="p-8 space-y-6 animate-fade-in">
@@ -315,10 +416,19 @@ const fetchData = useCallback(async () => {
             Schedule tests for organisations and their candidates
           </p>
         </div>
-        <Button onClick={() => setIsCreateDialogOpen(true)}>
-          <Plus className="w-4 h-4 mr-2" />
-          Create Schedule
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            onClick={() => autoCheckAndUpdateStatuses()}
+          >
+            <RefreshCw className="w-4 h-4 mr-2" />
+            Check Status
+          </Button>
+          <Button onClick={() => setIsCreateDialogOpen(true)}>
+            <Plus className="w-4 h-4 mr-2" />
+            Create Schedule
+          </Button>
+        </div>
       </div>
 
       {/* Search */}
@@ -367,7 +477,7 @@ const fetchData = useCallback(async () => {
               filteredSchedules.map((schedule) => {
                 const actions = getAvailableActions(schedule.status);
                 const isUpdating = updatingStatus === schedule.id;
-                
+
                 return (
                   <TableRow key={schedule.id}>
                     <TableCell className="font-medium">
@@ -409,7 +519,9 @@ const fetchData = useCallback(async () => {
                       </Badge>
                     </TableCell>
                     <TableCell>
-                      <Badge variant="outline">{schedule.invitedCount || 0}</Badge>
+                      <Badge variant="outline">
+                        {schedule.invitedCount || 0}
+                      </Badge>
                     </TableCell>
                     <TableCell>
                       <DropdownMenu>
@@ -429,25 +541,33 @@ const fetchData = useCallback(async () => {
                         <DropdownMenuContent align="end">
                           {/* View option always available */}
                           <DropdownMenuItem
-                            onClick={() => navigate(`/superadmin/test-schedules/${schedule.id}`)}
+                            onClick={() =>
+                              navigate(
+                                `/superadmin/test-schedules/${schedule.id}`,
+                              )
+                            }
                           >
                             <Eye className="w-4 h-4 mr-2" />
                             View Details
                           </DropdownMenuItem>
-                          
+
                           {/* Status change options based on current status */}
                           {actions.map((action) => (
                             <DropdownMenuItem
                               key={action.value}
                               onClick={() => {
                                 if (action.value === "view") {
-                                  navigate(`/superadmin/test-schedules/${schedule.id}`);
+                                  navigate(
+                                    `/superadmin/test-schedules/${schedule.id}`,
+                                  );
                                 } else {
                                   handleUpdateStatus(schedule.id, action.value);
                                 }
                               }}
                             >
-                              <action.icon className={`w-4 h-4 mr-2 ${action.color}`} />
+                              <action.icon
+                                className={`w-4 h-4 mr-2 ${action.color}`}
+                              />
                               <span>{action.label}</span>
                             </DropdownMenuItem>
                           ))}

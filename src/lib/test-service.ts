@@ -736,8 +736,13 @@ createTestSchedule: async (
 },
 // Add this to your testService object in test-service.ts
 
+// In test-service.ts, update the updateTestScheduleStatus method:
+
 updateTestScheduleStatus: async (scheduleId: string, status: string): Promise<TestScheduleExtended> => {
-  const response = await apiClient.patch<TestScheduleExtended>(`/test-schedules/${scheduleId}/status`, { status });
+  // Use the existing PATCH endpoint, not /status
+  const response = await apiClient.patch<TestScheduleExtended>(`/test-schedules/${scheduleId}`, { 
+    status: status 
+  });
   return unwrapResponse(response);
 },
 
