@@ -10,6 +10,7 @@ export interface CreateTestRequest {
   instructions?: Record<string, unknown>;
   status: "DRAFT" | "PUBLISHED" | "ARCHIVED";
   passMark: number;
+  isActive?: boolean;
   questions?: Array<{
     questionId: string;
     orderIndex: number;
@@ -70,6 +71,42 @@ export interface CreateQuestionRequest {
   subtopicId?: string;
   marks: number;
   mcqOptions?: Array<{ text: string; isCorrect: boolean }>;
+  codeTemplate?: Record<string, CodeTemplateEntry>;
+  title?: string;
+  difficulty?: string;
+  constraints?: string;
+  memoryLimitMb?: number;
+  timeLimitSecs?: number;
+  sampleExplanation?: string;
+  examples?: Array<Record<string, unknown>>;
+  hints?: string[];
+  tags?: string[];
+}
+
+export interface CodeTemplateEntry {
+  code: string;
+  lang: string;
+  langSlug: string;
+}
+
+export interface UpdateQuestionRequest {
+  questionType?: "MCQ" | "CODING";
+  prompt?: string;
+  subjectId?: string;
+  topicId?: string;
+  subtopicId?: string;
+  marks?: number;
+  mcqOptions?: Array<{ text: string; isCorrect: boolean }>;
+  codeTemplate?: Record<string, CodeTemplateEntry>;
+  title?: string;
+  difficulty?: string;
+  constraints?: string;
+  memoryLimitMb?: number;
+  timeLimitSecs?: number;
+  sampleExplanation?: string;
+  examples?: Array<Record<string, unknown>>;
+  hints?: string[];
+  tags?: string[];
 }
 
 // ==================== Response Models ====================
@@ -108,6 +145,16 @@ export interface Question {
   subtopicId?: string;
   marks?: number;
   mcqOptions?: Array<{ text: string; isCorrect: boolean }>;
+  codeTemplate?: Record<string, CodeTemplateEntry>;
+  title?: string;
+  difficulty?: string;
+  constraints?: string;
+  memoryLimitMb?: number;
+  timeLimitSecs?: number;
+  sampleExplanation?: string;
+  examples?: Array<Record<string, unknown>>;
+  hints?: string[];
+  tags?: string[];
   subject?: Subject;
   topic?: Topic;
   subtopic?: Subtopic;
@@ -131,6 +178,7 @@ export interface User {
   id: string;
   name?: string;
   email?: string;
+  organisation?: Organisation;  // Add this
 }
 
 export interface Test {
@@ -143,10 +191,12 @@ export interface Test {
   status: "DRAFT" | "PUBLISHED" | "ARCHIVED";
   passMark: number;
   createdBy?: User;
+  organisationId?: string;  // Add this line
   createdAt?: string;
   updatedAt?: string;
   questions?: TestQuestion[];
   testQuestions?: TestQuestion[];
+  isActive?: boolean;
 }
 
 export interface TestViewModel {
@@ -162,6 +212,7 @@ export interface TestViewModel {
   participants?: number;
   difficulty: string;
   passMark: number;
+  isActive?: boolean;
 }
 
 export interface TestSchedule {
@@ -179,8 +230,6 @@ export interface CreateTestScheduleRequest {
   endTime: string;
   status: string;
 }
-
-// Test Case Interface
 
 // Test Cases
 export interface TestCase {
@@ -208,14 +257,34 @@ export interface UpdateTestCaseRequest {
   questionId?: string;
 }
 
+// Test Schedule (extended)
+export interface TestScheduleExtended {
+  id: string;
+  testId: string;
+  test?: Test;  // This should already include organisation info
+  createdById?: string;
+  startTime: string;
+  endTime: string;
+  maxCandidates: number;
+  status: "SCHEDULED" | "ACCEPTED" | "EXPIRED" | "LIVE" | "COMPLETED";
+  createdAt?: string;
+}
+
+export interface CreateTestScheduleExtendedRequest {
+  testId: string;
+  startTime: string;
+  endTime: string;
+  maxCandidates?: number;
+  // Remove organisationId if backend doesn't need it
+  // organisationId?: string;
+}
+
 // ==================== Helper to unwrap BaseResponse ====================
 const unwrapResponse = <T>(response: { data: BaseResponse<T> | T }): T => {
   const data = response.data;
-  // Check if it's a BaseResponse with data property
   if (data && typeof data === "object" && "data" in data && "success" in data) {
     return (data as BaseResponse<T>).data;
   }
-  // Otherwise return as is
   return data as T;
 };
 
@@ -276,9 +345,7 @@ export const testService = {
   },
 
   getTopicsBySubject: async (subjectId: string): Promise<Topic[]> => {
-    const response = await apiClient.get<Topic[]>(
-      `/topics/subject/${subjectId}`,
-    );
+    const response = await apiClient.get<Topic[]>(`/topics/subject/${subjectId}`);
     return unwrapArrayResponse(response);
   },
 
@@ -318,17 +385,14 @@ export const testService = {
   },
 
   getSubtopicsByTopic: async (topicId: string): Promise<Subtopic[]> => {
-    const response = await apiClient.get<Subtopic[]>(
-      `/subtopics/topic/${topicId}`,
-    );
+    const response = await apiClient.get<Subtopic[]>(`/subtopics/topic/${topicId}`);
     return unwrapArrayResponse(response);
   },
 
-  // In test-service.ts - fix createSubtopic to use topic_id (snake_case)
   createSubtopic: async (name: string, topicId: string): Promise<Subtopic> => {
     const response = await apiClient.post<Subtopic>("/subtopics", {
       name,
-      topic_id: topicId, // Backend expects snake_case
+      topic_id: topicId,
     });
     return unwrapResponse(response);
   },
@@ -350,7 +414,6 @@ export const testService = {
   },
 
   // ==================== Question APIs ====================
-  // ==================== Question APIs ====================
   getAllQuestions: async (
     subjectId?: string,
     topicId?: string,
@@ -363,10 +426,7 @@ export const testService = {
 
     const url = `/questions${params.toString() ? `?${params.toString()}` : ""}`;
     const response = await apiClient.get<Question[]>(url);
-    const questions = unwrapArrayResponse(response);
-
-    // Just return the questions as-is, they already have questionType
-    return questions;
+    return unwrapArrayResponse(response);
   },
 
   getQuestionById: async (id: string): Promise<Question> => {
@@ -376,25 +436,33 @@ export const testService = {
 
   createQuestion: async (dto: CreateQuestionRequest): Promise<Question> => {
     const apiDto = {
-      ...dto,
+      type: dto.type,
+      prompt: dto.prompt,
       subject_id: dto.subjectId,
       topic_id: dto.topicId,
       subtopic_id: dto.subtopicId,
+      marks: dto.marks,
+      mcqOptions: dto.mcqOptions,
+      codeTemplate: dto.codeTemplate,
     };
     const response = await apiClient.post<Question>("/questions", apiDto);
     return unwrapResponse(response);
   },
+
   updateQuestion: async (
     id: string,
-    dto: Partial<CreateQuestionRequest>,
+    dto: UpdateQuestionRequest,
   ): Promise<Question> => {
-    const apiDto = {
-      ...dto,
-      ...(dto.type && { questionType: dto.type }),
-      ...(dto.subjectId && { subject_id: dto.subjectId }),
-      ...(dto.topicId && { topic_id: dto.topicId }),
-      ...(dto.subtopicId && { subtopic_id: dto.subtopicId }),
-    };
+    const apiDto: Record<string, unknown> = {};
+    if (dto.questionType !== undefined) apiDto.type = dto.questionType;
+    if (dto.prompt !== undefined) apiDto.prompt = dto.prompt;
+    if (dto.subjectId !== undefined) apiDto.subject_id = dto.subjectId;
+    if (dto.topicId !== undefined) apiDto.topic_id = dto.topicId;
+    if (dto.subtopicId !== undefined) apiDto.subtopic_id = dto.subtopicId;
+    if (dto.marks !== undefined) apiDto.marks = dto.marks;
+    if (dto.mcqOptions !== undefined) apiDto.mcqOptions = dto.mcqOptions;
+    if (dto.codeTemplate !== undefined) apiDto.codeTemplate = dto.codeTemplate;
+    
     const response = await apiClient.patch<Question>(`/questions/${id}`, apiDto);
     return unwrapResponse(response);
   },
@@ -402,8 +470,6 @@ export const testService = {
   deleteQuestion: async (id: string): Promise<void> => {
     await apiClient.delete(`/questions/${id}`);
   },
-
-  // Add to test-service.ts inside the testService object
 
   // ==================== Test Case APIs ====================
   getAllTestCases: async (): Promise<TestCase[]> => {
@@ -413,7 +479,7 @@ export const testService = {
 
   getTestCasesByQuestion: async (questionId: string): Promise<TestCase[]> => {
     const allTestCases = await testService.getAllTestCases();
-    return allTestCases.filter((tc) => tc.questionId === questionId);
+    return allTestCases.filter((tc: TestCase) => tc.questionId === questionId);
   },
 
   createTestCase: async (dto: CreateTestCaseRequest): Promise<TestCase> => {
@@ -425,10 +491,7 @@ export const testService = {
     id: string,
     dto: UpdateTestCaseRequest,
   ): Promise<TestCase> => {
-    const response = await apiClient.patch<TestCase>(
-      `/test-cases/update/${id}`,
-      dto,
-    );
+    const response = await apiClient.patch<TestCase>(`/test-cases/update/${id}`, dto);
     return response.data;
   },
 
@@ -440,6 +503,11 @@ export const testService = {
   // ==================== Test APIs ====================
   getAllTests: async (): Promise<Test[]> => {
     const response = await apiClient.get<Test[]>("/tests");
+    return unwrapArrayResponse(response);
+  },
+
+  getInactiveTests: async (): Promise<Test[]> => {
+    const response = await apiClient.get<Test[]>("/tests/inactive");
     return unwrapArrayResponse(response);
   },
 
@@ -462,7 +530,11 @@ export const testService = {
   },
 
   deleteTest: async (id: string): Promise<void> => {
-    await apiClient.delete(`/tests/${id}`);
+    await apiClient.patch(`/tests/${id}/inactive`);
+  },
+
+  activateTest: async (id: string): Promise<void> => {
+    await apiClient.patch(`/tests/${id}/active`);
   },
 
   // ==================== Test Question APIs ====================
@@ -495,10 +567,7 @@ export const testService = {
     id: string,
     dto: Partial<CreateTestQuestionRequest>,
   ): Promise<TestQuestion> => {
-    const response = await apiClient.put<TestQuestion>(
-      `/test-questions/${id}`,
-      dto,
-    );
+    const response = await apiClient.put<TestQuestion>(`/test-questions/${id}`, dto);
     return unwrapResponse(response);
   },
 
@@ -528,7 +597,36 @@ export const testService = {
     await testService.deleteTestQuestion(testQuestionId);
   },
 
-  // ==================== Helper Methods ====================
+  // Helper: Bulk add questions to test
+  bulkAddQuestionsToTest: async (
+    dto: BulkAddQuestionsRequest,
+  ): Promise<TestQuestion[]> => {
+    const response = await apiClient.post<TestQuestion[]>(`/test-questions/bulk`, dto);
+    return unwrapArrayResponse(response);
+  },
+
+  // Helper: Get questions for a test
+  getQuestionsForTest: async (testId: string): Promise<Question[]> => {
+    const testQuestions = await testService.getTestQuestions(testId);
+    const questionIds = testQuestions.map((tq) => tq.questionId);
+    if (questionIds.length === 0) return [];
+
+    const allQuestions = await testService.getAllQuestions();
+    return allQuestions.filter((q) => questionIds.includes(q.id));
+  },
+
+  // Helper: Get available questions not in test
+  getAvailableQuestions: async (testId: string): Promise<Question[]> => {
+    const [allQuestions, testQuestions] = await Promise.all([
+      testService.getAllQuestions(),
+      testService.getTestQuestions(testId),
+    ]);
+
+    const testQuestionIds = new Set(testQuestions.map((tq) => tq.questionId));
+    return allQuestions.filter((q) => !testQuestionIds.has(q.id));
+  },
+
+  // ==================== Helper Methods for UI ====================
   toViewModel: (test: Test): TestViewModel => {
     const status = (test.status || "DRAFT").toLowerCase();
     const difficulty = (test.difficulty || "MEDIUM").toLowerCase();
@@ -567,41 +665,8 @@ export const testService = {
       participants: 0,
       difficulty,
       passMark,
+      isActive: test.isActive,
     };
-  },
-
-  // Add this method to testService in test-service.ts (around line 500, after deleteTestQuestion)
-
-  // Add bulkAddQuestionsToTest method
-  bulkAddQuestionsToTest: async (
-    dto: BulkAddQuestionsRequest,
-  ): Promise<TestQuestion[]> => {
-    const response = await apiClient.post<TestQuestion[]>(
-      `/test-questions/bulk`,
-      dto,
-    );
-    return unwrapArrayResponse(response);
-  },
-
-  // Helper: Get questions for a test
-  getQuestionsForTest: async (testId: string): Promise<Question[]> => {
-    const testQuestions = await testService.getTestQuestions(testId);
-    const questionIds = testQuestions.map((tq) => tq.questionId);
-    if (questionIds.length === 0) return [];
-
-    const allQuestions = await testService.getAllQuestions();
-    return allQuestions.filter((q) => questionIds.includes(q.id));
-  },
-
-  // Helper: Get available questions not in test
-  getAvailableQuestions: async (testId: string): Promise<Question[]> => {
-    const [allQuestions, testQuestions] = await Promise.all([
-      testService.getAllQuestions(),
-      testService.getTestQuestions(testId),
-    ]);
-
-    const testQuestionIds = new Set(testQuestions.map((tq) => tq.questionId));
-    return allQuestions.filter((q) => !testQuestionIds.has(q.id));
   },
 
   getStatusStyle: (status: string): string => {
@@ -634,13 +699,49 @@ export const testService = {
   // ==================== Test Schedule APIs ====================
   getAllSchedules: async (): Promise<TestSchedule[]> => {
     const response = await apiClient.get<TestSchedule[]>("/schedules/all");
-    // This endpoint returns raw JSON list
     return response.data || [];
   },
 
   createSchedule: async (dto: CreateTestScheduleRequest): Promise<string> => {
     const response = await apiClient.post<string>("/schedules/create", dto);
-    // This endpoint returns plain text
     return response.data;
+  },
+
+  getAllTestSchedules: async (): Promise<TestScheduleExtended[]> => {
+    const response = await apiClient.get<TestScheduleExtended[]>("/test-schedules");
+    return unwrapArrayResponse(response);
+  },
+
+  getTestScheduleById: async (id: string): Promise<TestScheduleExtended> => {
+    const response = await apiClient.get<TestScheduleExtended>(`/test-schedules/${id}`);
+    return unwrapResponse(response);
+  },
+
+createTestSchedule: async (
+  request: CreateTestScheduleExtendedRequest,
+): Promise<TestScheduleExtended> => {
+  // DO NOT send createdById - backend gets it from Security Context
+  const payload = {
+    testId: request.testId,
+    startTime: request.startTime,
+    endTime: request.endTime,
+    maxCandidates: request.maxCandidates || 100,
+  };
+  
+  console.log("Final payload being sent:", payload);
+  
+  const response = await apiClient.post<TestScheduleExtended>("/test-schedules", payload);
+  console.log("Schedule creation response:", response);
+  return unwrapResponse(response);
+},
+// Add this to your testService object in test-service.ts
+
+updateTestScheduleStatus: async (scheduleId: string, status: string): Promise<TestScheduleExtended> => {
+  const response = await apiClient.patch<TestScheduleExtended>(`/test-schedules/${scheduleId}/status`, { status });
+  return unwrapResponse(response);
+},
+
+  deleteTestSchedule: async (id: string): Promise<void> => {
+    await apiClient.delete(`/test-schedules/${id}`);
   },
 };

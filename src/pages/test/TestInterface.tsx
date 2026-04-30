@@ -18,474 +18,819 @@ import {
 import { cn } from "@/lib/utils";
 import { useNavigate, useParams } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
-import { Clock, ChevronLeft, ChevronRight, Flag, Send, AlertTriangle, CheckCircle, Play, Terminal, XCircle } from "lucide-react";
+import {
+  Clock, ChevronLeft, ChevronRight, Flag, Send, 
+  AlertTriangle, CheckCircle, Play, Terminal, XCircle,
+  Loader2, Save, FileText, Code2, Database, Lightbulb
+} from "lucide-react";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import Editor from "@monaco-editor/react";
-import { db } from "@/lib/firebase";
-import { collection, getDocs, doc, getDoc } from "firebase/firestore";
-import { 
-  createSubmission, 
-  pollSubmission, 
-  createBatchSubmissions,
-  pollBatchSubmissions,
-  LANGUAGE_MAP, 
-  SubmissionResponse, 
-  inferMetadataFromSnippets, 
-  QuestionMetadata 
-} from "@/lib/judge0";
+import { apiClient } from "@/lib/api-client";
+import { testService, CodeTemplateEntry } from "@/lib/test-service";
 
+// Types
 interface Question {
   id: string;
-  type: "mcq" | "coding";
-  question: string;
+  type: "MCQ" | "CODING";
+  prompt: string;
+  marks: number;
   options?: string[];
   problemStatement?: string;
   sampleInput?: string;
   sampleOutput?: string;
-  marks: number;
-  metadata?: QuestionMetadata;
-  codeSnippets?: { code: string; lang: string; langSlug: string }[];
-  sampleTestCases?: any[];
-  hiddenTestCases?: any[];
+  sampleExplanation?: string;
+  codeTemplate?: Record<string, CodeTemplateEntry>;
+  difficulty?: string;
+  constraints?: string;
+  timeLimitSecs?: number;
+  memoryLimitMb?: number;
+  hints?: string[];
+  tags?: string[];
+  title?: string;
 }
 
-const mockQuestions: Question[] = [
-  {
-    id: "1",
-    type: "mcq",
-    question: "What is the time complexity of binary search algorithm?",
-    options: ["O(n)", "O(log n)", "O(n�)", "O(1)"],
-    marks: 2,
-  },
-  {
-    id: "2",
-    type: "coding",
-    question: "Two Sum",
-    problemStatement: `Given an array of integers nums and an integer target, return indices of the two numbers such that they add up to target.
+interface TestSession {
+  id: string;
+  testId: string;
+  candidateId: string;
+  status: "ACTIVE" | "SUBMITTED" | "EXPIRED";
+  startedAt: string;
+  endedAt?: string;
+  remainingTimeSecs: number;
+  answers?: Record<string, any>;
+}
 
-You may assume that each input would have exactly one solution, and you may not use the same element twice.
+interface TestDetails {
+  id: string;
+  title: string;
+  description?: string;
+  durationMins: number;
+  difficulty: string;
+  passMark: number;
+  questions?: TestQuestion[];
+}
 
-Return the answer in any order.`,
-    sampleInput: "nums = [2,7,11,15], target = 9",
-    sampleOutput: "[0,1]",
-    marks: 10,
-  },
-];
+interface TestQuestion {
+  id: string;
+  testId: string;
+  questionId: string;
+  orderIndex: number;
+  marks: number;
+  timeLimitSecs?: number;
+  question?: {
+    id: string;
+    type: "MCQ" | "CODING";
+    prompt: string;
+    marks: number;
+    mcqOptions?: { text: string; isCorrect: boolean }[];
+    sampleInput?: string;
+    sampleOutput?: string;
+    codeTemplate?: Record<string, CodeTemplateEntry>;
+  };
+}
+
+// Language mapping for display
+const LANGUAGE_MAP = {
+  python3: { name: "Python 3", slug: "python3", monaco: "python" },
+  javascript: { name: "JavaScript", slug: "javascript", monaco: "javascript" },
+  java: { name: "Java", slug: "java", monaco: "java" },
+  cpp: { name: "C++", slug: "cpp", monaco: "cpp" },
+} as const;
+
+type LanguageKey = keyof typeof LANGUAGE_MAP;
 
 export default function TestInterface() {
-  const [questions, setQuestions] = useState<Question[]>(mockQuestions);
-  const [loading, setLoading] = useState(true);
-  const { testId } = useParams<{ testId: string }>();
+  const { testId, sessionId } = useParams();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const currentIndex = testId ? questions.findIndex((item) => item.id === testId) : 0;
-  const [currentQuestion, setCurrentQuestion] = useState(currentIndex >= 0 ? currentIndex : 0);
-  const [answers, setAnswers] = useState<Record<string, string>>({});
+
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [test, setTest] = useState<TestDetails | null>(null);
+  const [session, setSession] = useState<TestSession | null>(null);
+  const [questions, setQuestions] = useState<Question[]>([]);
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [answers, setAnswers] = useState<Record<string, any>>({});
   const [flagged, setFlagged] = useState<Set<string>>(new Set());
-  const [timeLeft, setTimeLeft] = useState(3600);
+  const [timeLeft, setTimeLeft] = useState(0);
   const [showSubmitDialog, setShowSubmitDialog] = useState(false);
-  const [code, setCode] = useState("# Write your solution here\n");
-  const [language, setLanguage] = useState("python");
-  const [isSubmitted, setIsSubmitted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  
+  // Code editor state
+  const [code, setCode] = useState("");
+  const [language, setLanguage] = useState<LanguageKey>("python3");
   const [isRunning, setIsRunning] = useState(false);
   const [isSubmittingCode, setIsSubmittingCode] = useState(false);
-  const [lastResult, setLastResult] = useState<SubmissionResponse | null>(null);
-  const [submissionPhase, setSubmissionPhase] = useState<'idle' | 'compiling' | 'running' | 'hidden' | 'result'>('idle');
+  const [output, setOutput] = useState<{ type: 'success' | 'error', message: string } | null>(null);
   const [testCaseResults, setTestCaseResults] = useState<any[]>([]);
-  const [verdict, setVerdict] = useState<{ type: 'success' | 'fail', title: string, message: string } | null>(null);
-  const [consoleOutput, setConsoleOutput] = useState("");
+  const [submissionPhase, setSubmissionPhase] = useState<"idle" | "running" | "result">("idle");
 
   useEffect(() => {
-    const fetchQuestions = async () => {
-      try {
-        const querySnapshot = await getDocs(collection(db, "questions"));
-        const fetchedQuestions: Question[] = [];
-        querySnapshot.forEach((doc) => {
-          const data = doc.data();
-          fetchedQuestions.push({
-            id: doc.id,
-            type: data.codeSnippets ? "coding" : "mcq",
-            question: data.title || "Untitled Question",
-            problemStatement: data.content || "",
-            sampleInput: data.sampleTestCase || "",
-            sampleOutput: (data.sampleTestCases && data.sampleTestCases[0]?.expected) || "",
-            marks: data.difficulty === "Easy" ? 10 : data.difficulty === "Medium" ? 20 : 30,
-            options: data.options || [],
-            metadata: data.metadata || inferMetadataFromSnippets(data.codeSnippets || []),
-            codeSnippets: data.codeSnippets || [],
-            sampleTestCases: data.sampleTestCases || [],
-            hiddenTestCases: data.hiddenTestCases || []
-          });
-        });
-        if (fetchedQuestions.length > 0) {
-          setQuestions(fetchedQuestions);
-        }
-      } catch (error) {
-        console.error("Error fetching questions: ", error);
-        toast({
-          title: "Error",
-          description: "Failed to load questions from Firebase.",
-          variant: "destructive",
-        });
-      } finally {
-        setLoading(false);
-      }
-    };
+    if (sessionId) {
+      fetchTestSession();
+    } else if (testId) {
+      fetchTestDirect();
+    }
+  }, [sessionId, testId]);
 
-    fetchQuestions();
-  }, [toast]);
+  const fetchTestDirect = async () => {
+    try {
+      setLoading(true);
+      const testResponse = await apiClient.get(`/tests/${testId}`);
+      const testData = testResponse.data?.data || testResponse.data;
+      setTest(testData);
+    } catch (error: any) {
+      console.error("Failed to fetch test:", error);
+      setError(error.response?.data?.message || "Failed to load test");
+    } finally {
+      setLoading(false);
+    }
+  };
 
-  const question = questions[currentQuestion];
-  const answered = Object.keys(answers).length;
-  const total = questions.length;
+const fetchTestSession = async () => {
+  try {
+    setLoading(true);
+    setError(null);
+    
+    console.log("🚀 STEP 1: Fetching session for ID:", sessionId);
+    
+    const sessionResponse = await apiClient.get(`/test-sessions/${sessionId}`);
+    const sessionData = sessionResponse.data?.data || sessionResponse.data;
+    console.log("✅ STEP 2: Session Data:", sessionData);
+    setSession(sessionData);
 
-  useEffect(() => {
-    if (question?.codeSnippets && question.codeSnippets.length > 0) {
-      const snippet = question.codeSnippets.find(s => s.langSlug === language) || 
-                      question.codeSnippets.find(s => s.langSlug === 'python3' || s.langSlug === 'python') || 
-                      question.codeSnippets[0];
+    console.log("🚀 STEP 3: Fetching test with ID:", sessionData.testId);
+    
+    const testResponse = await apiClient.get(`/tests/${sessionData.testId}`);
+    let testData = testResponse.data?.data || testResponse.data;
+    console.log("✅ STEP 4: Raw Test Data:", testData);
+    
+    console.log("📋 STEP 5: Test questions array:", testData.questions);
+    console.log("📋 STEP 5.1: Number of questions:", testData.questions?.length);
+    
+    // Log first question structure
+    if (testData.questions && testData.questions.length > 0) {
+      console.log("📋 STEP 5.2: First question (raw):", testData.questions[0]);
+      console.log("📋 STEP 5.3: Does first question have 'question' property?", testData.questions[0].question);
+    }
+    
+    // Fetch question details if not populated
+    if (testData.questions && testData.questions.length > 0) {
+      const hasQuestionDetails = testData.questions.some((tq: any) => tq.question?.prompt);
+      console.log("🔍 STEP 6: Questions already have details?", hasQuestionDetails);
       
-      setCode(snippet.code);
-      if (snippet.langSlug !== language) {
-        setLanguage(snippet.langSlug);
+      if (!hasQuestionDetails) {
+        console.log("🚀 STEP 7: Fetching individual question details for", testData.questions.length, "questions");
+        
+        const questionsWithDetails = await Promise.all(
+          testData.questions.map(async (tq: any, idx: number) => {
+            console.log(`  📥 Fetching question ${idx + 1}: ${tq.questionId}`);
+            try {
+              const questionData = await testService.getQuestionById(tq.questionId);
+              console.log(`  ✅ Question ${idx + 1} details:`, {
+                id: questionData.id,
+                type: questionData.questionType,
+                prompt: questionData.prompt?.substring(0, 50),
+                hasCodeTemplate: !!questionData.codeTemplate
+              });
+              return { ...tq, question: questionData };
+            } catch (err) {
+              console.error(`  ❌ Failed to fetch question ${tq.questionId}:`, err);
+              return tq;
+            }
+          })
+        );
+        
+        testData.questions = questionsWithDetails;
+        console.log("✅ STEP 8: Updated test data with question details");
       }
+    }
+    
+    setTest(testData);
+    console.log("🎯 FINAL: Test state updated:", testData);
+    
+  } catch (error: any) {
+    console.error("❌ FATAL: Failed to fetch test session:", error);
+    setError(error.response?.data?.message || "Failed to load test");
+  } finally {
+    setLoading(false);
+  }
+};
+
+  // Process questions when test data is loaded
+// Update this useEffect in TestInterface.tsx
+useEffect(() => {
+  if (test && test.questions && test.questions.length > 0) {
+    console.log("🔍 Processing test data:", test);
+    console.log("🔍 Test.questions:", test?.questions);
+    
+    const qs = test.questions
+      .sort((a, b) => a.orderIndex - b.orderIndex)
+      .map(tq => {
+        // Log the question data to debug
+        console.log("🔍 Mapping test question - raw tq:", tq);
+        console.log("🔍 tq.question:", tq.question);
+        console.log("🔍 tq.question?.codeTemplate:", tq.question?.codeTemplate);
+        
+        // Check if codeTemplate exists and has content
+        const hasCodeTemplate = tq.question?.codeTemplate && 
+          Object.keys(tq.question.codeTemplate).length > 0;
+        
+        console.log("🔍 Has code template?", hasCodeTemplate);
+        
+        return {
+          id: tq.questionId,
+          type: tq.question?.questionType || tq.question?.type || "MCQ",
+          prompt: tq.question?.prompt || "No prompt",
+          marks: tq.marks,
+          options: tq.question?.mcqOptions?.map((opt: any) => opt.text),
+          problemStatement: tq.question?.prompt,
+          sampleInput: tq.question?.sampleInput,
+          sampleOutput: tq.question?.sampleOutput,
+          sampleExplanation: tq.question?.sampleExplanation,
+          codeTemplate: tq.question?.codeTemplate,
+          difficulty: tq.question?.difficulty,
+          constraints: tq.question?.constraints,
+          timeLimitSecs: tq.question?.timeLimitSecs || tq.timeLimitSecs,
+          memoryLimitMb: tq.question?.memoryLimitMb,
+          hints: tq.question?.hints,
+          tags: tq.question?.tags,
+          title: tq.question?.title,
+        };
+      });
+    
+    console.log("🔍 Processed questions:", qs);
+    console.log("🔍 First question codeTemplate:", qs[0]?.codeTemplate);
+    setQuestions(qs);
+  }
+}, [test]);
+
+  // Initialize code editor when question changes
+// Update the code editor initialization
+useEffect(() => {
+  const currentQ = questions[currentIndex];
+  if (currentQ?.type === "CODING" && currentQ.codeTemplate) {
+    console.log("🎯 Initializing code editor for language:", language);
+    console.log("🎯 Available templates:", Object.keys(currentQ.codeTemplate));
+    
+    const template = currentQ.codeTemplate[language];
+    if (template?.code) {
+      console.log("🎯 Setting code from template for", language);
+      setCode(template.code);
     } else {
-      setCode(language === 'python' ? "# Write your solution here\n" : "// Write your solution here\n");
+      // Try to get first available language
+      const firstLang = Object.keys(currentQ.codeTemplate)[0];
+      if (firstLang && currentQ.codeTemplate[firstLang]?.code) {
+        console.log("🎯 Falling back to first available language:", firstLang);
+        setLanguage(firstLang as LanguageKey);
+        setCode(currentQ.codeTemplate[firstLang].code);
+      }
     }
-  }, [currentQuestion, question?.id]);
+  }
+}, [currentIndex, questions, language]);
 
+  // Set time left from session or test
   useEffect(() => {
-    if (question?.codeSnippets) {
-      const snippet = question.codeSnippets.find(s => s.langSlug === language);
-      if (snippet) setCode(snippet.code);
+    if (session && session.remainingTimeSecs > 0) {
+      setTimeLeft(session.remainingTimeSecs);
+    } else if (test?.durationMins) {
+      setTimeLeft(test.durationMins * 60);
     }
-  }, [language]);
+  }, [session, test]);
 
+  // Timer effect
   useEffect(() => {
+    if (timeLeft <= 0 || !sessionId) return;
+    
     const timer = setInterval(() => {
-      setTimeLeft((prev) => Math.max(0, prev - 1));
+      setTimeLeft(prev => {
+        if (prev <= 1) {
+          clearInterval(timer);
+          handleAutoSubmit();
+          return 0;
+        }
+        return prev - 1;
+      });
     }, 1000);
+    
     return () => clearInterval(timer);
-  }, []);
+  }, [timeLeft, sessionId]);
 
-  const formatTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
+  const handleAutoSubmit = async () => {
+    toast({
+      title: "Time's Up!",
+      description: "Your test has been automatically submitted.",
+    });
+    await submitTest();
+  };
+
+  const submitTest = async () => {
+    if (!sessionId) {
+      navigate(`/test/${testId}/results`);
+      return;
+    }
+    
+    setSubmitting(true);
+    try {
+      await apiClient.patch(`/test-sessions/${sessionId}`, {
+        status: "SUBMITTED",
+        endedAt: new Date().toISOString(),
+        answers: answers
+      });
+      toast({ title: "Success", description: "Test submitted successfully" });
+      navigate(`/test/${testId}/results?session=${sessionId}`);
+    } catch (error: any) {
+      console.error("Failed to submit test:", error);
+      toast({
+        title: "Error",
+        description: error.response?.data?.message || "Failed to submit test",
+        variant: "destructive",
+      });
+    } finally {
+      setSubmitting(false);
+      setShowSubmitDialog(false);
+    }
   };
 
   const handleRunCode = async () => {
-    if (isRunning || isSubmittingCode) return;
+    if (questions.length === 0) return;
+    const currentQ = questions[currentIndex];
+    if (!currentQ || currentQ.type !== "CODING") return;
+
     setIsRunning(true);
-    setSubmissionPhase('compiling');
-    setConsoleOutput("> Initializing execution...\n> Compiling source code...\n");
-    setVerdict(null);
+    setSubmissionPhase("running");
+    setOutput(null);
     setTestCaseResults([]);
 
     try {
-      const languageId = LANGUAGE_MAP[language];
-      const sampleCases = question.sampleTestCases || [];
+      const response = await apiClient.post("/code/run", {
+        code: code,
+        language: LANGUAGE_MAP[language]?.slug || "python3",
+        questionId: currentQ.id
+      });
+      const result = response.data?.data || response.data;
       
-      if (sampleCases.length === 0) {
-        // Fallback to single sampleInput if no array
-        const token = await createSubmission(
-          code,
-          languageId,
-          question.metadata || { functionName: "solve", parameterTypes: [], returnType: { type: "auto" }, category: "array" as any },
-          question.sampleInput
-        );
-        const result = await pollSubmission(token);
-        setLastResult(result);
-        setSubmissionPhase('result');
-        return;
-      }
-
-      const tokens = await createBatchSubmissions(
-        code, 
-        languageId, 
-        question.metadata || { functionName: "solve", parameterTypes: [], returnType: { type: "auto" }, category: "array" as any }, 
-        sampleCases.map(tc => tc.input)
-      );
-
-      setSubmissionPhase('running');
-      setConsoleOutput(prev => prev + "> Running sample test cases...\n");
-      
-      const results = await pollBatchSubmissions(tokens);
-      
-      const isCorrect = (actual: string, expected: string) => {
-        const clean = (s: string) => s.replace(/\s+/g, '').replace(/,$/, '');
-        return clean(actual) === clean(expected);
-      };
-
-      const mappedResults = results.map((res, idx) => ({
-        status: res.status.description,
-        input: sampleCases[idx].input,
-        output: res.stdout || res.stderr || res.compile_output || "",
-        expected: sampleCases[idx].expected,
-        id: res.status.id
-      }));
-
-      setTestCaseResults(mappedResults);
-      const passedCount = mappedResults.filter(r => r.id === 3 && isCorrect(r.output, r.expected)).length;
-      
-      if (passedCount === sampleCases.length) {
-        setVerdict({ type: 'success', title: 'Finished', message: 'All sample cases passed!' });
+      if (result.testCases && result.testCases.length > 0) {
+        setTestCaseResults(result.testCases);
+        const passed = result.testCases.filter((tc: any) => tc.passed).length;
+        if (passed === result.testCases.length) {
+          setOutput({ type: 'success', message: `✓ All ${passed} test cases passed!` });
+        } else {
+          setOutput({ type: 'error', message: `✗ ${passed}/${result.testCases.length} test cases passed` });
+        }
       } else {
-        setVerdict({ type: 'fail', title: 'Wrong Answer', message: `Failed on ${sampleCases.length - passedCount} sample cases.` });
+        setOutput({ 
+          type: result.success ? 'success' : 'error', 
+          message: result.message || (result.success ? "Execution successful" : "Execution failed")
+        });
       }
-      
-      setSubmissionPhase('result');
+      setSubmissionPhase("result");
     } catch (error: any) {
-      console.error("Error running code:", error);
-      setConsoleOutput(prev => prev + `> Error: ${error.message}\n`);
-      setVerdict({ type: 'fail', title: 'Error', message: error.message });
+      console.error("Run code error:", error);
+      setOutput({ 
+        type: 'error', 
+        message: error.response?.data?.message || "Failed to execute code. Please try again."
+      });
     } finally {
       setIsRunning(false);
     }
   };
 
   const handleSubmitQuestion = async () => {
-    if (isRunning || isSubmittingCode) return;
+    if (questions.length === 0) return;
+    const currentQ = questions[currentIndex];
+    if (!currentQ) return;
+    
+    if (currentQ.type !== "CODING") {
+      if (!answers[currentQ.id]) {
+        toast({ title: "Warning", description: "Please select an answer", variant: "destructive" });
+        return;
+      }
+      toast({ title: "Saved", description: "Answer saved successfully" });
+      return;
+    }
+
     setIsSubmittingCode(true);
-    setSubmissionPhase('compiling');
-    setConsoleOutput("> Submitting code for full evaluation...\n> Compiling source code...\n");
-    setVerdict(null);
+    setSubmissionPhase("running");
+    setOutput(null);
 
     try {
-      const languageId = LANGUAGE_MAP[language];
-      const sampleCases = question.sampleTestCases || [];
-      const hiddenCases = question.hiddenTestCases || [];
-      const allCases = [...sampleCases, ...hiddenCases];
-
-      const tokens = await createBatchSubmissions(
-        code, 
-        languageId, 
-        question.metadata || { functionName: "solve", parameterTypes: [], returnType: { type: "auto" }, category: "array" as any }, 
-        allCases.map(tc => tc.input)
-      );
-
-      setSubmissionPhase('hidden');
-      setConsoleOutput(prev => prev + "> Sample cases passed. Verifying hidden constraints...\n");
+      const response = await apiClient.post("/code/submit", {
+        code: code,
+        language: LANGUAGE_MAP[language]?.slug || "python3",
+        questionId: currentQ.id
+      });
+      const result = response.data?.data || response.data;
       
-      const results = await pollBatchSubmissions(tokens);
+      setAnswers({ ...answers, [currentQ.id]: { code: code, language: language, result: result } });
+      toast({ 
+        title: result.passed ? "Accepted!" : "Wrong Answer", 
+        description: result.message || (result.passed ? "Solution accepted!" : "Solution did not pass all test cases"),
+        variant: result.passed ? "default" : "destructive"
+      });
       
-      const isCorrect = (actual: string, expected: string) => {
-        const clean = (s: string) => s.replace(/\s+/g, '').replace(/,$/, '');
-        return clean(actual) === clean(expected);
-      };
-
-      const finalResults = results.map((res, idx) => ({
-        status: res.status.description,
-        input: idx < sampleCases.length ? allCases[idx].input : "[HIDDEN]",
-        output: idx < sampleCases.length ? (res.stdout || res.stderr || "") : (res.status.id === 3 ? "Correct" : "Incorrect"),
-        expected: idx < sampleCases.length ? allCases[idx].expected : "[HIDDEN]",
-        id: res.status.id,
-        isHidden: idx >= sampleCases.length
-      }));
-
-      setTestCaseResults(finalResults);
-      const failIdx = finalResults.findIndex(r => r.id !== 3 || (!r.isHidden && !isCorrect(r.output, r.expected)));
-
-      if (failIdx === -1) {
-        setVerdict({ 
-          type: 'success', 
-          title: 'Accepted', 
-          message: `Runtime: ${Math.floor(Math.random() * 50) + 1} ms | Memory: ${Math.floor(Math.random() * 10) + 4} MB` 
+      if (result.testCases) {
+        setTestCaseResults(result.testCases);
+        const passed = result.testCases.filter((tc: any) => tc.passed).length;
+        setOutput({ 
+          type: result.passed ? 'success' : 'error', 
+          message: result.passed 
+            ? `✓ All ${passed} test cases passed!` 
+            : `✗ ${passed}/${result.testCases.length} test cases passed`
         });
-        // Store answer status
-        setAnswers({ ...answers, [question.id]: "ACCEPTED" });
-      } else {
-        setVerdict({ type: 'fail', title: 'Rejected', message: `Failed on case #${failIdx + 1}` });
       }
-      
-      setSubmissionPhase('result');
+      setSubmissionPhase("result");
     } catch (error: any) {
-      setVerdict({ type: 'fail', title: 'Error', message: error.message });
+      console.error("Submit code error:", error);
+      toast({
+        title: "Error",
+        description: error.response?.data?.message || "Failed to submit solution",
+        variant: "destructive",
+      });
+      setOutput({ 
+        type: 'error', 
+        message: error.response?.data?.message || "Failed to submit solution. Please try again."
+      });
     } finally {
       setIsSubmittingCode(false);
     }
   };
 
-  const handleSubmit = () => {
-    setIsSubmitted(true);
-    toast({
-      title: "Test Submitted!",
-      description: "Sending your answers and preparing results.",
-    });
-    setTimeout(() => {
-      navigate(`/test/${testId || "demo"}/results`, { state: { results: {} } });
-    }, 800);
+  const formatTime = (seconds: number) => {
+    const hours = Math.floor(seconds / 3600);
+    const mins = Math.floor((seconds % 3600) / 60);
+    const secs = seconds % 60;
+    if (hours > 0) {
+      return `${hours}:${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
+    }
+    return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
   };
 
-  const toggleFlag = () => {
-    const next = new Set(flagged);
-    if (next.has(question.id)) {
-      next.delete(question.id);
+// Add this right after the useEffect that processes questions
+useEffect(() => {
+  console.log("🔍📊 FINAL QUESTIONS STATE:", {
+    totalQuestions: questions.length,
+    questions: questions.map(q => ({
+      id: q.id,
+      type: q.type,
+      prompt: q.prompt?.substring(0, 30),
+      hasOptions: !!q.options?.length,
+      hasCodeTemplate: !!q.codeTemplate
+    }))
+  });
+}, [questions]);
+
+  const isCurrentAnswered = (): boolean => {
+    if (questions.length === 0) return false;
+    const currentQ = questions[currentIndex];
+    if (!currentQ) return false;
+    
+    if (currentQ.type === "MCQ") {
+      return !!answers[currentQ.id];
     } else {
-      next.add(question.id);
+      return !!answers[currentQ.id];
     }
-    setFlagged(next);
   };
+
+  // Get available languages from current question
+  const availableLanguages = (() => {
+    const currentQ = questions[currentIndex];
+    if (currentQ?.type === "CODING" && currentQ.codeTemplate) {
+      return Object.keys(currentQ.codeTemplate) as LanguageKey[];
+    }
+    return ["python3", "javascript", "java", "cpp"] as LanguageKey[];
+  })();
+
+  if (error) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-4">
+        <Card className="max-w-md w-full text-center">
+          <CardContent className="pt-6">
+            <div className="text-red-500 mb-4">
+              <AlertTriangle className="w-12 h-12 mx-auto" />
+            </div>
+            <h2 className="text-xl font-semibold mb-2">Something went wrong</h2>
+            <p className="text-muted-foreground mb-4">{error}</p>
+            <Button onClick={() => window.location.reload()}>Try Again</Button>
+            <Button variant="ghost" onClick={() => navigate("/")} className="ml-2">Home</Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (questions.length === 0) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-4">
+        <Card className="max-w-md w-full text-center">
+          <CardContent className="pt-6">
+            <h2 className="text-xl font-semibold mb-2">No questions found</h2>
+            <p className="text-muted-foreground mb-4">This test doesn't have any questions yet.</p>
+            <Button onClick={() => navigate("/")}>Go Home</Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  const currentQuestion = questions[currentIndex];
+  
+  if (!currentQuestion) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
       </div>
     );
   }
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
-      <header className="sticky top-0 z-40 border-b bg-card/90 backdrop-blur px-6 py-4 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+      {/* Header */}
+      <header className="sticky top-0 z-40 border-b bg-card/90 backdrop-blur px-6 py-4 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold">Test Interface</h1>
-          <p className="text-sm text-muted-foreground">Student exam experience only � no authoring tools here.</p>
+          <h1 className="text-xl font-semibold">{test?.title || "Test"}</h1>
+          <p className="text-xs text-muted-foreground">{test?.description}</p>
         </div>
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="rounded-lg bg-muted px-3 py-2 text-sm font-medium">
-            {formatTime(timeLeft)} remaining
+        <div className="flex items-center gap-3 flex-wrap">
+          <div className={cn(
+            "rounded-lg px-3 py-2 text-sm font-mono font-medium",
+            timeLeft < 300 ? "bg-red-500/10 text-red-500 animate-pulse" : "bg-muted"
+          )}>
+            <Clock className="w-4 h-4 inline mr-2" />
+            {formatTime(timeLeft)}
           </div>
-          <Button variant="outline" size="sm" onClick={() => setShowSubmitDialog(true)} disabled={isSubmitted}>
-            <Send className="w-4 h-4 mr-2" /> Submit Test
+          <div className="text-sm text-muted-foreground">
+            Q{currentIndex + 1}/{questions.length}
+          </div>
+          <Button variant="outline" size="sm" onClick={() => setShowSubmitDialog(true)}>
+            <Send className="w-4 h-4 mr-2" /> Submit
           </Button>
         </div>
       </header>
 
       <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
+        {/* Main Content */}
         <main className="flex-1 overflow-y-auto p-6">
           <AnimatePresence mode="wait">
             <motion.div
-              key={question.id}
+              key={currentQuestion.id}
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -20 }}
               transition={{ duration: 0.2 }}
               className="space-y-6"
             >
-              <Card className="p-6 bg-card/80 border">
-                <CardContent className="space-y-4">
-                  <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+              <Card>
+                <CardContent className="p-6 space-y-4">
+                  <div className="flex justify-between items-start flex-wrap gap-4">
                     <div>
-                      <h2 className="text-xl font-semibold">Q{currentQuestion + 1}. {question.question}</h2>
-                      <div className="mt-2 flex flex-wrap gap-2 text-sm text-muted-foreground">
-                        <Badge variant="outline">{question.type.toUpperCase()}</Badge>
-                        <Badge variant="outline">{question.marks} marks</Badge>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <Badge variant={currentQuestion.type === "CODING" ? "default" : "secondary"}>
+                          {currentQuestion.type === "CODING" ? <Code2 className="w-3 h-3 mr-1" /> : <FileText className="w-3 h-3 mr-1" />}
+                          {currentQuestion.type}
+                        </Badge>
+                        <Badge variant="outline">{currentQuestion.marks} marks</Badge>
+                        {currentQuestion.difficulty && (
+                          <Badge variant="outline" className={cn(
+                            currentQuestion.difficulty === "EASY" && "bg-green-500/10 text-green-500 border-green-500/20",
+                            currentQuestion.difficulty === "MEDIUM" && "bg-yellow-500/10 text-yellow-500 border-yellow-500/20",
+                            currentQuestion.difficulty === "HARD" && "bg-red-500/10 text-red-500 border-red-500/20",
+                          )}>
+                            {currentQuestion.difficulty}
+                          </Badge>
+                        )}
+                        {isCurrentAnswered() && (
+                          <Badge variant="success" className="bg-green-500/20 text-green-700">
+                            <CheckCircle className="w-3 h-3 mr-1" /> Answered
+                          </Badge>
+                        )}
                       </div>
+                      <h2 className="text-lg font-medium mt-3 whitespace-pre-wrap">
+                        {currentQuestion.title || currentQuestion.prompt}
+                      </h2>
+                      {currentQuestion.tags && currentQuestion.tags.length > 0 && (
+                        <div className="flex flex-wrap gap-1 mt-2">
+                          {currentQuestion.tags.map((tag, idx) => (
+                            <span key={idx} className="text-[10px] bg-muted px-2 py-0.5 rounded text-muted-foreground border">
+                              {tag}
+                            </span>
+                          ))}
+                        </div>
+                      )}
                     </div>
-                    <div className="text-sm text-muted-foreground">
-                      Answered {answered}/{total}
-                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        const newFlagged = new Set(flagged);
+                        if (newFlagged.has(currentQuestion.id)) {
+                          newFlagged.delete(currentQuestion.id);
+                        } else {
+                          newFlagged.add(currentQuestion.id);
+                        }
+                        setFlagged(newFlagged);
+                      }}
+                    >
+                      <Flag className={cn("w-4 h-4 mr-2", flagged.has(currentQuestion.id) && "fill-yellow-500 text-yellow-500")} />
+                      {flagged.has(currentQuestion.id) ? "Flagged" : "Flag for review"}
+                    </Button>
                   </div>
 
-                  {question.type === "mcq" ? (
+                  {currentQuestion.type === "MCQ" && currentQuestion.options && (
                     <RadioGroup
-                      value={answers[question.id] || ""}
-                      onValueChange={(value) => !isSubmitted && setAnswers({ ...answers, [question.id]: value })}
-                      className="space-y-3"
-                      disabled={isSubmitted}
+                      value={answers[currentQuestion.id] || ""}
+                      onValueChange={(value) => setAnswers({ ...answers, [currentQuestion.id]: value })}
+                      className="space-y-2 pt-2"
                     >
-                      {question.options?.map((option, idx) => (
-                        <Label
-                          key={idx}
-                          htmlFor={`option-${idx}`}
+                      {currentQuestion.options.map((option, idx) => (
+                        <Label 
+                          key={idx} 
                           className={cn(
-                            "flex items-center gap-4 rounded-2xl border p-4 cursor-pointer transition",
-                            answers[question.id] === option ? "border-primary bg-primary/10" : "border-border hover:border-primary/50"
+                            "flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-all",
+                            answers[currentQuestion.id] === option 
+                              ? "border-primary bg-primary/5 ring-1 ring-primary" 
+                              : "border-border hover:bg-muted/50 hover:border-primary/30"
                           )}
                         >
                           <RadioGroupItem value={option} id={`option-${idx}`} />
-                          <span>{option}</span>
+                          <span className="text-sm">{option}</span>
                         </Label>
                       ))}
                     </RadioGroup>
-                  ) : (
-                    <div className="space-y-6">
-                      <div className="rounded-2xl border bg-muted p-6">
-                        <p className="whitespace-pre-line text-sm leading-6 text-muted-foreground" dangerouslySetInnerHTML={{ __html: question.problemStatement || "" }} />
-                        <div className="mt-4 grid gap-3 md:grid-cols-2">
-                          <div className="rounded-xl bg-background px-4 py-3 text-sm">
-                            <div className="font-semibold">Input</div>
-                            <div className="mt-2 text-muted-foreground">{question.sampleInput}</div>
-                          </div>
-                          <div className="rounded-xl bg-background px-4 py-3 text-sm">
-                            <div className="font-semibold">Output</div>
-                            <div className="mt-2 text-muted-foreground">{question.sampleOutput}</div>
-                          </div>
+                  )}
+
+                  {currentQuestion.type === "CODING" && (
+                    <div className="space-y-4">
+                      <div className="rounded-lg bg-muted/30 p-4 space-y-4">
+                        <div className="prose prose-sm dark:prose-invert max-w-none">
+                          <p className="whitespace-pre-wrap leading-relaxed">
+                            {currentQuestion.problemStatement || currentQuestion.prompt}
+                          </p>
                         </div>
-                      </div>
-                      <div className="rounded-2xl border bg-card/80 overflow-hidden">
-                        <div className="flex items-center justify-between border-b border-border px-4 py-3 bg-muted">
-                          <div className="text-sm font-medium">Code Editor</div>
-                          <select
-                            value={language}
-                            onChange={(e) => setLanguage(e.target.value)}
-                            className="rounded-lg border bg-background px-2 py-1 text-xs"
-                          >
-                            <option value="python">Python</option>
-                            <option value="java">Java</option>
-                          </select>
-                        </div>
-                        <Editor
-                          height="320px"
-                          language={language}
-                          value={code}
-                          onChange={(value) => !isSubmitted && setCode(value || "")}
-                          theme="vs-dark"
-                          options={{ minimap: { enabled: false }, fontSize: 14, scrollBeyondLastLine: false }}
-                        />
-                        <div className="flex items-center justify-between p-3 border-t bg-muted/30">
-                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                            <Terminal className="w-3 h-3" /> Console Output
+
+                        {(currentQuestion.timeLimitSecs || currentQuestion.memoryLimitMb) && (
+                          <div className="flex gap-4 text-xs font-semibold text-muted-foreground border-y py-2">
+                            {currentQuestion.timeLimitSecs && (
+                              <div className="flex items-center gap-1">
+                                <Clock className="w-3 h-3" /> Time Limit: {currentQuestion.timeLimitSecs}s
+                              </div>
+                            )}
+                            {currentQuestion.memoryLimitMb && (
+                              <div className="flex items-center gap-1">
+                                <Database className="w-3 h-3" /> Memory Limit: {currentQuestion.memoryLimitMb}MB
+                              </div>
+                            )}
                           </div>
-                          <Button size="sm" onClick={handleRunCode} disabled={isRunning || isSubmittingCode || isSubmitted} variant="secondary">
-                            <Play className="w-3 h-3 mr-2" /> Run
-                          </Button>
-                          <Button size="sm" onClick={handleSubmitQuestion} disabled={isRunning || isSubmittingCode || isSubmitted} className="bg-primary hover:bg-primary/90 text-white">
-                            <Send className="w-3 h-3 mr-2" /> Submit
-                          </Button>
-                        </div>
-                        
-                        {(submissionPhase !== 'idle' || verdict) && (
-                          <div className="border-t bg-muted/10">
-                            <div className="p-4 space-y-4">
-                              {verdict && (
-                                <div className={cn(
-                                  "p-4 rounded-xl border flex items-center justify-between",
-                                  verdict.type === 'success' ? "bg-green-500/10 border-green-500/20 text-green-700" : "bg-red-500/10 border-red-500/20 text-red-700"
-                                )}>
-                                  <div className="flex items-center gap-3">
-                                    {verdict.type === 'success' ? <CheckCircle className="w-5 h-5" /> : <AlertTriangle className="w-5 h-5" />}
-                                    <div>
-                                      <div className="font-bold">{verdict.title}</div>
-                                      <div className="text-xs opacity-80">{verdict.message}</div>
-                                    </div>
+                        )}
+
+                        {currentQuestion.constraints && (
+                          <div className="space-y-1">
+                            <div className="text-xs font-semibold text-muted-foreground">Constraints:</div>
+                            <div className="text-sm bg-background/50 p-2 rounded border font-mono">
+                              {currentQuestion.constraints}
+                            </div>
+                          </div>
+                        )}
+
+                        {((test as any)?.examples || currentQuestion.sampleInput) && (
+                          <div className="space-y-3">
+                            <div className="text-xs font-semibold text-muted-foreground">Examples:</div>
+                            {(currentQuestion.sampleInput ? [
+                              { 
+                                input: currentQuestion.sampleInput, 
+                                output: currentQuestion.sampleOutput, 
+                                explanation: currentQuestion.sampleExplanation 
+                              }
+                            ] : ((test as any)?.examples || [])).map((ex: any, idx: number) => (
+                              <div key={idx} className="space-y-2 last:border-0 border-b pb-3 border-dashed">
+                                <div className="grid gap-3 md:grid-cols-2">
+                                  <div className="rounded-lg bg-background p-2 border">
+                                    <div className="text-[10px] font-bold text-muted-foreground mb-1 uppercase tracking-tight">Input:</div>
+                                    <pre className="text-xs font-mono">{ex.input}</pre>
+                                  </div>
+                                  <div className="rounded-lg bg-background p-2 border">
+                                    <div className="text-[10px] font-bold text-muted-foreground mb-1 uppercase tracking-tight">Output:</div>
+                                    <pre className="text-xs font-mono">{ex.output}</pre>
                                   </div>
                                 </div>
-                              )}
-                              
-                              <div className="space-y-2">
-                                <div className="text-xs font-semibold text-muted-foreground flex items-center gap-2">
-                                  <Terminal className="w-3 h-3" /> Console
-                                </div>
-                                <pre className="text-[10px] font-mono bg-black/5 p-3 rounded-lg overflow-auto max-h-[120px] whitespace-pre-wrap">
-                                  {consoleOutput}
-                                  {(submissionPhase === 'compiling' || submissionPhase === 'running' || submissionPhase === 'hidden') && (
-                                    <span className="animate-pulse">_</span>
-                                  )}
-                                </pre>
+                                {ex.explanation && (
+                                  <div className="text-xs text-muted-foreground bg-background/50 p-2 rounded border-l-2 border-primary/30">
+                                    <span className="font-semibold">Explanation:</span> {ex.explanation}
+                                  </div>
+                                )}
                               </div>
+                            ))}
+                          </div>
+                        )}
 
-                              {testCaseResults.length > 0 && (
-                                <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                                  {testCaseResults.map((res, idx) => (
-                                    <div key={idx} className={cn(
-                                      "p-2 rounded-lg border text-[10px] flex items-center justify-between",
-                                      res.id === 3 ? "bg-green-500/5 border-green-500/10" : "bg-red-500/5 border-red-500/10"
-                                    )}>
-                                      <span>Case {idx + 1}</span>
-                                      {res.id === 3 ? <CheckCircle className="w-3 h-3 text-green-500" /> : <XCircle className="w-3 h-3 text-red-500" />}
-                                    </div>
+                        {currentQuestion.hints && (currentQuestion.hints as any).length > 0 && (
+                          <Accordion type="single" collapsible className="w-full">
+                            <AccordionItem value="hints" className="border-none">
+                              <AccordionTrigger className="text-xs font-semibold text-primary py-1 hover:no-underline">
+                                <span className="flex items-center gap-1">
+                                  <Lightbulb className="w-3 h-3" /> Need a hint?
+                                </span>
+                              </AccordionTrigger>
+                              <AccordionContent className="pt-2">
+                                <ul className="space-y-2">
+                                  {(currentQuestion.hints as any).map((hint: string, hIdx: number) => (
+                                    <li key={hIdx} className="text-sm bg-yellow-500/5 p-2 rounded border border-yellow-500/10">
+                                      <span className="font-semibold text-xs text-yellow-600 mr-1">Hint {hIdx + 1}:</span> {hint}
+                                    </li>
                                   ))}
+                                </ul>
+                              </AccordionContent>
+                            </AccordionItem>
+                          </Accordion>
+                        )}
+                      </div>
+
+                      <div className="rounded-lg border overflow-hidden">
+                        <div className="flex justify-between items-center border-b px-4 py-2 bg-muted/30">
+                          <div className="text-sm font-medium">Code Editor</div>
+                          <div className="flex items-center gap-2">
+                            <select
+                              value={language}
+                              onChange={(e) => setLanguage(e.target.value as LanguageKey)}
+                              className="rounded border bg-background px-2 py-1 text-xs"
+                            >
+                              {availableLanguages.map((lang) => (
+                                <option key={lang} value={lang}>
+                                  {LANGUAGE_MAP[lang]?.name || lang}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        </div>
+                        <Editor
+                          height="400px"
+                          language={LANGUAGE_MAP[language]?.monaco || "python"}
+                          value={code}
+                          onChange={(value) => setCode(value || "")}
+                          theme="vs-dark"
+                          options={{ 
+                            minimap: { enabled: false }, 
+                            fontSize: 13,
+                            scrollBeyondLastLine: false,
+                            automaticLayout: true
+                          }}
+                        />
+                        <div className="flex gap-2 p-3 border-t bg-muted/30">
+                          <Button 
+                            size="sm" 
+                            variant="outline" 
+                            onClick={handleRunCode} 
+                            disabled={isRunning || isSubmittingCode}
+                          >
+                            {isRunning ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Play className="w-4 h-4 mr-2" />}
+                            Run Code
+                          </Button>
+                          <Button 
+                            size="sm" 
+                            onClick={handleSubmitQuestion} 
+                            disabled={isRunning || isSubmittingCode}
+                          >
+                            {isSubmittingCode ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
+                            Submit Solution
+                          </Button>
+                        </div>
+
+                        {(output || testCaseResults.length > 0) && (
+                          <div className="border-t bg-black/5">
+                            <div className="p-4 space-y-3">
+                              {output && (
+                                <div className={cn(
+                                  "p-3 rounded-lg text-sm font-mono",
+                                  output.type === 'success' 
+                                    ? "bg-green-500/10 text-green-600 border border-green-500/20" 
+                                    : "bg-red-500/10 text-red-600 border border-red-500/20"
+                                )}>
+                                  {output.type === 'success' ? <CheckCircle className="w-4 h-4 inline mr-2" /> : <XCircle className="w-4 h-4 inline mr-2" />}
+                                  {output.message}
+                                </div>
+                              )}
+                              {testCaseResults.length > 0 && (
+                                <div>
+                                  <div className="text-xs font-semibold text-muted-foreground mb-2">Test Cases:</div>
+                                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                                    {testCaseResults.map((tc, idx) => (
+                                      <div key={idx} className={cn(
+                                        "p-2 rounded-lg text-center text-xs font-mono",
+                                        tc.passed ? "bg-green-500/10 text-green-600 border border-green-500/20" : "bg-red-500/10 text-red-600 border border-red-500/20"
+                                      )}>
+                                        <div>Case {idx + 1}</div>
+                                        <div>{tc.passed ? "✓ Passed" : "✗ Failed"}</div>
+                                      </div>
+                                    ))}
+                                  </div>
                                 </div>
                               )}
                             </div>
@@ -500,37 +845,76 @@ export default function TestInterface() {
           </AnimatePresence>
         </main>
 
-        <aside className="hidden lg:flex lg:flex-col w-80 border-l border-border bg-card/80 p-6 gap-6">
-          <div className="space-y-4">
-            <div className="text-xs uppercase tracking-widest text-muted-foreground">Question Navigator</div>
-            <div className="grid grid-cols-4 gap-3">
-              {questions.map((item, idx) => (
-                <button
-                  key={item.id}
-                  onClick={() => !isSubmitted && setCurrentQuestion(idx)}
-                  className={cn(
-                    "h-12 rounded-xl font-semibold transition",
-                    idx === currentQuestion ? "bg-primary text-white" : "bg-muted hover:bg-muted/70"
-                  )}
-                >
-                  {idx + 1}
-                </button>
-              ))}
+        {/* Sidebar Navigation */}
+        <aside className="lg:w-80 border-l bg-card/50 p-4 space-y-4 overflow-y-auto">
+          <div>
+            <div className="text-xs uppercase tracking-wider text-muted-foreground mb-3 font-semibold">Question Navigator</div>
+            <div className="grid grid-cols-5 gap-2">
+              {questions.map((q, idx) => {
+                const isAnswered = !!answers[q.id];
+                return (
+                  <button
+                    key={q.id}
+                    onClick={() => setCurrentIndex(idx)}
+                    className={cn(
+                      "h-10 rounded-lg font-mono text-sm transition-all",
+                      idx === currentIndex && "ring-2 ring-primary bg-primary text-white",
+                      isAnswered && !flagged.has(q.id) && idx !== currentIndex && "bg-green-500/20 text-green-700",
+                      flagged.has(q.id) && "bg-yellow-500/20 text-yellow-700",
+                      !isAnswered && !flagged.has(q.id) && idx !== currentIndex && "bg-muted hover:bg-muted/70"
+                    )}
+                  >
+                    {idx + 1}
+                  </button>
+                );
+              })}
             </div>
           </div>
 
-          <div className="space-y-4">
-            <Button variant="outline" className="w-full" onClick={toggleFlag}>
-              <Flag className="w-4 h-4 mr-2" />
-              {flagged.has(question.id) ? "Unflag" : "Flag for Review"}
+          <div className="flex gap-2">
+            <Button 
+              variant="outline" 
+              className="flex-1" 
+              disabled={currentIndex === 0} 
+              onClick={() => setCurrentIndex(prev => prev - 1)}
+            >
+              <ChevronLeft className="w-4 h-4 mr-2" /> Prev
             </Button>
-            <div className="flex gap-3">
-              <Button variant="secondary" className="flex-1" disabled={currentQuestion === 0} onClick={() => setCurrentQuestion((prev) => Math.max(0, prev - 1))}>
-                <ChevronLeft className="w-4 h-4 mr-2" /> Prev
-              </Button>
-              <Button variant="secondary" className="flex-1" disabled={currentQuestion === total - 1} onClick={() => setCurrentQuestion((prev) => Math.min(total - 1, prev + 1))}>
-                Next <ChevronRight className="w-4 h-4 ml-2" />
-              </Button>
+            <Button 
+              variant="outline" 
+              className="flex-1" 
+              disabled={currentIndex === questions.length - 1} 
+              onClick={() => setCurrentIndex(prev => prev + 1)}
+            >
+              Next <ChevronRight className="w-4 h-4 ml-2" />
+            </Button>
+          </div>
+
+          <div className="pt-4 border-t">
+            <div className="text-xs text-muted-foreground space-y-2">
+              <div className="flex justify-between">
+                <span>Answered:</span>
+                <span className="font-semibold text-green-600">{Object.keys(answers).length}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Flagged:</span>
+                <span className="font-semibold text-yellow-600">{flagged.size}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Remaining:</span>
+                <span className="font-semibold">{questions.length - Object.keys(answers).length}</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="pt-4 border-t">
+            <div className="text-xs text-muted-foreground">
+              <p className="font-semibold mb-2">Legend:</p>
+              <div className="space-y-1">
+                <div className="flex items-center gap-2"><div className="w-3 h-3 rounded bg-green-500/20"></div><span className="text-xs">Answered</span></div>
+                <div className="flex items-center gap-2"><div className="w-3 h-3 rounded bg-yellow-500/20"></div><span className="text-xs">Flagged</span></div>
+                <div className="flex items-center gap-2"><div className="w-3 h-3 rounded bg-muted"></div><span className="text-xs">Not Answered</span></div>
+              </div>
             </div>
           </div>
         </aside>
@@ -540,17 +924,29 @@ export default function TestInterface() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">
-              <AlertTriangle className="w-4 h-4 text-warning" />
-              Submit Test
+              <AlertTriangle className="w-4 h-4 text-yellow-500" />
+              Submit Test?
             </AlertDialogTitle>
-            <AlertDialogDescription>
-              You are about to submit your test. This cannot be undone.
+            <AlertDialogDescription className="space-y-2">
+              <p>You have answered {Object.keys(answers).length} out of {questions.length} questions.</p>
+              {Object.keys(answers).length < questions.length && (
+                <p className="text-yellow-600 font-medium">
+                  ⚠️ You have {questions.length - Object.keys(answers).length} unanswered questions.
+                </p>
+              )}
+              {flagged.size > 0 && (
+                <p className="text-yellow-600">
+                  📌 You have {flagged.size} question(s) flagged for review.
+                </p>
+              )}
+              <p className="text-sm text-muted-foreground mt-2">This action cannot be undone.</p>
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter className="space-x-2">
+          <AlertDialogFooter>
             <AlertDialogCancel>Continue Testing</AlertDialogCancel>
-            <AlertDialogAction onClick={handleSubmit} className="bg-primary text-white">
-              Submit
+            <AlertDialogAction onClick={submitTest} disabled={submitting} className="bg-primary text-white">
+              {submitting ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
+              Submit Test
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

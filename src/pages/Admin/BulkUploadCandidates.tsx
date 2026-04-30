@@ -12,30 +12,54 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
 import { apiClient } from "@/lib/api-client";
-import { Upload, FileSpreadsheet, CheckCircle2, AlertCircle, Loader2, Download } from "lucide-react";
+import { Upload, FileSpreadsheet, CheckCircle2, AlertCircle, Loader2, Download, Building2 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface BulkUploadCandidatesProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSuccess: () => void;
+  isSuperAdmin?: boolean; // Prop to identify SuperAdmin mode
 }
 
-export function BulkUploadCandidates({ open, onOpenChange, onSuccess }: BulkUploadCandidatesProps) {
+export function BulkUploadCandidates({ open, onOpenChange, onSuccess, isSuperAdmin }: BulkUploadCandidatesProps) {
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [organisations, setOrganisations] = useState<any[]>([]);
+  const [selectedOrgId, setSelectedOrgId] = useState<string>("");
   const { toast } = useToast();
   const { user } = useAuth();
 
+  // Fetch organisations if SuperAdmin
+  React.useEffect(() => {
+    if (isSuperAdmin && open) {
+      apiClient.get("/organisations")
+        .then(res => setOrganisations(res.data.data || []))
+        .catch(err => console.error("Failed to fetch organisations", err));
+    }
+  }, [isSuperAdmin, open]);
+
   const getOrganisationId = () => {
+    if (isSuperAdmin) return selectedOrgId;
     if (user?.organisationData?.id) return user.organisationData.id;
     if (user?.organisationId) return user.organisationId;
     return null;
   };
 
   const getOrganisationName = () => {
+    if (isSuperAdmin) {
+      const org = organisations.find(o => o.id === selectedOrgId);
+      return org?.name || "Selected Organisation";
+    }
     if (user?.organisationData?.name) return user.organisationData.name;
     if (user?.organisationName) return user.organisationName;
     return null;
@@ -157,8 +181,10 @@ export function BulkUploadCandidates({ open, onOpenChange, onSuccess }: BulkUplo
       return;
     }
 
-    if (!organisationId) {
-      setError("Unable to determine your organisation. Please contact support.");
+    const effectiveOrgId = getOrganisationId();
+
+    if (!effectiveOrgId) {
+      setError(isSuperAdmin ? "Please select an organisation" : "Unable to determine your organisation. Please contact support.");
       return;
     }
 
@@ -177,10 +203,10 @@ export function BulkUploadCandidates({ open, onOpenChange, onSuccess }: BulkUplo
     }, 500);
 
     try {
-      const transformedFile = await transformCSV(file, organisationId);
+      const transformedFile = await transformCSV(file, effectiveOrgId);
       const formData = new FormData();
       formData.append("file", transformedFile);
-      formData.append("organisationId", organisationId);
+      formData.append("organisationId", effectiveOrgId);
 
       await apiClient.post("/candidates/bulk-upload", formData, {
         headers: { "Content-Type": "multipart/form-data" },
@@ -222,12 +248,33 @@ export function BulkUploadCandidates({ open, onOpenChange, onSuccess }: BulkUplo
         </DialogHeader>
 
         <div className="space-y-4">
-          {/* Organisation Badge */}
-          <div className="flex items-center justify-center">
-            <div className="bg-primary/10 text-primary px-3 py-1.5 rounded-full text-xs font-medium">
-              Assigning to: {organisationName || organisationId || "Loading..."}
+          {/* Organisation Selection/Display */}
+          {isSuperAdmin ? (
+            <div className="space-y-2">
+              <label className="text-sm font-medium flex items-center gap-2">
+                <Building2 className="w-4 h-4 text-primary" />
+                Target Organisation
+              </label>
+              <Select value={selectedOrgId} onValueChange={setSelectedOrgId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select an organisation" />
+                </SelectTrigger>
+                <SelectContent>
+                  {organisations.map((org) => (
+                    <SelectItem key={org.id} value={org.id}>
+                      {org.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
-          </div>
+          ) : (
+            <div className="flex items-center justify-center">
+              <div className="bg-primary/10 text-primary px-3 py-1.5 rounded-full text-xs font-medium">
+                Assigning to: {organisationName || organisationId || "Loading..."}
+              </div>
+            </div>
+          )}
 
           {/* Template Card */}
           <div className="border rounded-lg p-4 space-y-3">

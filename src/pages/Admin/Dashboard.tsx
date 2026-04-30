@@ -1,12 +1,23 @@
 import { StatsCard } from "@/components/dashboard/StatsCard";
 import { RecentTestsTable } from "@/components/dashboard/RecentTestsTable";
+import { TopicAnalysisChart } from "@/components/dashboard/TopicAnalysisChart";
+import { TopPerformersCard } from "@/components/dashboard/TopPerformersCard";
 import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Users,
   FileQuestion,
   ClipboardCheck,
   Plus,
   TrendingUp,
+  Activity,
+  Send,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
@@ -16,25 +27,39 @@ export default function AdminDashboard() {
   return (
     <div className="p-8 space-y-8 animate-fade-in">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-heading font-bold">Dashboard</h1>
           <p className="text-muted-foreground mt-1">
             Welcome back! Here's an overview of your assessments.
           </p>
         </div>
-        <Button
-          variant="hero"
-          size="lg"
-          onClick={() => navigate("/admin/tests/create")}
-        >
-          <Plus className="w-5 h-5" />
-          Create Test
-        </Button>
+        <div className="flex items-center gap-3">
+          <Select defaultValue="all">
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="Select Batch" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Batches</SelectItem>
+              <SelectItem value="cse2024">CSE 2024</SelectItem>
+              <SelectItem value="it2024">IT 2024</SelectItem>
+              <SelectItem value="cse2025">CSE 2025</SelectItem>
+            </SelectContent>
+          </Select>
+          <Button
+            variant="hero"
+            size="lg"
+            className="hidden md:flex"
+            onClick={() => navigate("/admin/tests/create")}
+          >
+            <Plus className="w-5 h-5" />
+            Create Test
+          </Button>
+        </div>
       </div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
         <StatsCard
           title="Total Candidates"
           value="142"
@@ -51,6 +76,13 @@ export default function AdminDashboard() {
           variant="accent"
         />
         <StatsCard
+          title="Live Now"
+          value="3"
+          subtitle="Tests in progress"
+          icon={Activity}
+          variant="warning"
+        />
+        <StatsCard
           title="Tests Created"
           value="12"
           subtitle="This month"
@@ -62,12 +94,18 @@ export default function AdminDashboard() {
           value="547"
           subtitle="Total test submissions"
           icon={ClipboardCheck}
-          variant="warning"
+          variant="default"
           trend={{ value: 15, positive: true }}
         />
       </div>
 
-      {/* Quick Actions */}
+      {/* Analytics Section */}
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+        <TopicAnalysisChart />
+        <TopPerformersCard />
+      </div>
+
+      {/* Quick Actions & Recent Activity */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2">
           <RecentTestsTable />
@@ -80,6 +118,22 @@ export default function AdminDashboard() {
               Quick Actions
             </h3>
             <div className="space-y-3">
+              <Button
+                variant="hero"
+                className="w-full justify-start gap-3 md:hidden mb-2"
+                onClick={() => navigate("/admin/tests/create")}
+              >
+                <Plus className="w-4 h-4" />
+                Create Test
+              </Button>
+              <Button
+                variant="outline"
+                className="w-full justify-start gap-3"
+                onClick={() => navigate("/admin/candidates?invite=true")}
+              >
+                <Send className="w-4 h-4" />
+                Quick Invite Candidates
+              </Button>
               <Button
                 variant="outline"
                 className="w-full justify-start gap-3"

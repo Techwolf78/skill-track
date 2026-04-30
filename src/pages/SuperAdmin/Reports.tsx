@@ -158,14 +158,14 @@
                <Award className="w-5 h-5 text-warning" />
                Top Performers
              </CardTitle>
-             <CardDescription>Students with highest average scores</CardDescription>
+             <CardDescription>Candidates with highest average scores</CardDescription>
            </CardHeader>
            <CardContent>
              <Table>
                <TableHeader>
                  <TableRow>
                    <TableHead className="w-16">Rank</TableHead>
-                   <TableHead>Student</TableHead>
+                   <TableHead>Candidate</TableHead>
                    <TableHead className="text-right">Score</TableHead>
                  </TableRow>
                </TableHeader>

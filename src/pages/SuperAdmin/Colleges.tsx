@@ -137,7 +137,7 @@
                      <Users className="w-4 h-4" />
                    </div>
                    <p className="text-2xl font-bold">{college.students}</p>
-                   <p className="text-xs text-muted-foreground">Students</p>
+                   <p className="text-xs text-muted-foreground">Candidates</p>
                  </div>
                  <div className="text-center">
                    <p className="text-2xl font-bold text-primary">{college.activeTests}</p>

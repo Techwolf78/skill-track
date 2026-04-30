@@ -30,7 +30,7 @@
        {/* Stats Grid */}
        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
          <StatsCard
-           title="Total Students"
+           title="Total Candidates"
            value="2,847"
            subtitle="Across 12 colleges"
            icon={Users}
@@ -82,7 +82,7 @@
                </Button>
                <Button variant="outline" className="w-full justify-start gap-3">
                  <Users className="w-4 h-4" />
-                 Bulk Upload Students
+                 Bulk Upload Candidates
                </Button>
              </div>
            </div>

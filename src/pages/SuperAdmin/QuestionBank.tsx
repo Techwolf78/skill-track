@@ -24,6 +24,7 @@ import {
   Eye,
   Loader2,
   FolderTree,
+  Trophy,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -53,6 +54,7 @@ import {
   Subtopic,
 } from "@/lib/test-service";
 import { useToast } from "@/hooks/use-toast";
+import { cn } from "@/lib/utils";
 
 const difficultyColors = {
   Easy: "bg-green-500/10 text-green-500 border-green-500/20",
@@ -71,8 +73,9 @@ export default function QuestionBank() {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<"mcq" | "coding">("mcq");
   const [difficultyFilter, setDifficultyFilter] = useState<
-    "All" | "Easy" | "Medium" | "Hard"
+    "All" | "Easy" | "Medium" | "Hard" | "EASY" | "MEDIUM" | "HARD"
   >("All");
+  const [tagSearch, setTagSearch] = useState("");
 
   // Filter states
   const [filterSubject, setFilterSubject] = useState<string>("all");
@@ -125,11 +128,15 @@ export default function QuestionBank() {
         description: "Question deleted successfully",
       });
       fetchData();
-    } catch (error: unknown) {
-      const errorMessage =
-        error instanceof Error ? error.message : "Failed to delete question";
+    } catch (error: any) {
+      console.error("Failed to delete question:", error);
+      
+      // Handle the 400 Bad Request with IllegalStateException for test usage
+      const errorData = error.response?.data;
+      const errorMessage = errorData?.message || error.message || "Failed to delete question";
+      
       toast({
-        title: "Error",
+        title: "Deletion Restricted",
         description: errorMessage,
         variant: "destructive",
       });
@@ -137,7 +144,7 @@ export default function QuestionBank() {
   };
 
   const handleEdit = (id: string) => {
-    navigate(`/admin/questions/edit/${id}`);
+    navigate(`/superadmin/questions/edit/${id}`);
   };
 
   const handlePreview = (question: Question) => {
@@ -149,7 +156,7 @@ export default function QuestionBank() {
   };
 
   const handleSolve = (id: string) => {
-    navigate(`/admin/questions/playground/${id}`);
+    navigate(`/superadmin/questions/playground/${id}`);
   };
 
   const getSubjectName = (subjectId?: string) => {
@@ -171,23 +178,34 @@ export default function QuestionBank() {
   };
 
   const getDifficultyFromQuestion = (question: Question): string => {
-    // You can add a difficulty field to your Question model later
-    // For now, return based on marks or default
+    if (question.difficulty) return question.difficulty;
+    // Fallback based on marks
     if (question.marks) {
-      if (question.marks <= 2) return "Easy";
-      if (question.marks <= 5) return "Medium";
-      return "Hard";
+      if (question.marks <= 2) return "EASY";
+      if (question.marks <= 5) return "MEDIUM";
+      return "HARD";
     }
-    return "Medium";
+    return "MEDIUM";
+  };
+
+  const getDifficultyColor = (difficulty: string) => {
+    const d = difficulty?.toUpperCase();
+    if (d === "EASY") return difficultyColors.Easy;
+    if (d === "MEDIUM") return difficultyColors.Medium;
+    if (d === "HARD") return difficultyColors.Hard;
+    return difficultyColors.Medium;
   };
 
   // Apply filters to questions
   const filterQuestions = (questionsList: Question[]) => {
     return questionsList.filter((q) => {
       // Search filter
-      const matchesSearch = q.prompt
-        .toLowerCase()
-        .includes(searchTerm.toLowerCase());
+      const matchesSearch = 
+        q.prompt.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (q.title && q.title.toLowerCase().includes(searchTerm.toLowerCase()));
+
+      // Tag search filter
+      const matchesTags = !tagSearch || (q.tags && q.tags.some(tag => tag.toLowerCase().includes(tagSearch.toLowerCase())));
 
       // Subject filter
       const matchesSubject =
@@ -201,12 +219,14 @@ export default function QuestionBank() {
         filterSubtopic === "all" || q.subtopicId === filterSubtopic;
 
       // Difficulty filter
+      const qDifficulty = getDifficultyFromQuestion(q)?.toUpperCase();
+      const fDifficulty = difficultyFilter?.toUpperCase();
       const matchesDifficulty =
-        difficultyFilter === "All" ||
-        getDifficultyFromQuestion(q) === difficultyFilter;
+        difficultyFilter === "All" || qDifficulty === fDifficulty;
 
       return (
         matchesSearch &&
+        matchesTags &&
         matchesSubject &&
         matchesTopic &&
         matchesSubtopic &&
@@ -290,14 +310,14 @@ export default function QuestionBank() {
           </Button>
           <Button
             variant="outline"
-            onClick={() => navigate("/admin/subjects/manage")}
+            onClick={() => navigate("/superadmin/subjects/manage")}
           >
             <FolderTree className="w-4 h-4 mr-2" />
             Manage Subjects
           </Button>
           <Button
             variant="hero"
-            onClick={() => navigate("/admin/questions/create")}
+            onClick={() => navigate("/superadmin/questions/create")}
           >
             <Plus className="w-4 h-4 mr-2" />
             Add Question
@@ -306,14 +326,24 @@ export default function QuestionBank() {
       </div>
 
       {/* Search Bar */}
-      <div className="relative max-w-md">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-        <Input
-          placeholder="Search questions by text..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="pl-10"
-        />
+      <div className="flex flex-col md:flex-row gap-4 items-start">
+        <div className="relative flex-1 w-full max-w-md">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <Input
+            placeholder="Search questions by text or title..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-10"
+          />
+        </div>
+        <div className="relative w-full max-w-xs">
+          <Input
+            placeholder="Search by tags..."
+            value={tagSearch}
+            onChange={(e) => setTagSearch(e.target.value)}
+            className="w-full"
+          />
+        </div>
       </div>
 
       {/* Active Filters Display */}
@@ -387,7 +417,7 @@ export default function QuestionBank() {
                     Question
                   </TableHead>
                   <TableHead className="font-semibold">Subject</TableHead>
-                  <TableHead className="font-semibold">Topic</TableHead>
+                  <TableHead className="font-semibold">Difficulty</TableHead>
                   <TableHead className="font-semibold">Marks</TableHead>
                   <TableHead className="font-semibold">Options</TableHead>
                   <TableHead className="font-semibold text-right">
@@ -411,16 +441,29 @@ export default function QuestionBank() {
                       key={q.id}
                       className="hover:bg-muted/30 transition-colors"
                     >
-                      <TableCell className="font-medium line-clamp-2">
-                        {q.prompt}
+                      <TableCell className="font-medium">
+                        <div className="flex flex-col gap-1">
+                          <span className="line-clamp-2">{q.title || q.prompt}</span>
+                          {q.tags && q.tags.length > 0 && (
+                            <div className="flex flex-wrap gap-1">
+                              {q.tags.map((tag, idx) => (
+                                <span key={idx} className="text-[10px] bg-muted px-1.5 py-0.5 rounded text-muted-foreground">
+                                  {tag}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
                       </TableCell>
                       <TableCell>
                         <Badge variant="outline">
                           {getSubjectName(q.subjectId)}
                         </Badge>
                       </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">
-                        {getTopicName(q.topicId)}
+                      <TableCell>
+                        <Badge variant="outline" className={getDifficultyColor(getDifficultyFromQuestion(q))}>
+                          {getDifficultyFromQuestion(q)}
+                        </Badge>
                       </TableCell>
                       <TableCell>
                         <Badge variant="secondary">{q.marks || 0} marks</Badge>
@@ -466,17 +509,23 @@ export default function QuestionBank() {
 
         {/* Coding Tab */}
         <TabsContent value="coding" className="mt-6">
-          <div className="rounded-xl border bg-card overflow-hidden">
+          <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
             <Table>
               <TableHeader>
-                <TableRow className="bg-muted/50">
-                  <TableHead className="font-semibold w-[40%]">
-                    Question
+                <TableRow className="bg-muted/30 hover:bg-muted/30 border-b">
+                  <TableHead className="font-bold text-xs uppercase tracking-wider py-4 pl-6">
+                    Title
                   </TableHead>
-                  <TableHead className="font-semibold">Subject</TableHead>
-                  <TableHead className="font-semibold">Topic</TableHead>
-                  <TableHead className="font-semibold">Marks</TableHead>
-                  <TableHead className="font-semibold text-right">
+                  <TableHead className="font-bold text-xs uppercase tracking-wider py-4">
+                    Subject / Topic
+                  </TableHead>
+                  <TableHead className="font-bold text-xs uppercase tracking-wider py-4">
+                    Difficulty
+                  </TableHead>
+                  <TableHead className="font-bold text-xs uppercase tracking-wider py-4">
+                    Marks
+                  </TableHead>
+                  <TableHead className="font-bold text-xs uppercase tracking-wider py-4 text-right pr-6">
                     Actions
                   </TableHead>
                 </TableRow>
@@ -486,62 +535,113 @@ export default function QuestionBank() {
                   <TableRow>
                     <TableCell
                       colSpan={5}
-                      className="text-center py-8 text-muted-foreground"
+                      className="text-center py-20 text-muted-foreground"
                     >
-                      No coding questions found
+                      <div className="flex flex-col items-center gap-2">
+                        <Code className="w-10 h-10 opacity-20" />
+                        <p>No coding questions found matching your filters</p>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filteredCoding.map((q) => (
+                  filteredCoding.map((q, index) => (
                     <TableRow
                       key={q.id}
-                      className="hover:bg-muted/30 transition-colors"
+                      className={cn(
+                        "group transition-all hover:bg-muted/50 border-b last:border-0",
+                        index % 2 === 0 ? "bg-background" : "bg-muted/10"
+                      )}
                     >
-                      <TableCell className="font-medium line-clamp-2">
-                        {q.prompt}
+                      <TableCell className="py-4 pl-6">
+                        <div className="flex flex-col gap-1.5">
+                          <span 
+                            className="font-semibold text-sm text-foreground group-hover:text-primary transition-colors cursor-pointer line-clamp-1"
+                            onClick={() => handleSolve(q.id)}
+                          >
+                            {index + 1}. {q.title || q.prompt}
+                          </span>
+                          {q.tags && q.tags.length > 0 && (
+                            <div className="flex flex-wrap gap-1">
+                              {q.tags.slice(0, 3).map((tag, idx) => (
+                                <span key={idx} className="text-[10px] bg-muted px-2 py-0.5 rounded-full text-muted-foreground font-medium border border-border/50">
+                                  {tag}
+                                </span>
+                              ))}
+                              {q.tags.length > 3 && (
+                                <span className="text-[10px] text-muted-foreground pl-1">
+                                  +{q.tags.length - 3}
+                                </span>
+                              )}
+                            </div>
+                          )}
+                        </div>
                       </TableCell>
-                      <TableCell>
-                        <Badge variant="outline">
-                          {getSubjectName(q.subjectId)}
-                        </Badge>
+                      <TableCell className="py-4">
+                        <div className="flex flex-col">
+                          <span className="text-xs font-medium text-foreground">
+                            {getSubjectName(q.subjectId)}
+                          </span>
+                          <span className="text-[10px] text-muted-foreground">
+                            {getTopicName(q.topicId)}
+                          </span>
+                        </div>
                       </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">
-                        {getTopicName(q.topicId)}
+                      <TableCell className="py-4">
+                        <span className={cn(
+                          "text-xs font-bold px-2.5 py-1 rounded-full border",
+                          getDifficultyColor(getDifficultyFromQuestion(q))
+                        )}>
+                          {getDifficultyFromQuestion(q)}
+                        </span>
                       </TableCell>
-                      <TableCell>
-                        <Badge variant="secondary">{q.marks || 0} marks</Badge>
+                      <TableCell className="py-4">
+                        <div className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground">
+                          <Trophy className="w-3.5 h-3.5 text-yellow-500" />
+                          {q.marks || 0}
+                        </div>
                       </TableCell>
-                      <TableCell className="text-right">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon">
-                              <MoreVertical className="w-4 h-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem
-                              onSelect={() => handleSolve(q.id)}
-                            >
-                              <Play className="w-4 h-4 mr-2" />
-                              Solve Question
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onSelect={() => handlePreview(q)}>
-                              <Eye className="w-4 h-4 mr-2" />
-                              Preview
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onSelect={() => handleEdit(q.id)}>
-                              <Edit className="w-4 h-4 mr-2" />
-                              Edit
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              className="text-destructive"
-                              onSelect={() => handleDelete(q.id)}
-                            >
-                              <Trash2 className="w-4 h-4 mr-2" />
-                              Delete
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
+                      <TableCell className="py-4 text-right pr-6">
+                        <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-8 w-8 text-primary hover:text-primary hover:bg-primary/10"
+                            onClick={() => handleSolve(q.id)}
+                            title="Open Playground"
+                          >
+                            <Play className="w-4 h-4" />
+                          </Button>
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                            onClick={() => handleEdit(q.id)}
+                            title="Edit"
+                          >
+                            <Edit className="w-3.5 h-3.5" />
+                          </Button>
+                          
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon" className="h-8 w-8">
+                                <MoreVertical className="w-4 h-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-40">
+                              <DropdownMenuItem onSelect={() => handlePreview(q)}>
+                                <Eye className="w-4 h-4 mr-2" />
+                                Preview
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                className="text-destructive focus:bg-destructive/10 focus:text-destructive"
+                                onSelect={() => handleDelete(q.id)}
+                              >
+                                <Trash2 className="w-4 h-4 mr-2" />
+                                Delete
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))

@@ -61,18 +61,20 @@ export default function Tests() {
   const [currentUserId, setCurrentUserId] = useState<string>("");
   const { toast } = useToast();
 
-  useEffect(() => {
-    const user = JSON.parse(localStorage.getItem("user") || "{}");
-    setCurrentUserId(user.id || "");
-    fetchTests();
-  }, []);
-
   const fetchTests = useCallback(async () => {
     try {
       setLoading(true);
-      const data = await testService.getAllTests();
-      const viewModels = data.map(testService.toViewModel);
-      setTests(viewModels);
+      
+      // Fetch both active and inactive tests from backend
+      const [activeData, inactiveData] = await Promise.all([
+        testService.getAllTests(),
+        testService.getInactiveTests()
+      ]);
+
+      const activeViewModels = activeData.map((t) => testService.toViewModel(t));
+      const inactiveViewModels = inactiveData.map((t) => testService.toViewModel(t));
+
+      setTests([...activeViewModels, ...inactiveViewModels]);
     } catch (error: unknown) {
       const errorMessage =
         error instanceof Error
@@ -89,6 +91,12 @@ export default function Tests() {
     }
   }, [toast]);
 
+  useEffect(() => {
+    const user = JSON.parse(localStorage.getItem("user") || "{}");
+    setCurrentUserId(user.id || "");
+    fetchTests();
+  }, [fetchTests]);
+
   const handleDeleteClick = (test: TestViewModel) => {
     setSelectedTest(test);
     setDeleteDialogOpen(true);
@@ -102,7 +110,7 @@ export default function Tests() {
       await testService.deleteTest(selectedTest.id);
       toast({
         title: "Success",
-        description: `"${selectedTest.name}" has been deleted successfully.`,
+        description: `"${selectedTest.name}" has been deactivated successfully.`,
       });
       await fetchTests();
     } catch (error: unknown) {
@@ -134,8 +142,7 @@ export default function Tests() {
         return;
       }
 
-      const createRequest = {
-        createdById: currentUserId,
+      const createRequest: CreateTestRequest = {
         title: `${test.name} (Copy)`,
         description: test.description,
         durationMins: test.duration,
@@ -143,6 +150,7 @@ export default function Tests() {
         instructions: {},
         status: "DRAFT" as const,
         passMark: test.passMark,
+        isActive: true, // New tests should be active
       };
 
       await testService.createTest(createRequest);
@@ -238,15 +246,16 @@ export default function Tests() {
   };
 
   const handleViewDetails = (test: TestViewModel) => {
-    navigate(`/admin/tests/${test.id}`);
+    navigate(`/superadmin/tests/${test.id}`);
   };
 
   const handleEdit = (test: TestViewModel) => {
-    navigate(`/admin/tests/edit/${test.id}`);
+    navigate(`/superadmin/tests/edit/${test.id}`);
   };
 
   const formatStatus = (status: string): string => {
-    return status.charAt(0).toUpperCase() + status.slice(1);
+    if (!status) return "";
+    return status.charAt(0).toUpperCase() + status.slice(1).toLowerCase();
   };
 
   const filteredTests = tests.filter((test) =>
@@ -254,13 +263,31 @@ export default function Tests() {
   );
 
   const getFilteredTests = (statusFilter: string) => {
-    if (statusFilter === "all") return filteredTests;
-    return filteredTests.filter((test) => test.status === statusFilter);
+    // Search filter already applied in filteredTests
+    if (statusFilter === "all") return filteredTests.filter(t => t.isActive !== false);
+    if (statusFilter === "inactive") return filteredTests.filter(t => t.isActive === false);
+    
+    // Status filters for active tests
+    return filteredTests.filter(
+      (test) => {
+        const testStatus = test.status.toLowerCase();
+        const targetStatus = statusFilter.toLowerCase();
+        return testStatus === targetStatus && test.isActive !== false;
+      }
+    );
   };
 
   const getStatusCount = (statusFilter: string) => {
-    if (statusFilter === "all") return tests.length;
-    return tests.filter((test) => test.status === statusFilter).length;
+    if (statusFilter === "all") return tests.filter(t => t.isActive !== false).length;
+    if (statusFilter === "inactive") return tests.filter(t => t.isActive === false).length;
+    
+    return tests.filter(
+      (test) => {
+        const testStatus = test.status.toLowerCase();
+        const targetStatus = statusFilter.toLowerCase();
+        return testStatus === targetStatus && test.isActive !== false;
+      }
+    ).length;
   };
 
   const renderTestsTable = (statusFilter: string) => {
@@ -277,7 +304,7 @@ export default function Tests() {
               : "Create your first test to get started."}
           </p>
           {!searchTerm && statusFilter === "all" && (
-            <Link to="/admin/tests/create" className="mt-4 inline-block">
+            <Link to="/superadmin/tests/create" className="mt-4 inline-block">
               <Button variant="outline" size="sm">
                 <Plus className="w-4 h-4 mr-2" />
                 Create Test
@@ -442,13 +469,31 @@ export default function Tests() {
                       )}
 
                       <DropdownMenuSeparator />
-                      <DropdownMenuItem
-                        className="text-destructive"
-                        onClick={() => handleDeleteClick(test)}
-                      >
-                        <Trash2 className="w-4 h-4 mr-2" />
-                        Delete
-                      </DropdownMenuItem>
+                      {test.isActive === false ? (
+                        <DropdownMenuItem
+                          className="text-primary"
+                          onClick={async () => {
+                            try {
+                              await testService.activateTest(test.id);
+                              toast({ title: "Success", description: "Test reactivated" });
+                              fetchTests();
+                            } catch (e) {
+                              toast({ title: "Error", description: "Failed to reactivate", variant: "destructive" });
+                            }
+                          }}
+                        >
+                          <RefreshCw className="w-4 h-4 mr-2" />
+                          Reactivate
+                        </DropdownMenuItem>
+                      ) : (
+                        <DropdownMenuItem
+                          className="text-destructive"
+                          onClick={() => handleDeleteClick(test)}
+                        >
+                          <Archive className="w-4 h-4 mr-2" />
+                          Deactivate
+                        </DropdownMenuItem>
+                      )}
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </TableCell>
@@ -482,7 +527,7 @@ export default function Tests() {
             <RefreshCw className="w-4 h-4 mr-2" />
             Refresh
           </Button>
-          <Link to="/admin/tests/create">
+          <Link to="/superadmin/tests/create">
             <Button>
               <Plus className="w-4 h-4 mr-2" />
               Create Test
@@ -520,6 +565,9 @@ export default function Tests() {
           <TabsTrigger value="archived">
             Archived ({getStatusCount("archived")})
           </TabsTrigger>
+          <TabsTrigger value="inactive">
+            Inactive ({getStatusCount("inactive")})
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="all" className="mt-6">
@@ -534,6 +582,9 @@ export default function Tests() {
         <TabsContent value="archived" className="mt-6">
           {renderTestsTable("archived")}
         </TabsContent>
+        <TabsContent value="inactive" className="mt-6">
+          {renderTestsTable("inactive")}
+        </TabsContent>
       </Tabs>
 
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
@@ -541,8 +592,7 @@ export default function Tests() {
           <AlertDialogHeader>
             <AlertDialogTitle>Are you sure?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently delete the test "{selectedTest?.name}". This
-              action cannot be undone.
+              This will deactivate the test "{selectedTest?.name}". It will no longer be visible to candidates but will remain in the records.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -555,10 +605,10 @@ export default function Tests() {
               {deleting ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Deleting...
+                  Deactivating...
                 </>
               ) : (
-                "Delete"
+                "Deactivate"
               )}
             </AlertDialogAction>
           </AlertDialogFooter>

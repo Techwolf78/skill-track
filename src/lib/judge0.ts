@@ -1659,6 +1659,8 @@ export async function createSubmission(
       language_id: languageId,
       stdin: stdin ? encodeBase64(stdin) : undefined,
       base64_encoded: true,
+      cpu_time_limit: metadata.timeLimit ? metadata.timeLimit / 1000 : undefined,
+      memory_limit: metadata.memoryLimit ? metadata.memoryLimit * 1024 : undefined,
       fields: "*",
     }),
   };
@@ -1857,6 +1859,8 @@ export async function createBatchSubmissions(
     language_id: languageId,
     stdin: encodeBase64(prepareStdin(stdin, safeMetadata)),
     base64_encoded: true,
+    cpu_time_limit: metadata.timeLimit ? metadata.timeLimit / 1000 : undefined,
+    memory_limit: metadata.memoryLimit ? metadata.memoryLimit * 1024 : undefined,
     fields: "*",
   }));
 

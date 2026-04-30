@@ -46,6 +46,8 @@ import { BulkUploadCandidates } from "./BulkUploadCandidates";
 import { EditCandidateDialog } from "./EditCandidateDialog";
 import { DeleteConfirmDialog } from "./DeleteConfirmDialog";
 
+import { useAuth } from "@/lib/auth-context";
+
 export default function AdminCandidates() {
   const [searchTerm, setSearchTerm] = useState("");
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
@@ -81,13 +83,31 @@ export default function AdminCandidates() {
   });
   const [submitting, setSubmitting] = useState(false);
   const { toast } = useToast();
+  const { user } = useAuth();
 
   // Fetch candidates only (organisations come from candidate data)
   const fetchData = useCallback(async () => {
     try {
       setLoading(true);
-      const candidatesData = await candidateService.getCandidates();
-      setCandidates(candidatesData);
+      const unfilteredData = await candidateService.getCandidates();
+      
+      // Log each candidate's organization ID for debugging
+      unfilteredData.forEach(c => {
+        console.log(`Candidate: ${c.user.name}, Org ID: ${c.organisation?.id}, Org Name: ${c.organisation?.name}`);
+      });
+      
+      // Get organisation ID from user context
+      const orgId = user?.organisationData?.id || (user as any)?.organisationId;
+      
+      console.log("Admin Dashboard - Current User Org ID:", orgId);
+      
+      // Filter candidates that belong to the current admin's organisation
+      const filteredData = orgId 
+        ? unfilteredData.filter(c => c.organisation.id === orgId)
+        : unfilteredData;
+        
+      console.log(`Filtered ${filteredData.length} candidates for org ${orgId}`);
+      setCandidates(filteredData);
     } catch (error) {
       console.error("Failed to fetch data:", error);
       toast({

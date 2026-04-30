@@ -21,6 +21,7 @@ import {
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   ArrowLeft,
   Save,
@@ -31,6 +32,8 @@ import {
   ListChecks,
   Eye,
   AlertCircle,
+  Terminal,
+  X,
 } from "lucide-react";
 import { testService, Subject, Topic, Subtopic } from "@/lib/test-service";
 import { useToast } from "@/hooks/use-toast";
@@ -48,6 +51,108 @@ interface TestCase {
   weight: number;
 }
 
+interface CodeTemplate {
+  python3: {
+    code: string;
+    lang: string;
+    langSlug: string;
+  };
+  javascript: {
+    code: string;
+    lang: string;
+    langSlug: string;
+  };
+  java: {
+    code: string;
+    lang: string;
+    langSlug: string;
+  };
+  cpp: {
+    code: string;
+    lang: string;
+    langSlug: string;
+  };
+}
+
+const defaultCodeTemplate: CodeTemplate = {
+  python3: {
+    code: `# Write your solution here
+
+def solve():
+    import sys
+    data = sys.stdin.read()
+    # Your code here
+    print(data)
+
+if __name__ == "__main__":
+    solve()`,
+    lang: "Python 3",
+    langSlug: "python3",
+  },
+  javascript: {
+    code: `// Write your solution here
+
+function solve() {
+    const readline = require('readline');
+    const rl = readline.createInterface({
+        input: process.stdin,
+        output: process.stdout
+    });
+    
+    let input = '';
+    rl.on('line', (line) => {
+        input += line + '\\n';
+    });
+    rl.on('close', () => {
+        // Your code here
+        console.log(input.trim());
+    });
+}
+
+solve();`,
+    lang: "JavaScript",
+    langSlug: "javascript",
+  },
+  java: {
+    code: `// Write your solution here
+
+import java.util.*;
+
+public class Main {
+    public static void main(String[] args) {
+        Scanner sc = new Scanner(System.in);
+        StringBuilder input = new StringBuilder();
+        while (sc.hasNextLine()) {
+            input.append(sc.nextLine()).append("\\n");
+        }
+        // Your code here
+        System.out.print(input.toString());
+    }
+}`,
+    lang: "Java",
+    langSlug: "java",
+  },
+  cpp: {
+    code: `// Write your solution here
+
+#include <iostream>
+#include <string>
+using namespace std;
+
+int main() {
+    string input, line;
+    while (getline(cin, line)) {
+        input += line + "\\n";
+    }
+    // Your code here
+    cout << input;
+    return 0;
+}`,
+    lang: "C++",
+    langSlug: "cpp",
+  },
+};
+
 export default function AddQuestion() {
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -64,12 +169,25 @@ export default function AddQuestion() {
   const [selectedSubtopic, setSelectedSubtopic] = useState("");
   const [prompt, setPrompt] = useState("");
   const [marks, setMarks] = useState<number>(5);
+  const [title, setTitle] = useState("");
+  const [difficulty, setDifficulty] = useState("MEDIUM");
+  const [constraints, setConstraints] = useState("");
+  const [memoryLimitMb, setMemoryLimitMb] = useState<number>(256);
+  const [timeLimitSecs, setTimeLimitSecs] = useState<number>(1);
+  const [sampleExplanation, setSampleExplanation] = useState("");
+  const [hints, setHints] = useState<string[]>([""]);
+  const [tags, setTags] = useState<string[]>([""]);
+
   const [mcqOptions, setMcqOptions] = useState<McqOption[]>([
     { text: "", isCorrect: false },
     { text: "", isCorrect: false },
     { text: "", isCorrect: false },
     { text: "", isCorrect: false },
   ]);
+
+  // Code template state for coding questions
+  const [codeTemplate, setCodeTemplate] = useState<CodeTemplate>(defaultCodeTemplate);
+  const [activeLanguageTab, setActiveLanguageTab] = useState<string>("python3");
 
   // Test cases state for coding questions
   const [testCases, setTestCases] = useState<TestCase[]>([
@@ -139,6 +257,24 @@ export default function AddQuestion() {
     updated[index].text = text;
     setMcqOptions(updated);
   };
+
+  const handleHintChange = (index: number, value: string) => {
+    const newHints = [...hints];
+    newHints[index] = value;
+    setHints(newHints);
+  };
+
+  const addHint = () => setHints([...hints, ""]);
+  const removeHint = (index: number) => setHints(hints.filter((_, i) => i !== index));
+
+  const handleTagChange = (index: number, value: string) => {
+    const newTags = [...tags];
+    newTags[index] = value;
+    setTags(newTags);
+  };
+
+  const addTag = () => setTags([...tags, ""]);
+  const removeTag = (index: number) => setTags(tags.filter((_, i) => i !== index));
 
   const handleCorrectOptionChange = (index: number) => {
     const updated = mcqOptions.map((opt, i) => ({
@@ -291,21 +427,56 @@ export default function AddQuestion() {
 
     setLoading(true);
     try {
-      // Create the question first
-      const questionData = {
+      const questionData: any = {
         type: questionType,
         prompt: prompt,
         subjectId: selectedSubject,
         topicId: selectedTopic || undefined,
         subtopicId: selectedSubtopic || undefined,
         marks: marks,
-        ...(questionType === "MCQ" && {
-          mcqOptions: mcqOptions.map((opt) => ({
-            text: opt.text,
-            isCorrect: opt.isCorrect,
-          })),
-        }),
+        title: title || undefined,
+        difficulty: difficulty,
+        constraints: constraints || undefined,
+        memoryLimitMb: memoryLimitMb,
+        timeLimitSecs: timeLimitSecs,
+        sampleExplanation: sampleExplanation || undefined,
+        hints: hints.filter(h => h.trim() !== ""),
+        tags: tags.filter(t => t.trim() !== ""),
+        examples: testCases.filter(tc => tc.sample).map(tc => ({
+          input: tc.input,
+          output: tc.expectedOutput,
+          explanation: ""
+        }))
       };
+
+      console.log("Creating question with data:", JSON.stringify(questionData, null, 2));
+
+      if (questionType === "MCQ") {
+        questionData.mcqOptions = mcqOptions.map((opt) => ({
+          text: opt.text,
+          isCorrect: opt.isCorrect,
+        }));
+      }
+
+      if (questionType === "CODING") {
+        // Filter out empty code templates and prepare for backend
+        const filteredTemplate: Record<string, any> = {};
+        
+        if (codeTemplate.python3?.code?.trim()) {
+          filteredTemplate.python3 = codeTemplate.python3;
+        }
+        if (codeTemplate.javascript?.code?.trim()) {
+          filteredTemplate.javascript = codeTemplate.javascript;
+        }
+        if (codeTemplate.java?.code?.trim()) {
+          filteredTemplate.java = codeTemplate.java;
+        }
+        if (codeTemplate.cpp?.code?.trim()) {
+          filteredTemplate.cpp = codeTemplate.cpp;
+        }
+        
+        questionData.codeTemplate = filteredTemplate;
+      }
 
       const createdQuestion = await testService.createQuestion(questionData);
 
@@ -326,7 +497,7 @@ export default function AddQuestion() {
         title: "Success",
         description: "Question added successfully",
       });
-      navigate("/admin/questions");
+      navigate("/superadmin/questions");
     } catch (error) {
       console.error("Failed to create question:", error);
       toast({
@@ -349,7 +520,7 @@ export default function AddQuestion() {
         <Button
           variant="ghost"
           size="icon"
-          onClick={() => navigate("/admin/questions")}
+          onClick={() => navigate("/superadmin/questions")}
         >
           <ArrowLeft className="w-5 h-5" />
         </Button>
@@ -380,14 +551,14 @@ export default function AddQuestion() {
               >
                 <div className="flex items-center space-x-2">
                   <RadioGroupItem value="MCQ" id="mcq" />
-                  <Label htmlFor="mcq" className="flex items-center gap-2">
+                  <Label htmlFor="mcq" className="flex items-center gap-2 cursor-pointer">
                     <ListChecks className="w-4 h-4" />
                     Multiple Choice (MCQ)
                   </Label>
                 </div>
                 <div className="flex items-center space-x-2">
                   <RadioGroupItem value="CODING" id="coding" />
-                  <Label htmlFor="coding" className="flex items-center gap-2">
+                  <Label htmlFor="coding" className="flex items-center gap-2 cursor-pointer">
                     <Code className="w-4 h-4" />
                     Coding Question
                   </Label>
@@ -472,16 +643,72 @@ export default function AddQuestion() {
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <Label>Marks *</Label>
-                <Input
-                  type="number"
-                  value={marks}
-                  onChange={(e) => setMarks(parseInt(e.target.value) || 0)}
-                  min={1}
-                  max={100}
-                  placeholder="e.g., 5"
-                />
+              <div className="space-y-4">
+                {questionType === "CODING" && (
+                  <div className="space-y-2">
+                    <Label>Question Title *</Label>
+                    <Input
+                      value={title}
+                      onChange={(e) => setTitle(e.target.value)}
+                      placeholder="e.g., Two Sum"
+                    />
+                  </div>
+                )}
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Difficulty {questionType === "CODING" && "*"}</Label>
+                    <Select
+                      value={difficulty}
+                      onValueChange={setDifficulty}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select difficulty" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="EASY">Easy</SelectItem>
+                        <SelectItem value="MEDIUM">Medium</SelectItem>
+                        <SelectItem value="HARD">Hard</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Marks *</Label>
+                    <Input
+                      type="number"
+                      value={marks}
+                      onChange={(e) => setMarks(parseInt(e.target.value) || 0)}
+                      min={1}
+                      max={100}
+                      placeholder="e.g., 5"
+                    />
+                  </div>
+                </div>
+
+                {questionType === "CODING" && (
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Time Limit (Seconds)</Label>
+                      <Input
+                        type="number"
+                        value={timeLimitSecs}
+                        onChange={(e) => setTimeLimitSecs(parseFloat(e.target.value) || 0)}
+                        min={0.1}
+                        step={0.1}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Memory Limit (MB)</Label>
+                      <Input
+                        type="number"
+                        value={memoryLimitMb}
+                        onChange={(e) => setMemoryLimitMb(parseInt(e.target.value) || 0)}
+                        min={1}
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className="space-y-2">
@@ -494,6 +721,77 @@ export default function AddQuestion() {
                   className="resize-none"
                 />
               </div>
+
+              {questionType === "CODING" && (
+                <>
+                  <div className="space-y-2">
+                    <Label>Constraints</Label>
+                    <Textarea
+                      value={constraints}
+                      onChange={(e) => setConstraints(e.target.value)}
+                      placeholder="Enter problem constraints..."
+                      rows={3}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Sample Explanation</Label>
+                    <Textarea
+                      value={sampleExplanation}
+                      onChange={(e) => setSampleExplanation(e.target.value)}
+                      placeholder="Explain the sample test cases..."
+                      rows={3}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <Label>Hints</Label>
+                      <Button type="button" variant="ghost" size="sm" onClick={addHint}>
+                        <Plus className="w-3 h-3 mr-1" /> Add Hint
+                      </Button>
+                    </div>
+                    {hints.map((hint, idx) => (
+                      <div key={idx} className="flex gap-2">
+                        <Input
+                          value={hint}
+                          onChange={(e) => handleHintChange(idx, e.target.value)}
+                          placeholder={`Hint ${idx + 1}`}
+                        />
+                        {hints.length > 1 && (
+                          <Button type="button" variant="ghost" size="icon" onClick={() => removeHint(idx)}>
+                            <Trash2 className="w-4 h-4 text-destructive" />
+                          </Button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <Label>Tags</Label>
+                      <Button type="button" variant="ghost" size="sm" onClick={addTag}>
+                        <Plus className="w-3 h-3 mr-1" /> Add Tag
+                      </Button>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {tags.map((tag, idx) => (
+                        <div key={idx} className="flex gap-1 items-center bg-muted p-1 rounded">
+                          <Input
+                            value={tag}
+                            onChange={(e) => handleTagChange(idx, e.target.value)}
+                            className="h-7 w-24 text-xs"
+                            placeholder="Tag"
+                          />
+                          <Button type="button" variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => removeTag(idx)}>
+                            <X className="w-3 h-3" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </>
+              )}
             </CardContent>
           </Card>
 
@@ -562,6 +860,118 @@ export default function AddQuestion() {
             </Card>
           )}
 
+          {/* Code Template for Coding Questions */}
+          {questionType === "CODING" && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Code Template</CardTitle>
+                <CardDescription>
+                  Set starter code templates for different programming languages
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <Tabs value={activeLanguageTab} onValueChange={setActiveLanguageTab}>
+                  <TabsList className="grid w-full grid-cols-4">
+                    <TabsTrigger value="python3">Python 3</TabsTrigger>
+                    <TabsTrigger value="javascript">JavaScript</TabsTrigger>
+                    <TabsTrigger value="java">Java</TabsTrigger>
+                    <TabsTrigger value="cpp">C++</TabsTrigger>
+                  </TabsList>
+                  
+                  <TabsContent value="python3" className="space-y-4 mt-4">
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <Label>Python 3 Starter Code</Label>
+                        <Badge variant="outline">Version: 3.9</Badge>
+                      </div>
+                      <Textarea
+                        value={codeTemplate.python3.code}
+                        onChange={(e) => setCodeTemplate({
+                          ...codeTemplate,
+                          python3: { ...codeTemplate.python3, code: e.target.value }
+                        })}
+                        placeholder="Python 3 starter code"
+                        rows={12}
+                        className="font-mono text-sm"
+                      />
+                    </div>
+                  </TabsContent>
+
+                  <TabsContent value="javascript" className="space-y-4 mt-4">
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <Label>JavaScript Starter Code</Label>
+                        <Badge variant="outline">Version: Node.js 16</Badge>
+                      </div>
+                      <Textarea
+                        value={codeTemplate.javascript.code}
+                        onChange={(e) => setCodeTemplate({
+                          ...codeTemplate,
+                          javascript: { ...codeTemplate.javascript, code: e.target.value }
+                        })}
+                        placeholder="JavaScript starter code"
+                        rows={12}
+                        className="font-mono text-sm"
+                      />
+                    </div>
+                  </TabsContent>
+
+                  <TabsContent value="java" className="space-y-4 mt-4">
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <Label>Java Starter Code</Label>
+                        <Badge variant="outline">Version: 17</Badge>
+                      </div>
+                      <Textarea
+                        value={codeTemplate.java.code}
+                        onChange={(e) => setCodeTemplate({
+                          ...codeTemplate,
+                          java: { ...codeTemplate.java, code: e.target.value }
+                        })}
+                        placeholder="Java starter code"
+                        rows={12}
+                        className="font-mono text-sm"
+                      />
+                    </div>
+                  </TabsContent>
+
+                  <TabsContent value="cpp" className="space-y-4 mt-4">
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <Label>C++ Starter Code</Label>
+                        <Badge variant="outline">Version: C++17</Badge>
+                      </div>
+                      <Textarea
+                        value={codeTemplate.cpp.code}
+                        onChange={(e) => setCodeTemplate({
+                          ...codeTemplate,
+                          cpp: { ...codeTemplate.cpp, code: e.target.value }
+                        })}
+                        placeholder="C++ starter code"
+                        rows={12}
+                        className="font-mono text-sm"
+                      />
+                    </div>
+                  </TabsContent>
+                </Tabs>
+                
+                <div className="bg-muted/30 rounded-lg p-3">
+                  <div className="flex items-start gap-2">
+                    <Terminal className="w-4 h-4 text-muted-foreground mt-0.5" />
+                    <div>
+                      <p className="text-xs font-medium">About Code Templates</p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Candidates will see these templates when they open the coding question.
+                        You can customize the starter code for each language. All 4 languages
+                        (Python 3, JavaScript, Java, C++) are supported.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
           {/* Coding Question Test Cases */}
           {questionType === "CODING" && (
             <Card>
@@ -570,14 +980,14 @@ export default function AddQuestion() {
                   <div>
                     <CardTitle>Test Cases</CardTitle>
                     <CardDescription>
-                      Define test cases to validate student solutions
+                      Define test cases to validate candidate solutions
                     </CardDescription>
                     {totalWeight !== 100 && testCases.length > 0 && (
                       <p
                         className={`text-sm mt-2 ${totalWeight !== 100 ? "text-yellow-600" : "text-green-600"}`}
                       >
                         Total weight: {totalWeight}%{" "}
-                        {totalWeight !== 100 && "(must be 100%)"}
+                        {totalWeight !== 100 ? "(must be 100%)" : ""}
                       </p>
                     )}
                   </div>
@@ -665,7 +1075,7 @@ export default function AddQuestion() {
                             htmlFor={`sample-${index}`}
                             className="cursor-pointer"
                           >
-                            Sample Test Case (visible to students)
+                            Sample Test Case (visible to candidates)
                           </Label>
                         </div>
 
@@ -762,6 +1172,20 @@ export default function AddQuestion() {
                   </div>
                 </div>
               )}
+              {questionType === "CODING" && (
+                <div className="rounded-lg bg-muted/30 p-4">
+                  <p className="text-sm font-medium mb-2">Languages:</p>
+                  <div className="flex flex-wrap gap-2">
+                    {Object.entries(codeTemplate).map(([lang, template]) => (
+                      template.code?.trim() && (
+                        <Badge key={lang} variant="outline" className="capitalize">
+                          {lang === "python3" ? "Python" : lang}
+                        </Badge>
+                      )
+                    ))}
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
 
@@ -789,7 +1213,7 @@ export default function AddQuestion() {
               </Button>
               <Button
                 variant="outline"
-                onClick={() => navigate("/admin/questions")}
+                onClick={() => navigate("/superadmin/questions")}
                 className="w-full"
               >
                 Cancel

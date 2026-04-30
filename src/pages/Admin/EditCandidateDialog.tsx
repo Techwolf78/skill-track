@@ -13,21 +13,31 @@ import {
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { apiClient } from "@/lib/api-client";
-import { Loader2, AlertCircle } from "lucide-react";
+import { Loader2, AlertCircle, Building2 } from "lucide-react";
 import type { Candidate } from "@/lib/candidate-service";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface EditCandidateDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   candidate: Candidate | null;
   onSuccess: () => void;
+  isSuperAdmin?: boolean;
 }
 
-export function EditCandidateDialog({ open, onOpenChange, candidate, onSuccess }: EditCandidateDialogProps) {
+export function EditCandidateDialog({ open, onOpenChange, candidate, onSuccess, isSuperAdmin }: EditCandidateDialogProps) {
   const [loading, setLoading] = useState(false);
+  const [organisations, setOrganisations] = useState<any[]>([]);
   const [formData, setFormData] = useState({
     name: "",
     phoneNumber: "",
+    organisationId: "",
     college: "",
     course: "",
     year: "",
@@ -36,12 +46,22 @@ export function EditCandidateDialog({ open, onOpenChange, candidate, onSuccess }
   });
   const { toast } = useToast();
 
+  // Fetch organisations if SuperAdmin
+  useEffect(() => {
+    if (isSuperAdmin && open) {
+      apiClient.get("/organisations")
+        .then(res => setOrganisations(res.data.data || []))
+        .catch(err => console.error("Failed to fetch organisations", err));
+    }
+  }, [isSuperAdmin, open]);
+
   // Populate form when candidate changes
   useEffect(() => {
     if (candidate) {
       setFormData({
         name: candidate.user.name || "",
         phoneNumber: candidate.user.phoneNumber || "",
+        organisationId: candidate.organisation?.id || "",
         college: (candidate.extraFields?.college as string) || "",
         course: (candidate.extraFields?.course as string) || "",
         year: (candidate.extraFields?.year as string) || "",
@@ -59,6 +79,11 @@ export function EditCandidateDialog({ open, onOpenChange, candidate, onSuccess }
       return;
     }
 
+    if (isSuperAdmin && !formData.organisationId) {
+      toast({ title: "Error", description: "Organisation is required", variant: "destructive" });
+      return;
+    }
+
     if (!candidate) return;
 
     setLoading(true);
@@ -73,11 +98,17 @@ export function EditCandidateDialog({ open, onOpenChange, candidate, onSuccess }
         extraFields.skills = formData.skills.split(",").map(s => s.trim());
       }
 
-      await apiClient.patch(`/candidates/${candidate.id}`, {
+      const payload: any = {
         name: formData.name,
         phoneNumber: formData.phoneNumber || undefined,
         extraFields: Object.keys(extraFields).length > 0 ? extraFields : undefined,
-      });
+      };
+
+      if (isSuperAdmin) {
+        payload.organisationId = formData.organisationId;
+      }
+
+      await apiClient.patch(`/candidates/${candidate.id}`, payload);
 
       toast({ title: "Success", description: "Candidate updated successfully" });
       onSuccess();
@@ -134,6 +165,28 @@ export function EditCandidateDialog({ open, onOpenChange, candidate, onSuccess }
                 />
                 <p className="text-xs text-muted-foreground mt-1">Email cannot be changed</p>
               </div>
+              {isSuperAdmin && (
+                <div className="col-span-2">
+                  <Label>Organisation</Label>
+                  <Select 
+                    value={formData.organisationId} 
+                    onValueChange={(v) => setFormData({ ...formData, organisationId: v })}
+                    disabled
+                  >
+                    <SelectTrigger className="bg-muted">
+                      <SelectValue placeholder="Select Organisation" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {organisations.map(org => (
+                        <SelectItem key={org.id} value={org.id}>
+                          {org.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground mt-1">Organisation cannot be changed after creation</p>
+                </div>
+              )}
             </div>
           </div>
 

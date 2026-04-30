@@ -19,7 +19,38 @@ export interface UpdateOrganisationRequest {
   logoUrl?: string;
 }
 
+export interface OrganisationDashboardStats {
+  totalCandidates: number;
+  totalQuestions: number;
+  activeTests: number;
+  testsCreated: number;
+  totalSubmissions: number;
+  averageScore: number;
+  completionRate: number;
+  passRate: number;
+  topicPerformance: Array<{
+    topic: string;
+    avgScore: number;
+    difficulty: "Easy" | "Medium" | "Hard";
+  }>;
+  topPerformers: Array<{
+    name: string;
+    score: number;
+    batch: string;
+    rank: number;
+  }>;
+}
+
 export const organisationService = {
+  getDashboardStats: async (organisationId: string, batchId?: string): Promise<OrganisationDashboardStats> => {
+    const params = batchId ? { batchId } : {};
+    const response = await apiClient.get<BaseResponse<OrganisationDashboardStats>>(
+      `/organisations/${organisationId}/dashboard`,
+      { params }
+    );
+    return response.data.data;
+  },
+
   getOrganisations: async (): Promise<OrganisationResponse[]> => {
     const response =
       await apiClient.get<BaseResponse<OrganisationResponse[]>>(

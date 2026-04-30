@@ -151,6 +151,7 @@ export default function TestCreate() {
         status: status as "DRAFT" | "PUBLISHED",
         instructions: formData.instructions || {},
         questions: [],
+        isActive: true,
       };
 
       console.log("Creating test with data:", createData);
@@ -200,15 +201,15 @@ export default function TestCreate() {
             "Test created successfully, but we couldn't redirect you to add questions automatically. Please find your test in the list.",
           variant: "default",
         });
-        navigate("/admin/tests");
+        navigate("/superadmin/tests");
         return;
       }
 
       // Navigate to add questions page
-      navigate(`/admin/tests/${testId}/questions`);
+      navigate(`/superadmin/tests/${testId}/questions`);
     } catch (error: unknown) {
       console.error("Failed to create test:", error);
-      const errorMessage =
+      const errorMessage: string =
         error instanceof Error ? error.message : "Failed to create test";
       toast({
         title: "Error",
@@ -230,7 +231,7 @@ export default function TestCreate() {
           <Button
             variant="ghost"
             size="icon"
-            onClick={() => navigate("/admin/tests")}
+            onClick={() => navigate("/superadmin/tests")}
           >
             <ArrowLeft className="w-5 h-5" />
           </Button>

@@ -107,7 +107,7 @@ export default function TestsEdit() {
         description: errorMessage,
         variant: "destructive",
       });
-      navigate("/admin/tests");
+      navigate("/superadmin/tests");
     } finally {
       setLoading(false);
     }
@@ -117,7 +117,7 @@ export default function TestsEdit() {
     if (id) {
       fetchTest();
     } else {
-      navigate("/admin/tests");
+      navigate("/superadmin/tests");
     }
   }, [id, fetchTest]);
 
@@ -187,7 +187,7 @@ export default function TestsEdit() {
         title: "Success",
         description: "Test has been updated successfully.",
       });
-      navigate("/admin/tests");
+      navigate("/superadmin/tests");
     } catch (error: any) {
       console.error("Failed to update test:", error);
       toast({
@@ -209,7 +209,7 @@ export default function TestsEdit() {
         title: "Success",
         description: `"${test?.title}" has been deleted successfully.`,
       });
-      navigate("/admin/tests");
+      navigate("/superadmin/tests");
     } catch (error: any) {
       console.error("Failed to delete test:", error);
       toast({
@@ -225,7 +225,7 @@ export default function TestsEdit() {
   };
 
   const handleAddQuestions = () => {
-    navigate(`/admin/tests/${id}/questions`);
+    navigate(`/superadmin/tests/${id}/questions`);
   };
 
   if (loading) {
@@ -244,7 +244,7 @@ export default function TestsEdit() {
         <p className="text-muted-foreground mb-4">
           The test you're looking for doesn't exist or has been deleted.
         </p>
-        <Link to="/admin/tests">
+        <Link to="/superadmin/tests">
           <Button>
             <ArrowLeft className="w-4 h-4 mr-2" />
             Back to Tests
@@ -261,7 +261,7 @@ export default function TestsEdit() {
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div className="flex items-center gap-4">
-          <Link to="/admin/tests">
+          <Link to="/superadmin/tests">
             <Button variant="ghost" size="icon">
               <ArrowLeft className="w-5 h-5" />
             </Button>

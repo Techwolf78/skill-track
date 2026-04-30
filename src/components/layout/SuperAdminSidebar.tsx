@@ -12,6 +12,7 @@ import {
   ChevronLeft,
   ChevronRight,
   UserRound,
+  Send,
 } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -20,10 +21,12 @@ const navItems = [
   { icon: LayoutDashboard, label: "Dashboard", path: "/superadmin", end: true },
   { icon: Building2, label: "Organisations", path: "/superadmin/organisations" },
   { icon: UserRound, label: "Users", path: "/superadmin/users" },
-  { icon: Users, label: "Students", path: "/superadmin/students" },
+  { icon: Users, label: "Candidates", path: "/superadmin/students" },
   { icon: FileQuestion, label: "Question Bank", path: "/superadmin/questions" },
   { icon: ClipboardList, label: "Tests", path: "/superadmin/tests" },
-  { icon: BarChart3, label: "Reports", path: "/superadmin/reports" },
+  { icon: Building2, label: "Test Schedules", path: "/superadmin/test-schedules" },
+  { icon: Send, label: "Invite Candidates", path: "/superadmin/invitations" },
+    { icon: BarChart3, label: "Reports", path: "/superadmin/reports" },
   { icon: Settings, label: "Settings", path: "/superadmin/settings" },
 ];
 

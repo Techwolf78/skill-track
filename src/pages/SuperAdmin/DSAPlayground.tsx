@@ -33,6 +33,7 @@ import {
   X,
   Lock,
   Loader2,
+  Database,
 } from "lucide-react";
 import Editor from "@monaco-editor/react";
 import { testService, Question, TestCase } from "@/lib/test-service";
@@ -55,6 +56,7 @@ interface TestCaseUI {
   expected: string;
   isHidden?: boolean;
   weight?: number;
+  explanation?: string;
 }
 
 interface CodeSnippet {
@@ -67,10 +69,18 @@ interface QuestionUI {
   id: string;
   type: "mcq" | "coding";
   question: string;
+  title?: string;
+  difficulty?: string;
+  constraints?: string;
+  hints?: string[];
+  timeLimitSecs?: number;
+  memoryLimitMb?: number;
+  tags?: string[];
   options?: string[];
   problemStatement?: string;
   sampleInput?: string;
   sampleOutput?: string;
+  sampleExplanation?: string;
   testCases: TestCaseUI[];
   marks: number;
   metadata?: QuestionMetadata;
@@ -214,6 +224,7 @@ export default function DSAPlayground() {
           expected: tc.expectedOutput,
           isHidden: !tc.sample,
           weight: tc.weight,
+          explanation: tc.explanation,
         }));
 
         // Create code snippets
@@ -247,9 +258,17 @@ export default function DSAPlayground() {
         id: backendQuestion.id,
         type: backendQuestion.questionType === "CODING" ? "coding" : "mcq",
         question: backendQuestion.prompt,
-        problemStatement: backendQuestion.prompt,
+        title: backendQuestion.title,
+        difficulty: backendQuestion.difficulty,
+        constraints: backendQuestion.constraints,
+        hints: backendQuestion.hints,
+        timeLimitSecs: backendQuestion.timeLimitSecs,
+        memoryLimitMb: backendQuestion.memoryLimitMb,
+        tags: backendQuestion.tags,
+        problemStatement: backendQuestion.problemStatement || backendQuestion.prompt,
         sampleInput: testCasesData.find((tc) => !tc.isHidden)?.input || "",
         sampleOutput: testCasesData.find((tc) => !tc.isHidden)?.expected || "",
+        sampleExplanation: testCasesData.find((tc) => !tc.isHidden)?.explanation || "",
         testCases: testCasesData,
         marks: backendQuestion.marks || 10,
         options: backendQuestion.mcqOptions?.map((opt) => opt.text) || [],
@@ -289,6 +308,16 @@ export default function DSAPlayground() {
       const langId = LANGUAGE_MAP[language as Language] || 71;
       const sampleCases = question.testCases.filter((tc) => !tc.isHidden);
 
+      const metadata: QuestionMetadata = {
+        ...(question.metadata || {}),
+        functionName: question.metadata?.functionName || "solve",
+        parameterTypes: question.metadata?.parameterTypes || [],
+        returnType: question.metadata?.returnType || { type: "any" },
+        category: question.metadata?.category || ProblemType.ARRAY,
+        timeLimit: question.timeLimitSecs ? question.timeLimitSecs * 1000 : undefined,
+        memoryLimit: question.memoryLimitMb,
+      };
+
       if (sampleCases.length > 0) {
         setSubmissionPhase("samples");
         setConsoleOutput((prev) => prev + "> Running sample test cases...\n");
@@ -296,7 +325,7 @@ export default function DSAPlayground() {
         const tokens = await createBatchSubmissions(
           code,
           langId,
-          question.metadata,
+          metadata,
           sampleCases.map((tc) => tc.input),
         );
         const results = await pollBatchSubmissions(tokens);
@@ -382,7 +411,7 @@ export default function DSAPlayground() {
         const token = await createSubmission(
           code,
           langId,
-          question.metadata,
+          metadata,
           question.sampleInput || "",
         );
         const result = await pollSubmission(token);
@@ -422,6 +451,17 @@ export default function DSAPlayground() {
     try {
       const langId = LANGUAGE_MAP[language as Language] || 71;
       const allCases = question.testCases;
+      const hiddenCases = allCases.filter(tc => tc.isHidden);
+
+      const metadata: QuestionMetadata = {
+        ...(question.metadata || {}),
+        functionName: question.metadata?.functionName || "solve",
+        parameterTypes: question.metadata?.parameterTypes || [],
+        returnType: question.metadata?.returnType || { type: "any" },
+        category: question.metadata?.category || ProblemType.ARRAY,
+        timeLimit: question.timeLimitSecs ? question.timeLimitSecs * 1000 : undefined,
+        memoryLimit: question.memoryLimitMb,
+      };
 
       await new Promise((r) => setTimeout(r, 800));
 
@@ -431,7 +471,7 @@ export default function DSAPlayground() {
       const sampleTokens = await createBatchSubmissions(
         code,
         langId,
-        question.metadata,
+        metadata,
         sampleCases.map((tc) => tc.input),
       );
       const sampleResults = await pollBatchSubmissions(sampleTokens);
@@ -479,15 +519,14 @@ export default function DSAPlayground() {
       setSubmissionPhase("hidden");
       setConsoleOutput(
         (prev) =>
-          prev + "> Sample cases passed. Verifying hidden constraints...\n",
+          prev + "> Sample cases passed. Verifying " + hiddenCases.length + " hidden constraints...\n",
       );
 
-      const hiddenCases = allCases.filter((tc) => tc.isHidden);
       if (hiddenCases.length > 0) {
         const hiddenTokens = await createBatchSubmissions(
           code,
           langId,
-          question.metadata,
+          metadata,
           hiddenCases.map((tc) => tc.input),
         );
 
@@ -598,7 +637,7 @@ export default function DSAPlayground() {
           <p className="text-destructive text-lg font-semibold">
             Question not found
           </p>
-          <Button onClick={() => navigate("/admin/questions")}>
+          <Button onClick={() => navigate("/superadmin/questions")}>
             Back to Question Bank
           </Button>
         </div>
@@ -607,14 +646,14 @@ export default function DSAPlayground() {
   }
 
   return (
-    <div className="min-h-screen bg-[#1a1a1a] text-white flex flex-col">
-      <header className="sticky top-0 z-50 bg-[#282828] border-b border-[#3e3e3e] px-6 py-2 flex items-center justify-between">
+    <div className="h-screen bg-[#1a1a1a] text-white flex flex-col overflow-hidden">
+      <header className="flex-none bg-[#282828] border-b border-[#3e3e3e] px-6 py-2 flex items-center justify-between h-[52px]">
         <div className="flex items-center gap-6">
           <Button
             variant="ghost"
             size="sm"
             className="text-[#eff1f6cc] hover:text-white"
-            onClick={() => navigate("/admin/questions")}
+            onClick={() => navigate("/superadmin/questions")}
           >
             <ArrowLeft className="w-4 h-4 mr-2" />
             Exit Playground
@@ -628,7 +667,7 @@ export default function DSAPlayground() {
               {question.type === "coding" ? "Coding Challenge" : "MCQ Question"}
             </Badge>
             <h1 className="text-sm font-medium text-[#eff1f6cc]">
-              {question.question?.substring(0, 50)}...
+              {question.title || question.question?.substring(0, 50)}
             </h1>
           </div>
         </div>
@@ -724,78 +763,177 @@ export default function DSAPlayground() {
                   )}
                 >
                   <div className="flex items-center gap-2">
-                    <MessageSquare className="w-3.5 h-3.5" />
+                    <ListChecks className="w-3.5 h-3.5" />
                     Test Cases
                   </div>
                 </button>
               </div>
 
               <div className="flex-1 overflow-y-auto p-6 space-y-6">
-                <div>
-                  <h2 className="text-2xl font-bold text-white mb-2">
-                    {question.question}
-                  </h2>
-                  <div className="flex gap-2 mb-4">
-                    <Badge
-                      variant="outline"
-                      className="text-success border-success/30 bg-success/10 py-0 text-[10px]"
-                    >
-                      {question.marks} marks
-                    </Badge>
-                  </div>
-                </div>
+                {activeTab === "description" ? (
+                  <>
+                    <div>
+                      <h2 className="text-2xl font-bold text-white mb-2">
+                        {question.title || question.question}
+                      </h2>
+                      <div className="flex flex-wrap gap-2 mb-4">
+                        <Badge
+                          variant="outline"
+                          className="text-success border-success/30 bg-success/10 py-0 text-[10px]"
+                        >
+                          {question.marks} marks
+                        </Badge>
+                        {question.difficulty && (
+                          <Badge variant="outline" className={cn(
+                            "py-0 text-[10px]",
+                            question.difficulty === "EASY" && "bg-green-500/10 text-green-500 border-green-500/20",
+                            question.difficulty === "MEDIUM" && "bg-yellow-500/10 text-yellow-500 border-yellow-500/20",
+                            question.difficulty === "HARD" && "bg-red-500/10 text-red-500 border-red-500/20",
+                          )}>
+                            {question.difficulty}
+                          </Badge>
+                        )}
+                        {question.tags && question.tags.map((tag, i) => (
+                          <Badge key={i} variant="outline" className="border-[#3e3e3e] text-[10px] py-0">
+                            {tag}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
 
-                <div className="prose prose-invert prose-sm max-w-none text-[#eff1f6cc]">
-                  <p>{question.problemStatement}</p>
-                </div>
+                    <div className="prose prose-invert prose-sm max-w-none text-[#eff1f6cc]">
+                      <p className="whitespace-pre-wrap">{question.problemStatement}</p>
+                    </div>
 
-                <div className="space-y-4">
-                  <h4 className="text-sm font-semibold text-white">
-                    Sample Test Cases
-                  </h4>
-                  {question.testCases
-                    .filter((tc) => !tc.isHidden)
-                    .map((tc, idx) => (
-                      <div
-                        key={idx}
-                        className="bg-[#1a1a1a] p-4 rounded-lg border border-[#3e3e3e]"
-                      >
-                        <div className="font-mono text-xs space-y-2">
-                          <div>
-                            <span className="text-blue-400">Input:</span>{" "}
-                            {tc.input}
+                    {(question.timeLimitSecs || question.memoryLimitMb) && (
+                      <div className="flex gap-4 text-xs font-semibold text-[#eff1f6cc]/60 border-y border-[#3e3e3e] py-3">
+                        {question.timeLimitSecs && (
+                          <div className="flex items-center gap-1">
+                            <Clock className="w-3 h-3" /> Time Limit: {question.timeLimitSecs}s
                           </div>
-                          <div>
-                            <span className="text-green-400">Output:</span>{" "}
-                            {tc.expected}
+                        )}
+                        {question.memoryLimitMb && (
+                          <div className="flex items-center gap-1">
+                            <Database className="w-3 h-3" /> Memory Limit: {question.memoryLimitMb}MB
                           </div>
-                          {tc.weight && (
-                            <div>
-                              <span className="text-yellow-400">Weight:</span>{" "}
-                              {tc.weight}%
-                            </div>
-                          )}
+                        )}
+                      </div>
+                    )}
+
+                    {question.constraints && (
+                      <div className="space-y-2">
+                        <div className="text-sm font-bold text-white">Constraints</div>
+                        <div className="text-xs bg-[#1a1a1a] p-3 rounded border border-[#3e3e3e] font-mono text-[#eff1f6cc]">
+                          {question.constraints}
                         </div>
                       </div>
-                    ))}
-                  {question.testCases.filter((tc) => !tc.isHidden).length ===
-                    0 && (
-                    <div className="text-muted-foreground text-sm">
-                      No sample test cases available
-                    </div>
-                  )}
-                </div>
+                    )}
 
-                {question.testCases.filter((tc) => tc.isHidden).length > 0 && (
-                  <div className="space-y-2">
-                    <h4 className="text-sm font-semibold text-white flex items-center gap-2">
-                      <Lock className="w-3 h-3" />
-                      Hidden Test Cases
-                    </h4>
-                    <p className="text-xs text-muted-foreground">
-                      {question.testCases.filter((tc) => tc.isHidden).length}{" "}
-                      hidden test cases will be used for final evaluation
-                    </p>
+                    {question.testCases.filter(tc => !tc.isHidden).length > 0 && (
+                      <div className="space-y-4">
+                        <div className="text-sm font-bold text-white">Examples</div>
+                        {question.testCases.filter(tc => !tc.isHidden).map((ex, idx) => (
+                          <div key={idx} className="space-y-2 border-l-2 border-primary/30 pl-4 py-1">
+                            <div className="grid gap-3 md:grid-cols-2">
+                              <div className="rounded-lg bg-[#1a1a1a] p-3 border border-[#3e3e3e]">
+                                <div className="text-[10px] font-bold text-[#eff1f6cc]/40 mb-1 uppercase">Input</div>
+                                <pre className="text-xs font-mono">{ex.input}</pre>
+                              </div>
+                              <div className="rounded-lg bg-[#1a1a1a] p-3 border border-[#3e3e3e]">
+                                <div className="text-[10px] font-bold text-[#eff1f6cc]/40 mb-1 uppercase">Output</div>
+                                <pre className="text-xs font-mono">{ex.expected}</pre>
+                              </div>
+                            </div>
+                            {ex.explanation && (
+                              <div className="text-xs text-[#eff1f6cc]/70 italic">
+                                <span className="font-semibold non-italic">Explanation:</span> {ex.explanation}
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {question.hints && question.hints.length > 0 && (
+                      <div className="space-y-2 pb-8">
+                        <div className="text-sm font-bold text-white flex items-center gap-1">
+                          <Zap className="w-3 h-3 text-yellow-500 fill-yellow-500" />
+                          Hints
+                        </div>
+                        <div className="space-y-2">
+                          {question.hints.map((hint, idx) => (
+                            <div key={idx} className="text-xs bg-yellow-500/5 p-3 rounded border border-yellow-500/10 text-[#eff1f6cc]">
+                              <span className="font-bold text-yellow-500 mr-2">Hint {idx + 1}:</span>
+                              {hint}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <div className="space-y-6">
+                    <div className="space-y-4">
+                      <h4 className="text-lg font-semibold text-white">
+                        Sample Test Cases
+                      </h4>
+                      {question.testCases
+                        .filter((tc) => !tc.isHidden)
+                        .map((tc, idx) => (
+                          <div
+                            key={idx}
+                            className="bg-[#1a1a1a] p-4 rounded-lg border border-[#3e3e3e] shadow-sm"
+                          >
+                            <div className="font-mono text-xs space-y-3">
+                              <div className="flex flex-col gap-1">
+                                <span className="text-blue-400 font-bold uppercase text-[10px]">Input</span>
+                                <pre className="bg-[#222] p-2 rounded">{tc.input}</pre>
+                              </div>
+                              <div className="flex flex-col gap-1">
+                                <span className="text-green-400 font-bold uppercase text-[10px]">Expected Output</span>
+                                <pre className="bg-[#222] p-2 rounded">{tc.expected}</pre>
+                              </div>
+                              {tc.weight && (
+                                <div className="flex items-center gap-2 mt-2 pt-2 border-t border-[#3e3e3e]">
+                                  <span className="text-yellow-400 font-bold uppercase text-[10px]">Weight:</span>
+                                  <Badge variant="secondary" className="h-5 text-[10px] bg-yellow-500/10 text-yellow-500 border-none">
+                                    {tc.weight}%
+                                  </Badge>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      {question.testCases.filter((tc) => !tc.isHidden).length ===
+                        0 && (
+                        <div className="text-muted-foreground text-sm py-4 text-center border-2 border-dashed border-[#3e3e3e] rounded-lg">
+                          No sample test cases available
+                        </div>
+                      )}
+                    </div>
+
+                    {question.testCases.filter((tc) => tc.isHidden).length > 0 && (
+                      <div className="space-y-4">
+                        <h4 className="text-lg font-semibold text-white flex items-center gap-2">
+                          <Lock className="w-4 h-4 text-primary" />
+                          Hidden Test Cases
+                        </h4>
+                        <div className="grid grid-cols-1 gap-2">
+                          {question.testCases.filter(tc => tc.isHidden).map((tc, idx) => (
+                            <div key={idx} className="flex items-center justify-between bg-[#1a1a1a]/50 p-3 rounded border border-dashed border-[#3e3e3e]">
+                              <span className="text-xs text-[#eff1f6cc]">Hidden Case #{idx + 1}</span>
+                              <Badge variant="outline" className="text-[10px] border-[#3e3e3e]">
+                                {tc.weight || 0}% weight
+                              </Badge>
+                            </div>
+                          ))}
+                        </div>
+                        <p className="text-xs text-muted-foreground italic">
+                          Total of {question.testCases.filter((tc) => tc.isHidden).length}{" "}
+                          hidden test cases will be used for final automated evaluation.
+                        </p>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

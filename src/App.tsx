@@ -10,7 +10,7 @@ import NationalLandingPage from "./pages/NationalLandingPage";
 import { AdminLayout } from "./components/layout/AdminLayout";
 import AdminDashboard from "./pages/SuperAdmin/Dashboard";
 import Organisations from "./pages/SuperAdmin/Organisations";
-import Students from "./pages/SuperAdmin/Students";
+import Students from "./pages/SuperAdmin/SuperAdminCandidates";
 import Users from "./pages/SuperAdmin/Users";
 import QuestionBank from "./pages/SuperAdmin/QuestionBank";
 import ManageSubjects from "./pages/SuperAdmin/ManageSubjects";
@@ -19,11 +19,15 @@ import TestCreate from "./pages/SuperAdmin/TestCreate";
 import TestsEdit from "./pages/SuperAdmin/TestsEdit";
 import TestQuestions from "./pages/SuperAdmin/TestQuestions";
 import TestDetails from "./pages/SuperAdmin/TestDetails"; // Add this import
+import TestScheduleDetails from "./pages/SuperAdmin/TestScheduleDetails";
+import InviteCandidates from "./pages/SuperAdmin/InviteCandidates";
+import TestAccess from "./pages/Test/TestAccess";
 import EditQuestion from "./pages/SuperAdmin/EditQuestion";
 import AddQuestion from "./pages/SuperAdmin/AddQuestion";
 import Settings from "./pages/SuperAdmin/Settings";
 import DSAPlayground from "./pages/SuperAdmin/DSAPlayground";
 import Reports from "./pages/SuperAdmin/Reports";
+import TestSchedules from "./pages/SuperAdmin/TestSchedules";
 import { AuthProvider } from "./lib/auth-context";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ProtectedRoute } from "./components/ProtectedRoute";
@@ -39,8 +43,8 @@ import AdminTestsEdit from "./pages/Admin/TestsEdit";
 import AdminTestDetails from "./pages/Admin/TestDetails";
 
 // Test Taking
-import TestInterface from "./pages/test/TestInterface";
-import TestResults from "./pages/test/TestResults";
+import TestInterface from "./pages/Test/TestInterface";
+import TestResults from "./pages/Test/TestResults";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -66,7 +70,6 @@ const App = () => (
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
               <Route path="/unauthorized" element={<NotFound />} />
-
               {/* SuperAdmin Routes (SUPERADMIN role only) */}
               <Route
                 path="/superadmin"
@@ -86,6 +89,9 @@ const App = () => (
                   element={<DSAPlayground />}
                 />
                 <Route path="tests" element={<Tests />} />
+                <Route path="test-schedules" element={<TestSchedules />} />
+                <Route path="test-schedules/:id" element={<TestScheduleDetails />} />
+                <Route path="invitations" element={<InviteCandidates />} />
                 <Route path="tests/create" element={<TestCreate />} />
                 <Route path="tests/edit/:id" element={<TestsEdit />} />
                 <Route path="tests/:id" element={<TestDetails />} />
@@ -97,7 +103,6 @@ const App = () => (
                 <Route path="settings" element={<Settings />} />
                 <Route path="subjects/manage" element={<ManageSubjects />} />
               </Route>
-
               {/* Admin Routes (ADMIN role only) */}
               <Route
                 path="/admin"
@@ -115,11 +120,15 @@ const App = () => (
                 <Route path="tests/edit/:id" element={<AdminTestsEdit />} />
                 <Route path="tests/:id" element={<AdminTestDetails />} />
               </Route>
-
               {/* Student Test Taking */}
               <Route path="/test/:testId" element={<TestInterface />} />
+              <Route
+                path="/test/:testId/session/:sessionId"
+                element={<TestInterface />}
+              />
               <Route path="/test/:testId/results" element={<TestResults />} />
-
+              <Route path="/test/access/:token" element={<TestAccess />} />{" "}
+              {/* ← Add this line */}
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
             </Routes>

@@ -97,11 +97,11 @@ export default function TestDetails() {
   };
 
   const handleEdit = () => {
-    navigate(`/admin/tests/edit/${id}`);
+    navigate(`/superadmin/tests/edit/${id}`);
   };
 
-  const handleAddQuestions = () => {
-    navigate(`/admin/tests/${id}/questions`);
+  const handleManageQuestions = () => {
+    navigate(`/superadmin/tests/${id}/questions`);
   };
 
   const handlePublish = async () => {
@@ -165,7 +165,7 @@ export default function TestDetails() {
         title: "Success",
         description: "Test duplicated successfully.",
       });
-      navigate("/admin/tests");
+      navigate("/superadmin/tests");
     } catch (error: any) {
       toast({
         title: "Error",
@@ -187,7 +187,7 @@ export default function TestDetails() {
           title: "Success",
           description: "Test deleted successfully.",
         });
-        navigate("/admin/tests");
+        navigate("/superadmin/tests");
       } catch (error: any) {
         toast({
           title: "Error",
@@ -256,7 +256,7 @@ export default function TestDetails() {
         <p className="text-muted-foreground mb-4">
           The test you're looking for doesn't exist or has been deleted.
         </p>
-        <Link to="/admin/tests">
+        <Link to="/superadmin/tests">
           <Button>
             <ArrowLeft className="w-4 h-4 mr-2" />
             Back to Tests
@@ -271,7 +271,7 @@ export default function TestDetails() {
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div className="flex items-center gap-4">
-          <Link to="/admin/tests">
+          <Link to="/superadmin/tests">
             <Button variant="ghost" size="icon">
               <ArrowLeft className="w-5 h-5" />
             </Button>
@@ -477,7 +477,7 @@ export default function TestDetails() {
                     Questions included in this test
                   </CardDescription>
                 </div>
-                <Button onClick={handleAddQuestions}>
+                <Button onClick={handleManageQuestions}>
                   <FileQuestion className="w-4 h-4 mr-2" />
                   Manage Questions
                 </Button>
@@ -488,7 +488,7 @@ export default function TestDetails() {
                 <div className="text-center py-12 text-muted-foreground">
                   <FileQuestion className="w-12 h-12 mx-auto mb-4 opacity-50" />
                   <p>No questions added yet.</p>
-                  <Button onClick={handleAddQuestions} className="mt-4">
+                  <Button onClick={handleManageQuestions} className="mt-4">
                     Add Questions
                   </Button>
                 </div>

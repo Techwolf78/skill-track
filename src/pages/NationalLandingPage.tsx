@@ -23,7 +23,7 @@ import {
   TrendingUp,
   Mail,
   Phone,
-  MapPin
+  MapPin,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
@@ -31,84 +31,97 @@ const features = [
   {
     icon: Shield,
     title: "Advanced Anti-Cheating",
-    description: "AI-powered proctoring with real-time monitoring and automated violation detection."
+    description:
+      "AI-powered proctoring with real-time monitoring and automated violation detection.",
   },
   {
     icon: BarChart3,
     title: "Comprehensive Analytics",
-    description: "Detailed performance insights with customizable reports and data-driven insights."
+    description:
+      "Detailed performance insights with customizable reports and data-driven insights.",
   },
   {
     icon: Clock,
     title: "Real-time Assessment",
-    description: "Instant evaluation with automated grading and immediate feedback systems."
+    description:
+      "Instant evaluation with automated grading and immediate feedback systems.",
   },
   {
     icon: Target,
     title: "Custom Test Builder",
-    description: "Create assessments with multiple question types, coding challenges, and adaptive difficulty."
+    description:
+      "Create assessments with multiple question types, coding challenges, and adaptive difficulty.",
   },
   {
     icon: Users,
     title: "Multi-user Management",
-    description: "Role-based access control for administrators, trainers, and students with bulk operations."
+    description:
+      "Role-based access control for administrators, trainers, and students with bulk operations.",
   },
   {
     icon: Award,
     title: "Certification Ready",
-    description: "Generate professional certificates and badges with blockchain verification."
-  }
+    description:
+      "Generate professional certificates and badges with blockchain verification.",
+  },
 ];
 
 const stats = [
   { number: "50,000+", label: "Students Assessed" },
   { number: "500+", label: "Partner Institutions" },
   { number: "98%", label: "Accuracy Rate" },
-  { number: "24/7", label: "Support Available" }
+  { number: "24/7", label: "Support Available" },
 ];
 
 const testimonials = [
   {
     name: "Dr. Rajesh Kumar",
     role: "Director, IIT Delhi",
-    content: "RxOne has revolutionized our assessment process. The anti-cheating features and detailed analytics have helped us maintain academic integrity while providing valuable insights.",
-    rating: 5
+    content:
+      "RxOne has revolutionized our assessment process. The anti-cheating features and detailed analytics have helped us maintain academic integrity while providing valuable insights.",
+    rating: 5,
   },
   {
     name: "Priya Sharma",
     role: "HR Director, TCS",
-    content: "The platform's scalability and customization options make it perfect for our large-scale recruitment drives. The automated evaluation saves us countless hours.",
-    rating: 5
+    content:
+      "The platform's scalability and customization options make it perfect for our large-scale recruitment drives. The automated evaluation saves us countless hours.",
+    rating: 5,
   },
   {
     name: "Prof. Amit Patel",
     role: "Dean, Engineering College",
-    content: "Outstanding platform for conducting online examinations. The real-time monitoring and comprehensive reporting features are exactly what we needed.",
-    rating: 5
-  }
+    content:
+      "Outstanding platform for conducting online examinations. The real-time monitoring and comprehensive reporting features are exactly what we needed.",
+    rating: 5,
+  },
 ];
 
 const useCases = [
   {
     icon: GraduationCap,
     title: "Educational Institutions",
-    description: "Conduct secure online examinations, entrance tests, and skill assessments for universities and colleges nationwide."
+    description:
+      "Conduct secure online examinations, entrance tests, and skill assessments for universities and colleges nationwide.",
   },
   {
     icon: Building,
     title: "Corporate Training",
-    description: "Evaluate employee skills, conduct certification programs, and measure training effectiveness across organizations."
+    description:
+      "Evaluate employee skills, conduct certification programs, and measure training effectiveness across organizations.",
   },
   {
     icon: Users,
     title: "Placement Agencies",
-    description: "Streamline candidate assessment with standardized tests and automated evaluation for better hiring decisions."
+    description:
+      "Streamline candidate assessment with standardized tests and automated evaluation for better hiring decisions.",
   },
   {
     icon: BookOpen,
     title: "Government Programs",
-    description: "Manage large-scale skill development initiatives with secure, scalable assessment solutions."
-  }
+    description:
+      "Manage large-scale skill development initiatives with secure, scalable assessment solutions.",
+  },
 ];
 
 export default function NationalLandingPage() {
@@ -118,13 +131,15 @@ export default function NationalLandingPage() {
     email: "",
     organization: "",
     phone: "",
-    message: ""
+    message: "",
   });
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+  const handleInputChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
+  ) => {
     setFormData({
       ...formData,
-      [e.target.name]: e.target.value
+      [e.target.name]: e.target.value,
     });
   };
 
@@ -132,7 +147,9 @@ export default function NationalLandingPage() {
     e.preventDefault();
     // Handle form submission
     console.log("Contact form submitted:", formData);
-    alert("Thank you for your interest! Our team will contact you within 24 hours.");
+    alert(
+      "Thank you for your interest! Our team will contact you within 24 hours.",
+    );
   };
 
   return (
@@ -143,7 +160,9 @@ export default function NationalLandingPage() {
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-gradient-primary flex items-center justify-center shadow-primary">
-                <span className="text-lg font-bold text-primary-foreground">R</span>
+                <span className="text-lg font-bold text-primary-foreground">
+                  R
+                </span>
               </div>
               <span className="font-heading font-bold text-xl">RxOne</span>
             </div>
@@ -151,7 +170,13 @@ export default function NationalLandingPage() {
               <Button variant="ghost" onClick={() => navigate("/login")}>
                 Login
               </Button>
-              <Button onClick={() => document.getElementById('contact')?.scrollIntoView({ behavior: 'smooth' })}>
+              <Button
+                onClick={() =>
+                  document
+                    .getElementById("contact")
+                    ?.scrollIntoView({ behavior: "smooth" })
+                }
+              >
                 Get Started
               </Button>
             </div>
@@ -175,18 +200,38 @@ export default function NationalLandingPage() {
               </Badge>
               <h1 className="text-4xl md:text-6xl font-heading font-bold mb-6">
                 India's Leading
-                <span className="text-gradient-primary block">Skill Assessment Platform</span>
+                <span className="text-gradient-primary block">
+                  Skill Assessment Platform
+                </span>
               </h1>
               <p className="text-xl text-muted-foreground mb-8 max-w-3xl mx-auto">
-                Empower your institution with secure, scalable assessment solutions. Conduct examinations,
-                evaluate skills, and drive excellence across India's educational and corporate landscape.
+                Empower your institution with secure, scalable assessment
+                solutions. Conduct examinations, evaluate skills, and drive
+                excellence across India's educational and corporate landscape.
               </p>
               <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                <Button size="lg" className="text-lg px-8" onClick={() => document.getElementById('contact')?.scrollIntoView({ behavior: 'smooth' })}>
+                <Button
+                  size="lg"
+                  className="text-lg px-8"
+                  onClick={() =>
+                    document
+                      .getElementById("contact")
+                      ?.scrollIntoView({ behavior: "smooth" })
+                  }
+                >
                   Start Free Trial
                   <ArrowRight className="w-5 h-5 ml-2" />
                 </Button>
-                <Button size="lg" variant="outline" className="text-lg px-8" onClick={() => document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' })}>
+                <Button
+                  size="lg"
+                  variant="outline"
+                  className="text-lg px-8"
+                  onClick={() =>
+                    document
+                      .getElementById("features")
+                      ?.scrollIntoView({ behavior: "smooth" })
+                  }
+                >
                   View Demo
                 </Button>
               </div>
@@ -204,7 +249,9 @@ export default function NationalLandingPage() {
           >
             {stats.map((stat, index) => (
               <div key={index} className="text-center">
-                <div className="text-3xl md:text-4xl font-bold text-primary mb-2">{stat.number}</div>
+                <div className="text-3xl md:text-4xl font-bold text-primary mb-2">
+                  {stat.number}
+                </div>
                 <div className="text-muted-foreground">{stat.label}</div>
               </div>
             ))}
@@ -220,7 +267,8 @@ export default function NationalLandingPage() {
               Comprehensive Assessment Solutions
             </h2>
             <p className="text-xl text-muted-foreground max-w-3xl mx-auto">
-              Everything you need to conduct secure, efficient, and insightful assessments at scale.
+              Everything you need to conduct secure, efficient, and insightful
+              assessments at scale.
             </p>
           </div>
 
@@ -240,7 +288,9 @@ export default function NationalLandingPage() {
                     <CardTitle className="text-xl">{feature.title}</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <p className="text-muted-foreground">{feature.description}</p>
+                    <p className="text-muted-foreground">
+                      {feature.description}
+                    </p>
                   </CardContent>
                 </Card>
               </motion.div>
@@ -248,6 +298,57 @@ export default function NationalLandingPage() {
           </div>
         </div>
       </section>
+
+      {/* No fuss section */}
+    <section className="py-24 relative bg-white overflow-hidden">
+  
+  {/* Grid Background */}
+  <div className="absolute inset-0 -z-10 bg-[linear-gradient(to_right,#e5e7eb_1px,transparent_1px),linear-gradient(to_bottom,#e5e7eb_1px,transparent_1px)] bg-[size:40px_40px]" />
+
+  <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
+      
+      {/* Left Image */}
+      <div className="w-full">
+        <img
+          src="final-fuss-bg.png"
+          alt="Assessment Platform"
+          className="w-full h-auto rounded-2xl"
+        />
+      </div>
+
+      {/* Right Content */}
+      <div>
+        <h2 className="text-3xl md:text-4xl font-heading font-bold mb-4 leading-tight">
+          Find the best <br />
+          candidate. No fuss.
+        </h2>
+
+        <p className="text-lg text-muted-foreground mb-6">
+          Evalart’s online evaluations can pre-filter candidates to identify the best applicants and significantly reduce the number of candidates who require an interview.
+        </p>
+
+        <p className="text-lg text-muted-foreground mb-8">
+          Online assessments allow you to filter out up to{" "}
+          <span className="font-semibold text-foreground">
+            80% of applicants.
+          </span>
+        </p>
+
+        <div className="flex items-center gap-4">
+          <button className="px-6 py-3 rounded-xl bg-primary text-white font-medium">
+            Watch video
+          </button>
+
+          <button className="px-6 py-3 rounded-xl border border-border font-medium">
+            See sample test
+          </button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
 
       {/* Use Cases */}
       <section className="py-24">
@@ -257,7 +358,8 @@ export default function NationalLandingPage() {
               Perfect for Every Industry
             </h2>
             <p className="text-xl text-muted-foreground max-w-3xl mx-auto">
-              Trusted by educational institutions, corporations, and government bodies nationwide.
+              Trusted by educational institutions, corporations, and government
+              bodies nationwide.
             </p>
           </div>
 
@@ -305,13 +407,20 @@ export default function NationalLandingPage() {
                   <CardContent className="p-6">
                     <div className="flex mb-4">
                       {[...Array(testimonial.rating)].map((_, i) => (
-                        <Star key={i} className="w-5 h-5 text-yellow-400 fill-current" />
+                        <Star
+                          key={i}
+                          className="w-5 h-5 text-yellow-400 fill-current"
+                        />
                       ))}
                     </div>
-                    <p className="text-muted-foreground mb-6">"{testimonial.content}"</p>
+                    <p className="text-muted-foreground mb-6">
+                      "{testimonial.content}"
+                    </p>
                     <div>
                       <div className="font-semibold">{testimonial.name}</div>
-                      <div className="text-sm text-muted-foreground">{testimonial.role}</div>
+                      <div className="text-sm text-muted-foreground">
+                        {testimonial.role}
+                      </div>
                     </div>
                   </CardContent>
                 </Card>
@@ -332,15 +441,29 @@ export default function NationalLandingPage() {
               Ready to Transform Your Assessment Process?
             </h2>
             <p className="text-xl mb-8 opacity-90">
-              Join India's leading institutions in adopting next-generation assessment technology.
-              Start your free trial today and experience the difference.
+              Join India's leading institutions in adopting next-generation
+              assessment technology. Start your free trial today and experience
+              the difference.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Button size="lg" variant="secondary" className="text-lg px-8" onClick={() => document.getElementById('contact')?.scrollIntoView({ behavior: 'smooth' })}>
+              <Button
+                size="lg"
+                variant="secondary"
+                className="text-lg px-8"
+                onClick={() =>
+                  document
+                    .getElementById("contact")
+                    ?.scrollIntoView({ behavior: "smooth" })
+                }
+              >
                 Get Started Now
                 <Zap className="w-5 h-5 ml-2" />
               </Button>
-              <Button size="lg" variant="outline" className="text-lg px-8 border-primary-foreground text-primary-foreground hover:bg-primary-foreground hover:text-primary text-black">
+              <Button
+                size="lg"
+                variant="outline"
+                className="text-lg px-8 border-primary-foreground text-primary-foreground hover:bg-primary-foreground hover:text-primary text-black"
+              >
                 Schedule Demo
               </Button>
             </div>
@@ -356,7 +479,8 @@ export default function NationalLandingPage() {
               Get in Touch
             </h2>
             <p className="text-xl text-muted-foreground">
-              Ready to get started? Contact our sales team for a personalized demonstration.
+              Ready to get started? Contact our sales team for a personalized
+              demonstration.
             </p>
           </div>
 
@@ -386,14 +510,16 @@ export default function NationalLandingPage() {
               </Card>
 
               <div className="mt-8">
-                <h3 className="text-lg font-semibold mb-4">Why Choose RxOne?</h3>
+                <h3 className="text-lg font-semibold mb-4">
+                  Why Choose RxOne?
+                </h3>
                 <div className="space-y-3">
                   {[
                     "Pan-India presence with 500+ partners",
                     "24/7 technical support",
                     "Custom integration capabilities",
                     "GDPR compliant data security",
-                    "Free training and onboarding"
+                    "Free training and onboarding",
                   ].map((item, index) => (
                     <div key={index} className="flex items-center gap-3">
                       <CheckCircle className="w-5 h-5 text-green-600" />
@@ -480,12 +606,15 @@ export default function NationalLandingPage() {
             <div>
               <div className="flex items-center gap-3 mb-4">
                 <div className="w-8 h-8 rounded-lg bg-gradient-primary flex items-center justify-center">
-                  <span className="text-sm font-bold text-primary-foreground">R</span>
+                  <span className="text-sm font-bold text-primary-foreground">
+                    R
+                  </span>
                 </div>
                 <span className="font-heading font-bold">RxOne</span>
               </div>
               <p className="text-muted-foreground">
-                India's premier skill assessment platform, trusted by institutions nationwide.
+                India's premier skill assessment platform, trusted by
+                institutions nationwide.
               </p>
             </div>
             <div>
@@ -517,7 +646,10 @@ export default function NationalLandingPage() {
             </div>
           </div>
           <div className="border-t mt-8 pt-8 text-center text-muted-foreground">
-            <p>&copy; 2024 RxOne. All rights reserved. Made with ❤️ for India's education sector.</p>
+            <p>
+              &copy; 2024 RxOne. All rights reserved. Made with ❤️ for India's
+              education sector.
+            </p>
           </div>
         </div>
       </footer>

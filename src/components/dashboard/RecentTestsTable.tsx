@@ -11,47 +11,51 @@
  import { Eye, MoreVertical } from "lucide-react";
  
  const recentTests = [
-   {
-     id: "1",
-     name: "Python Fundamentals",
-     type: "Mixed",
-     batch: "CSE 2024",
-     college: "ABC Engineering",
-     date: "2024-01-15",
-     status: "completed",
-     participants: 45,
-   },
-   {
-     id: "2",
-     name: "Data Structures MCQ",
-     type: "MCQ",
-     batch: "IT 2024",
-     college: "XYZ Institute",
-     date: "2024-01-14",
-     status: "active",
-     participants: 32,
-   },
-   {
-     id: "3",
-     name: "Java Coding Challenge",
-     type: "Coding",
-     batch: "CSE 2025",
-     college: "Tech College",
-     date: "2024-01-13",
-     status: "scheduled",
-     participants: 60,
-   },
-   {
-     id: "4",
-     name: "SQL Proficiency",
-     type: "Mixed",
-     batch: "MCA 2024",
-     college: "ABC Engineering",
-     date: "2024-01-12",
-     status: "completed",
-     participants: 28,
-   },
- ];
+  {
+    id: "1",
+    name: "Python Fundamentals",
+    type: "Mixed",
+    batch: "CSE 2024",
+    college: "ABC Engineering",
+    date: "2024-01-15",
+    status: "completed",
+    participants: 45,
+    invited: 45,
+  },
+  {
+    id: "2",
+    name: "Data Structures MCQ",
+    type: "MCQ",
+    batch: "IT 2024",
+    college: "XYZ Institute",
+    date: "2024-01-14",
+    status: "active",
+    participants: 12,
+    invited: 32,
+  },
+  {
+    id: "3",
+    name: "Java Coding Challenge",
+    type: "Coding",
+    batch: "CSE 2025",
+    college: "Tech College",
+    date: "2024-01-13",
+    status: "scheduled",
+    participants: 0,
+    invited: 60,
+  },
+  {
+    id: "4",
+    name: "SQL Proficiency",
+    type: "Mixed",
+    batch: "MCA 2024",
+    college: "ABC Engineering",
+    date: "2024-01-12",
+    status: "completed",
+    participants: 28,
+    invited: 28,
+  },
+];
  
  const statusStyles = {
    completed: "bg-success/10 text-success border-success/20",
@@ -72,7 +76,7 @@
              <TableHead className="font-semibold">Type</TableHead>
              <TableHead className="font-semibold">Batch</TableHead>
              <TableHead className="font-semibold">Status</TableHead>
-             <TableHead className="font-semibold text-center">Participants</TableHead>
+             <TableHead className="font-semibold text-center">Invited / Started</TableHead>
              <TableHead className="font-semibold text-right">Actions</TableHead>
            </TableRow>
          </TableHeader>
@@ -97,7 +101,15 @@
                    {test.status.charAt(0).toUpperCase() + test.status.slice(1)}
                  </Badge>
                </TableCell>
-               <TableCell className="text-center font-medium">{test.participants}</TableCell>
+               <TableCell className="text-center font-medium">
+                 {test.invited} / {test.participants}
+                 <div className="w-24 h-1.5 bg-muted rounded-full mt-2 mx-auto overflow-hidden">
+                   <div 
+                     className="h-full bg-primary" 
+                     style={{ width: `${(test.participants / test.invited) * 100}%` }}
+                   />
+                 </div>
+               </TableCell>
                <TableCell className="text-right">
                  <div className="flex items-center justify-end gap-2">
                    <Button variant="ghost" size="icon">

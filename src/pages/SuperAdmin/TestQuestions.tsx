@@ -107,49 +107,98 @@ export default function TestQuestions() {
     setSelectedQuestions(newSelected);
   };
 
-  const handleAddQuestions = async () => {
-    if (selectedQuestions.size === 0) {
-      toast({
-        title: "No Questions Selected",
-        description: "Please select at least one question to add.",
-        variant: "destructive",
-      });
-      return;
+const handleAddQuestions = async () => {
+  if (selectedQuestions.size === 0) {
+    toast({
+      title: "No Questions Selected",
+      description: "Please select at least one question to add.",
+      variant: "destructive",
+    });
+    return;
+  }
+
+  setAdding(true);
+  try {
+    // Get current questions to determine starting order index
+    const testWithQuestions = await testService.getTestById(id!);
+    const currentQuestions = testWithQuestions.testQuestions || testWithQuestions.questions || [];
+    
+    // Find the maximum order index currently in the test
+    let maxOrderIndex = -1;
+    currentQuestions.forEach((tq: any) => {
+      if (tq.orderIndex > maxOrderIndex) {
+        maxOrderIndex = tq.orderIndex;
+      }
+    });
+
+    let orderIndex = maxOrderIndex + 1;
+    let successCount = 0;
+    let failCount = 0;
+    const failedQuestions: string[] = [];
+
+    console.log("Starting to add questions:", {
+      testId: id,
+      selectedQuestions: Array.from(selectedQuestions),
+      startOrderIndex: orderIndex,
+      defaultMarks,
+      defaultTimeLimit
+    });
+
+    // Add each question individually (since no bulk endpoint)
+    for (const questionId of selectedQuestions) {
+      try {
+        const currentOrderIndex = orderIndex++;
+        const requestData = {
+          testId: id!,
+          questionId: questionId,
+          orderIndex: currentOrderIndex,
+          marks: defaultMarks,
+          timeLimitSecs: defaultTimeLimit,
+        };
+        
+        console.log("Adding question:", requestData);
+        
+        const response = await testService.addQuestionToTest(
+          id!,
+          questionId,
+          currentOrderIndex,
+          defaultMarks,
+          defaultTimeLimit
+        );
+        
+        console.log("Question added successfully:", response);
+        successCount++;
+      } catch (error: any) {
+        console.error(`Failed to add question ${questionId}:`, error);
+        console.error("Error response:", error.response?.data);
+        failCount++;
+        failedQuestions.push(questionId);
+      }
     }
 
-    setAdding(true);
-    try {
-      // Get current max order index
-      const currentQuestions = test?.questions || [];
-      const maxOrderIndex = currentQuestions.length;
+    console.log("Add questions completed:", { successCount, failCount, failedQuestions });
 
-      // Use bulk add endpoint
-      await testService.bulkAddQuestionsToTest({
-        testId: id!,
-        questionIds: Array.from(selectedQuestions),
-        startOrderIndex: maxOrderIndex + 1,
-        defaultMarks: defaultMarks,
-        defaultTimeLimitSecs: defaultTimeLimit,
-      });
-
+    if (successCount > 0) {
       toast({
         title: "Success",
-        description: `${selectedQuestions.size} question(s) added to test.`,
+        description: `${successCount} question(s) added to test.${failCount > 0 ? ` ${failCount} failed.` : ''}`,
       });
-
       // Navigate back to test edit page
-      navigate(`/admin/tests/edit/${id}`);
-    } catch (error: any) {
-      console.error("Failed to add questions:", error);
-      toast({
-        title: "Error",
-        description: error.message || "Failed to add questions",
-        variant: "destructive",
-      });
-    } finally {
-      setAdding(false);
+      navigate(`/superadmin/tests/edit/${id}`);
+    } else {
+      throw new Error("Failed to add any questions");
     }
-  };
+  } catch (error: any) {
+    console.error("Failed to add questions:", error);
+    toast({
+      title: "Error",
+      description: error.message || "Failed to add questions",
+      variant: "destructive",
+    });
+  } finally {
+    setAdding(false);
+  }
+};
 
   const getQuestionTypeIcon = (type: string) => {
     switch (type) {
@@ -200,7 +249,7 @@ export default function TestQuestions() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Link to={`/admin/tests/edit/${id}`}>
+          <Link to={`/superadmin/tests/edit/${id}`}>
             <Button variant="ghost" size="icon">
               <ArrowLeft className="w-5 h-5" />
             </Button>
@@ -265,7 +314,7 @@ export default function TestQuestions() {
                     : "Create questions in the Question Bank first."}
                 </p>
                 {!searchTerm && subjectFilter === "all" && (
-                  <Link to="/admin/questions">
+                  <Link to="/superadmin/questions">
                     <Button variant="outline" className="mt-4">
                       <Plus className="w-4 h-4 mr-2" />
                       Go to Question Bank

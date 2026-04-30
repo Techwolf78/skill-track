@@ -435,7 +435,7 @@ export default function ManageSubjects() {
           <Button
             variant="ghost"
             size="icon"
-            onClick={() => navigate("/admin/questions")}
+            onClick={() => navigate("/superadmin/questions")}
           >
             <ArrowLeft className="w-5 h-5" />
           </Button>

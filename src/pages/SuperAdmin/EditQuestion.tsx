@@ -32,6 +32,7 @@ import {
   ListChecks,
   Eye,
   AlertCircle,
+  X,
 } from "lucide-react";
 import {
   testService,
@@ -75,6 +76,15 @@ export default function EditQuestion() {
   const [selectedSubtopic, setSelectedSubtopic] = useState("");
   const [prompt, setPrompt] = useState("");
   const [marks, setMarks] = useState<number>(5);
+  const [title, setTitle] = useState("");
+  const [difficulty, setDifficulty] = useState("MEDIUM");
+  const [constraints, setConstraints] = useState("");
+  const [memoryLimitMb, setMemoryLimitMb] = useState<number>(256);
+  const [timeLimitSecs, setTimeLimitSecs] = useState<number>(1);
+  const [sampleExplanation, setSampleExplanation] = useState("");
+  const [hints, setHints] = useState<string[]>([]);
+  const [tags, setTags] = useState<string[]>([]);
+
   const [mcqOptions, setMcqOptions] = useState<McqOption[]>([
     { text: "", isCorrect: false },
     { text: "", isCorrect: false },
@@ -102,6 +112,14 @@ export default function EditQuestion() {
       // Set form data from fetched question
       setPrompt(questionData.prompt || "");
       setMarks(questionData.marks || 5);
+      setTitle(questionData.title || "");
+      setDifficulty(questionData.difficulty || "MEDIUM");
+      setConstraints(questionData.constraints || "");
+      setMemoryLimitMb(questionData.memoryLimitMb || 256);
+      setTimeLimitSecs(questionData.timeLimitSecs || 1);
+      setSampleExplanation(questionData.sampleExplanation || "");
+      setHints(questionData.hints || []);
+      setTags(questionData.tags || []);
 
       // Handle question type
       const qType = questionData.questionType || questionData.type;
@@ -179,7 +197,7 @@ export default function EditQuestion() {
         description: "Failed to load question",
         variant: "destructive",
       });
-      navigate("/admin/questions");
+      navigate("/superadmin/questions");
     } finally {
       setLoading(false);
     }
@@ -223,6 +241,24 @@ export default function EditQuestion() {
     updated[index].text = text;
     setMcqOptions(updated);
   };
+
+  const handleHintChange = (index: number, value: string) => {
+    const newHints = [...hints];
+    newHints[index] = value;
+    setHints(newHints);
+  };
+
+  const addHint = () => setHints([...hints, ""]);
+  const removeHint = (index: number) => setHints(hints.filter((_, i) => i !== index));
+
+  const handleTagChange = (index: number, value: string) => {
+    const newTags = [...tags];
+    newTags[index] = value;
+    setTags(newTags);
+  };
+
+  const addTag = () => setTags([...tags, ""]);
+  const removeTag = (index: number) => setTags(tags.filter((_, i) => i !== index));
 
   const handleCorrectOptionChange = (index: number) => {
     const updated = mcqOptions.map((opt, i) => ({
@@ -381,12 +417,25 @@ export default function EditQuestion() {
     try {
       // Update question
       const questionData = {
-        type: questionType,
+        questionType: questionType,
         prompt: prompt,
         subjectId: selectedSubject,
         topicId: selectedTopic || undefined,
         subtopicId: selectedSubtopic || undefined,
         marks: marks,
+        title: title || undefined,
+        difficulty: difficulty,
+        constraints: constraints || undefined,
+        memoryLimitMb: memoryLimitMb,
+        timeLimitSecs: timeLimitSecs,
+        sampleExplanation: sampleExplanation || undefined,
+        hints: hints.filter(h => h.trim() !== ""),
+        tags: tags.filter(t => t.trim() !== ""),
+        examples: testCases.filter(tc => tc.sample).map(tc => ({
+          input: tc.input,
+          output: tc.expectedOutput,
+          explanation: ""
+        })),
         ...(questionType === "MCQ" && {
           mcqOptions: mcqOptions.map((opt) => ({
             text: opt.text,
@@ -444,7 +493,7 @@ export default function EditQuestion() {
         title: "Success",
         description: "Question updated successfully",
       });
-      navigate("/admin/questions");
+      navigate("/superadmin/questions");
     } catch (error) {
       console.error("Failed to update question:", error);
       toast({
@@ -475,7 +524,7 @@ export default function EditQuestion() {
         <Button
           variant="ghost"
           size="icon"
-          onClick={() => navigate("/admin/questions")}
+          onClick={() => navigate("/superadmin/questions")}
         >
           <ArrowLeft className="w-5 h-5" />
         </Button>
@@ -613,16 +662,72 @@ export default function EditQuestion() {
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <Label>Marks *</Label>
-                <Input
-                  type="number"
-                  value={marks}
-                  onChange={(e) => setMarks(parseInt(e.target.value) || 0)}
-                  min={1}
-                  max={100}
-                  placeholder="e.g., 5"
-                />
+              <div className="space-y-4">
+                {questionType === "CODING" && (
+                  <div className="space-y-2">
+                    <Label>Question Title *</Label>
+                    <Input
+                      value={title}
+                      onChange={(e) => setTitle(e.target.value)}
+                      placeholder="e.g., Two Sum"
+                    />
+                  </div>
+                )}
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Difficulty {questionType === "CODING" && "*"}</Label>
+                    <Select
+                      value={difficulty}
+                      onValueChange={setDifficulty}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select difficulty" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="EASY">Easy</SelectItem>
+                        <SelectItem value="MEDIUM">Medium</SelectItem>
+                        <SelectItem value="HARD">Hard</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Marks *</Label>
+                    <Input
+                      type="number"
+                      value={marks}
+                      onChange={(e) => setMarks(parseInt(e.target.value) || 0)}
+                      min={1}
+                      max={100}
+                      placeholder="e.g., 5"
+                    />
+                  </div>
+                </div>
+
+                {questionType === "CODING" && (
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Time Limit (Seconds)</Label>
+                      <Input
+                        type="number"
+                        value={timeLimitSecs}
+                        onChange={(e) => setTimeLimitSecs(parseFloat(e.target.value) || 0)}
+                        min={0.1}
+                        step={0.1}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Memory Limit (MB)</Label>
+                      <Input
+                        type="number"
+                        value={memoryLimitMb}
+                        onChange={(e) => setMemoryLimitMb(parseInt(e.target.value) || 0)}
+                        min={1}
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className="space-y-2">
@@ -635,6 +740,77 @@ export default function EditQuestion() {
                   className="resize-none"
                 />
               </div>
+
+              {questionType === "CODING" && (
+                <>
+                  <div className="space-y-2">
+                    <Label>Constraints</Label>
+                    <Textarea
+                      value={constraints}
+                      onChange={(e) => setConstraints(e.target.value)}
+                      placeholder="Enter problem constraints..."
+                      rows={3}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Sample Explanation</Label>
+                    <Textarea
+                      value={sampleExplanation}
+                      onChange={(e) => setSampleExplanation(e.target.value)}
+                      placeholder="Explain the sample test cases..."
+                      rows={3}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <Label>Hints</Label>
+                      <Button type="button" variant="ghost" size="sm" onClick={addHint}>
+                        <Plus className="w-3 h-3 mr-1" /> Add Hint
+                      </Button>
+                    </div>
+                    {hints.map((hint, idx) => (
+                      <div key={idx} className="flex gap-2">
+                        <Input
+                          value={hint}
+                          onChange={(e) => handleHintChange(idx, e.target.value)}
+                          placeholder={`Hint ${idx + 1}`}
+                        />
+                        {hints.length > 0 && (
+                          <Button type="button" variant="ghost" size="icon" onClick={() => removeHint(idx)}>
+                            <Trash2 className="w-4 h-4 text-destructive" />
+                          </Button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <Label>Tags</Label>
+                      <Button type="button" variant="ghost" size="sm" onClick={addTag}>
+                        <Plus className="w-3 h-3 mr-1" /> Add Tag
+                      </Button>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {tags.map((tag, idx) => (
+                        <div key={idx} className="flex gap-1 items-center bg-muted p-1 rounded">
+                          <Input
+                            value={tag}
+                            onChange={(e) => handleTagChange(idx, e.target.value)}
+                            className="h-7 w-24 text-xs"
+                            placeholder="Tag"
+                          />
+                          <Button type="button" variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => removeTag(idx)}>
+                            <X className="w-3 h-3" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </>
+              )}
             </CardContent>
           </Card>
 
@@ -711,7 +887,7 @@ export default function EditQuestion() {
                   <div>
                     <CardTitle>Test Cases</CardTitle>
                     <CardDescription>
-                      Define test cases to validate student solutions
+                      Define test cases to validate candidate solutions
                     </CardDescription>
                     {totalWeight !== 100 && testCases.length > 0 && (
                       <p
@@ -806,7 +982,7 @@ export default function EditQuestion() {
                             htmlFor={`sample-${index}`}
                             className="cursor-pointer"
                           >
-                            Sample Test Case (visible to students)
+                            Sample Test Case (visible to candidates)
                           </Label>
                         </div>
 
@@ -856,7 +1032,7 @@ export default function EditQuestion() {
                       <ul className="text-sm text-muted-foreground mt-1 space-y-1">
                         <li>
                           • <strong>Sample test cases</strong> are visible to
-                          students and help them understand requirements
+                          candidates and help them understand requirements
                         </li>
                         <li>
                           • <strong>Hidden test cases</strong> are used for
@@ -975,7 +1151,7 @@ export default function EditQuestion() {
               </Button>
               <Button
                 variant="outline"
-                onClick={() => navigate("/admin/questions")}
+                onClick={() => navigate("/superadmin/questions")}
                 className="w-full"
               >
                 Cancel
