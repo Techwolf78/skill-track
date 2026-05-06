@@ -40,9 +40,16 @@ import {
   Hash,
   ChevronDown,
   ChevronRight,
+  Upload,
+  Download,
+  AlertCircle,
+  CheckCircle,
+  FileJson,
 } from "lucide-react";
 import { testService, Subject, Topic, Subtopic } from "@/lib/test-service";
 import { useToast } from "@/hooks/use-toast";
+import { Textarea } from "@/components/ui/textarea";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 export default function ManageSubjects() {
   const navigate = useNavigate();
@@ -60,6 +67,14 @@ export default function ManageSubjects() {
   const [subjectDialogOpen, setSubjectDialogOpen] = useState(false);
   const [topicDialogOpen, setTopicDialogOpen] = useState(false);
   const [subtopicDialogOpen, setSubtopicDialogOpen] = useState(false);
+  const [bulkUploadDialogOpen, setBulkUploadDialogOpen] = useState(false);
+  const [bulkJsonData, setBulkJsonData] = useState("");
+  const [uploadStatus, setUploadStatus] = useState<{
+    type: "success" | "error" | "warning" | null;
+    message: string;
+    details?: string[];
+  }>({ type: null, message: "" });
+  const [uploading, setUploading] = useState(false);
   const [editingItem, setEditingItem] = useState<{
     type: "subject" | "topic" | "subtopic";
     id: string;
@@ -419,6 +434,194 @@ export default function ManageSubjects() {
     setSubtopicDialogOpen(true);
   };
 
+  // Bulk Upload Handlers
+  const handleBulkUpload = async () => {
+    if (!bulkJsonData.trim()) {
+      setUploadStatus({
+        type: "error",
+        message: "Please enter JSON data",
+      });
+      return;
+    }
+
+    setUploading(true);
+    setUploadStatus({ type: null, message: "" });
+
+    try {
+      const data = JSON.parse(bulkJsonData);
+
+      // Validate structure
+      if (!data.subjects || !Array.isArray(data.subjects)) {
+        throw new Error("Invalid format: Expected { subjects: [] }");
+      }
+
+      const errors: string[] = [];
+      let subjectsCreated = 0;
+      let topicsCreated = 0;
+      let subtopicsCreated = 0;
+
+      for (const subjectData of data.subjects) {
+        if (!subjectData.name) {
+          errors.push(`Subject missing name: ${JSON.stringify(subjectData)}`);
+          continue;
+        }
+
+        try {
+          // Create subject
+          const subject = await testService.createSubject(subjectData.name);
+          subjectsCreated++;
+
+          // Create topics under this subject
+          if (subjectData.topics && Array.isArray(subjectData.topics)) {
+            for (const topicData of subjectData.topics) {
+              if (!topicData.name) {
+                errors.push(
+                  `Topic missing name under subject ${subjectData.name}`,
+                );
+                continue;
+              }
+
+              try {
+                const topic = await testService.createTopic(
+                  topicData.name,
+                  subject.id,
+                );
+                topicsCreated++;
+
+                // Create subtopics under this topic
+                if (topicData.subtopics && Array.isArray(topicData.subtopics)) {
+                  for (const subtopicName of topicData.subtopics) {
+                    if (!subtopicName) continue;
+
+                    await testService.createSubtopic(subtopicName, topic.id);
+                    subtopicsCreated++;
+                  }
+                }
+              } catch (error) {
+                errors.push(
+                  `Failed to create topic "${topicData.name}": ${error instanceof Error ? error.message : "Unknown error"}`,
+                );
+              }
+            }
+          }
+        } catch (error) {
+          errors.push(
+            `Failed to create subject "${subjectData.name}": ${error instanceof Error ? error.message : "Unknown error"}`,
+          );
+        }
+      }
+
+      if (errors.length > 0) {
+        setUploadStatus({
+          type: "warning",
+          message: `Partial success: ${subjectsCreated} subjects, ${topicsCreated} topics, ${subtopicsCreated} subtopics created`,
+          details: errors.slice(0, 5), // Show first 5 errors
+        });
+      } else {
+        setUploadStatus({
+          type: "success",
+          message: `Successfully created ${subjectsCreated} subjects, ${topicsCreated} topics, and ${subtopicsCreated} subtopics!`,
+        });
+        setBulkJsonData("");
+        fetchData(); // Refresh the tree view
+
+        // Auto close after 2 seconds on success
+        setTimeout(() => {
+          setBulkUploadDialogOpen(false);
+          setUploadStatus({ type: null, message: "" });
+        }, 2000);
+      }
+    } catch (error) {
+      setUploadStatus({
+        type: "error",
+        message:
+          error instanceof Error ? error.message : "Invalid JSON format",
+      });
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const downloadTemplate = () => {
+    const template = {
+      subjects: [
+        {
+          name: "Mathematics",
+          topics: [
+            {
+              name: "Algebra",
+              subtopics: [
+                "Linear Equations",
+                "Quadratic Equations",
+                "Polynomials",
+              ],
+            },
+            {
+              name: "Calculus",
+              subtopics: ["Differentiation", "Integration", "Limits"],
+            },
+          ],
+        },
+        {
+          name: "Computer Science",
+          topics: [
+            {
+              name: "Data Structures",
+              subtopics: ["Arrays", "Linked Lists", "Trees", "Graphs"],
+            },
+            {
+              name: "Algorithms",
+              subtopics: ["Sorting", "Searching", "Dynamic Programming"],
+            },
+          ],
+        },
+      ],
+    };
+
+    const blob = new Blob([JSON.stringify(template, null, 2)], {
+      type: "application/json",
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "subjects_template.json";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const exampleJson = `{
+  "subjects": [
+    {
+      "name": "Mathematics",
+      "topics": [
+        {
+          "name": "Algebra",
+          "subtopics": ["Linear Equations", "Quadratic Equations"]
+        },
+        {
+          "name": "Geometry",
+          "subtopics": ["Triangles", "Circles", "Coordinate Geometry"]
+        }
+      ]
+    },
+    {
+      "name": "Physics",
+      "topics": [
+        {
+          "name": "Mechanics",
+          "subtopics": ["Kinematics", "Dynamics", "Laws of Motion"]
+        },
+        {
+          "name": "Thermodynamics",
+          "subtopics": ["Heat Transfer", "Laws of Thermodynamics"]
+        }
+      ]
+    }
+  ]
+}`;
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-96">
@@ -447,6 +650,16 @@ export default function ManageSubjects() {
           </div>
         </div>
         <div className="flex gap-2">
+          {/* Bulk Upload Button - Separate from Dialogs */}
+          <Button
+            variant="outline"
+            onClick={() => setBulkUploadDialogOpen(true)}
+          >
+            <Upload className="w-4 h-4 mr-2" />
+            Bulk Upload
+          </Button>
+
+          {/* Add Subject Dialog */}
           <Dialog open={subjectDialogOpen} onOpenChange={setSubjectDialogOpen}>
             <DialogTrigger asChild>
               <Button
@@ -506,6 +719,7 @@ export default function ManageSubjects() {
             </DialogContent>
           </Dialog>
 
+          {/* Add Topic Dialog */}
           <Dialog open={topicDialogOpen} onOpenChange={setTopicDialogOpen}>
             <DialogTrigger asChild>
               <Button variant="outline">
@@ -577,6 +791,7 @@ export default function ManageSubjects() {
             </DialogContent>
           </Dialog>
 
+          {/* Add Subtopic Dialog */}
           <Dialog
             open={subtopicDialogOpen}
             onOpenChange={setSubtopicDialogOpen}
@@ -678,6 +893,117 @@ export default function ManageSubjects() {
           </Dialog>
         </div>
       </div>
+
+      {/* Bulk Upload Dialog */}
+      <Dialog
+        open={bulkUploadDialogOpen}
+        onOpenChange={setBulkUploadDialogOpen}
+      >
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FileJson className="w-5 h-5" />
+              Bulk Upload Subjects/Topics/Subtopics
+            </DialogTitle>
+            <DialogDescription>
+              Upload a JSON file or paste JSON data to create multiple subjects,
+              topics, and subtopics at once.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            {/* Template Download */}
+            <div className="flex justify-end">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={downloadTemplate}
+              >
+                <Download className="w-4 h-4 mr-2" />
+                Download Template
+              </Button>
+            </div>
+
+            {/* JSON Input */}
+            <div className="space-y-2">
+              <Label>JSON Data</Label>
+              <Textarea
+                value={bulkJsonData}
+                onChange={(e) => setBulkJsonData(e.target.value)}
+                placeholder="Paste your JSON here..."
+                rows={10}
+                className="font-mono text-sm"
+              />
+            </div>
+
+            {/* Example */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label className="text-muted-foreground">Example Format:</Label>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setBulkJsonData(exampleJson)}
+                  className="h-6 text-xs"
+                >
+                  Use Example
+                </Button>
+              </div>
+              <pre className="bg-muted p-3 rounded-md text-xs overflow-x-auto">
+                <code>{exampleJson}</code>
+              </pre>
+            </div>
+
+            {/* Status Messages */}
+            {uploadStatus.type && (
+              <Alert
+                variant={
+                  uploadStatus.type === "error" ? "destructive" : "default"
+                }
+              >
+                {uploadStatus.type === "success" ? (
+                  <CheckCircle className="h-4 w-4" />
+                ) : (
+                  <AlertCircle className="h-4 w-4" />
+                )}
+                <AlertDescription>
+                  <p className="font-medium">{uploadStatus.message}</p>
+                  {uploadStatus.details && uploadStatus.details.length > 0 && (
+                    <ul className="mt-2 text-sm list-disc pl-4">
+                      {uploadStatus.details.map((detail, idx) => (
+                        <li key={idx}>{detail}</li>
+                      ))}
+                    </ul>
+                  )}
+                </AlertDescription>
+              </Alert>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setBulkUploadDialogOpen(false);
+                setBulkJsonData("");
+                setUploadStatus({ type: null, message: "" });
+              }}
+            >
+              Cancel
+            </Button>
+            <Button onClick={handleBulkUpload} disabled={uploading}>
+              {uploading ? (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              ) : (
+                <Upload className="w-4 h-4 mr-2" />
+              )}
+              {uploading ? "Uploading..." : "Upload & Create"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Subjects Tree View */}
       <div className="space-y-4">

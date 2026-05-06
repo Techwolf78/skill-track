@@ -55,6 +55,7 @@ interface TestCaseForm {
   expectedOutput: string;
   sample: boolean;
   weight: number;
+  explanation?: string;
 }
 
 export default function EditQuestion() {
@@ -81,7 +82,6 @@ export default function EditQuestion() {
   const [constraints, setConstraints] = useState("");
   const [memoryLimitMb, setMemoryLimitMb] = useState<number>(256);
   const [timeLimitSecs, setTimeLimitSecs] = useState<number>(1);
-  const [sampleExplanation, setSampleExplanation] = useState("");
   const [hints, setHints] = useState<string[]>([]);
   const [tags, setTags] = useState<string[]>([]);
 
@@ -106,6 +106,9 @@ export default function EditQuestion() {
           testService.getAllTestCases(),
         ]);
 
+      console.log("Fetched Question Data:", questionData);
+      console.log("Fetched All Test Cases:", allTestCases);
+
       setSubjects(allSubjects);
       setAllTopics(allTopicsData);
 
@@ -117,7 +120,6 @@ export default function EditQuestion() {
       setConstraints(questionData.constraints || "");
       setMemoryLimitMb(questionData.memoryLimitMb || 256);
       setTimeLimitSecs(questionData.timeLimitSecs || 1);
-      setSampleExplanation(questionData.sampleExplanation || "");
       setHints(questionData.hints || []);
       setTags(questionData.tags || []);
 
@@ -181,6 +183,7 @@ export default function EditQuestion() {
               expectedOutput: tc.expectedOutput,
               sample: tc.sample,
               weight: tc.weight,
+              explanation: tc.explanation || "",
             })),
           );
         } else {
@@ -249,7 +252,8 @@ export default function EditQuestion() {
   };
 
   const addHint = () => setHints([...hints, ""]);
-  const removeHint = (index: number) => setHints(hints.filter((_, i) => i !== index));
+  const removeHint = (index: number) =>
+    setHints(hints.filter((_, i) => i !== index));
 
   const handleTagChange = (index: number, value: string) => {
     const newTags = [...tags];
@@ -258,7 +262,8 @@ export default function EditQuestion() {
   };
 
   const addTag = () => setTags([...tags, ""]);
-  const removeTag = (index: number) => setTags(tags.filter((_, i) => i !== index));
+  const removeTag = (index: number) =>
+    setTags(tags.filter((_, i) => i !== index));
 
   const handleCorrectOptionChange = (index: number) => {
     const updated = mcqOptions.map((opt, i) => ({
@@ -297,7 +302,13 @@ export default function EditQuestion() {
   const addTestCase = () => {
     setTestCases([
       ...testCases,
-      { input: "", expectedOutput: "", sample: false, weight: 0 },
+      {
+        input: "",
+        expectedOutput: "",
+        sample: false,
+        weight: 0,
+        explanation: "",
+      },
     ]);
   };
 
@@ -428,14 +439,15 @@ export default function EditQuestion() {
         constraints: constraints || undefined,
         memoryLimitMb: memoryLimitMb,
         timeLimitSecs: timeLimitSecs,
-        sampleExplanation: sampleExplanation || undefined,
-        hints: hints.filter(h => h.trim() !== ""),
-        tags: tags.filter(t => t.trim() !== ""),
-        examples: testCases.filter(tc => tc.sample).map(tc => ({
-          input: tc.input,
-          output: tc.expectedOutput,
-          explanation: ""
-        })),
+        hints: hints.filter((h) => h.trim() !== ""),
+        tags: tags.filter((t) => t.trim() !== ""),
+        examples: testCases
+          .filter((tc) => tc.sample)
+          .map((tc) => ({
+            input: tc.input,
+            output: tc.expectedOutput,
+            explanation: tc.explanation || "",
+          })),
         ...(questionType === "MCQ" && {
           mcqOptions: mcqOptions.map((opt) => ({
             text: opt.text,
@@ -474,6 +486,7 @@ export default function EditQuestion() {
               expectedOutput: testCase.expectedOutput,
               sample: testCase.sample,
               weight: testCase.weight,
+              explanation: testCase.explanation,
               questionId: id,
             });
           } else {
@@ -483,6 +496,7 @@ export default function EditQuestion() {
               expectedOutput: testCase.expectedOutput,
               sample: testCase.sample,
               weight: testCase.weight,
+              explanation: testCase.explanation,
               questionId: id!,
             });
           }
@@ -541,32 +555,40 @@ export default function EditQuestion() {
           {/* Question Type */}
           <Card>
             <CardHeader>
-              <CardTitle>Question Type</CardTitle>
-              <CardDescription>Select the type of question</CardDescription>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle>Question Type</CardTitle>
+                  <CardDescription>
+                    This field is read-only in edit mode
+                  </CardDescription>
+                </div>
+                <Badge variant="outline" className="bg-primary/10">
+                  {questionType === "MCQ" ? "MCQ" : "Coding"}
+                </Badge>
+              </div>
             </CardHeader>
             <CardContent>
-              <RadioGroup
-                value={questionType}
-                onValueChange={(val) =>
-                  setQuestionType(val as "MCQ" | "CODING")
-                }
-                className="flex gap-6"
-              >
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="MCQ" id="mcq" />
-                  <Label htmlFor="mcq" className="flex items-center gap-2">
-                    <ListChecks className="w-4 h-4" />
-                    Multiple Choice (MCQ)
-                  </Label>
+              <div className="rounded-lg bg-muted/20 p-4 border">
+                <div className="flex items-center gap-3">
+                  {questionType === "MCQ" ? (
+                    <ListChecks className="w-8 h-8 text-primary" />
+                  ) : (
+                    <Code className="w-8 h-8 text-primary" />
+                  )}
+                  <div>
+                    <h3 className="font-semibold">
+                      {questionType === "MCQ"
+                        ? "Multiple Choice Question"
+                        : "Coding Challenge"}
+                    </h3>
+                    <p className="text-sm text-muted-foreground">
+                      {questionType === "MCQ"
+                        ? "Candidates select one correct answer from multiple options"
+                        : "Candidates write code to solve a programming problem"}
+                    </p>
+                  </div>
                 </div>
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="CODING" id="code" />
-                  <Label htmlFor="code" className="flex items-center gap-2">
-                    <Code className="w-4 h-4" />
-                    Coding Question
-                  </Label>
-                </div>
-              </RadioGroup>
+              </div>
             </CardContent>
           </Card>
 
@@ -677,10 +699,7 @@ export default function EditQuestion() {
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label>Difficulty {questionType === "CODING" && "*"}</Label>
-                    <Select
-                      value={difficulty}
-                      onValueChange={setDifficulty}
-                    >
+                    <Select value={difficulty} onValueChange={setDifficulty}>
                       <SelectTrigger>
                         <SelectValue placeholder="Select difficulty" />
                       </SelectTrigger>
@@ -712,7 +731,9 @@ export default function EditQuestion() {
                       <Input
                         type="number"
                         value={timeLimitSecs}
-                        onChange={(e) => setTimeLimitSecs(parseFloat(e.target.value) || 0)}
+                        onChange={(e) =>
+                          setTimeLimitSecs(parseFloat(e.target.value) || 0)
+                        }
                         min={0.1}
                         step={0.1}
                       />
@@ -722,7 +743,9 @@ export default function EditQuestion() {
                       <Input
                         type="number"
                         value={memoryLimitMb}
-                        onChange={(e) => setMemoryLimitMb(parseInt(e.target.value) || 0)}
+                        onChange={(e) =>
+                          setMemoryLimitMb(parseInt(e.target.value) || 0)
+                        }
                         min={1}
                       />
                     </div>
@@ -754,19 +777,14 @@ export default function EditQuestion() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label>Sample Explanation</Label>
-                    <Textarea
-                      value={sampleExplanation}
-                      onChange={(e) => setSampleExplanation(e.target.value)}
-                      placeholder="Explain the sample test cases..."
-                      rows={3}
-                    />
-                  </div>
-
-                  <div className="space-y-2">
                     <div className="flex items-center justify-between">
                       <Label>Hints</Label>
-                      <Button type="button" variant="ghost" size="sm" onClick={addHint}>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={addHint}
+                      >
                         <Plus className="w-3 h-3 mr-1" /> Add Hint
                       </Button>
                     </div>
@@ -774,11 +792,18 @@ export default function EditQuestion() {
                       <div key={idx} className="flex gap-2">
                         <Input
                           value={hint}
-                          onChange={(e) => handleHintChange(idx, e.target.value)}
+                          onChange={(e) =>
+                            handleHintChange(idx, e.target.value)
+                          }
                           placeholder={`Hint ${idx + 1}`}
                         />
                         {hints.length > 0 && (
-                          <Button type="button" variant="ghost" size="icon" onClick={() => removeHint(idx)}>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => removeHint(idx)}
+                          >
                             <Trash2 className="w-4 h-4 text-destructive" />
                           </Button>
                         )}
@@ -789,20 +814,36 @@ export default function EditQuestion() {
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
                       <Label>Tags</Label>
-                      <Button type="button" variant="ghost" size="sm" onClick={addTag}>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={addTag}
+                      >
                         <Plus className="w-3 h-3 mr-1" /> Add Tag
                       </Button>
                     </div>
                     <div className="flex flex-wrap gap-2">
                       {tags.map((tag, idx) => (
-                        <div key={idx} className="flex gap-1 items-center bg-muted p-1 rounded">
+                        <div
+                          key={idx}
+                          className="flex gap-1 items-center bg-muted p-1 rounded"
+                        >
                           <Input
                             value={tag}
-                            onChange={(e) => handleTagChange(idx, e.target.value)}
+                            onChange={(e) =>
+                              handleTagChange(idx, e.target.value)
+                            }
                             className="h-7 w-24 text-xs"
                             placeholder="Tag"
                           />
-                          <Button type="button" variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => removeTag(idx)}>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="h-6 w-6 p-0"
+                            onClick={() => removeTag(idx)}
+                          >
                             <X className="w-3 h-3" />
                           </Button>
                         </div>
@@ -1003,6 +1044,19 @@ export default function EditQuestion() {
                             step={5}
                           />
                         </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label>Explanation (optional)</Label>
+                        <Textarea
+                          value={testCase.explanation || ""}
+                          onChange={(e) =>
+                            updateTestCase(index, "explanation", e.target.value)
+                          }
+                          placeholder="Explain why this output is expected for the given input"
+                          rows={2}
+                          className="text-sm"
+                        />
                       </div>
                     </div>
                   </div>

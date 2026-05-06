@@ -51,6 +51,7 @@ import { useToast } from "@/hooks/use-toast";
 import { testService, Test, TestScheduleExtended } from "@/lib/test-service";
 import { useNavigate } from "react-router-dom";
 import { apiClient } from "@/lib/api-client";
+import { useAuth } from "@/lib/auth-context";
 
 interface Organisation {
   id: string;
@@ -82,6 +83,7 @@ export default function TestSchedules() {
   });
   const { toast } = useToast();
   const navigate = useNavigate();
+  const { user } = useAuth();
 
   const fetchData = useCallback(async () => {
     try {
@@ -169,6 +171,7 @@ export default function TestSchedules() {
     setUpdatingStatus(scheduleId);
     try {
       await testService.updateTestScheduleStatus(scheduleId, newStatus);
+      
       toast({
         title: "Success",
         description: `Schedule status updated to ${newStatus}`,
@@ -380,6 +383,7 @@ export default function TestSchedules() {
     for (const update of schedulesToUpdate) {
       try {
         await testService.updateTestScheduleStatus(update.id, update.newStatus);
+        
         console.log(
           `✅ Updated schedule ${update.id}: ${update.currentStatus} → ${update.newStatus}`,
         );
@@ -529,6 +533,7 @@ export default function TestSchedules() {
                           <Button
                             variant="ghost"
                             size="icon"
+                            className="text-muted-foreground hover:text-orange-600 hover:bg-orange-50/40 dark:hover:bg-orange-950/10"
                             disabled={isUpdating}
                           >
                             {isUpdating ? (
@@ -543,7 +548,7 @@ export default function TestSchedules() {
                           <DropdownMenuItem
                             onClick={() =>
                               navigate(
-                                `/superadmin/test-schedules/${schedule.id}`,
+                                `/${user?.role === "ADMIN" ? "admin" : "superadmin"}/schedules/${schedule.id}`,
                               )
                             }
                           >
@@ -558,7 +563,7 @@ export default function TestSchedules() {
                               onClick={() => {
                                 if (action.value === "view") {
                                   navigate(
-                                    `/superadmin/test-schedules/${schedule.id}`,
+                                    `/${user?.role === "ADMIN" ? "admin" : "superadmin"}/schedules/${schedule.id}`,
                                   );
                                 } else {
                                   handleUpdateStatus(schedule.id, action.value);

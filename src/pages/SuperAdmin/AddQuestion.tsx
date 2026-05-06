@@ -49,6 +49,7 @@ interface TestCase {
   expectedOutput: string;
   sample: boolean;
   weight: number;
+  explanation?: string;
 }
 
 interface CodeTemplate {
@@ -174,7 +175,6 @@ export default function AddQuestion() {
   const [constraints, setConstraints] = useState("");
   const [memoryLimitMb, setMemoryLimitMb] = useState<number>(256);
   const [timeLimitSecs, setTimeLimitSecs] = useState<number>(1);
-  const [sampleExplanation, setSampleExplanation] = useState("");
   const [hints, setHints] = useState<string[]>([""]);
   const [tags, setTags] = useState<string[]>([""]);
 
@@ -313,7 +313,7 @@ export default function AddQuestion() {
   const addTestCase = () => {
     setTestCases([
       ...testCases,
-      { input: "", expectedOutput: "", sample: false, weight: 0 },
+      { input: "", expectedOutput: "", sample: false, weight: 0, explanation: "" },
     ]);
   };
 
@@ -439,13 +439,12 @@ export default function AddQuestion() {
         constraints: constraints || undefined,
         memoryLimitMb: memoryLimitMb,
         timeLimitSecs: timeLimitSecs,
-        sampleExplanation: sampleExplanation || undefined,
         hints: hints.filter(h => h.trim() !== ""),
         tags: tags.filter(t => t.trim() !== ""),
         examples: testCases.filter(tc => tc.sample).map(tc => ({
           input: tc.input,
           output: tc.expectedOutput,
-          explanation: ""
+          explanation: tc.explanation || ""
         }))
       };
 
@@ -488,6 +487,7 @@ export default function AddQuestion() {
             expectedOutput: testCase.expectedOutput,
             sample: testCase.sample,
             weight: testCase.weight,
+            explanation: testCase.explanation,
             questionId: createdQuestion.id,
           });
         }
@@ -730,16 +730,6 @@ export default function AddQuestion() {
                       value={constraints}
                       onChange={(e) => setConstraints(e.target.value)}
                       placeholder="Enter problem constraints..."
-                      rows={3}
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label>Sample Explanation</Label>
-                    <Textarea
-                      value={sampleExplanation}
-                      onChange={(e) => setSampleExplanation(e.target.value)}
-                      placeholder="Explain the sample test cases..."
                       rows={3}
                     />
                   </div>
@@ -1096,6 +1086,19 @@ export default function AddQuestion() {
                             step={5}
                           />
                         </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label>Explanation (optional)</Label>
+                        <Textarea
+                          value={testCase.explanation || ""}
+                          onChange={(e) =>
+                            updateTestCase(index, "explanation", e.target.value)
+                          }
+                          placeholder="Explain why this output is expected for the given input"
+                          rows={2}
+                          className="text-sm"
+                        />
                       </div>
                     </div>
                   </div>

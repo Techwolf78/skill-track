@@ -130,11 +130,12 @@ export default function QuestionBank() {
       fetchData();
     } catch (error: any) {
       console.error("Failed to delete question:", error);
-      
+
       // Handle the 400 Bad Request with IllegalStateException for test usage
       const errorData = error.response?.data;
-      const errorMessage = errorData?.message || error.message || "Failed to delete question";
-      
+      const errorMessage =
+        errorData?.message || error.message || "Failed to delete question";
+
       toast({
         title: "Deletion Restricted",
         description: errorMessage,
@@ -200,12 +201,17 @@ export default function QuestionBank() {
   const filterQuestions = (questionsList: Question[]) => {
     return questionsList.filter((q) => {
       // Search filter
-      const matchesSearch = 
+      const matchesSearch =
         q.prompt.toLowerCase().includes(searchTerm.toLowerCase()) ||
         (q.title && q.title.toLowerCase().includes(searchTerm.toLowerCase()));
 
       // Tag search filter
-      const matchesTags = !tagSearch || (q.tags && q.tags.some(tag => tag.toLowerCase().includes(tagSearch.toLowerCase())));
+      const matchesTags =
+        !tagSearch ||
+        (q.tags &&
+          q.tags.some((tag) =>
+            tag.toLowerCase().includes(tagSearch.toLowerCase()),
+          ));
 
       // Subject filter
       const matchesSubject =
@@ -443,11 +449,16 @@ export default function QuestionBank() {
                     >
                       <TableCell className="font-medium">
                         <div className="flex flex-col gap-1">
-                          <span className="line-clamp-2">{q.title || q.prompt}</span>
+                          <span className="line-clamp-2">
+                            {q.title || q.prompt}
+                          </span>
                           {q.tags && q.tags.length > 0 && (
                             <div className="flex flex-wrap gap-1">
                               {q.tags.map((tag, idx) => (
-                                <span key={idx} className="text-[10px] bg-muted px-1.5 py-0.5 rounded text-muted-foreground">
+                                <span
+                                  key={idx}
+                                  className="text-[10px] bg-muted px-1.5 py-0.5 rounded text-muted-foreground"
+                                >
                                   {tag}
                                 </span>
                               ))}
@@ -461,7 +472,12 @@ export default function QuestionBank() {
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        <Badge variant="outline" className={getDifficultyColor(getDifficultyFromQuestion(q))}>
+                        <Badge
+                          variant="outline"
+                          className={getDifficultyColor(
+                            getDifficultyFromQuestion(q),
+                          )}
+                        >
                           {getDifficultyFromQuestion(q)}
                         </Badge>
                       </TableCell>
@@ -508,6 +524,7 @@ export default function QuestionBank() {
         </TabsContent>
 
         {/* Coding Tab */}
+        {/* Coding Tab */}
         <TabsContent value="coding" className="mt-6">
           <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
             <Table>
@@ -549,12 +566,12 @@ export default function QuestionBank() {
                       key={q.id}
                       className={cn(
                         "group transition-all hover:bg-muted/50 border-b last:border-0",
-                        index % 2 === 0 ? "bg-background" : "bg-muted/10"
+                        index % 2 === 0 ? "bg-background" : "bg-muted/10",
                       )}
                     >
                       <TableCell className="py-4 pl-6">
                         <div className="flex flex-col gap-1.5">
-                          <span 
+                          <span
                             className="font-semibold text-sm text-foreground group-hover:text-primary transition-colors cursor-pointer line-clamp-1"
                             onClick={() => handleSolve(q.id)}
                           >
@@ -563,7 +580,10 @@ export default function QuestionBank() {
                           {q.tags && q.tags.length > 0 && (
                             <div className="flex flex-wrap gap-1">
                               {q.tags.slice(0, 3).map((tag, idx) => (
-                                <span key={idx} className="text-[10px] bg-muted px-2 py-0.5 rounded-full text-muted-foreground font-medium border border-border/50">
+                                <span
+                                  key={idx}
+                                  className="text-[10px] bg-muted px-2 py-0.5 rounded-full text-muted-foreground font-medium border border-border/50"
+                                >
                                   {tag}
                                 </span>
                               ))}
@@ -587,10 +607,12 @@ export default function QuestionBank() {
                         </div>
                       </TableCell>
                       <TableCell className="py-4">
-                        <span className={cn(
-                          "text-xs font-bold px-2.5 py-1 rounded-full border",
-                          getDifficultyColor(getDifficultyFromQuestion(q))
-                        )}>
+                        <span
+                          className={cn(
+                            "text-xs font-bold px-2.5 py-1 rounded-full border",
+                            getDifficultyColor(getDifficultyFromQuestion(q)),
+                          )}
+                        >
                           {getDifficultyFromQuestion(q)}
                         </span>
                       </TableCell>
@@ -601,34 +623,41 @@ export default function QuestionBank() {
                         </div>
                       </TableCell>
                       <TableCell className="py-4 text-right pr-6">
-                        <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
+                        {/* REMOVED opacity-0 group-hover:opacity-100 - Now always visible */}
+                        <div className="flex items-center justify-end gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon"
                             className="h-8 w-8 text-primary hover:text-primary hover:bg-primary/10"
                             onClick={() => handleSolve(q.id)}
                             title="Open Playground"
                           >
                             <Play className="w-4 h-4" />
                           </Button>
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
+                          <Button
+                            variant="ghost"
+                            size="icon"
                             className="h-8 w-8 text-muted-foreground hover:text-foreground"
                             onClick={() => handleEdit(q.id)}
                             title="Edit"
                           >
                             <Edit className="w-3.5 h-3.5" />
                           </Button>
-                          
+
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="icon" className="h-8 w-8">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8"
+                              >
                                 <MoreVertical className="w-4 h-4" />
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end" className="w-40">
-                              <DropdownMenuItem onSelect={() => handlePreview(q)}>
+                              <DropdownMenuItem
+                                onSelect={() => handlePreview(q)}
+                              >
                                 <Eye className="w-4 h-4 mr-2" />
                                 Preview
                               </DropdownMenuItem>

@@ -77,7 +77,6 @@ export interface CreateQuestionRequest {
   constraints?: string;
   memoryLimitMb?: number;
   timeLimitSecs?: number;
-  sampleExplanation?: string;
   examples?: Array<Record<string, unknown>>;
   hints?: string[];
   tags?: string[];
@@ -103,7 +102,6 @@ export interface UpdateQuestionRequest {
   constraints?: string;
   memoryLimitMb?: number;
   timeLimitSecs?: number;
-  sampleExplanation?: string;
   examples?: Array<Record<string, unknown>>;
   hints?: string[];
   tags?: string[];
@@ -183,20 +181,20 @@ export interface User {
 
 export interface Test {
   id: string;
+  createdById?: string; // Matching backend JSON key
   title: string;
   description?: string;
-  durationMins: number;
+  durationMins: number; // Mapping to duration_mins in DB
   difficulty: "EASY" | "MEDIUM" | "HARD";
   instructions?: Record<string, unknown>;
   status: "DRAFT" | "PUBLISHED" | "ARCHIVED";
-  passMark: number;
-  createdBy?: User;
-  organisationId?: string;  // Add this line
+  passMark: number; // Mapping to pass_mark in DB
   createdAt?: string;
   updatedAt?: string;
   questions?: TestQuestion[];
   testQuestions?: TestQuestion[];
   isActive?: boolean;
+  organisationId?: string; // Matching backend JSON key
 }
 
 export interface TestViewModel {
@@ -238,6 +236,7 @@ export interface TestCase {
   expectedOutput: string;
   sample: boolean;
   weight: number;
+  explanation?: string;
   questionId?: string;
 }
 
@@ -246,6 +245,7 @@ export interface CreateTestCaseRequest {
   expectedOutput: string;
   sample?: boolean;
   weight?: number;
+  explanation?: string;
   questionId: string;
 }
 
@@ -254,6 +254,7 @@ export interface UpdateTestCaseRequest {
   expectedOutput?: string;
   sample?: boolean;
   weight?: number;
+  explanation?: string;
   questionId?: string;
 }
 
@@ -444,6 +445,14 @@ export const testService = {
       marks: dto.marks,
       mcqOptions: dto.mcqOptions,
       codeTemplate: dto.codeTemplate,
+      title: dto.title,
+      difficulty: dto.difficulty,
+      constraints: dto.constraints,
+      memoryLimitMb: dto.memoryLimitMb,
+      timeLimitSecs: dto.timeLimitSecs,
+      examples: dto.examples,
+      hints: dto.hints,
+      tags: dto.tags,
     };
     const response = await apiClient.post<Question>("/questions", apiDto);
     return unwrapResponse(response);
@@ -462,6 +471,14 @@ export const testService = {
     if (dto.marks !== undefined) apiDto.marks = dto.marks;
     if (dto.mcqOptions !== undefined) apiDto.mcqOptions = dto.mcqOptions;
     if (dto.codeTemplate !== undefined) apiDto.codeTemplate = dto.codeTemplate;
+    if (dto.title !== undefined) apiDto.title = dto.title;
+    if (dto.difficulty !== undefined) apiDto.difficulty = dto.difficulty;
+    if (dto.constraints !== undefined) apiDto.constraints = dto.constraints;
+    if (dto.memoryLimitMb !== undefined) apiDto.memoryLimitMb = dto.memoryLimitMb;
+    if (dto.timeLimitSecs !== undefined) apiDto.timeLimitSecs = dto.timeLimitSecs;
+    if (dto.examples !== undefined) apiDto.examples = dto.examples;
+    if (dto.hints !== undefined) apiDto.hints = dto.hints;
+    if (dto.tags !== undefined) apiDto.tags = dto.tags;
     
     const response = await apiClient.patch<Question>(`/questions/${id}`, apiDto);
     return unwrapResponse(response);
@@ -474,7 +491,7 @@ export const testService = {
   // ==================== Test Case APIs ====================
   getAllTestCases: async (): Promise<TestCase[]> => {
     const response = await apiClient.get<TestCase[]>("/test-cases");
-    return response.data || [];
+    return unwrapArrayResponse(response);
   },
 
   getTestCasesByQuestion: async (questionId: string): Promise<TestCase[]> => {
@@ -484,7 +501,7 @@ export const testService = {
 
   createTestCase: async (dto: CreateTestCaseRequest): Promise<TestCase> => {
     const response = await apiClient.post<TestCase>("/test-cases", dto);
-    return response.data;
+    return unwrapResponse(response);
   },
 
   updateTestCase: async (
@@ -492,7 +509,7 @@ export const testService = {
     dto: UpdateTestCaseRequest,
   ): Promise<TestCase> => {
     const response = await apiClient.patch<TestCase>(`/test-cases/update/${id}`, dto);
-    return response.data;
+    return unwrapResponse(response);
   },
 
   deleteTestCase: async (id: string): Promise<string> => {

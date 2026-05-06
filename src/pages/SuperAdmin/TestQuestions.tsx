@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
+import { useAuth } from "@/lib/auth-context";
 import {
   Card,
   CardContent,
@@ -51,6 +52,7 @@ export default function TestQuestions() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { user } = useAuth();
 
   const [loading, setLoading] = useState(true);
   const [test, setTest] = useState<Test | null>(null);
@@ -183,8 +185,9 @@ const handleAddQuestions = async () => {
         title: "Success",
         description: `${successCount} question(s) added to test.${failCount > 0 ? ` ${failCount} failed.` : ''}`,
       });
-      // Navigate back to test edit page
-      navigate(`/superadmin/tests/edit/${id}`);
+      // Navigate back to test edit page with role-awareness
+      const rolePath = user?.role === 'ADMIN' ? 'admin' : 'superadmin';
+      navigate(`/${rolePath}/tests/edit/${id}`);
     } else {
       throw new Error("Failed to add any questions");
     }
@@ -249,7 +252,7 @@ const handleAddQuestions = async () => {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Link to={`/superadmin/tests/edit/${id}`}>
+          <Link to={`/${user?.role === 'ADMIN' ? 'admin' : 'superadmin'}/tests/edit/${id}`}>
             <Button variant="ghost" size="icon">
               <ArrowLeft className="w-5 h-5" />
             </Button>
@@ -314,7 +317,7 @@ const handleAddQuestions = async () => {
                     : "Create questions in the Question Bank first."}
                 </p>
                 {!searchTerm && subjectFilter === "all" && (
-                  <Link to="/superadmin/questions">
+                  <Link to={`/${user?.role === 'ADMIN' ? 'admin' : 'superadmin'}/questions`}>
                     <Button variant="outline" className="mt-4">
                       <Plus className="w-4 h-4 mr-2" />
                       Go to Question Bank

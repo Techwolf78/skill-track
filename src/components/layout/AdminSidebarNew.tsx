@@ -5,6 +5,8 @@ import {
   Users,
   FileQuestion,
   ClipboardList,
+  CalendarDays,
+  UserPlus,
   LogOut,
   ChevronLeft,
   ChevronRight,
@@ -18,6 +20,8 @@ const navItems = [
   { icon: Users, label: "Candidates", path: "/admin/candidates" },
   { icon: FileQuestion, label: "Question Bank", path: "/admin/questions" },
   { icon: ClipboardList, label: "Tests", path: "/admin/tests" },
+  { icon: CalendarDays, label: "Test Schedules", path: "/admin/schedules" },
+  { icon: UserPlus, label: "Invitations", path: "/admin/invitations" },
 ];
 
 export function AdminSidebar() {

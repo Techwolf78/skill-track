@@ -101,6 +101,19 @@ const validateToken = async () => {
 
       const session = response.data?.data || response.data;
       console.log("Test session created:", session);
+      
+      // Update invitation status to ACCEPTED
+      try {
+        console.log("Attempting to update invitation status for ID:", testData.invitationId);
+        const statusUpdateResponse = await apiClient.patch(`/candidate-invitations/${testData.invitationId}`, {
+          status: "ACCEPTED"
+        });
+        console.log("Invitation status updated to ACCEPTED. Full Backend response:", JSON.stringify(statusUpdateResponse.data, null, 2));
+      } catch (statusError) {
+        console.error("Failed to update invitation status:", statusError);
+        // We don't block the test start if status update fails
+      }
+
       toast({ title: "Success", description: "Starting your test..." });
 
       // Navigate to the actual test interface

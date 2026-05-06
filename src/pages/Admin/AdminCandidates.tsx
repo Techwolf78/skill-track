@@ -513,11 +513,15 @@ export default function AdminCandidates() {
                     </TableCell>
                     <TableCell className="text-right">
                       <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon">
-                            <MoreVertical className="w-4 h-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
+                   <DropdownMenuTrigger asChild>
+  <Button
+    variant="ghost"
+    size="icon"
+    className="text-muted-foreground hover:text-orange-600 hover:bg-orange-50/40 dark:hover:bg-orange-950/10"
+  >
+    <MoreVertical className="w-4 h-4" />
+  </Button>
+</DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
                           <DropdownMenuItem
                             onClick={() => handleEditClick(candidate)}

@@ -121,6 +121,9 @@ export default function Users() {
   }, [isAddUserOpen]);
 
   const filteredUsers = (users as UserResponse[]).filter((user) => {
+    // Exclude CANDIDATE role completely
+    if (user.role === "CANDIDATE") return false;
+
     const matchesSearch =
       user.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       user.email?.toLowerCase().includes(searchTerm.toLowerCase());
@@ -412,7 +415,6 @@ export default function Users() {
                           </SelectItem>
                           <SelectItem value="ADMIN">Admin</SelectItem>
                           <SelectItem value="TRAINER">Trainer</SelectItem>
-                          <SelectItem value="STUDENT">Student</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
@@ -505,7 +507,7 @@ export default function Users() {
             <SelectItem value="SUPERADMIN">Super Admin</SelectItem>
             <SelectItem value="ADMIN">Admin</SelectItem>
             <SelectItem value="TRAINER">Trainer</SelectItem>
-            <SelectItem value="STUDENT">Student</SelectItem>
+            {/* Remove STUDENT/CANDIDATE option */}
           </SelectContent>
         </Select>
       </div>

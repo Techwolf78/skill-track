@@ -21,6 +21,7 @@ import TestQuestions from "./pages/SuperAdmin/TestQuestions";
 import TestDetails from "./pages/SuperAdmin/TestDetails"; // Add this import
 import TestScheduleDetails from "./pages/SuperAdmin/TestScheduleDetails";
 import InviteCandidates from "./pages/SuperAdmin/InviteCandidates";
+import InvitedCandidatesHistory from "./pages/SuperAdmin/InvitedCandidatesHistory";
 import TestAccess from "./pages/Test/TestAccess";
 import EditQuestion from "./pages/SuperAdmin/EditQuestion";
 import AddQuestion from "./pages/SuperAdmin/AddQuestion";
@@ -92,6 +93,7 @@ const App = () => (
                 <Route path="test-schedules" element={<TestSchedules />} />
                 <Route path="test-schedules/:id" element={<TestScheduleDetails />} />
                 <Route path="invitations" element={<InviteCandidates />} />
+                <Route path="invitations-history" element={<InvitedCandidatesHistory />} />
                 <Route path="tests/create" element={<TestCreate />} />
                 <Route path="tests/edit/:id" element={<TestsEdit />} />
                 <Route path="tests/:id" element={<TestDetails />} />
@@ -119,6 +121,11 @@ const App = () => (
                 <Route path="tests/create" element={<AdminTestCreate />} />
                 <Route path="tests/edit/:id" element={<AdminTestsEdit />} />
                 <Route path="tests/:id" element={<AdminTestDetails />} />
+                <Route path="tests/:id/questions" element={<TestQuestions />} />
+                <Route path="schedules" element={<TestSchedules />} />
+                <Route path="schedules/:id" element={<TestScheduleDetails />} />
+                <Route path="invitations" element={<InviteCandidates />} />
+                <Route path="invitations-history" element={<InvitedCandidatesHistory />} />
               </Route>
               {/* Student Test Taking */}
               <Route path="/test/:testId" element={<TestInterface />} />
