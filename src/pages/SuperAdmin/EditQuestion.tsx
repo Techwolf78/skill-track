@@ -790,8 +790,10 @@ export default function EditQuestion() {
 
     setSaving(true);
     try {
-      const questionData: UpdateQuestionRequest = {
+      const questionData: UpdateQuestionRequest & { question_type?: string, type?: string } = {
         questionType: questionType,
+        question_type: questionType, // Sent to workaround potential Jackson snake-case mapping issues
+        type: questionType, // Extra fallback
         prompt: prompt,
         subject_id: selectedSubject,
         topic_id: selectedTopic || undefined,
@@ -1096,8 +1098,7 @@ export default function EditQuestion() {
           </div>
         ))}
 
-{mcqOptions.length < (mcqSubType === "TRUE_FALSE" ? 2 : 6) &&
-  mcqSubType !== "ASSERTION_REASON" && mcqSubType !== "FILL_IN_THE_BLANK" && (
+{mcqOptions.length < (mcqSubType === "TRUE_FALSE" ? 2 : 6) && (
             <Button
               type="button"
               variant="outline"

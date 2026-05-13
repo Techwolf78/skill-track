@@ -583,7 +583,7 @@ export const testService = {
 
   // ==================== Code Execution APIs ====================
   executeCode: async (request: CodeExecutionRequest): Promise<CodeExecutionResponse> => {
-    const response = await apiClient.post<CodeExecutionResponse>("/api/code/execute", request);
+    const response = await apiClient.post<CodeExecutionResponse>("/code/execute", request);
     return unwrapResponse(response);
   },
 

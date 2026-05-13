@@ -79,13 +79,22 @@ interface TestQuestion {
   timeLimitSecs?: number;
   question?: {
     id: string;
-    type: "MCQ" | "CODING";
+    type?: "MCQ" | "CODING";
+    questionType?: "MCQ" | "CODING";
     prompt: string;
     marks: number;
     mcqOptions?: { text: string; isCorrect: boolean }[];
     sampleInput?: string;
     sampleOutput?: string;
+    sampleExplanation?: string;
     codeTemplate?: Record<string, CodeTemplateEntry>;
+    difficulty?: "EASY" | "MEDIUM" | "HARD" | string;
+    constraints?: string;
+    timeLimitSecs?: number;
+    memoryLimitMb?: number;
+    hints?: string[];
+    tags?: string[];
+    title?: string;
   };
 }
 
@@ -363,26 +372,33 @@ useEffect(() => {
     setTestCaseResults([]);
 
     try {
-      const response = await apiClient.post("/code/run", {
-        code: code,
+      const response = await apiClient.post("/api/code/execute/run", {
+        sessionId: sessionId || "00000000-0000-0000-0000-000000000000",
+        questionId: currentQ.id,
         language: LANGUAGE_MAP[language]?.slug || "python3",
-        questionId: currentQ.id
+        sourceCode: code,
       });
-      const result = response.data?.data || response.data;
       
-      if (result.testCases && result.testCases.length > 0) {
-        setTestCaseResults(result.testCases);
-        const passed = result.testCases.filter((tc: any) => tc.passed).length;
-        if (passed === result.testCases.length) {
-          setOutput({ type: 'success', message: `✓ All ${passed} test cases passed!` });
+      console.log("Run Code Response:", response.data);
+
+      const resultsArray = Array.isArray(response.data?.data) ? response.data.data : [];
+      
+      const mappedTestCases = resultsArray.map((tc: any) => ({
+        passed: tc.status === "ACCEPTED",
+        ...tc
+      }));
+
+      setTestCaseResults(mappedTestCases);
+      const passedCount = mappedTestCases.filter((tc: any) => tc.passed).length;
+      
+      if (mappedTestCases.length > 0) {
+        if (passedCount === mappedTestCases.length) {
+          setOutput({ type: 'success', message: `✓ All ${passedCount} test cases passed!` });
         } else {
-          setOutput({ type: 'error', message: `✗ ${passed}/${result.testCases.length} test cases passed` });
+          setOutput({ type: 'error', message: `✗ ${passedCount}/${mappedTestCases.length} test cases passed` });
         }
       } else {
-        setOutput({ 
-          type: result.success ? 'success' : 'error', 
-          message: result.message || (result.success ? "Execution successful" : "Execution failed")
-        });
+         setOutput({ type: 'error', message: "No test cases returned." });
       }
       setSubmissionPhase("result");
     } catch (error: any) {
@@ -608,7 +624,7 @@ useEffect(() => {
                           </Badge>
                         )}
                         {isCurrentAnswered() && (
-                          <Badge variant="success" className="bg-green-500/20 text-green-700">
+                          <Badge variant="outline" className="bg-green-500/20 text-green-700 border-green-500/30">
                             <CheckCircle className="w-3 h-3 mr-1" /> Answered
                           </Badge>
                         )}
