@@ -63,24 +63,23 @@ export interface UpdateSubtopicRequest {
   topicId: string;
 }
 
-export interface CreateQuestionRequest {
-  type: "MCQ" | "CODING";
-  prompt: string;
-  subjectId: string;
-  topicId?: string;
-  subtopicId?: string;
-  marks: number;
-  mcqOptions?: Array<{ text: string; isCorrect: boolean }>;
-  codeTemplate?: Record<string, CodeTemplateEntry>;
-  title?: string;
-  difficulty?: string;
-  constraints?: string;
-  memoryLimitMb?: number;
-  timeLimitSecs?: number;
-  examples?: Array<Record<string, unknown>>;
-  hints?: string[];
-  tags?: string[];
+// New MCQ Option Types
+export interface McqOption {
+  id?: string;
+  text: string;
+  imageUrl?: string;
+  isCorrect: boolean;
+  displayOrder?: number;
 }
+
+export type McqType = 
+  | "SINGLE_CORRECT" 
+  | "MULTIPLE_CORRECT" 
+  | "TRUE_FALSE" 
+  | "IMAGE_SINGLE_CORRECT" 
+  | "IMAGE_MULTIPLE_CORRECT" 
+  | "ASSERTION_REASON" 
+  | "FILL_IN_THE_BLANK";
 
 export interface CodeTemplateEntry {
   code: string;
@@ -88,23 +87,130 @@ export interface CodeTemplateEntry {
   langSlug: string;
 }
 
-export interface UpdateQuestionRequest {
-  questionType?: "MCQ" | "CODING";
-  prompt?: string;
-  subjectId?: string;
-  topicId?: string;
-  subtopicId?: string;
-  marks?: number;
-  mcqOptions?: Array<{ text: string; isCorrect: boolean }>;
-  codeTemplate?: Record<string, CodeTemplateEntry>;
+// Updated CreateQuestionRequest to match backend API
+export interface CreateQuestionRequest {
+  questionType: "MCQ" | "CODING";  // Changed from 'type'
+  prompt: string;
+  subject_id: string;  // Changed from subjectId (snake_case)
+  topic_id?: string;   // Changed from topicId
+  subtopic_id?: string; // Changed from subtopicId
+  marks: number;
   title?: string;
-  difficulty?: string;
+  difficulty?: "EASY" | "MEDIUM" | "HARD";
   constraints?: string;
   memoryLimitMb?: number;
   timeLimitSecs?: number;
-  examples?: Array<Record<string, unknown>>;
+  sampleExplanation?: string;  // Added for coding questions
   hints?: string[];
   tags?: string[];
+  // MCQ specific fields
+  mcqType?: McqType;
+  mcqOptions?: McqOption[];
+  shuffleOptions?: boolean;
+  multipleCorrect?: boolean;
+  // Assertion-Reason specific
+  assertion?: string;
+  reason?: string;
+  // Fill in the blank specific
+  correctAnswer?: string;
+  // Coding specific
+  codeTemplate?: Record<string, CodeTemplateEntry>;
+  examples?: Array<{ input: string; output: string; explanation?: string }>;
+}
+
+// Updated UpdateQuestionRequest to match backend API
+export interface UpdateQuestionRequest {
+  questionType?: "MCQ" | "CODING";
+  prompt?: string;
+  subject_id?: string;  // Changed to snake_case
+  topic_id?: string;
+  subtopic_id?: string;
+  marks?: number;
+  title?: string;
+  difficulty?: "EASY" | "MEDIUM" | "HARD";
+  constraints?: string;
+  memoryLimitMb?: number;
+  timeLimitSecs?: number;
+  sampleExplanation?: string;
+  hints?: string[];
+  tags?: string[];
+  // MCQ specific fields
+  mcqType?: McqType;
+  mcqOptions?: McqOption[];
+  shuffleOptions?: boolean;
+  multipleCorrect?: boolean;
+  // Assertion-Reason specific
+  assertion?: string;
+  reason?: string;
+  // Fill in the blank specific
+  correctAnswer?: string;
+  // Coding specific
+  codeTemplate?: Record<string, CodeTemplateEntry>;
+  examples?: Array<{ input: string; output: string; explanation?: string }>;
+}
+
+// Updated TestCase DTOs to match backend
+export interface TestCase {
+  id?: string;
+  codingQuestionId?: string;  // Changed from questionId
+  input: string;
+  expectedOutput: string;
+  sample: boolean;
+  weight: number;
+  explanation?: string;
+}
+
+export interface CreateTestCaseRequest {
+  codingQuestionId: string;  // Changed from questionId
+  input: string;
+  expectedOutput: string;
+  sample?: boolean;
+  weight?: number;
+  explanation?: string;
+}
+
+export interface UpdateTestCaseRequest {
+  codingQuestionId?: string;  // Changed from questionId
+  input?: string;
+  expectedOutput?: string;
+  sample?: boolean;
+  weight?: number;
+  explanation?: string;
+}
+
+// Code Execution DTOs
+export interface CodeExecutionRequest {
+  submissionId: string;
+  language: string;
+  sourceCode: string;
+  input?: string;
+  runAllTestCases?: boolean;
+}
+
+export interface TestCaseResult {
+  status: "ACCEPTED" | "WRONG_ANSWER" | "TIME_LIMIT_EXCEEDED" | "COMPILATION_ERROR" | "RUNTIME_ERROR" | "INTERNAL_ERROR";
+  stdout?: string;
+  actualOutput?: string;
+  stderr?: string;
+  compileOutput?: string;
+  execTimeMs?: number;
+  memoryKb?: number;
+  passed: boolean;
+  expectedOutput?: string;
+  input?: string;
+}
+
+export interface CodeExecutionResponse {
+  status: "ACCEPTED" | "WRONG_ANSWER" | "TIME_LIMIT_EXCEEDED" | "COMPILATION_ERROR" | "RUNTIME_ERROR" | "INTERNAL_ERROR";
+  stdout?: string;
+  stderr?: string;
+  execTimeMs?: number;
+  judge0Token?: string;
+  compileOutput?: string;
+  totalTestCases: number;
+  passedTestCases: number;
+  memoryKb?: number;
+  testCaseResults?: TestCaseResult[];
 }
 
 // ==================== Response Models ====================
@@ -136,21 +242,21 @@ export interface Subtopic {
 export interface Question {
   id: string;
   questionType: "MCQ" | "CODING";
-  type?: "MCQ" | "CODING";
   prompt: string;
-  subjectId: string;
+  subject_id?: string;  // Snake_case from backend
+  topic_id?: string;
+  subtopic_id?: string;
+  subjectId?: string;   // CamelCase fallback
   topicId?: string;
   subtopicId?: string;
   marks?: number;
-  mcqOptions?: Array<{ text: string; isCorrect: boolean }>;
-  codeTemplate?: Record<string, CodeTemplateEntry>;
   title?: string;
-  difficulty?: string;
+  difficulty?: "EASY" | "MEDIUM" | "HARD";
   constraints?: string;
   memoryLimitMb?: number;
   timeLimitSecs?: number;
   sampleExplanation?: string;
-  examples?: Array<Record<string, unknown>>;
+  examples?: Array<{ input: string; output: string; explanation?: string }>;
   hints?: string[];
   tags?: string[];
   subject?: Subject;
@@ -158,6 +264,18 @@ export interface Question {
   subtopic?: Subtopic;
   createdAt?: string;
   updatedAt?: string;
+  // MCQ specific fields
+  mcqType?: McqType;
+  mcqOptions?: McqOption[];
+  shuffleOptions?: boolean;
+  multipleCorrect?: boolean;
+  // Assertion-Reason specific
+  assertion?: string;
+  reason?: string;
+  // Fill in the blank specific
+  correctAnswer?: string;
+  // Coding specific
+  codeTemplate?: Record<string, CodeTemplateEntry>;
 }
 
 export interface TestQuestion {
@@ -167,6 +285,7 @@ export interface TestQuestion {
   orderIndex: number;
   marks: number;
   timeLimitSecs: number;
+  sectionName?: string;
   question?: Question;
   createdAt?: string;
   updatedAt?: string;
@@ -176,25 +295,30 @@ export interface User {
   id: string;
   name?: string;
   email?: string;
-  organisation?: Organisation;  // Add this
+  organisation?: Organisation;
+}
+
+export interface Organisation {
+  id: string;
+  name: string;
 }
 
 export interface Test {
   id: string;
-  createdById?: string; // Matching backend JSON key
+  createdById?: string;
   title: string;
   description?: string;
-  durationMins: number; // Mapping to duration_mins in DB
+  durationMins: number;
   difficulty: "EASY" | "MEDIUM" | "HARD";
   instructions?: Record<string, unknown>;
   status: "DRAFT" | "PUBLISHED" | "ARCHIVED";
-  passMark: number; // Mapping to pass_mark in DB
+  passMark: number;
   createdAt?: string;
   updatedAt?: string;
   questions?: TestQuestion[];
   testQuestions?: TestQuestion[];
   isActive?: boolean;
-  organisationId?: string; // Matching backend JSON key
+  organisationId?: string;
 }
 
 export interface TestViewModel {
@@ -229,40 +353,11 @@ export interface CreateTestScheduleRequest {
   status: string;
 }
 
-// Test Cases
-export interface TestCase {
-  id?: string;
-  input: string;
-  expectedOutput: string;
-  sample: boolean;
-  weight: number;
-  explanation?: string;
-  questionId?: string;
-}
-
-export interface CreateTestCaseRequest {
-  input: string;
-  expectedOutput: string;
-  sample?: boolean;
-  weight?: number;
-  explanation?: string;
-  questionId: string;
-}
-
-export interface UpdateTestCaseRequest {
-  input?: string;
-  expectedOutput?: string;
-  sample?: boolean;
-  weight?: number;
-  explanation?: string;
-  questionId?: string;
-}
-
 // Test Schedule (extended)
 export interface TestScheduleExtended {
   id: string;
   testId: string;
-  test?: Test;  // This should already include organisation info
+  test?: Test;
   createdById?: string;
   startTime: string;
   endTime: string;
@@ -276,8 +371,11 @@ export interface CreateTestScheduleExtendedRequest {
   startTime: string;
   endTime: string;
   maxCandidates?: number;
-  // Remove organisationId if backend doesn't need it
-  // organisationId?: string;
+}
+
+// Grouped Test Questions Response
+export interface GroupedTestQuestions {
+  [sectionName: string]: TestQuestion[];
 }
 
 // ==================== Helper to unwrap BaseResponse ====================
@@ -436,25 +534,8 @@ export const testService = {
   },
 
   createQuestion: async (dto: CreateQuestionRequest): Promise<Question> => {
-    const apiDto = {
-      type: dto.type,
-      prompt: dto.prompt,
-      subject_id: dto.subjectId,
-      topic_id: dto.topicId,
-      subtopic_id: dto.subtopicId,
-      marks: dto.marks,
-      mcqOptions: dto.mcqOptions,
-      codeTemplate: dto.codeTemplate,
-      title: dto.title,
-      difficulty: dto.difficulty,
-      constraints: dto.constraints,
-      memoryLimitMb: dto.memoryLimitMb,
-      timeLimitSecs: dto.timeLimitSecs,
-      examples: dto.examples,
-      hints: dto.hints,
-      tags: dto.tags,
-    };
-    const response = await apiClient.post<Question>("/questions", apiDto);
+    // Direct mapping - backend expects snake_case
+    const response = await apiClient.post<Question>("/questions", dto);
     return unwrapResponse(response);
   },
 
@@ -462,25 +543,8 @@ export const testService = {
     id: string,
     dto: UpdateQuestionRequest,
   ): Promise<Question> => {
-    const apiDto: Record<string, unknown> = {};
-    if (dto.questionType !== undefined) apiDto.type = dto.questionType;
-    if (dto.prompt !== undefined) apiDto.prompt = dto.prompt;
-    if (dto.subjectId !== undefined) apiDto.subject_id = dto.subjectId;
-    if (dto.topicId !== undefined) apiDto.topic_id = dto.topicId;
-    if (dto.subtopicId !== undefined) apiDto.subtopic_id = dto.subtopicId;
-    if (dto.marks !== undefined) apiDto.marks = dto.marks;
-    if (dto.mcqOptions !== undefined) apiDto.mcqOptions = dto.mcqOptions;
-    if (dto.codeTemplate !== undefined) apiDto.codeTemplate = dto.codeTemplate;
-    if (dto.title !== undefined) apiDto.title = dto.title;
-    if (dto.difficulty !== undefined) apiDto.difficulty = dto.difficulty;
-    if (dto.constraints !== undefined) apiDto.constraints = dto.constraints;
-    if (dto.memoryLimitMb !== undefined) apiDto.memoryLimitMb = dto.memoryLimitMb;
-    if (dto.timeLimitSecs !== undefined) apiDto.timeLimitSecs = dto.timeLimitSecs;
-    if (dto.examples !== undefined) apiDto.examples = dto.examples;
-    if (dto.hints !== undefined) apiDto.hints = dto.hints;
-    if (dto.tags !== undefined) apiDto.tags = dto.tags;
-    
-    const response = await apiClient.patch<Question>(`/questions/${id}`, apiDto);
+    // Use PATCH for partial updates as per backend
+    const response = await apiClient.patch<Question>(`/questions/${id}`, dto);
     return unwrapResponse(response);
   },
 
@@ -494,9 +558,9 @@ export const testService = {
     return unwrapArrayResponse(response);
   },
 
-  getTestCasesByQuestion: async (questionId: string): Promise<TestCase[]> => {
+  getTestCasesByCodingQuestion: async (codingQuestionId: string): Promise<TestCase[]> => {
     const allTestCases = await testService.getAllTestCases();
-    return allTestCases.filter((tc: TestCase) => tc.questionId === questionId);
+    return allTestCases.filter((tc: TestCase) => tc.codingQuestionId === codingQuestionId);
   },
 
   createTestCase: async (dto: CreateTestCaseRequest): Promise<TestCase> => {
@@ -515,6 +579,12 @@ export const testService = {
   deleteTestCase: async (id: string): Promise<string> => {
     const response = await apiClient.delete<string>(`/test-cases/delete/${id}`);
     return response.data;
+  },
+
+  // ==================== Code Execution APIs ====================
+  executeCode: async (request: CodeExecutionRequest): Promise<CodeExecutionResponse> => {
+    const response = await apiClient.post<CodeExecutionResponse>("/api/code/execute", request);
+    return unwrapResponse(response);
   },
 
   // ==================== Test APIs ====================
@@ -643,6 +713,12 @@ export const testService = {
     return allQuestions.filter((q) => !testQuestionIds.has(q.id));
   },
 
+  // Helper: Get grouped test questions
+  getGroupedTestQuestions: async (testId: string): Promise<GroupedTestQuestions> => {
+    const response = await apiClient.get<GroupedTestQuestions>(`/test-questions/test/${testId}/grouped`);
+    return unwrapResponse(response);
+  },
+
   // ==================== Helper Methods for UI ====================
   toViewModel: (test: Test): TestViewModel => {
     const status = (test.status || "DRAFT").toLowerCase();
@@ -654,7 +730,7 @@ export const testService = {
 
     let type = "Mixed";
     if (questions.length > 0) {
-      const types = new Set(questions.map((tq) => tq.question?.type));
+      const types = new Set(questions.map((tq) => tq.question?.questionType));
       if (types.size === 1) {
         const questionType = Array.from(types)[0];
         type =
@@ -734,34 +810,29 @@ export const testService = {
     return unwrapResponse(response);
   },
 
-createTestSchedule: async (
-  request: CreateTestScheduleExtendedRequest,
-): Promise<TestScheduleExtended> => {
-  // DO NOT send createdById - backend gets it from Security Context
-  const payload = {
-    testId: request.testId,
-    startTime: request.startTime,
-    endTime: request.endTime,
-    maxCandidates: request.maxCandidates || 100,
-  };
-  
-  console.log("Final payload being sent:", payload);
-  
-  const response = await apiClient.post<TestScheduleExtended>("/test-schedules", payload);
-  console.log("Schedule creation response:", response);
-  return unwrapResponse(response);
-},
-// Add this to your testService object in test-service.ts
+  createTestSchedule: async (
+    request: CreateTestScheduleExtendedRequest,
+  ): Promise<TestScheduleExtended> => {
+    const payload = {
+      testId: request.testId,
+      startTime: request.startTime,
+      endTime: request.endTime,
+      maxCandidates: request.maxCandidates || 100,
+    };
+    
+    console.log("Final payload being sent:", payload);
+    
+    const response = await apiClient.post<TestScheduleExtended>("/test-schedules", payload);
+    console.log("Schedule creation response:", response);
+    return unwrapResponse(response);
+  },
 
-// In test-service.ts, update the updateTestScheduleStatus method:
-
-updateTestScheduleStatus: async (scheduleId: string, status: string): Promise<TestScheduleExtended> => {
-  // Use the existing PATCH endpoint, not /status
-  const response = await apiClient.patch<TestScheduleExtended>(`/test-schedules/${scheduleId}`, { 
-    status: status 
-  });
-  return unwrapResponse(response);
-},
+  updateTestScheduleStatus: async (scheduleId: string, status: string): Promise<TestScheduleExtended> => {
+    const response = await apiClient.patch<TestScheduleExtended>(`/test-schedules/${scheduleId}`, { 
+      status: status 
+    });
+    return unwrapResponse(response);
+  },
 
   deleteTestSchedule: async (id: string): Promise<void> => {
     await apiClient.delete(`/test-schedules/${id}`);
