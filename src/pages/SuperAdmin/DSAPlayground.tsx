@@ -36,12 +36,15 @@ import {
   Database,
 } from "lucide-react";
 import Editor from "@monaco-editor/react";
-import { testService, Question, TestCase, CodeExecutionResponse, TestCaseResult } from "@/lib/test-service";
-import { apiClient } from "@/lib/api-client";
 import {
-  mapFriendlyError,
-  QuestionMetadata,
-} from "@/lib/judge0";
+  testService,
+  Question,
+  TestCase,
+  CodeExecutionResponse,
+  TestCaseResult,
+} from "@/lib/test-service";
+import { apiClient } from "@/lib/api-client";
+import { mapFriendlyError, QuestionMetadata } from "@/lib/judge0";
 
 interface TestCaseUI {
   input: string;
@@ -254,7 +257,8 @@ export default function DSAPlayground() {
         problemStatement: backendQuestion.prompt,
         sampleInput: testCasesData.find((tc) => !tc.isHidden)?.input || "",
         sampleOutput: testCasesData.find((tc) => !tc.isHidden)?.expected || "",
-        sampleExplanation: testCasesData.find((tc) => !tc.isHidden)?.explanation || "",
+        sampleExplanation:
+          testCasesData.find((tc) => !tc.isHidden)?.explanation || "",
         testCases: testCasesData,
         marks: backendQuestion.marks || 10,
         options: backendQuestion.mcqOptions?.map((opt) => opt.text) || [],
@@ -309,26 +313,35 @@ export default function DSAPlayground() {
         requestBody.input = question.sampleInput;
       }
 
-      const response = await apiClient.post<any>("/api/code/execute/playground", requestBody);
+      const response = await apiClient.post<any>(
+        "/api/code/execute/playground",
+        requestBody,
+      );
       const executionResult = response.data.data;
 
       const statusToId: Record<string, number> = {
-        "ACCEPTED": 3,
-        "WRONG_ANSWER": 4,
-        "TIME_LIMIT_EXCEEDED": 5,
-        "COMPILATION_ERROR": 6,
-        "RUNTIME_ERROR": 7,
-        "INTERNAL_ERROR": 13,
+        ACCEPTED: 3,
+        WRONG_ANSWER: 4,
+        TIME_LIMIT_EXCEEDED: 5,
+        COMPILATION_ERROR: 6,
+        RUNTIME_ERROR: 7,
+        INTERNAL_ERROR: 13,
       };
 
-      const mappedResults = executionResult.testCaseResults?.map((res: TestCaseResult) => ({
-        status: res.status,
-        input: res.input || "",
-        output: res.actualOutput || res.stdout || res.stderr || res.compileOutput || "",
-        expected: res.expectedOutput || "",
-        isHidden: false,
-        id: statusToId[res.status] || 4,
-      })) || [];
+      const mappedResults =
+        executionResult.testCaseResults?.map((res: TestCaseResult) => ({
+          status: res.status,
+          input: res.input || "",
+          output:
+            res.actualOutput ||
+            res.stdout ||
+            res.stderr ||
+            res.compileOutput ||
+            "",
+          expected: res.expectedOutput || "",
+          isHidden: false,
+          id: statusToId[res.status] || 4,
+        })) || [];
 
       setTestCaseResults(mappedResults);
       setConsoleOutput("> Execution finished.\n");
@@ -342,7 +355,10 @@ export default function DSAPlayground() {
 
         if (topLevelId === 6) {
           title = "Compilation Error";
-          message = executionResult.compileOutput || executionResult.stderr || "Compilation failed";
+          message =
+            executionResult.compileOutput ||
+            executionResult.stderr ||
+            "Compilation failed";
         } else if (topLevelId === 5) {
           title = "Time Limit Exceeded";
           message = "Your code took too long to run.";
@@ -366,8 +382,7 @@ export default function DSAPlayground() {
         const totalCount = executionResult.totalTestCases;
         setConsoleOutput(
           (prev) =>
-            prev +
-            `> Sample Results: ${passedCount}/${totalCount} Passed\n`,
+            prev + `> Sample Results: ${passedCount}/${totalCount} Passed\n`,
         );
 
         if (passedCount < totalCount) {
@@ -411,31 +426,38 @@ export default function DSAPlayground() {
 
     try {
       const backendLanguage = language === "python3" ? "python" : language;
-      const response = await apiClient.post<any>("/api/code/execute/playground", {
-        questionId: question.id,
-        language: backendLanguage,
-        sourceCode: code,
-      });
+      const response = await apiClient.post<any>(
+        "/api/code/execute/playground",
+        {
+          questionId: question.id,
+          language: backendLanguage,
+          sourceCode: code,
+        },
+      );
 
       const executionResult = response.data.data;
 
       const statusToId: Record<string, number> = {
-        "ACCEPTED": 3,
-        "WRONG_ANSWER": 4,
-        "TIME_LIMIT_EXCEEDED": 5,
-        "COMPILATION_ERROR": 6,
-        "RUNTIME_ERROR": 7,
-        "INTERNAL_ERROR": 13,
+        ACCEPTED: 3,
+        WRONG_ANSWER: 4,
+        TIME_LIMIT_EXCEEDED: 5,
+        COMPILATION_ERROR: 6,
+        RUNTIME_ERROR: 7,
+        INTERNAL_ERROR: 13,
       };
 
-      const mappedResults = executionResult.testCaseResults?.map((res: TestCaseResult) => ({
-        status: res.status,
-        input: res.input || "[HIDDEN DATA]",
-        output: res.status === "ACCEPTED" ? (res.actualOutput || "Correct Output") : "Incorrect",
-        expected: res.expectedOutput || "[HIDDEN DATA]",
-        isHidden: !res.input || res.input === "[HIDDEN DATA]",
-        id: statusToId[res.status] || 4,
-      })) || [];
+      const mappedResults =
+        executionResult.testCaseResults?.map((res: TestCaseResult) => ({
+          status: res.status,
+          input: res.input || "[HIDDEN DATA]",
+          output:
+            res.status === "ACCEPTED"
+              ? res.actualOutput || "Correct Output"
+              : "Incorrect",
+          expected: res.expectedOutput || "[HIDDEN DATA]",
+          isHidden: !res.input || res.input === "[HIDDEN DATA]",
+          id: statusToId[res.status] || 4,
+        })) || [];
 
       setTestCaseResults(mappedResults);
       setConsoleOutput("> Verification finished.\n");
@@ -448,7 +470,10 @@ export default function DSAPlayground() {
 
         if (topLevelId === 6) {
           title = "Compilation Failed";
-          message = executionResult.compileOutput || executionResult.stderr || "Compilation failed";
+          message =
+            executionResult.compileOutput ||
+            executionResult.stderr ||
+            "Compilation failed";
         } else if (topLevelId === 5) {
           title = "Time Limit Exceeded";
           message = "Exceeded time on test case.";
@@ -466,7 +491,7 @@ export default function DSAPlayground() {
       } else {
         const passedCount = executionResult.passedTestCases;
         const totalCount = executionResult.totalTestCases;
-        
+
         setVerdict({
           type: "success",
           title: "Accepted",
@@ -673,37 +698,52 @@ export default function DSAPlayground() {
                           {question.marks} marks
                         </Badge>
                         {question.difficulty && (
-                          <Badge variant="outline" className={cn(
-                            "py-0 text-[10px]",
-                            question.difficulty === "EASY" && "bg-green-500/10 text-green-500 border-green-500/20",
-                            question.difficulty === "MEDIUM" && "bg-yellow-500/10 text-yellow-500 border-yellow-500/20",
-                            question.difficulty === "HARD" && "bg-red-500/10 text-red-500 border-red-500/20",
-                          )}>
+                          <Badge
+                            variant="outline"
+                            className={cn(
+                              "py-0 text-[10px]",
+                              question.difficulty === "EASY" &&
+                                "bg-green-500/10 text-green-500 border-green-500/20",
+                              question.difficulty === "MEDIUM" &&
+                                "bg-yellow-500/10 text-yellow-500 border-yellow-500/20",
+                              question.difficulty === "HARD" &&
+                                "bg-red-500/10 text-red-500 border-red-500/20",
+                            )}
+                          >
                             {question.difficulty}
                           </Badge>
                         )}
-                        {question.tags && question.tags.map((tag, i) => (
-                          <Badge key={i} variant="outline" className="border-[#3e3e3e] text-[10px] py-0">
-                            {tag}
-                          </Badge>
-                        ))}
+                        {question.tags &&
+                          question.tags.map((tag, i) => (
+                            <Badge
+                              key={i}
+                              variant="outline"
+                              className="border-[#3e3e3e] text-[10px] py-0"
+                            >
+                              {tag}
+                            </Badge>
+                          ))}
                       </div>
                     </div>
 
                     <div className="prose prose-invert prose-sm max-w-none text-[#eff1f6cc]">
-                      <p className="whitespace-pre-wrap">{question.problemStatement}</p>
+                      <p className="whitespace-pre-wrap">
+                        {question.problemStatement}
+                      </p>
                     </div>
 
                     {(question.timeLimitSecs || question.memoryLimitMb) && (
                       <div className="flex gap-4 text-xs font-semibold text-[#eff1f6cc]/60 border-y border-[#3e3e3e] py-3">
                         {question.timeLimitSecs && (
                           <div className="flex items-center gap-1">
-                            <Clock className="w-3 h-3" /> Time Limit: {question.timeLimitSecs}s
+                            <Clock className="w-3 h-3" /> Time Limit:{" "}
+                            {question.timeLimitSecs}s
                           </div>
                         )}
                         {question.memoryLimitMb && (
                           <div className="flex items-center gap-1">
-                            <Database className="w-3 h-3" /> Memory Limit: {question.memoryLimitMb}MB
+                            <Database className="w-3 h-3" /> Memory Limit:{" "}
+                            {question.memoryLimitMb}MB
                           </div>
                         )}
                       </div>
@@ -711,35 +751,56 @@ export default function DSAPlayground() {
 
                     {question.constraints && (
                       <div className="space-y-2">
-                        <div className="text-sm font-bold text-white">Constraints</div>
+                        <div className="text-sm font-bold text-white">
+                          Constraints
+                        </div>
                         <div className="text-xs bg-[#1a1a1a] p-3 rounded border border-[#3e3e3e] font-mono text-[#eff1f6cc]">
                           {question.constraints}
                         </div>
                       </div>
                     )}
 
-                    {question.testCases.filter(tc => !tc.isHidden).length > 0 && (
+                    {question.testCases.filter((tc) => !tc.isHidden).length >
+                      0 && (
                       <div className="space-y-4">
-                        <div className="text-sm font-bold text-white">Examples</div>
-                        {question.testCases.filter(tc => !tc.isHidden).map((ex, idx) => (
-                          <div key={idx} className="space-y-2 border-l-2 border-primary/30 pl-4 py-1">
-                            <div className="grid gap-3 md:grid-cols-2">
-                              <div className="rounded-lg bg-[#1a1a1a] p-3 border border-[#3e3e3e]">
-                                <div className="text-[10px] font-bold text-[#eff1f6cc]/40 mb-1 uppercase">Input</div>
-                                <pre className="text-xs font-mono">{ex.input}</pre>
+                        <div className="text-sm font-bold text-white">
+                          Examples
+                        </div>
+                        {question.testCases
+                          .filter((tc) => !tc.isHidden)
+                          .map((ex, idx) => (
+                            <div
+                              key={idx}
+                              className="space-y-2 border-l-2 border-primary/30 pl-4 py-1"
+                            >
+                              <div className="grid gap-3 md:grid-cols-2">
+                                <div className="rounded-lg bg-[#1a1a1a] p-3 border border-[#3e3e3e]">
+                                  <div className="text-[10px] font-bold text-[#eff1f6cc]/40 mb-1 uppercase">
+                                    Input
+                                  </div>
+                                  <pre className="text-xs font-mono">
+                                    {ex.input}
+                                  </pre>
+                                </div>
+                                <div className="rounded-lg bg-[#1a1a1a] p-3 border border-[#3e3e3e]">
+                                  <div className="text-[10px] font-bold text-[#eff1f6cc]/40 mb-1 uppercase">
+                                    Output
+                                  </div>
+                                  <pre className="text-xs font-mono">
+                                    {ex.expected}
+                                  </pre>
+                                </div>
                               </div>
-                              <div className="rounded-lg bg-[#1a1a1a] p-3 border border-[#3e3e3e]">
-                                <div className="text-[10px] font-bold text-[#eff1f6cc]/40 mb-1 uppercase">Output</div>
-                                <pre className="text-xs font-mono">{ex.expected}</pre>
-                              </div>
+                              {ex.explanation && (
+                                <div className="text-xs text-[#eff1f6cc]/70 italic">
+                                  <span className="font-semibold non-italic">
+                                    Explanation:
+                                  </span>{" "}
+                                  {ex.explanation}
+                                </div>
+                              )}
                             </div>
-                            {ex.explanation && (
-                              <div className="text-xs text-[#eff1f6cc]/70 italic">
-                                <span className="font-semibold non-italic">Explanation:</span> {ex.explanation}
-                              </div>
-                            )}
-                          </div>
-                        ))}
+                          ))}
                       </div>
                     )}
 
@@ -751,8 +812,13 @@ export default function DSAPlayground() {
                         </div>
                         <div className="space-y-2">
                           {question.hints.map((hint, idx) => (
-                            <div key={idx} className="text-xs bg-yellow-500/5 p-3 rounded border border-yellow-500/10 text-[#eff1f6cc]">
-                              <span className="font-bold text-yellow-500 mr-2">Hint {idx + 1}:</span>
+                            <div
+                              key={idx}
+                              className="text-xs bg-yellow-500/5 p-3 rounded border border-yellow-500/10 text-[#eff1f6cc]"
+                            >
+                              <span className="font-bold text-yellow-500 mr-2">
+                                Hint {idx + 1}:
+                              </span>
                               {hint}
                             </div>
                           ))}
@@ -775,17 +841,30 @@ export default function DSAPlayground() {
                           >
                             <div className="font-mono text-xs space-y-3">
                               <div className="flex flex-col gap-1">
-                                <span className="text-blue-400 font-bold uppercase text-[10px]">Input</span>
-                                <pre className="bg-[#222] p-2 rounded">{tc.input}</pre>
+                                <span className="text-blue-400 font-bold uppercase text-[10px]">
+                                  Input
+                                </span>
+                                <pre className="bg-[#222] p-2 rounded">
+                                  {tc.input}
+                                </pre>
                               </div>
                               <div className="flex flex-col gap-1">
-                                <span className="text-green-400 font-bold uppercase text-[10px]">Expected Output</span>
-                                <pre className="bg-[#222] p-2 rounded">{tc.expected}</pre>
+                                <span className="text-green-400 font-bold uppercase text-[10px]">
+                                  Expected Output
+                                </span>
+                                <pre className="bg-[#222] p-2 rounded">
+                                  {tc.expected}
+                                </pre>
                               </div>
                               {tc.weight && (
                                 <div className="flex items-center gap-2 mt-2 pt-2 border-t border-[#3e3e3e]">
-                                  <span className="text-yellow-400 font-bold uppercase text-[10px]">Weight:</span>
-                                  <Badge variant="secondary" className="h-5 text-[10px] bg-yellow-500/10 text-yellow-500 border-none">
+                                  <span className="text-yellow-400 font-bold uppercase text-[10px]">
+                                    Weight:
+                                  </span>
+                                  <Badge
+                                    variant="secondary"
+                                    className="h-5 text-[10px] bg-yellow-500/10 text-yellow-500 border-none"
+                                  >
                                     {tc.weight}%
                                   </Badge>
                                 </div>
@@ -793,33 +872,49 @@ export default function DSAPlayground() {
                             </div>
                           </div>
                         ))}
-                      {question.testCases.filter((tc) => !tc.isHidden).length ===
-                        0 && (
+                      {question.testCases.filter((tc) => !tc.isHidden)
+                        .length === 0 && (
                         <div className="text-muted-foreground text-sm py-4 text-center border-2 border-dashed border-[#3e3e3e] rounded-lg">
                           No sample test cases available
                         </div>
                       )}
                     </div>
 
-                    {question.testCases.filter((tc) => tc.isHidden).length > 0 && (
+                    {question.testCases.filter((tc) => tc.isHidden).length >
+                      0 && (
                       <div className="space-y-4">
                         <h4 className="text-lg font-semibold text-white flex items-center gap-2">
                           <Lock className="w-4 h-4 text-primary" />
                           Hidden Test Cases
                         </h4>
                         <div className="grid grid-cols-1 gap-2">
-                          {question.testCases.filter(tc => tc.isHidden).map((tc, idx) => (
-                            <div key={idx} className="flex items-center justify-between bg-[#1a1a1a]/50 p-3 rounded border border-dashed border-[#3e3e3e]">
-                              <span className="text-xs text-[#eff1f6cc]">Hidden Case #{idx + 1}</span>
-                              <Badge variant="outline" className="text-[10px] border-[#3e3e3e]">
-                                {tc.weight || 0}% weight
-                              </Badge>
-                            </div>
-                          ))}
+                          {question.testCases
+                            .filter((tc) => tc.isHidden)
+                            .map((tc, idx) => (
+                              <div
+                                key={idx}
+                                className="flex items-center justify-between bg-[#1a1a1a]/50 p-3 rounded border border-dashed border-[#3e3e3e]"
+                              >
+                                <span className="text-xs text-[#eff1f6cc]">
+                                  Hidden Case #{idx + 1}
+                                </span>
+                                <Badge
+                                  variant="outline"
+                                  className="text-[10px] border-[#3e3e3e]"
+                                >
+                                  {tc.weight || 0}% weight
+                                </Badge>
+                              </div>
+                            ))}
                         </div>
                         <p className="text-xs text-muted-foreground italic">
-                          Total of {question.testCases.filter((tc) => tc.isHidden).length}{" "}
-                          hidden test cases will be used for final automated evaluation.
+                          Total of{" "}
+                          {
+                            question.testCases.filter((tc) => tc.isHidden)
+                              .length
+                          }{" "}
+                          hidden test cases will be used for final automated
+                          evaluation.
                         </p>
                       </div>
                     )}

@@ -401,56 +401,56 @@ useEffect(() => {
     const currentQ = questions[currentIndex];
     if (!currentQ) return;
     
-    if (currentQ.type !== "CODING") {
-      if (!answers[currentQ.id]) {
+    let answerText = "";
+    
+    if (currentQ.type === "CODING") {
+      answerText = code;
+      setIsSubmittingCode(true);
+      setSubmissionPhase("running");
+      setOutput(null);
+    } else {
+      const currentAnswer = answers[currentQ.id];
+      if (!currentAnswer) {
         toast({ title: "Warning", description: "Please select an answer", variant: "destructive" });
         return;
       }
-      toast({ title: "Saved", description: "Answer saved successfully" });
-      return;
+      answerText = typeof currentAnswer === 'string' ? currentAnswer : JSON.stringify(currentAnswer);
+      setIsSubmittingCode(true);
     }
 
-    setIsSubmittingCode(true);
-    setSubmissionPhase("running");
-    setOutput(null);
-
     try {
-      const response = await apiClient.post("/code/submit", {
-        code: code,
-        language: LANGUAGE_MAP[language]?.slug || "python3",
-        questionId: currentQ.id
-      });
+      const payload = {
+        sessionId: sessionId,
+        questionId: currentQ.id,
+        answerText: answerText
+      };
+      
+      console.log("Submitting to backend:", payload);
+      
+      const response = await apiClient.post("/submissions", payload);
       const result = response.data?.data || response.data;
       
-      setAnswers({ ...answers, [currentQ.id]: { code: code, language: language, result: result } });
-      toast({ 
-        title: result.passed ? "Accepted!" : "Wrong Answer", 
-        description: result.message || (result.passed ? "Solution accepted!" : "Solution did not pass all test cases"),
-        variant: result.passed ? "default" : "destructive"
-      });
-      
-      if (result.testCases) {
-        setTestCaseResults(result.testCases);
-        const passed = result.testCases.filter((tc: any) => tc.passed).length;
-        setOutput({ 
-          type: result.passed ? 'success' : 'error', 
-          message: result.passed 
-            ? `✓ All ${passed} test cases passed!` 
-            : `✗ ${passed}/${result.testCases.length} test cases passed`
-        });
+      if (currentQ.type === "CODING") {
+        setAnswers({ ...answers, [currentQ.id]: { code: code, language: language, result: result } });
+        toast({ title: "Success", description: "Solution submitted successfully" });
+        setSubmissionPhase("result");
+      } else {
+        toast({ title: "Saved", description: "Answer saved successfully" });
       }
-      setSubmissionPhase("result");
+      
     } catch (error: any) {
-      console.error("Submit code error:", error);
+      console.error("Submit error:", error);
       toast({
         title: "Error",
-        description: error.response?.data?.message || "Failed to submit solution",
+        description: error.response?.data?.message || "Failed to submit answer",
         variant: "destructive",
       });
-      setOutput({ 
-        type: 'error', 
-        message: error.response?.data?.message || "Failed to submit solution. Please try again."
-      });
+      if (currentQ.type === "CODING") {
+        setOutput({ 
+          type: 'error', 
+          message: error.response?.data?.message || "Failed to submit solution. Please try again."
+        });
+      }
     } finally {
       setIsSubmittingCode(false);
     }
@@ -645,26 +645,38 @@ useEffect(() => {
                   </div>
 
                   {currentQuestion.type === "MCQ" && currentQuestion.options && (
-                    <RadioGroup
-                      value={answers[currentQuestion.id] || ""}
-                      onValueChange={(value) => setAnswers({ ...answers, [currentQuestion.id]: value })}
-                      className="space-y-2 pt-2"
-                    >
-                      {currentQuestion.options.map((option, idx) => (
-                        <Label 
-                          key={idx} 
-                          className={cn(
-                            "flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-all",
-                            answers[currentQuestion.id] === option 
-                              ? "border-primary bg-primary/5 ring-1 ring-primary" 
-                              : "border-border hover:bg-muted/50 hover:border-primary/30"
-                          )}
+                    <div className="space-y-4">
+                      <RadioGroup
+                        value={answers[currentQuestion.id] || ""}
+                        onValueChange={(value) => setAnswers({ ...answers, [currentQuestion.id]: value })}
+                        className="space-y-2 pt-2"
+                      >
+                        {currentQuestion.options.map((option, idx) => (
+                          <Label 
+                            key={idx} 
+                            className={cn(
+                              "flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-all",
+                              answers[currentQuestion.id] === option 
+                                ? "border-primary bg-primary/5 ring-1 ring-primary" 
+                                : "border-border hover:bg-muted/50 hover:border-primary/30"
+                            )}
+                          >
+                            <RadioGroupItem value={option} id={`option-${idx}`} />
+                            <span className="text-sm">{option}</span>
+                          </Label>
+                        ))}
+                      </RadioGroup>
+                      <div className="flex justify-end">
+                        <Button 
+                          size="sm" 
+                          onClick={handleSubmitQuestion}
+                          disabled={isSubmittingCode}
                         >
-                          <RadioGroupItem value={option} id={`option-${idx}`} />
-                          <span className="text-sm">{option}</span>
-                        </Label>
-                      ))}
-                    </RadioGroup>
+                          {isSubmittingCode ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
+                          Submit Answer
+                        </Button>
+                      </div>
+                    </div>
                   )}
 
                   {currentQuestion.type === "CODING" && (
