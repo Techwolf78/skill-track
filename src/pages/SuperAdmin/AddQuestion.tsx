@@ -634,8 +634,10 @@ export default function AddQuestion() {
     setLoading(true);
     try {
       // Build the request according to the new API DTO
-      const questionData: CreateQuestionRequest = {
+      const questionData: CreateQuestionRequest & { question_type?: string, type?: string } = {
         questionType: questionType,
+        question_type: questionType, // Sent to workaround potential Jackson snake-case mapping issues
+        type: questionType, // Extra fallback
         prompt: prompt,
         subject_id: selectedSubject,
         topic_id: selectedTopic || undefined,
