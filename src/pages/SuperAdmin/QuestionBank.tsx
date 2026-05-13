@@ -55,6 +55,7 @@ import {
 } from "@/lib/test-service";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import { QuestionPreview } from "./QuestionPreview";
 
 const difficultyColors = {
   Easy: "bg-green-500/10 text-green-500 border-green-500/20",
@@ -82,6 +83,9 @@ export default function QuestionBank() {
   const [filterTopic, setFilterTopic] = useState<string>("all");
   const [filterSubtopic, setFilterSubtopic] = useState<string>("all");
   const [filterDialogOpen, setFilterDialogOpen] = useState(false);
+  // Add this state in the component (after other useState declarations)
+const [previewQuestion, setPreviewQuestion] = useState<Question | null>(null);
+const [previewOpen, setPreviewOpen] = useState(false);
 
   // Fetch questions and subjects from backend
   const fetchData = async () => {
@@ -148,13 +152,11 @@ export default function QuestionBank() {
     navigate(`/superadmin/questions/edit/${id}`);
   };
 
-  const handlePreview = (question: Question) => {
-    // Show preview dialog
-    toast({
-      title: "Question Preview",
-      description: question.prompt,
-    });
-  };
+// Replace the existing handlePreview function
+const handlePreview = (question: Question) => {
+  setPreviewQuestion(question);
+  setPreviewOpen(true);
+};
 
   const handleSolve = (id: string) => {
     navigate(`/superadmin/questions/playground/${id}`);
@@ -784,6 +786,13 @@ export default function QuestionBank() {
           </div>
         </DialogContent>
       </Dialog>
+
+        {/* Add Question Preview Dialog */}
+    <QuestionPreview
+      question={previewQuestion}
+      open={previewOpen}
+      onOpenChange={setPreviewOpen}
+    />
     </div>
   );
 }

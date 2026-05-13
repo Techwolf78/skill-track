@@ -22,6 +22,7 @@ import {
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   ArrowLeft,
   Save,
@@ -33,6 +34,13 @@ import {
   Eye,
   AlertCircle,
   X,
+  Image as ImageIcon,
+  CheckSquare,
+  Circle,
+  HelpCircle,
+  FileText,
+  Shield,
+  Terminal,
 } from "lucide-react";
 import {
   testService,
@@ -41,13 +49,12 @@ import {
   Subtopic,
   Question,
   TestCase,
+  McqType,
+  McqOption,
+  UpdateQuestionRequest,
+  CodeTemplateEntry,
 } from "@/lib/test-service";
 import { useToast } from "@/hooks/use-toast";
-
-interface McqOption {
-  text: string;
-  isCorrect: boolean;
-}
 
 interface TestCaseForm {
   id?: string;
@@ -57,6 +64,142 @@ interface TestCaseForm {
   weight: number;
   explanation?: string;
 }
+
+interface CodeTemplate {
+  python3?: { code: string; lang: string; langSlug: string };
+  javascript?: { code: string; lang: string; langSlug: string };
+  java?: { code: string; lang: string; langSlug: string };
+  cpp?: { code: string; lang: string; langSlug: string };
+}
+
+const defaultCodeTemplate: CodeTemplate = {
+  python3: {
+    code: `# Write your solution here
+
+def solve():
+    import sys
+    data = sys.stdin.read()
+    # Your code here
+    print(data)
+
+if __name__ == "__main__":
+    solve()`,
+    lang: "Python 3",
+    langSlug: "python3",
+  },
+  javascript: {
+    code: `// Write your solution here
+
+function solve() {
+    const readline = require('readline');
+    const rl = readline.createInterface({
+        input: process.stdin,
+        output: process.stdout
+    });
+    
+    let input = '';
+    rl.on('line', (line) => {
+        input += line + '\\n';
+    });
+    rl.on('close', () => {
+        // Your code here
+        console.log(input.trim());
+    });
+}
+
+solve();`,
+    lang: "JavaScript",
+    langSlug: "javascript",
+  },
+  java: {
+    code: `// Write your solution here
+
+import java.util.*;
+
+public class Main {
+    public static void main(String[] args) {
+        Scanner sc = new Scanner(System.in);
+        StringBuilder input = new StringBuilder();
+        while (sc.hasNextLine()) {
+            input.append(sc.nextLine()).append("\\n");
+        }
+        // Your code here
+        System.out.print(input.toString());
+    }
+}`,
+    lang: "Java",
+    langSlug: "java",
+  },
+  cpp: {
+    code: `// Write your solution here
+
+#include <iostream>
+#include <string>
+using namespace std;
+
+int main() {
+    string input, line;
+    while (getline(cin, line)) {
+        input += line + "\\n";
+    }
+    // Your code here
+    cout << input;
+    return 0;
+}`,
+    lang: "C++",
+    langSlug: "cpp",
+  },
+};
+
+const MCQ_TYPES: {
+  value: McqType;
+  label: string;
+  description: string;
+  icon: React.ReactNode;
+}[] = [
+  {
+    value: "SINGLE_CORRECT",
+    label: "Single Correct",
+    description: "One correct answer out of multiple options",
+    icon: <Circle className="w-4 h-4" />,
+  },
+  {
+    value: "MULTIPLE_CORRECT",
+    label: "Multiple Correct",
+    description: "Multiple correct answers can be selected",
+    icon: <CheckSquare className="w-4 h-4" />,
+  },
+  {
+    value: "TRUE_FALSE",
+    label: "True / False",
+    description: "Simple true or false statement",
+    icon: <HelpCircle className="w-4 h-4" />,
+  },
+  {
+    value: "IMAGE_SINGLE_CORRECT",
+    label: "Image Based (Single)",
+    description: "Identify correct image option",
+    icon: <ImageIcon className="w-4 h-4" />,
+  },
+  {
+    value: "IMAGE_MULTIPLE_CORRECT",
+    label: "Image Based (Multiple)",
+    description: "Select multiple correct images",
+    icon: <ImageIcon className="w-4 h-4" />,
+  },
+  {
+    value: "ASSERTION_REASON",
+    label: "Assertion & Reason",
+    description: "Assertion and reasoning questions",
+    icon: <Shield className="w-4 h-4" />,
+  },
+  {
+    value: "FILL_IN_THE_BLANK",
+    label: "Fill in the Blank",
+    description: "Complete the sentence with correct word",
+    icon: <FileText className="w-4 h-4" />,
+  },
+];
 
 export default function EditQuestion() {
   const { id } = useParams();
@@ -72,24 +215,39 @@ export default function EditQuestion() {
 
   // Form state
   const [questionType, setQuestionType] = useState<"MCQ" | "CODING">("MCQ");
+  const [mcqSubType, setMcqSubType] = useState<McqType>("SINGLE_CORRECT");
   const [selectedSubject, setSelectedSubject] = useState("");
   const [selectedTopic, setSelectedTopic] = useState("");
   const [selectedSubtopic, setSelectedSubtopic] = useState("");
   const [prompt, setPrompt] = useState("");
   const [marks, setMarks] = useState<number>(5);
   const [title, setTitle] = useState("");
-  const [difficulty, setDifficulty] = useState("MEDIUM");
+  const [difficulty, setDifficulty] = useState<"EASY" | "MEDIUM" | "HARD">(
+    "MEDIUM",
+  );
   const [constraints, setConstraints] = useState("");
   const [memoryLimitMb, setMemoryLimitMb] = useState<number>(256);
   const [timeLimitSecs, setTimeLimitSecs] = useState<number>(1);
+  const [sampleExplanation, setSampleExplanation] = useState("");
   const [hints, setHints] = useState<string[]>([]);
   const [tags, setTags] = useState<string[]>([]);
+  const [shuffleOptions, setShuffleOptions] = useState(true);
+
+  // Assertion-Reason specific
+  const [assertion, setAssertion] = useState("");
+  const [reason, setReason] = useState("");
+
+  // Fill in the blank specific
+  const [correctAnswer, setCorrectAnswer] = useState("");
+
+  // Code template for coding questions
+  const [codeTemplate, setCodeTemplate] =
+    useState<CodeTemplate>(defaultCodeTemplate);
+  const [activeLanguageTab, setActiveLanguageTab] = useState<string>("python3");
 
   const [mcqOptions, setMcqOptions] = useState<McqOption[]>([
-    { text: "", isCorrect: false },
-    { text: "", isCorrect: false },
-    { text: "", isCorrect: false },
-    { text: "", isCorrect: false },
+    { text: "", isCorrect: false, displayOrder: 1 },
+    { text: "", isCorrect: false, displayOrder: 2 },
   ]);
 
   // Test cases state for coding questions
@@ -122,16 +280,55 @@ export default function EditQuestion() {
       setTimeLimitSecs(questionData.timeLimitSecs || 1);
       setHints(questionData.hints || []);
       setTags(questionData.tags || []);
+      setShuffleOptions(
+        questionData.shuffleOptions !== undefined
+          ? questionData.shuffleOptions
+          : true,
+      );
+      setSampleExplanation(questionData.sampleExplanation || "");
 
       // Handle question type
-      const qType = questionData.questionType || questionData.type;
+      const qType = questionData.questionType;
       const questionTypeValue = qType === "CODING" ? "CODING" : "MCQ";
       setQuestionType(questionTypeValue);
 
-      // Extract IDs - handle both object and direct ID
-      const subjectId = questionData.subject?.id || questionData.subjectId;
-      const topicId = questionData.topic?.id || questionData.topicId;
-      const subtopicId = questionData.subtopic?.id || questionData.subtopicId;
+      // Handle MCQ subtype
+      if (questionTypeValue === "MCQ" && questionData.mcqType) {
+        setMcqSubType(questionData.mcqType);
+      }
+
+      // Handle Assertion-Reason specific fields
+      if (questionData.mcqType === "ASSERTION_REASON") {
+        if (questionData.assertion) setAssertion(questionData.assertion);
+        if (questionData.reason) setReason(questionData.reason);
+        
+        // Extract from prompt if missing
+        if (!questionData.assertion || !questionData.reason) {
+          const match = questionData.prompt?.match(/Assertion \(A\): (.*?)\.? Reason \(R\): (.*?)\.?$/);
+          if (match) {
+            if (!questionData.assertion) setAssertion(match[1]);
+            if (!questionData.reason) setReason(match[2]);
+          }
+        }
+      }
+      if (questionData.correctAnswer)
+        setCorrectAnswer(questionData.correctAnswer);
+
+      // Handle code template for coding questions
+      if (questionTypeValue === "CODING" && questionData.codeTemplate) {
+        const template = questionData.codeTemplate;
+        setCodeTemplate({
+          python3: template.python3 || defaultCodeTemplate.python3,
+          javascript: template.javascript || defaultCodeTemplate.javascript,
+          java: template.java || defaultCodeTemplate.java,
+          cpp: template.cpp || defaultCodeTemplate.cpp,
+        });
+      }
+
+      // Extract IDs - use snake_case from backend with camelCase fallback
+      const subjectId = questionData.subject_id || questionData.subject?.id || questionData.subjectId;
+      const topicId = questionData.topic_id || questionData.topic?.id || questionData.topicId;
+      const subtopicId = questionData.subtopic_id || questionData.subtopic?.id || questionData.subtopicId;
 
       setSelectedSubject(subjectId || "");
 
@@ -161,18 +358,58 @@ export default function EditQuestion() {
       // Handle MCQ options
       if (questionData.mcqOptions && questionData.mcqOptions.length > 0) {
         const parsedOptions = questionData.mcqOptions.map(
-          (opt: { text: string; isCorrect: boolean }) => ({
+          (opt: McqOption, idx: number) => ({
             text: opt.text || "",
+            imageUrl: opt.imageUrl,
             isCorrect: opt.isCorrect || false,
+            displayOrder: opt.displayOrder || idx + 1,
           }),
         );
         setMcqOptions(parsedOptions);
+      } else {
+        // Default options based on subtype
+        if (questionData.mcqType === "TRUE_FALSE") {
+          setMcqOptions([
+            { text: "True", isCorrect: false, displayOrder: 1 },
+            { text: "False", isCorrect: false, displayOrder: 2 },
+          ]);
+        } else if (questionData.mcqType === "ASSERTION_REASON") {
+          setMcqOptions([
+            {
+              text: "Both A and R are true and R is correct explanation of A",
+              isCorrect: true,
+              displayOrder: 1,
+            },
+            {
+              text: "Both A and R are true but R is not correct explanation",
+              isCorrect: false,
+              displayOrder: 2,
+            },
+            {
+              text: "A is true but R is false",
+              isCorrect: false,
+              displayOrder: 3,
+            },
+            {
+              text: "A is false but R is true",
+              isCorrect: false,
+              displayOrder: 4,
+            },
+          ]);
+        } else if (questionData.mcqType === "FILL_IN_THE_BLANK") {
+          setMcqOptions([{ text: "", isCorrect: false, displayOrder: 1 }]);
+        } else {
+          setMcqOptions([
+            { text: "", isCorrect: false, displayOrder: 1 },
+            { text: "", isCorrect: false, displayOrder: 2 },
+          ]);
+        }
       }
 
-      // Handle test cases for coding questions
+      // Handle test cases for coding questions - filter by codingQuestionId
       if (questionTypeValue === "CODING") {
         const questionTestCases = allTestCases.filter(
-          (tc) => tc.questionId === id,
+          (tc) => tc.codingQuestionId === id,
         );
 
         if (questionTestCases.length > 0) {
@@ -210,7 +447,7 @@ export default function EditQuestion() {
     fetchData();
   }, [fetchData]);
 
-  const handleSubjectChange = async (subjectId: string) => {
+  const handleSubjectChange = (subjectId: string) => {
     setSelectedSubject(subjectId);
     setSelectedTopic("");
     setSelectedSubtopic("");
@@ -239,9 +476,19 @@ export default function EditQuestion() {
     }
   };
 
+  const handleDifficultyChange = (value: string) => {
+    setDifficulty(value as "EASY" | "MEDIUM" | "HARD");
+  };
+
   const handleMcqOptionChange = (index: number, text: string) => {
     const updated = [...mcqOptions];
     updated[index].text = text;
+    setMcqOptions(updated);
+  };
+
+  const handleMcqOptionImageChange = (index: number, imageUrl: string) => {
+    const updated = [...mcqOptions];
+    updated[index].imageUrl = imageUrl;
     setMcqOptions(updated);
   };
 
@@ -265,36 +512,65 @@ export default function EditQuestion() {
   const removeTag = (index: number) =>
     setTags(tags.filter((_, i) => i !== index));
 
-  const handleCorrectOptionChange = (index: number) => {
-    const updated = mcqOptions.map((opt, i) => ({
-      ...opt,
-      isCorrect: i === index,
-    }));
-    setMcqOptions(updated);
+  const isMultipleCorrect = () => {
+    return (
+      mcqSubType === "MULTIPLE_CORRECT" ||
+      mcqSubType === "IMAGE_MULTIPLE_CORRECT"
+    );
+  };
+
+  const isImageBased = () => {
+    return (
+      mcqSubType === "IMAGE_SINGLE_CORRECT" ||
+      mcqSubType === "IMAGE_MULTIPLE_CORRECT"
+    );
+  };
+
+  const handleCorrectOptionChange = (index: number, isChecked?: boolean) => {
+    if (isMultipleCorrect()) {
+      const updated = [...mcqOptions];
+      updated[index].isCorrect =
+        isChecked !== undefined ? isChecked : !updated[index].isCorrect;
+      setMcqOptions(updated);
+    } else {
+      const updated = mcqOptions.map((opt, i) => ({
+        ...opt,
+        isCorrect: i === index,
+      }));
+      setMcqOptions(updated);
+    }
   };
 
   const addMcqOption = () => {
-    if (mcqOptions.length >= 6) {
+    const maxOptions = mcqSubType === "TRUE_FALSE" ? 2 : 6;
+    if (mcqOptions.length >= maxOptions) {
       toast({
         title: "Warning",
-        description: "Maximum 6 options allowed",
+        description: `Maximum ${maxOptions} options allowed`,
         variant: "destructive",
       });
       return;
     }
-    setMcqOptions([...mcqOptions, { text: "", isCorrect: false }]);
+    setMcqOptions([
+      ...mcqOptions,
+      { text: "", isCorrect: false, displayOrder: mcqOptions.length + 1 },
+    ]);
   };
 
   const removeMcqOption = (index: number) => {
-    if (mcqOptions.length <= 2) {
+    const minOptions = mcqSubType === "FILL_IN_THE_BLANK" ? 1 : 2;
+    if (mcqOptions.length <= minOptions) {
       toast({
         title: "Error",
-        description: "At least 2 options are required",
+        description: `At least ${minOptions} option${minOptions > 1 ? "s are" : " is"} required`,
         variant: "destructive",
       });
       return;
     }
     const updated = mcqOptions.filter((_, i) => i !== index);
+    updated.forEach((opt, idx) => {
+      opt.displayOrder = idx + 1;
+    });
     setMcqOptions(updated);
   };
 
@@ -328,7 +604,7 @@ export default function EditQuestion() {
   const updateTestCase = (
     index: number,
     field: keyof TestCaseForm,
-    value: any,
+    value: string | boolean | number,
   ) => {
     const updated = [...testCases];
     updated[index] = { ...updated[index], [field]: value };
@@ -339,12 +615,118 @@ export default function EditQuestion() {
     return testCases.reduce((sum, tc) => sum + tc.weight, 0);
   };
 
+  const validateMcqOptions = () => {
+    if (mcqSubType === "TRUE_FALSE") {
+      const hasTrue = mcqOptions.some(
+        (opt) => opt.text.toLowerCase() === "true",
+      );
+      const hasFalse = mcqOptions.some(
+        (opt) => opt.text.toLowerCase() === "false",
+      );
+      if (!hasTrue || !hasFalse) {
+        toast({
+          title: "Validation Error",
+          description:
+            "True/False questions must have both 'True' and 'False' options",
+          variant: "destructive",
+        });
+        return false;
+      }
+      return true;
+    }
+
+    if (mcqSubType === "ASSERTION_REASON") {
+      if (!assertion.trim() || !reason.trim()) {
+        toast({
+          title: "Validation Error",
+          description: "Both Assertion and Reason statements are required",
+          variant: "destructive",
+        });
+        return false;
+      }
+      return true;
+    }
+
+    if (mcqSubType === "FILL_IN_THE_BLANK") {
+      if (!correctAnswer.trim()) {
+        toast({
+          title: "Validation Error",
+          description:
+            "Please provide the correct answer for fill in the blank",
+          variant: "destructive",
+        });
+        return false;
+      }
+      return true;
+    }
+
+    // Regular MCQ validation
+    const hasEmptyOption = mcqOptions.some((opt) => !opt.text.trim());
+    if (hasEmptyOption) {
+      toast({
+        title: "Validation Error",
+        description: "All options must have text",
+        variant: "destructive",
+      });
+      return false;
+    }
+
+    if (isImageBased()) {
+      const hasEmptyImage = mcqOptions.some((opt) => !opt.imageUrl?.trim());
+      if (hasEmptyImage) {
+        toast({
+          title: "Validation Error",
+          description: "All image options must have an image URL",
+          variant: "destructive",
+        });
+        return false;
+      }
+    }
+
+    const hasCorrectOption = mcqOptions.some((opt) => opt.isCorrect);
+    if (!hasCorrectOption) {
+      toast({
+        title: "Validation Error",
+        description: `Please select ${isMultipleCorrect() ? "at least one" : "the"} correct answer`,
+        variant: "destructive",
+      });
+      return false;
+    }
+
+    return true;
+  };
+
+  // Helper to determine if options preview should be shown
+  const shouldShowOptionsPreview = () => {
+    if (questionType !== "MCQ") return false;
+    if (!mcqOptions.some((opt) => opt.text)) return false;
+    // Only show for these specific types
+    return (
+      mcqSubType === "SINGLE_CORRECT" ||
+      mcqSubType === "MULTIPLE_CORRECT" ||
+      mcqSubType === "TRUE_FALSE" ||
+      mcqSubType === "IMAGE_SINGLE_CORRECT" ||
+      mcqSubType === "IMAGE_MULTIPLE_CORRECT"
+    );
+  };
+
   const handleUpdate = async () => {
     // Validation
-    if (!prompt.trim()) {
+    const isAssertionReason = questionType === "MCQ" && mcqSubType === "ASSERTION_REASON";
+    
+    if (!isAssertionReason && !prompt.trim()) {
       toast({
         title: "Validation Error",
         description: "Question prompt is required",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    if (isAssertionReason && (!assertion.trim() || !reason.trim())) {
+      toast({
+        title: "Validation Error",
+        description: "Both Assertion and Reason are required",
         variant: "destructive",
       });
       return;
@@ -369,25 +751,7 @@ export default function EditQuestion() {
     }
 
     if (questionType === "MCQ") {
-      const hasEmptyOption = mcqOptions.some((opt) => !opt.text.trim());
-      if (hasEmptyOption) {
-        toast({
-          title: "Validation Error",
-          description: "All options must have text",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      const hasCorrectOption = mcqOptions.some((opt) => opt.isCorrect);
-      if (!hasCorrectOption) {
-        toast({
-          title: "Validation Error",
-          description: "Please select a correct answer",
-          variant: "destructive",
-        });
-        return;
-      }
+      if (!validateMcqOptions()) return;
     }
 
     if (questionType === "CODING") {
@@ -426,19 +790,19 @@ export default function EditQuestion() {
 
     setSaving(true);
     try {
-      // Update question
-      const questionData = {
+      const questionData: UpdateQuestionRequest = {
         questionType: questionType,
         prompt: prompt,
-        subjectId: selectedSubject,
-        topicId: selectedTopic || undefined,
-        subtopicId: selectedSubtopic || undefined,
+        subject_id: selectedSubject,
+        topic_id: selectedTopic || undefined,
+        subtopic_id: selectedSubtopic || undefined,
         marks: marks,
         title: title || undefined,
         difficulty: difficulty,
         constraints: constraints || undefined,
         memoryLimitMb: memoryLimitMb,
         timeLimitSecs: timeLimitSecs,
+        sampleExplanation: sampleExplanation || undefined,
         hints: hints.filter((h) => h.trim() !== ""),
         tags: tags.filter((t) => t.trim() !== ""),
         examples: testCases
@@ -448,24 +812,74 @@ export default function EditQuestion() {
             output: tc.expectedOutput,
             explanation: tc.explanation || "",
           })),
-        ...(questionType === "MCQ" && {
-          mcqOptions: mcqOptions.map((opt) => ({
-            text: opt.text,
-            isCorrect: opt.isCorrect,
-          })),
-        }),
       };
+
+      if (questionType === "MCQ") {
+        questionData.mcqType = mcqSubType;
+        questionData.shuffleOptions = shuffleOptions;
+        questionData.multipleCorrect = isMultipleCorrect();
+
+        if (mcqSubType === "ASSERTION_REASON") {
+          // Combine assertion and reason into prompt
+          questionData.prompt = `Assertion (A): ${assertion}. Reason (R): ${reason}.`;
+          
+          questionData.mcqOptions = [
+            {
+              text: "Both A and R are true and R is correct explanation of A",
+              isCorrect: true,
+              displayOrder: 1,
+            },
+            {
+              text: "Both A and R are true but R is not correct explanation",
+              isCorrect: false,
+              displayOrder: 2,
+            },
+            {
+              text: "A is true but R is false",
+              isCorrect: false,
+              displayOrder: 3,
+            },
+            {
+              text: "A is false but R is true",
+              isCorrect: false,
+              displayOrder: 4,
+            },
+          ];
+        } else if (mcqSubType === "FILL_IN_THE_BLANK") {
+          questionData.correctAnswer = correctAnswer;
+          questionData.mcqOptions = mcqOptions;
+        } else {
+          questionData.mcqOptions = mcqOptions;
+        }
+      }
+
+      if (questionType === "CODING") {
+        // Filter out empty code templates
+        const filteredTemplate: Record<string, CodeTemplateEntry> = {};
+        if (codeTemplate.python3?.code?.trim())
+          filteredTemplate.python3 = codeTemplate.python3;
+        if (codeTemplate.javascript?.code?.trim())
+          filteredTemplate.javascript = codeTemplate.javascript;
+        if (codeTemplate.java?.code?.trim())
+          filteredTemplate.java = codeTemplate.java;
+        if (codeTemplate.cpp?.code?.trim())
+          filteredTemplate.cpp = codeTemplate.cpp;
+        questionData.codeTemplate = filteredTemplate;
+      }
 
       console.log("Updating question with data:", questionData);
       await testService.updateQuestion(id!, questionData);
 
-      // If coding question, update test cases
+      // If coding question, update test cases with codingQuestionId
       if (questionType === "CODING") {
         // Get existing test cases
-        const existingTestCases = await testService.getTestCasesByQuestion(id!);
+        const existingTestCases = await testService.getAllTestCases();
+        const questionTestCases = existingTestCases.filter(
+          (tc) => tc.codingQuestionId === id,
+        );
 
         // Delete test cases that were removed
-        const existingIds = new Set(existingTestCases.map((tc) => tc.id));
+        const existingIds = new Set(questionTestCases.map((tc) => tc.id));
         const currentIds = new Set(
           testCases.filter((tc) => tc.id).map((tc) => tc.id),
         );
@@ -474,7 +888,7 @@ export default function EditQuestion() {
         );
 
         for (const testCaseId of idsToDelete) {
-          await testService.deleteTestCase(testCaseId);
+          await testService.deleteTestCase(testCaseId!);
         }
 
         // Create or update test cases
@@ -482,22 +896,22 @@ export default function EditQuestion() {
           if (testCase.id) {
             // Update existing
             await testService.updateTestCase(testCase.id, {
+              codingQuestionId: id,
               input: testCase.input,
               expectedOutput: testCase.expectedOutput,
               sample: testCase.sample,
               weight: testCase.weight,
               explanation: testCase.explanation,
-              questionId: id,
             });
           } else {
             // Create new
             await testService.createTestCase({
+              codingQuestionId: id!,
               input: testCase.input,
               expectedOutput: testCase.expectedOutput,
               sample: testCase.sample,
               weight: testCase.weight,
               explanation: testCase.explanation,
-              questionId: id!,
             });
           }
         }
@@ -522,6 +936,198 @@ export default function EditQuestion() {
   };
 
   const totalWeight = getTotalWeight();
+
+  // Render MCQ options based on type
+  const renderMcqOptions = () => {
+    if (mcqSubType === "ASSERTION_REASON") {
+      return (
+        <div className="bg-muted/30 rounded-lg p-4">
+          <p className="text-sm font-medium mb-2">Standard Options:</p>
+          <ul className="text-sm text-muted-foreground space-y-1">
+            <li>
+              A) Both A and R are true and R is correct explanation of A
+            </li>
+            <li>B) Both A and R are true but R is not correct explanation</li>
+            <li>C) A is true but R is false</li>
+            <li>D) A is false but R is true</li>
+          </ul>
+          <p className="text-xs text-muted-foreground mt-4">
+            💡 These standard options are automatically used for Assertion & Reason questions.
+          </p>
+        </div>
+      );
+    }
+
+    if (mcqSubType === "FILL_IN_THE_BLANK") {
+      return (
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <Label>Correct Answer</Label>
+            <Input
+              value={correctAnswer}
+              onChange={(e) => setCorrectAnswer(e.target.value)}
+              placeholder="Enter the correct answer for the blank"
+            />
+            <p className="text-xs text-muted-foreground">
+              This is the word or phrase that correctly fills in the blank
+            </p>
+          </div>
+          <div className="space-y-2">
+            <Label>Distractors (Optional)</Label>
+            {mcqOptions.map((option, index) => (
+              <div key={index} className="flex gap-2">
+                <Input
+                  value={option.text}
+                  onChange={(e) => handleMcqOptionChange(index, e.target.value)}
+                  placeholder={`Distractor ${index + 1}`}
+                />
+                {mcqOptions.length > 1 && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => removeMcqOption(index)}
+                  >
+                    <Trash2 className="w-4 h-4 text-destructive" />
+                  </Button>
+                )}
+              </div>
+            ))}
+            {mcqOptions.length < 3 && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={addMcqOption}
+              >
+                <Plus className="w-4 h-4 mr-1" />
+                Add Distractor
+              </Button>
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    // Regular MCQ options (with image support)
+    return (
+      <div className="space-y-3">
+        {mcqOptions.map((option, index) => (
+          <div key={index} className="border rounded-lg p-4 space-y-3">
+            <div className="flex items-start gap-3">
+              {isMultipleCorrect() ? (
+                <div className="flex items-center h-5">
+                  <Checkbox
+                    id={`correct-${index}`}
+                    checked={option.isCorrect}
+                    onCheckedChange={(checked) =>
+                      handleCorrectOptionChange(index, checked as boolean)
+                    }
+                  />
+                </div>
+              ) : (
+                <RadioGroup
+                  value={
+                    mcqOptions.findIndex((opt) => opt.isCorrect) === index
+                      ? index.toString()
+                      : ""
+                  }
+                  onValueChange={() => handleCorrectOptionChange(index)}
+                >
+                  <RadioGroupItem
+                    value={index.toString()}
+                    id={`correct-${index}`}
+                  />
+                </RadioGroup>
+              )}
+              <div className="flex-1 space-y-3">
+                <div className="flex gap-2">
+                  <Input
+                    value={option.text}
+                    onChange={(e) =>
+                      handleMcqOptionChange(index, e.target.value)
+                    }
+                    placeholder={`Option ${index + 1}`}
+                    className="flex-1"
+                  />
+                  {mcqOptions.length >
+                    (mcqSubType === "TRUE_FALSE" ? 2 : 2) && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => removeMcqOption(index)}
+                    >
+                      <Trash2 className="w-4 h-4 text-destructive" />
+                    </Button>
+                  )}
+                </div>
+
+                {isImageBased() && (
+                  <div className="space-y-2">
+                    <Label className="text-xs">Option Image URL</Label>
+                    <div className="flex gap-2">
+                      <Input
+                        value={option.imageUrl || ""}
+                        onChange={(e) =>
+                          handleMcqOptionImageChange(index, e.target.value)
+                        }
+                        placeholder="https://example.com/image.jpg"
+                        className="flex-1 text-sm"
+                      />
+                      {option.imageUrl && (
+                        <div className="w-16 h-16 border rounded overflow-hidden">
+                          <img
+                            src={option.imageUrl}
+                            alt={`Option ${index + 1}`}
+                            className="w-full h-full object-cover"
+                            onError={(e) => {
+                              (e.target as HTMLImageElement).src =
+                                "/api/placeholder/64/64";
+                            }}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        ))}
+
+{mcqOptions.length < (mcqSubType === "TRUE_FALSE" ? 2 : 6) &&
+  mcqSubType !== "ASSERTION_REASON" && mcqSubType !== "FILL_IN_THE_BLANK" && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={addMcqOption}
+            >
+              <Plus className="w-4 h-4 mr-1" />
+              Add Option
+            </Button>
+          )}
+
+        <div className="flex items-center space-x-2 mt-4">
+          <Checkbox
+            id="shuffleOptions"
+            checked={shuffleOptions}
+            onCheckedChange={(checked) => setShuffleOptions(checked as boolean)}
+          />
+          <Label htmlFor="shuffleOptions" className="cursor-pointer">
+            Shuffle options when displaying to candidates
+          </Label>
+        </div>
+
+        <p className="text-xs text-muted-foreground mt-2">
+          {isMultipleCorrect()
+            ? "Click the checkboxes to mark correct answers (multiple allowed)"
+            : "Click the radio button to mark the correct answer"}
+        </p>
+      </div>
+    );
+  };
 
   if (loading) {
     return (
@@ -583,7 +1189,7 @@ export default function EditQuestion() {
                     </h3>
                     <p className="text-sm text-muted-foreground">
                       {questionType === "MCQ"
-                        ? "Candidates select one correct answer from multiple options"
+                        ? "Candidates select correct answer(s) from multiple options"
                         : "Candidates write code to solve a programming problem"}
                     </p>
                   </div>
@@ -699,7 +1305,10 @@ export default function EditQuestion() {
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label>Difficulty {questionType === "CODING" && "*"}</Label>
-                    <Select value={difficulty} onValueChange={setDifficulty}>
+                    <Select
+                      value={difficulty}
+                      onValueChange={handleDifficultyChange}
+                    >
                       <SelectTrigger>
                         <SelectValue placeholder="Select difficulty" />
                       </SelectTrigger>
@@ -753,16 +1362,92 @@ export default function EditQuestion() {
                 )}
               </div>
 
-              <div className="space-y-2">
-                <Label>Question Prompt *</Label>
-                <Textarea
-                  value={prompt}
-                  onChange={(e) => setPrompt(e.target.value)}
-                  placeholder="Enter your question here..."
-                  rows={5}
-                  className="resize-none"
-                />
-              </div>
+              {/* Question Prompt - Hide for Assertion & Reason */}
+              {!(questionType === "MCQ" && mcqSubType === "ASSERTION_REASON") && (
+                <div className="space-y-2">
+                  <Label>Question Prompt *</Label>
+                  <Textarea
+                    value={prompt}
+                    onChange={(e) => setPrompt(e.target.value)}
+                    placeholder="Enter your question here..."
+                    rows={5}
+                    className="resize-none"
+                  />
+                </div>
+              )}
+
+              {/* Assertion & Reason Inputs */}
+              {questionType === "MCQ" && mcqSubType === "ASSERTION_REASON" && (
+                <div className="space-y-4 border p-4 rounded-lg bg-muted/10">
+                  <div className="space-y-2">
+                    <Label>Assertion (A)</Label>
+                    <Textarea
+                      value={assertion}
+                      onChange={(e) => setAssertion(e.target.value)}
+                      placeholder="Enter the assertion statement..."
+                      rows={3}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Reason (R)</Label>
+                    <Textarea
+                      value={reason}
+                      onChange={(e) => setReason(e.target.value)}
+                      placeholder="Enter the reason statement..."
+                      rows={3}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {questionType === "MCQ" && (
+                <div className="space-y-2">
+                  <Label>MCQ Subtype</Label>
+                  <Select
+                    value={mcqSubType}
+                    onValueChange={(val) => {
+                      setMcqSubType(val as McqType);
+                      // Reset options based on type
+                      if (val === "TRUE_FALSE") {
+                        setMcqOptions([
+                          { text: "True", isCorrect: false, displayOrder: 1 },
+                          { text: "False", isCorrect: false, displayOrder: 2 },
+                        ]);
+                      } else if (val === "ASSERTION_REASON") {
+                        setAssertion("");
+                        setReason("");
+                      } else if (val === "FILL_IN_THE_BLANK") {
+                        setCorrectAnswer("");
+                        setMcqOptions([
+                          { text: "", isCorrect: false, displayOrder: 1 },
+                        ]);
+                      } else {
+                        setMcqOptions([
+                          { text: "", isCorrect: false, displayOrder: 1 },
+                          { text: "", isCorrect: false, displayOrder: 2 },
+                        ]);
+                      }
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select MCQ subtype" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {MCQ_TYPES.map((type) => (
+                        <SelectItem key={type.value} value={type.value}>
+                          <div className="flex items-center gap-2">
+                            {type.icon}
+                            <span>{type.label}</span>
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    {MCQ_TYPES.find((t) => t.value === mcqSubType)?.description}
+                  </p>
+                </div>
+              )}
 
               {questionType === "CODING" && (
                 <>
@@ -773,6 +1458,16 @@ export default function EditQuestion() {
                       onChange={(e) => setConstraints(e.target.value)}
                       placeholder="Enter problem constraints..."
                       rows={3}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Sample Explanation</Label>
+                    <Textarea
+                      value={sampleExplanation}
+                      onChange={(e) => setSampleExplanation(e.target.value)}
+                      placeholder="Explain the sample test cases..."
+                      rows={2}
                     />
                   </div>
 
@@ -863,59 +1558,157 @@ export default function EditQuestion() {
                   <div>
                     <CardTitle>Answer Options</CardTitle>
                     <CardDescription>
-                      Add options and select the correct answer
+                      Add options and select the correct answer(s)
                     </CardDescription>
                   </div>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={addMcqOption}
-                  >
-                    <Plus className="w-4 h-4 mr-1" />
-                    Add Option
-                  </Button>
                 </div>
               </CardHeader>
-              <CardContent className="space-y-3">
-                {mcqOptions.map((option, index) => (
-                  <div key={index} className="flex items-center gap-3">
-                    <RadioGroup
-                      value={
-                        mcqOptions.findIndex((opt) => opt.isCorrect) === index
-                          ? index.toString()
-                          : ""
-                      }
-                      onValueChange={() => handleCorrectOptionChange(index)}
-                    >
-                      <RadioGroupItem
-                        value={index.toString()}
-                        id={`correct-${index}`}
+              <CardContent>{renderMcqOptions()}</CardContent>
+            </Card>
+          )}
+
+          {/* Code Template for Coding Questions */}
+          {questionType === "CODING" && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Code Template</CardTitle>
+                <CardDescription>
+                  Set starter code templates for different programming languages
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <Tabs
+                  value={activeLanguageTab}
+                  onValueChange={setActiveLanguageTab}
+                >
+                  <TabsList className="grid w-full grid-cols-4">
+                    <TabsTrigger value="python3">Python 3</TabsTrigger>
+                    <TabsTrigger value="javascript">JavaScript</TabsTrigger>
+                    <TabsTrigger value="java">Java</TabsTrigger>
+                    <TabsTrigger value="cpp">C++</TabsTrigger>
+                  </TabsList>
+
+                  <TabsContent value="python3" className="space-y-4 mt-4">
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <Label>Python 3 Starter Code</Label>
+                        <Badge variant="outline">Version: 3.9</Badge>
+                      </div>
+                      <Textarea
+                        value={codeTemplate.python3?.code || ""}
+                        onChange={(e) =>
+                          setCodeTemplate({
+                            ...codeTemplate,
+                            python3: {
+                              ...defaultCodeTemplate.python3,
+                              code: e.target.value,
+                              lang: "Python 3",
+                              langSlug: "python3",
+                            },
+                          })
+                        }
+                        placeholder="Python 3 starter code"
+                        rows={12}
+                        className="font-mono text-sm"
                       />
-                    </RadioGroup>
-                    <Input
-                      value={option.text}
-                      onChange={(e) =>
-                        handleMcqOptionChange(index, e.target.value)
-                      }
-                      placeholder={`Option ${index + 1}`}
-                      className="flex-1"
-                    />
-                    {mcqOptions.length > 2 && (
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => removeMcqOption(index)}
-                      >
-                        <Trash2 className="w-4 h-4 text-destructive" />
-                      </Button>
-                    )}
+                    </div>
+                  </TabsContent>
+
+                  <TabsContent value="javascript" className="space-y-4 mt-4">
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <Label>JavaScript Starter Code</Label>
+                        <Badge variant="outline">Version: Node.js 16</Badge>
+                      </div>
+                      <Textarea
+                        value={codeTemplate.javascript?.code || ""}
+                        onChange={(e) =>
+                          setCodeTemplate({
+                            ...codeTemplate,
+                            javascript: {
+                              ...defaultCodeTemplate.javascript,
+                              code: e.target.value,
+                              lang: "JavaScript",
+                              langSlug: "javascript",
+                            },
+                          })
+                        }
+                        placeholder="JavaScript starter code"
+                        rows={12}
+                        className="font-mono text-sm"
+                      />
+                    </div>
+                  </TabsContent>
+
+                  <TabsContent value="java" className="space-y-4 mt-4">
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <Label>Java Starter Code</Label>
+                        <Badge variant="outline">Version: 17</Badge>
+                      </div>
+                      <Textarea
+                        value={codeTemplate.java?.code || ""}
+                        onChange={(e) =>
+                          setCodeTemplate({
+                            ...codeTemplate,
+                            java: {
+                              ...defaultCodeTemplate.java,
+                              code: e.target.value,
+                              lang: "Java",
+                              langSlug: "java",
+                            },
+                          })
+                        }
+                        placeholder="Java starter code"
+                        rows={12}
+                        className="font-mono text-sm"
+                      />
+                    </div>
+                  </TabsContent>
+
+                  <TabsContent value="cpp" className="space-y-4 mt-4">
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <Label>C++ Starter Code</Label>
+                        <Badge variant="outline">Version: C++17</Badge>
+                      </div>
+                      <Textarea
+                        value={codeTemplate.cpp?.code || ""}
+                        onChange={(e) =>
+                          setCodeTemplate({
+                            ...codeTemplate,
+                            cpp: {
+                              ...defaultCodeTemplate.cpp,
+                              code: e.target.value,
+                              lang: "C++",
+                              langSlug: "cpp",
+                            },
+                          })
+                        }
+                        placeholder="C++ starter code"
+                        rows={12}
+                        className="font-mono text-sm"
+                      />
+                    </div>
+                  </TabsContent>
+                </Tabs>
+
+                <div className="bg-muted/30 rounded-lg p-3">
+                  <div className="flex items-start gap-2">
+                    <Terminal className="w-4 h-4 text-muted-foreground mt-0.5" />
+                    <div>
+                      <p className="text-xs font-medium">
+                        About Code Templates
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Candidates will see these templates when they open the
+                        coding question. You can customize the starter code for
+                        each language. All 4 languages (Python 3, JavaScript,
+                        Java, C++) are supported.
+                      </p>
+                    </div>
                   </div>
-                ))}
-                <p className="text-xs text-muted-foreground mt-2">
-                  Click the radio button to mark the correct answer
-                </p>
+                </div>
               </CardContent>
             </Card>
           )}
@@ -1016,7 +1809,11 @@ export default function EditQuestion() {
                             id={`sample-${index}`}
                             checked={testCase.sample}
                             onCheckedChange={(checked) =>
-                              updateTestCase(index, "sample", checked)
+                              updateTestCase(
+                                index,
+                                "sample",
+                                checked as boolean,
+                              )
                             }
                           />
                           <Label
@@ -1129,40 +1926,43 @@ export default function EditQuestion() {
                   <Badge variant="outline">{marks} marks</Badge>
                 </div>
               )}
-              {questionType === "MCQ" && mcqOptions.some((opt) => opt.text) && (
+              {questionType === "MCQ" && mcqSubType && (
                 <div className="rounded-lg bg-muted/30 p-4">
-                  <p className="text-sm font-medium mb-2">Options:</p>
-                  <div className="space-y-1">
-                    {mcqOptions.map((opt, idx) => (
-                      <div
-                        key={idx}
-                        className="flex items-center gap-2 text-sm"
-                      >
-                        <div
-                          className={`w-2 h-2 rounded-full ${opt.isCorrect ? "bg-green-500" : "bg-gray-300"}`}
-                        />
-                        <span
-                          className={
-                            opt.isCorrect
-                              ? "text-green-600"
-                              : "text-muted-foreground"
-                          }
-                        >
-                          {opt.text || `Option ${idx + 1}`}
-                        </span>
-                        {opt.isCorrect && (
-                          <Badge
-                            variant="outline"
-                            className="text-green-600 text-xs"
-                          >
-                            Correct
-                          </Badge>
-                        )}
-                      </div>
-                    ))}
-                  </div>
+                  <p className="text-sm font-medium mb-2">Type:</p>
+                  <Badge variant="outline">
+                    {MCQ_TYPES.find((t) => t.value === mcqSubType)?.label ||
+                      mcqSubType}
+                  </Badge>
                 </div>
               )}
+{shouldShowOptionsPreview() && (
+  <div className="rounded-lg bg-muted/30 p-4">
+    <p className="text-sm font-medium mb-2">Options:</p>
+    <div className="space-y-1">
+      {mcqOptions.map((opt, idx) => (
+        <div key={idx} className="flex items-center gap-2 text-sm">
+          <div
+            className={`w-2 h-2 rounded-full ${opt.isCorrect ? "bg-green-500" : "bg-gray-300"}`}
+          />
+          <span
+            className={
+              opt.isCorrect
+                ? "text-green-600"
+                : "text-muted-foreground"
+            }
+          >
+            {opt.text || `Option ${idx + 1}`}
+          </span>
+          {opt.isCorrect && (
+            <Badge variant="outline" className="text-green-600 text-xs">
+              Correct
+            </Badge>
+          )}
+        </div>
+      ))}
+    </div>
+  </div>
+)}
               {questionType === "CODING" && testCases.length > 0 && (
                 <div className="rounded-lg bg-muted/30 p-4">
                   <p className="text-sm font-medium mb-2">Test Cases:</p>
@@ -1229,6 +2029,15 @@ export default function EditQuestion() {
                   {questionType}
                 </Badge>
               </div>
+              {questionType === "MCQ" && mcqSubType && (
+                <div className="text-sm">
+                  <span className="text-muted-foreground">Subtype:</span>
+                  <Badge variant="outline" className="ml-2">
+                    {MCQ_TYPES.find((t) => t.value === mcqSubType)?.label ||
+                      mcqSubType}
+                  </Badge>
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>

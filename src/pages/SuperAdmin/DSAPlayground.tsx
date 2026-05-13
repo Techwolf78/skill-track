@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -36,19 +36,11 @@ import {
   Database,
 } from "lucide-react";
 import Editor from "@monaco-editor/react";
-import { testService, Question, TestCase } from "@/lib/test-service";
+import { testService, Question, TestCase, CodeExecutionResponse, TestCaseResult } from "@/lib/test-service";
+import { apiClient } from "@/lib/api-client";
 import {
-  createSubmission,
-  pollSubmission,
-  createBatchSubmissions,
-  pollBatchSubmissions,
-  LANGUAGE_MAP,
-  SubmissionResponse,
-  Language,
-  ProblemType,
-  inferMetadataFromSnippets,
-  QuestionMetadata,
   mapFriendlyError,
+  QuestionMetadata,
 } from "@/lib/judge0";
 
 interface TestCaseUI {
@@ -178,7 +170,7 @@ export default function DSAPlayground() {
   const [mcqAnswer, setMcqAnswer] = useState("");
   const [isExecuting, setIsExecuting] = useState(false);
   const [executionResult, setExecutionResult] =
-    useState<SubmissionResponse | null>(null);
+    useState<CodeExecutionResponse | null>(null);
   const [testCaseResults, setTestCaseResults] = useState<
     {
       status: string;
@@ -200,13 +192,7 @@ export default function DSAPlayground() {
     message: string;
   } | null>(null);
 
-  useEffect(() => {
-    if (id) {
-      fetchQuestionFromBackend();
-    }
-  }, [id]);
-
-  const fetchQuestionFromBackend = async () => {
+  const fetchQuestionFromBackend = useCallback(async () => {
     try {
       setLoading(true);
 
@@ -218,7 +204,7 @@ export default function DSAPlayground() {
       let codeSnippetsData: CodeSnippet[] = [];
 
       if (backendQuestion.questionType === "CODING") {
-        const testCases = await testService.getTestCasesByQuestion(id!);
+        const testCases = await testService.getTestCasesByCodingQuestion(id!);
         testCasesData = testCases.map((tc: TestCase) => ({
           input: tc.input,
           expected: tc.expectedOutput,
@@ -265,7 +251,7 @@ export default function DSAPlayground() {
         timeLimitSecs: backendQuestion.timeLimitSecs,
         memoryLimitMb: backendQuestion.memoryLimitMb,
         tags: backendQuestion.tags,
-        problemStatement: backendQuestion.problemStatement || backendQuestion.prompt,
+        problemStatement: backendQuestion.prompt,
         sampleInput: testCasesData.find((tc) => !tc.isHidden)?.input || "",
         sampleOutput: testCasesData.find((tc) => !tc.isHidden)?.expected || "",
         sampleExplanation: testCasesData.find((tc) => !tc.isHidden)?.explanation || "",
@@ -277,7 +263,7 @@ export default function DSAPlayground() {
           problemId: backendQuestion.id,
           functionName: "solve",
           params: [],
-          returnType: "any",
+          returnType: { type: "any" },
         },
       };
 
@@ -292,7 +278,13 @@ export default function DSAPlayground() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [id, toast]);
+
+  useEffect(() => {
+    if (id) {
+      fetchQuestionFromBackend();
+    }
+  }, [id, fetchQuestionFromBackend]);
 
   const handleRunCode = async () => {
     if (!code || !question || question.type !== "coding") return;
@@ -305,124 +297,93 @@ export default function DSAPlayground() {
     setTestCaseResults([]);
 
     try {
-      const langId = LANGUAGE_MAP[language as Language] || 71;
-      const sampleCases = question.testCases.filter((tc) => !tc.isHidden);
-
-      const metadata: QuestionMetadata = {
-        ...(question.metadata || {}),
-        functionName: question.metadata?.functionName || "solve",
-        parameterTypes: question.metadata?.parameterTypes || [],
-        returnType: question.metadata?.returnType || { type: "any" },
-        category: question.metadata?.category || ProblemType.ARRAY,
-        timeLimit: question.timeLimitSecs ? question.timeLimitSecs * 1000 : undefined,
-        memoryLimit: question.memoryLimitMb,
+      const backendLanguage = language === "python3" ? "python" : language;
+      const requestBody: Record<string, unknown> = {
+        questionId: question.id,
+        language: backendLanguage,
+        sourceCode: code,
       };
 
-      if (sampleCases.length > 0) {
-        setSubmissionPhase("samples");
-        setConsoleOutput((prev) => prev + "> Running sample test cases...\n");
+      const sampleCases = question.testCases.filter((tc) => !tc.isHidden);
+      if (sampleCases.length === 0 && question.sampleInput) {
+        requestBody.input = question.sampleInput;
+      }
 
-        const tokens = await createBatchSubmissions(
-          code,
-          langId,
-          metadata,
-          sampleCases.map((tc) => tc.input),
-        );
-        const results = await pollBatchSubmissions(tokens);
+      const response = await apiClient.post<any>("/api/code/execute/playground", requestBody);
+      const executionResult = response.data.data;
 
-        const mappedResults = results.map((res, idx) => {
-          const stdout = res.stdout ? res.stdout.trim() : "";
-          const stderr = res.stderr ? res.stderr.trim() : "";
-          const compileOutput = res.compile_output
-            ? res.compile_output.trim()
-            : "";
+      const statusToId: Record<string, number> = {
+        "ACCEPTED": 3,
+        "WRONG_ANSWER": 4,
+        "TIME_LIMIT_EXCEEDED": 5,
+        "COMPILATION_ERROR": 6,
+        "RUNTIME_ERROR": 7,
+        "INTERNAL_ERROR": 13,
+      };
 
-          return {
-            status: res.status.description,
-            input: sampleCases[idx].input,
-            output: stdout || stderr || compileOutput || "",
-            expected: sampleCases[idx].expected,
-            isHidden: false,
-            id: res.status.id,
-          };
-        });
+      const mappedResults = executionResult.testCaseResults?.map((res: TestCaseResult) => ({
+        status: res.status,
+        input: res.input || "",
+        output: res.actualOutput || res.stdout || res.stderr || res.compileOutput || "",
+        expected: res.expectedOutput || "",
+        isHidden: false,
+        id: statusToId[res.status] || 4,
+      })) || [];
 
-        setTestCaseResults(mappedResults);
+      setTestCaseResults(mappedResults);
+      setConsoleOutput("> Execution finished.\n");
 
-        const executionError = mappedResults.find(
-          (r) => r.id > 3 && r.id !== 11,
-        );
+      const topLevelId = statusToId[executionResult.status] || 4;
 
-        if (executionError) {
-          const type: "fail" | "error" = "fail";
-          let title = "Error";
-          let message = executionError.status;
+      if (topLevelId !== 3) {
+        const type: "fail" | "error" = "fail";
+        let title = "Error";
+        let message = executionResult.status;
 
-          if (executionError.id === 6) {
-            title = "Compilation Error";
-            message = executionError.output;
-          } else if (executionError.id === 5) {
-            title = "Time Limit Exceeded";
-            message = "Your code took too long to run.";
-          } else if (executionError.id === 4) {
-            title = "Wrong Answer";
-            message = "Logic failed on sample case.";
-          } else if (executionError.id >= 7) {
-            title = "Runtime Error";
-            message = executionError.status;
-          }
-
-          const friendlyHint = mapFriendlyError(message, language);
-          if (friendlyHint) {
-            message = friendlyHint + "\n\nOriginal Error:\n" + message;
-          }
-
-          setVerdict({ type, title, message });
-          setSubmissionPhase("result");
-        } else {
-          const passedCount = mappedResults.filter(
-            (r) => r.id === 3 && isCorrect(r.output, r.expected),
-          ).length;
-          setConsoleOutput(
-            (prev) =>
-              prev +
-              `> Sample Results: ${passedCount}/${sampleCases.length} Passed\n`,
-          );
-
-          if (passedCount < sampleCases.length) {
-            const failIdx = mappedResults.findIndex(
-              (r) => !isCorrect(r.output, r.expected),
-            );
-            setVerdict({
-              type: "fail",
-              title: "Wrong Answer",
-              message: `Failed on Sample Case #${failIdx + 1}`,
-            });
-          } else {
-            setVerdict({
-              type: "success",
-              title: "Finished",
-              message: "All sample cases passed!",
-            });
-          }
-          setSubmissionPhase("result");
+        if (topLevelId === 6) {
+          title = "Compilation Error";
+          message = executionResult.compileOutput || executionResult.stderr || "Compilation failed";
+        } else if (topLevelId === 5) {
+          title = "Time Limit Exceeded";
+          message = "Your code took too long to run.";
+        } else if (topLevelId === 4) {
+          title = "Wrong Answer";
+          message = "Logic failed on sample case.";
+        } else if (topLevelId >= 7) {
+          title = "Runtime Error";
+          message = executionResult.stderr || "Runtime error";
         }
+
+        const friendlyHint = mapFriendlyError(message, language);
+        if (friendlyHint) {
+          message = friendlyHint + "\n\nOriginal Error:\n" + message;
+        }
+
+        setVerdict({ type, title, message });
+        setSubmissionPhase("result");
       } else {
-        const token = await createSubmission(
-          code,
-          langId,
-          metadata,
-          question.sampleInput || "",
-        );
-        const result = await pollSubmission(token);
-        setExecutionResult(result);
+        const passedCount = executionResult.passedTestCases;
+        const totalCount = executionResult.totalTestCases;
         setConsoleOutput(
-          "> " +
-            (result.stdout ||
-              result.stderr ||
-              result.compile_output ||
-              "No output"),
+          (prev) =>
+            prev +
+            `> Sample Results: ${passedCount}/${totalCount} Passed\n`,
         );
+
+        if (passedCount < totalCount) {
+          setVerdict({
+            type: "fail",
+            title: "Wrong Answer",
+            message: `Failed on some sample cases.`,
+          });
+        } else {
+          setVerdict({
+            type: "success",
+            title: "Finished",
+            message: "All sample cases passed!",
+          });
+        }
+        setSubmissionPhase("result");
       }
     } catch (error) {
       console.error("Judge0 Error:", error);
@@ -449,60 +410,51 @@ export default function DSAPlayground() {
     );
 
     try {
-      const langId = LANGUAGE_MAP[language as Language] || 71;
-      const allCases = question.testCases;
-      const hiddenCases = allCases.filter(tc => tc.isHidden);
+      const backendLanguage = language === "python3" ? "python" : language;
+      const response = await apiClient.post<any>("/api/code/execute/playground", {
+        questionId: question.id,
+        language: backendLanguage,
+        sourceCode: code,
+      });
 
-      const metadata: QuestionMetadata = {
-        ...(question.metadata || {}),
-        functionName: question.metadata?.functionName || "solve",
-        parameterTypes: question.metadata?.parameterTypes || [],
-        returnType: question.metadata?.returnType || { type: "any" },
-        category: question.metadata?.category || ProblemType.ARRAY,
-        timeLimit: question.timeLimitSecs ? question.timeLimitSecs * 1000 : undefined,
-        memoryLimit: question.memoryLimitMb,
+      const executionResult = response.data.data;
+
+      const statusToId: Record<string, number> = {
+        "ACCEPTED": 3,
+        "WRONG_ANSWER": 4,
+        "TIME_LIMIT_EXCEEDED": 5,
+        "COMPILATION_ERROR": 6,
+        "RUNTIME_ERROR": 7,
+        "INTERNAL_ERROR": 13,
       };
 
-      await new Promise((r) => setTimeout(r, 800));
+      const mappedResults = executionResult.testCaseResults?.map((res: TestCaseResult) => ({
+        status: res.status,
+        input: res.input || "[HIDDEN DATA]",
+        output: res.status === "ACCEPTED" ? (res.actualOutput || "Correct Output") : "Incorrect",
+        expected: res.expectedOutput || "[HIDDEN DATA]",
+        isHidden: !res.input || res.input === "[HIDDEN DATA]",
+        id: statusToId[res.status] || 4,
+      })) || [];
 
-      setSubmissionPhase("samples");
-      setConsoleOutput((prev) => prev + "> Validating sample heuristics...\n");
-      const sampleCases = allCases.filter((tc) => !tc.isHidden);
-      const sampleTokens = await createBatchSubmissions(
-        code,
-        langId,
-        metadata,
-        sampleCases.map((tc) => tc.input),
-      );
-      const sampleResults = await pollBatchSubmissions(sampleTokens);
+      setTestCaseResults(mappedResults);
+      setConsoleOutput("> Verification finished.\n");
 
-      const mappedSamples = sampleResults.map((res, idx) => ({
-        status: res.status.description,
-        input: sampleCases[idx].input,
-        output: res.stdout || res.stderr || res.compile_output || "",
-        expected: sampleCases[idx].expected,
-        isHidden: false,
-        id: res.status.id,
-      }));
+      const topLevelId = statusToId[executionResult.status] || 4;
 
-      setTestCaseResults(mappedSamples);
-
-      const sampleError = mappedSamples.find(
-        (r) => r.id > 3 || !isCorrect(r.output, r.expected),
-      );
-      if (sampleError) {
+      if (topLevelId !== 3) {
         let title = "Wrong Answer";
-        let message = "Failed on sample test cases.";
+        let message = "Failed on test cases.";
 
-        if (sampleError.id === 6) {
+        if (topLevelId === 6) {
           title = "Compilation Failed";
-          message = sampleError.output;
-        } else if (sampleError.id === 5) {
+          message = executionResult.compileOutput || executionResult.stderr || "Compilation failed";
+        } else if (topLevelId === 5) {
           title = "Time Limit Exceeded";
-          message = "Exceeded time on sample case.";
-        } else if (sampleError.id >= 7) {
+          message = "Exceeded time on test case.";
+        } else if (topLevelId >= 7) {
           title = "Runtime Error";
-          message = "Crash during sample validation.";
+          message = executionResult.stderr || "Crash during validation.";
         }
 
         const friendlyHint = mapFriendlyError(message, language);
@@ -511,82 +463,19 @@ export default function DSAPlayground() {
         }
 
         setVerdict({ type: "fail", title, message });
-        setSubmissionPhase("result");
-        setIsSubmitting(false);
-        return;
-      }
-
-      setSubmissionPhase("hidden");
-      setConsoleOutput(
-        (prev) =>
-          prev + "> Sample cases passed. Verifying " + hiddenCases.length + " hidden constraints...\n",
-      );
-
-      if (hiddenCases.length > 0) {
-        const hiddenTokens = await createBatchSubmissions(
-          code,
-          langId,
-          metadata,
-          hiddenCases.map((tc) => tc.input),
-        );
-
-        for (let i = 0; i < hiddenCases.length; i++) {
-          setConsoleOutput(
-            (prev) =>
-              prev + `> Testing case ${sampleCases.length + i + 1}...\n`,
-          );
-          await new Promise((r) => setTimeout(r, 600));
-        }
-
-        const hiddenResults = await pollBatchSubmissions(hiddenTokens);
-        setConsoleOutput(
-          (prev) => prev + "> Hidden constraints verified successfully.\n",
-        );
-
-        const mappedHidden = hiddenResults.map((res, idx) => ({
-          status: res.status.description,
-          input: "[HIDDEN DATA]",
-          output: res.status.id === 3 ? "Correct Output" : "Incorrect",
-          expected: "[HIDDEN DATA]",
-          isHidden: true,
-          id: res.status.id,
-        }));
-
-        const finalResults = [...mappedSamples, ...mappedHidden];
-        setTestCaseResults(finalResults);
-
-        const failIdx = finalResults.findIndex((r) => r.id !== 3);
-
-        if (failIdx === -1) {
-          // Calculate score based on weights
-          const totalScore = allCases.reduce((sum, tc) => {
-            const passed =
-              finalResults.find((r) => r.expected === tc.expected)?.id === 3;
-            return sum + (passed ? tc.weight || 0 : 0);
-          }, 0);
-
-          setVerdict({
-            type: "success",
-            title: "Accepted",
-            message: `All test cases passed! Score: ${totalScore}%`,
-          });
-
-          toast({
-            title: "Success!",
-            description: `Solution accepted! Score: ${totalScore}%`,
-          });
-        } else {
-          setVerdict({
-            type: "fail",
-            title: "Wrong Answer",
-            message: `Failed on Test Case #${failIdx + 1}`,
-          });
-        }
       } else {
+        const passedCount = executionResult.passedTestCases;
+        const totalCount = executionResult.totalTestCases;
+        
         setVerdict({
           type: "success",
           title: "Accepted",
-          message: "All test cases passed!",
+          message: `All test cases passed! (${passedCount}/${totalCount})`,
+        });
+
+        toast({
+          title: "Success!",
+          description: `Solution accepted! (${passedCount}/${totalCount})`,
         });
       }
 
