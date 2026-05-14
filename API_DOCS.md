@@ -258,9 +258,10 @@ There is currently no `DELETE /tests/{id}` route in the controller.
 
 | Method | Path | Auth | Notes |
 |---|---|---|---|
-| POST | `/api/code/execute/run` | JWT | Run code against sample test cases only. Ephemeral run, only writes to `code_execution_runs`. |
-| POST | `/api/code/execute/submit` | JWT | Submit code for final grading. Async process, creates a `Submission` with status `PENDING`. |
-| GET | `/api/code/execute/submit/{submissionId}/result` | JWT | Fetch the graded result for a submission. Returns `202` if still pending. |
+| POST | `/api/code/execute/run` | JWT | Run code against sample test cases only (requires `sessionId` and `questionId`). Ephemeral run, only writes to `code_execution_runs`. |
+| POST | `/api/code/execute/submit` | JWT | Submit code for final grading against ALL test cases (requires `sessionId` and `questionId`). Async process, creates a `Submission` with status `PENDING`. Returns `submissionId`. |
+| GET | `/api/code/execute/submit/{submissionId}/result` | JWT | Poll for grading result. Returns `202 Accepted` if still pending, `200 OK` when complete. |
+| POST | `/api/code/execute/playground` | JWT | **Playground mode**: Run code with custom input WITHOUT session/question requirements. No persistence. Perfect for practice/testing. |
 
 ## Key Request and Response Samples
 
@@ -467,6 +468,37 @@ Response (when complete):
     "maxScore": 20.0,
     "execTimeMs": 450,
     "status": "ACCEPTED"
+  }
+}
+```
+
+### 7. Playground Mode (Practice/Testing)
+
+Run code without session or question requirements. Useful for practice environments.
+
+```http
+POST /api/code/execute/playground
+```
+
+```json
+{
+  "language": "java",
+  "sourceCode": "public class Main { public static void main(String[] args) { System.out.println(\"Hello, World!\"); } }",
+  "input": ""
+}
+```
+
+Response:
+
+```json
+{
+  "success": true,
+  "data": {
+    "stdout": "Hello, World!\n",
+    "stderr": null,
+    "compileOutput": null,
+    "status": "ACCEPTED",
+    "execTimeMs": 42
   }
 }
 ```
