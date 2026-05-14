@@ -346,6 +346,19 @@ useEffect(() => {
         endedAt: new Date().toISOString(),
         answers: answers
       });
+
+      // Calculate and save test results
+      try {
+        await apiClient.post("/test-results", {
+          sessionId: sessionId,
+          candidateId: session?.candidateId
+        });
+        console.log("Test results calculated and saved successfully");
+      } catch (calcError) {
+        console.error("Failed to calculate test results:", calcError);
+        // We continue anyway, as the session is already submitted
+      }
+
       toast({ title: "Success", description: "Test submitted successfully" });
       navigate(`/test/${testId}/results?session=${sessionId}`);
     } catch (error: any) {

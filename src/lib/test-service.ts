@@ -373,6 +373,30 @@ export interface CreateTestScheduleExtendedRequest {
   maxCandidates?: number;
 }
 
+// Test Session
+export interface TestSession {
+  id: string;
+  testId: string;
+  candidateId: string;
+  status: "STARTED" | "SUBMITTED" | "EVALUATED" | "EXPIRED";
+  startedAt: string;
+  submittedAt?: string;
+  expiresAt: string;
+}
+
+// Test Result
+export interface TestResult {
+  id: string;
+  testSessionId: string;
+  candidateId: string;
+  totalScore: number;
+  maxScore: number;
+  percentage: number;
+  passed: boolean;
+  evaluatedAt: string;
+  reportBucketLink?: string;
+}
+
 // Grouped Test Questions Response
 export interface GroupedTestQuestions {
   [sectionName: string]: TestQuestion[];
@@ -836,5 +860,30 @@ export const testService = {
 
   deleteTestSchedule: async (id: string): Promise<void> => {
     await apiClient.delete(`/test-schedules/${id}`);
+  },
+
+  // ==================== Test Session APIs ====================
+  getAllSessions: async (): Promise<TestSession[]> => {
+    const response = await apiClient.get<TestSession[]>("/test-sessions");
+    return unwrapArrayResponse(response);
+  },
+
+  getSessionsByTestId: async (testId: string): Promise<TestSession[]> => {
+    const allSessions = await testService.getAllSessions();
+    return allSessions.filter((s) => s.testId === testId);
+  },
+
+  // ==================== Test Result APIs ====================
+  calculateResult: async (sessionId: string, candidateId: string): Promise<TestResult> => {
+    const response = await apiClient.post<TestResult>("/test-results", {
+      sessionId,
+      candidateId,
+    });
+    return unwrapResponse(response);
+  },
+
+  getResultBySessionId: async (sessionId: string): Promise<TestResult> => {
+    const response = await apiClient.get<TestResult>(`/test-results/session/${sessionId}`);
+    return unwrapResponse(response);
   },
 };

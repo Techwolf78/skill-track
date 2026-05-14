@@ -3,54 +3,74 @@ import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { CheckCircle, XCircle, Clock, Trophy, ArrowLeft } from "lucide-react";
-import { useNavigate, useLocation } from "react-router-dom";
+import { CheckCircle, XCircle, Clock, Trophy, ArrowLeft, Loader2, FileText } from "lucide-react";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { apiClient } from "@/lib/api-client";
 
 interface TestResult {
-  totalQuestions: number;
-  answeredQuestions: number;
-  correctAnswers: number;
-  timeTaken: number;
-  score: number;
-  answers: Record<string, string>;
+  id: string;
+  testSessionId: string;
+  candidateId: string;
+  totalScore: number;
+  maxScore: number;
+  percentage: number;
+  passed: boolean;
+  evaluatedAt: string;
+  reportBucketLink?: string;
 }
 
 export default function TestResults() {
   const navigate = useNavigate();
-  const location = useLocation();
+  const [searchParams] = useSearchParams();
+  const sessionId = searchParams.get("session");
   const [results, setResults] = useState<TestResult | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    // Get results from navigation state or localStorage
-    const testResults = location.state?.results;
-    if (testResults) {
-      setResults(testResults);
+    if (sessionId) {
+      fetchResults();
     } else {
-      // Mock results for demonstration
-      setResults({
-        totalQuestions: 5,
-        answeredQuestions: 4,
-        correctAnswers: 3,
-        timeTaken: 2340, // 39 minutes in seconds
-        score: 75,
-        answers: {
-          "1": "O(log n)",
-          "2": "List",
-          "3": "def function_name():",
-          "4": "Dictionary",
-          "5": "Tuple"
-        }
-      });
+      setError("No session ID provided");
+      setLoading(false);
     }
-  }, [location.state]);
+  }, [sessionId]);
 
-  if (!results) {
+  const fetchResults = async () => {
+    try {
+      setLoading(true);
+      const response = await apiClient.get(`/test-results/session/${sessionId}`);
+      setResults(response.data?.data || response.data);
+    } catch (err: any) {
+      console.error("Failed to fetch results:", err);
+      setError(err.response?.data?.message || "Failed to load test results");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
-          <h2 className="text-2xl font-bold mb-4">Loading Results...</h2>
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+          <Loader2 className="w-8 h-8 animate-spin text-primary mx-auto mb-4" />
+          <h2 className="text-2xl font-bold mb-4">Calculating Results...</h2>
         </div>
+      </div>
+    );
+  }
+
+  if (error || !results) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-4">
+        <Card className="max-w-md w-full text-center">
+          <CardContent className="pt-6">
+            <XCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
+            <h2 className="text-xl font-semibold mb-2">Error</h2>
+            <p className="text-muted-foreground mb-6">{error || "Could not load results"}</p>
+            <Button onClick={() => navigate("/")}>Go Home</Button>
+          </CardContent>
+        </Card>
       </div>
     );
   }
@@ -86,65 +106,51 @@ export default function TestResults() {
                 <Trophy className="w-6 h-6 text-primary" />
                 <CardTitle className="text-2xl">Your Score</CardTitle>
               </div>
-              <div className="text-6xl font-bold text-primary mb-4">
-                {results.score}%
+              <div className="flex flex-col items-center">
+                <div className="text-6xl font-bold text-primary mb-2">
+                  {results.percentage.toFixed(1)}%
+                </div>
+                <Badge variant={results.passed ? "default" : "destructive"} className="text-sm px-4 py-1">
+                  {results.passed ? "PASSED" : "FAILED"}
+                </Badge>
               </div>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
-                <div>
-                  <div className="text-2xl font-bold text-green-600">{results.correctAnswers}</div>
-                  <div className="text-sm text-muted-foreground">Correct</div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-center max-w-2xl mx-auto">
+                <div className="bg-background/50 p-4 rounded-xl border border-primary/10">
+                  <div className="text-3xl font-bold text-primary">{results.totalScore}</div>
+                  <div className="text-xs uppercase tracking-wider text-muted-foreground mt-1">Total Score</div>
                 </div>
-                <div>
-                  <div className="text-2xl font-bold text-red-600">{results.totalQuestions - results.correctAnswers}</div>
-                  <div className="text-sm text-muted-foreground">Incorrect</div>
+                <div className="bg-background/50 p-4 rounded-xl border border-primary/10">
+                  <div className="text-3xl font-bold text-muted-foreground">{results.maxScore}</div>
+                  <div className="text-xs uppercase tracking-wider text-muted-foreground mt-1">Max Score</div>
                 </div>
-                <div>
-                  <div className="text-2xl font-bold text-blue-600">{results.answeredQuestions}</div>
-                  <div className="text-sm text-muted-foreground">Answered</div>
-                </div>
-                <div>
-                  <div className="text-2xl font-bold text-orange-600">{formatTime(results.timeTaken)}</div>
-                  <div className="text-sm text-muted-foreground">Time Taken</div>
+                <div className="bg-background/50 p-4 rounded-xl border border-primary/10">
+                  <div className="text-3xl font-bold text-orange-600">
+                    {new Date(results.evaluatedAt).toLocaleDateString()}
+                  </div>
+                  <div className="text-xs uppercase tracking-wider text-muted-foreground mt-1">Evaluated At</div>
                 </div>
               </div>
             </CardContent>
           </Card>
         </motion.div>
 
-        {/* Detailed Results */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
-        >
-          <Card>
-            <CardHeader>
-              <CardTitle>Question Summary</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {Object.entries(results.answers).map(([questionId, answer], index) => (
-                <div key={questionId} className="flex items-center justify-between p-4 border rounded-lg">
-                  <div className="flex items-center gap-3">
-                    <Badge variant={index < results.correctAnswers ? "default" : "secondary"}>
-                      Q{questionId}
-                    </Badge>
-                    <span className="font-medium">Question {questionId}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm text-muted-foreground">{answer}</span>
-                    {index < results.correctAnswers ? (
-                      <CheckCircle className="w-5 h-5 text-green-600" />
-                    ) : (
-                      <XCircle className="w-5 h-5 text-red-600" />
-                    )}
-                  </div>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
-        </motion.div>
+        {results.reportBucketLink && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+            className="text-center"
+          >
+            <Button variant="outline" asChild>
+              <a href={results.reportBucketLink} target="_blank" rel="noopener noreferrer">
+                <FileText className="w-4 h-4 mr-2" />
+                Download Detailed Report
+              </a>
+            </Button>
+          </motion.div>
+        )}
 
         {/* Actions */}
         <motion.div
