@@ -180,11 +180,21 @@ export interface UpdateTestCaseRequest {
 
 // Code Execution DTOs
 export interface CodeExecutionRequest {
-  submissionId: string;
+  sessionId: string;
+  questionId: string;
   language: string;
   sourceCode: string;
-  input?: string;
-  runAllTestCases?: boolean;
+}
+
+export interface GradingResult {
+  submissionId: string;
+  testCasesPassed: number;
+  testCasesTotal: number;
+  scoreAwarded: number;
+  maxScore: number;
+  execTimeMs: number;
+  status: string;
+  errorMessage?: string;
 }
 
 export interface TestCaseResult {
@@ -606,8 +616,19 @@ export const testService = {
   },
 
   // ==================== Code Execution APIs ====================
-  executeCode: async (request: CodeExecutionRequest): Promise<CodeExecutionResponse> => {
-    const response = await apiClient.post<CodeExecutionResponse>("/code/execute", request);
+  executeCode: async (request: CodeExecutionRequest): Promise<TestCaseResult[]> => {
+    const response = await apiClient.post<TestCaseResult[]>("/api/code/execute/run", request);
+    console.log(response);
+    return unwrapArrayResponse(response);
+  },
+
+  submitCode: async (request: CodeExecutionRequest): Promise<string> => {
+    const response = await apiClient.post<string>("/api/code/execute/submit", request);
+    return unwrapResponse(response);
+  },
+
+  getCodeResult: async (submissionId: string): Promise<GradingResult> => {
+    const response = await apiClient.get<GradingResult>(`/api/code/execute/submit/${submissionId}/result`);
     return unwrapResponse(response);
   },
 
@@ -871,6 +892,14 @@ export const testService = {
   getSessionsByTestId: async (testId: string): Promise<TestSession[]> => {
     const allSessions = await testService.getAllSessions();
     return allSessions.filter((s) => s.testId === testId);
+  },
+
+  submitSession: async (id: string, answers?: Record<string, any>): Promise<TestSession> => {
+    const response = await apiClient.post<TestSession>(`/test-sessions/${id}/submit`, {
+      answers,
+      submittedAt: new Date().toISOString(),
+    });
+    return unwrapResponse(response);
   },
 
   // ==================== Test Result APIs ====================

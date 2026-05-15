@@ -341,19 +341,15 @@ useEffect(() => {
     
     setSubmitting(true);
     try {
-      await apiClient.patch(`/test-sessions/${sessionId}`, {
-        status: "SUBMITTED",
-        endedAt: new Date().toISOString(),
-        answers: answers
-      });
+      // Use the new dedicated submit endpoint
+      await testService.submitSession(sessionId, answers);
 
-      // Calculate and save test results
+      // Calculate and save test results using the service
       try {
-        await apiClient.post("/test-results", {
-          sessionId: sessionId,
-          candidateId: session?.candidateId
-        });
-        console.log("Test results calculated and saved successfully");
+        if (session?.candidateId) {
+          await testService.calculateResult(sessionId, session.candidateId);
+          console.log("Test results calculated and saved successfully");
+        }
       } catch (calcError) {
         console.error("Failed to calculate test results:", calcError);
         // We continue anyway, as the session is already submitted
@@ -385,16 +381,12 @@ useEffect(() => {
     setTestCaseResults([]);
 
     try {
-      const response = await apiClient.post("/api/code/execute/run", {
+      const resultsArray = await testService.executeCode({
         sessionId: sessionId || "00000000-0000-0000-0000-000000000000",
         questionId: currentQ.id,
         language: LANGUAGE_MAP[language]?.slug || "python3",
         sourceCode: code,
       });
-      
-      console.log("Run Code Response:", response.data);
-
-      const resultsArray = Array.isArray(response.data?.data) ? response.data.data : [];
       
       const mappedTestCases = resultsArray.map((tc: any) => ({
         passed: tc.status === "ACCEPTED",
@@ -430,43 +422,79 @@ useEffect(() => {
     const currentQ = questions[currentIndex];
     if (!currentQ) return;
     
-    let answerText = "";
-    
     if (currentQ.type === "CODING") {
-      answerText = code;
+      if (!sessionId) {
+        toast({ title: "Error", description: "No active session found", variant: "destructive" });
+        return;
+      }
+
       setIsSubmittingCode(true);
       setSubmissionPhase("running");
       setOutput(null);
-    } else {
-      const currentAnswer = answers[currentQ.id];
-      if (!currentAnswer) {
-        toast({ title: "Warning", description: "Please select an answer", variant: "destructive" });
-        return;
+
+      try {
+        const submissionId = await testService.submitCode({
+          sessionId: sessionId,
+          questionId: currentQ.id,
+          language: LANGUAGE_MAP[language]?.slug || "python3",
+          sourceCode: code,
+        });
+
+        // Polling for results
+        let gradingResult = null;
+        for (let i = 0; i < 30; i++) { // 60 seconds max
+          await new Promise(resolve => setTimeout(resolve, 2000));
+          try {
+            const res = await testService.getCodeResult(submissionId);
+            if (res.status !== "PENDING" && res.status !== "PROCESSING") {
+              gradingResult = res;
+              break;
+            }
+          } catch (e) {
+            // Ignore polling errors
+          }
+        }
+
+        if (gradingResult) {
+          setAnswers({ ...answers, [currentQ.id]: { code: code, language: language, result: gradingResult } });
+          toast({ title: "Success", description: `Solution submitted! ${gradingResult.testCasesPassed}/${gradingResult.testCasesTotal} passed.` });
+          setSubmissionPhase("result");
+          
+          if (gradingResult.status === "ACCEPTED") {
+            setOutput({ type: 'success', message: "✓ All test cases passed!" });
+          } else {
+            setOutput({ type: 'error', message: `✗ ${gradingResult.status}: ${gradingResult.testCasesPassed}/${gradingResult.testCasesTotal} passed` });
+          }
+        } else {
+          throw new Error("Grading timed out. Please try again.");
+        }
+      } catch (error: any) {
+        console.error("Submit error:", error);
+        const msg = error.response?.data?.message || error.message || "Failed to submit solution";
+        toast({ title: "Error", description: msg, variant: "destructive" });
+        setOutput({ type: 'error', message: msg });
+      } finally {
+        setIsSubmittingCode(false);
       }
-      answerText = typeof currentAnswer === 'string' ? currentAnswer : JSON.stringify(currentAnswer);
-      setIsSubmittingCode(true);
+      return;
     }
 
+    // MCQ submission
+    const currentAnswer = answers[currentQ.id];
+    if (!currentAnswer) {
+      toast({ title: "Warning", description: "Please select an answer", variant: "destructive" });
+      return;
+    }
+    
+    setIsSubmittingCode(true);
     try {
-      const payload = {
+      const answerText = typeof currentAnswer === 'string' ? currentAnswer : JSON.stringify(currentAnswer);
+      await apiClient.post("/submissions", {
         sessionId: sessionId,
         questionId: currentQ.id,
         answerText: answerText
-      };
-      
-      console.log("Submitting to backend:", payload);
-      
-      const response = await apiClient.post("/submissions", payload);
-      const result = response.data?.data || response.data;
-      
-      if (currentQ.type === "CODING") {
-        setAnswers({ ...answers, [currentQ.id]: { code: code, language: language, result: result } });
-        toast({ title: "Success", description: "Solution submitted successfully" });
-        setSubmissionPhase("result");
-      } else {
-        toast({ title: "Saved", description: "Answer saved successfully" });
-      }
-      
+      });
+      toast({ title: "Saved", description: "Answer saved successfully" });
     } catch (error: any) {
       console.error("Submit error:", error);
       toast({
@@ -474,12 +502,6 @@ useEffect(() => {
         description: error.response?.data?.message || "Failed to submit answer",
         variant: "destructive",
       });
-      if (currentQ.type === "CODING") {
-        setOutput({ 
-          type: 'error', 
-          message: error.response?.data?.message || "Failed to submit solution. Please try again."
-        });
-      }
     } finally {
       setIsSubmittingCode(false);
     }
