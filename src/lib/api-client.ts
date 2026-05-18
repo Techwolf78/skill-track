@@ -36,6 +36,26 @@ apiClient.interceptors.response.use(
       // window.location.href = "/login";
     }
 
+    // Enhance the error object with standard BaseResponse error details
+    if (error.response?.data && typeof error.response.data === "object") {
+      const data = error.response.data as any;
+
+      // Extract field validation errors
+      if (data.errors && typeof data.errors === "object") {
+        const errorEntries = Object.entries(data.errors);
+        if (errorEntries.length > 0) {
+          const validationMsg = errorEntries
+            .map(([field, msg]) => `${field}: ${msg}`)
+            .join("\n");
+          const fullMessage = `${data.message || "Validation failed"}:\n${validationMsg}`;
+          error.message = fullMessage;
+          data.message = fullMessage; // For components using error.response?.data?.message
+        }
+      } else if (data.message) {
+        error.message = data.message;
+      }
+    }
+
     return Promise.reject(error);
   },
 );

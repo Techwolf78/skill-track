@@ -1,6 +1,6 @@
 # RxOne API Documentation
 
-This document reflects the current controllers, DTOs, security rules, Jackson configuration, and Judge0-backed coding flow in the codebase as of 2026-05-13.
+This document reflects the current controllers, DTOs, security rules, Jackson configuration, exception/response refactoring, Bean Validation, and Judge0-backed coding flow in the codebase as of 2026-05-18.
 
 ## Base URL
 
@@ -17,6 +17,11 @@ This document reflects the current controllers, DTOs, security rules, Jackson co
 - Every other route requires `Authorization: Bearer <jwt>`
 - Method-level role checks are enforced with `@PreAuthorize(...)`
 
+**Error Handling:**
+- Missing or invalid JWT → **401 Unauthorized** with `errorCode: "UNAUTHORIZED"`
+- Valid JWT but insufficient role → **403 Forbidden** with `errorCode: "ACCESS_DENIED"`
+- Expired JWT → **401 Unauthorized** with `errorCode: "UNAUTHORIZED"`
+
 Example header:
 
 ```http
@@ -25,20 +30,242 @@ Authorization: Bearer <jwt-token>
 
 ## Response Conventions
 
-Most routes return `BaseResponse<T>`:
+All endpoints return the standardized `BaseResponse<T>` wrapper:
 
 ```json
 {
   "success": true,
+  "status": 200,
   "message": "Request completed successfully",
   "data": {},
   "errorCode": null,
   "errors": null,
-  "timestamp": "2026-05-11T10:00:00Z"
+  "timestamp": "2026-05-18T10:00:00Z",
+  "path": "/api/endpoint"
 }
 ```
 
-All endpoints consistently return `BaseResponse<T>`. No exceptions in the current implementation.
+### BaseResponse Structure
+
+| Field | Type | Description |
+|---|---|---|
+| `success` | boolean | `true` for successful responses; `false` for errors |
+| `status` | int | HTTP status code (200, 400, 401, 403, 404, 409, 500, etc.) |
+| `message` | string | Human-readable message describing the response |
+| `data` | T | Response payload (null for errors or no-data responses) |
+| `errorCode` | string | Machine-readable error identifier (e.g., `"RESOURCE_NOT_FOUND"`) |
+| `errors` | object | Validation field map for 400 errors; otherwise null |
+| `timestamp` | string | ISO-8601 timestamp when the response was generated |
+| `path` | string | The request URI path |
+
+### Success Response Example
+
+```json
+{
+  "success": true,
+  "status": 200,
+  "message": "User retrieved successfully",
+  "data": {
+    "id": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+    "email": "user@example.com",
+    "name": "John Doe"
+  },
+  "errorCode": null,
+  "errors": null,
+  "timestamp": "2026-05-18T10:15:30Z",
+  "path": "/api/users/xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+}
+```
+
+## Error Handling and HTTP Status Codes
+
+The application implements centralized exception handling through `GlobalExceptionHandler` (a Spring `@RestControllerAdvice`). All errors are returned in the `BaseResponse<T>` format with appropriate HTTP status codes.
+
+### Supported HTTP Status Codes
+
+| Status | Code | Description | Error Code |
+|---|---|---|---|
+| 400 | Bad Request | Invalid request data, validation failures, or malformed input | `BAD_REQUEST`, `VALIDATION_ERROR` |
+| 401 | Unauthorized | Missing, invalid, or expired JWT; authentication failed | `UNAUTHORIZED` |
+| 403 | Forbidden | Valid authentication but insufficient permissions (role-based access control failure) | `ACCESS_DENIED` |
+| 404 | Not Found | Resource does not exist | `RESOURCE_NOT_FOUND` |
+| 409 | Conflict | Business logic violation (e.g., duplicate record, state conflict) | `CONFLICT` |
+| 500 | Internal Server Error | Unexpected server error, external service failures (e.g., Judge0, database) | `INTERNAL_SERVER_ERROR` |
+
+### Custom Exceptions
+
+The application provides reusable custom exceptions for consistent error handling:
+
+#### ResourceNotFoundException
+Thrown when a requested resource (user, question, test, etc.) does not exist.
+
+```java
+throw new ResourceNotFoundException("Question with id xxxxxxxx not found");
+```
+
+Returns: **404 Not Found** with `errorCode: "RESOURCE_NOT_FOUND"`
+
+#### BadRequestException
+Thrown for invalid input, malformed requests, or business rule violations.
+
+```java
+throw new BadRequestException("Invalid question type");
+```
+
+Returns: **400 Bad Request** with `errorCode: "BAD_REQUEST"`
+
+#### UnauthorizedException
+Thrown when authentication is missing or invalid in application logic.
+
+```java
+throw new UnauthorizedException("Invalid or expired token");
+```
+
+Returns: **401 Unauthorized** with `errorCode: "UNAUTHORIZED"`
+
+#### ConflictException
+Thrown for business logic conflicts (e.g., duplicate records, state conflicts).
+
+```java
+throw new ConflictException("A user with this email already exists");
+```
+
+Returns: **409 Conflict** with `errorCode: "CONFLICT"`
+
+### Error Response Examples
+
+#### 404 Not Found
+
+```json
+{
+  "success": false,
+  "status": 404,
+  "message": "Question with id 99999999-9999-9999-9999-999999999999 not found",
+  "data": null,
+  "errorCode": "RESOURCE_NOT_FOUND",
+  "errors": null,
+  "timestamp": "2026-05-18T10:20:45Z",
+  "path": "/api/questions/99999999-9999-9999-9999-999999999999"
+}
+```
+
+#### 400 Bad Request (Validation Failure)
+
+```json
+{
+  "success": false,
+  "status": 400,
+  "message": "Validation failed",
+  "data": null,
+  "errorCode": "VALIDATION_ERROR",
+  "errors": {
+    "email": "must be a valid email address",
+    "name": "must not be empty",
+    "phoneNumber": "must match pattern"
+  },
+  "timestamp": "2026-05-18T10:21:00Z",
+  "path": "/api/users"
+}
+```
+
+#### 401 Unauthorized (Missing/Invalid JWT)
+
+```json
+{
+  "success": false,
+  "status": 401,
+  "message": "Authentication required",
+  "data": null,
+  "errorCode": "UNAUTHORIZED",
+  "errors": null,
+  "timestamp": "2026-05-18T10:22:15Z",
+  "path": "/api/users"
+}
+```
+
+#### 403 Forbidden (Insufficient Permissions)
+
+```json
+{
+  "success": false,
+  "status": 403,
+  "message": "Access denied",
+  "data": null,
+  "errorCode": "ACCESS_DENIED",
+  "errors": null,
+  "timestamp": "2026-05-18T10:23:00Z",
+  "path": "/api/admin/users"
+}
+```
+
+#### 409 Conflict (Business Logic Violation)
+
+```json
+{
+  "success": false,
+  "status": 409,
+  "message": "A user with email test@example.com already exists",
+  "data": null,
+  "errorCode": "CONFLICT",
+  "errors": null,
+  "timestamp": "2026-05-18T10:24:30Z",
+  "path": "/api/users"
+}
+```
+
+#### 500 Internal Server Error
+
+```json
+{
+  "success": false,
+  "status": 500,
+  "message": "Internal server error",
+  "data": null,
+  "errorCode": "INTERNAL_SERVER_ERROR",
+  "errors": null,
+  "timestamp": "2026-05-18T10:25:45Z",
+  "path": "/api/code/execute/submit"
+}
+```
+
+### Spring Security Error Handling
+
+- **Invalid or Missing JWT**: Intercepted by `CustomAuthenticationEntryPoint` → **401 Unauthorized**
+- **Role-Based Access Control Failures** (`@PreAuthorize` violations): Intercepted by `CustomAccessDeniedHandler` → **403 Forbidden**
+- **JWT Processing Errors** (invalid signature, expired, malformed): Handled by `JwtAuthenticationFilter` → **401 Unauthorized**
+
+### Bean Validation
+
+The application uses **Jakarta Bean Validation** with Hibernate Validator. Add `@NotNull`, `@NotEmpty`, `@Email`, `@Pattern`, etc. to request DTOs:
+
+```java
+public class CreateUserRequest {
+    @NotNull(message = "name is required")
+    private String name;
+
+    @Email(message = "must be a valid email address")
+    private String email;
+
+    @Pattern(regexp = "^\\d{10}$", message = "must be 10 digits")
+    private String phoneNumber;
+}
+```
+
+Validation failures return **400 Bad Request** with a field-level `errors` map.
+
+## Build and Dependencies
+
+### Key Dependencies
+
+- **Spring Boot 4.0.6** with Spring Security
+- **JWT** (jjwt-api, jjwt-impl, jjwt-jackson) for token-based authentication
+- **Jakarta Bean Validation API** with **spring-boot-starter-validation** for declarative input validation
+- **PostgreSQL** for data persistence
+- **Flyway** for database migrations
+- **Apache POI** for file uploads (Excel support)
+- **Judge0 CE API** for remote code execution (via RestClient)
+
+The `spring-boot-starter-validation` dependency provides Hibernate Validator, enabling bean validation annotations in request DTOs.
 
 ## Serialization Configuration
 
@@ -240,8 +467,48 @@ There is currently no `DELETE /tests/{id}` route in the controller.
 
 | Method | Path | Auth | Notes |
 |---|---|---|---|
-| POST | `/submissions` | JWT | Creates submission for a session/question pair |
+| POST | `/submissions` | JWT | Creates submission for a session/question pair. MCQ submissions are auto-graded immediately; coding submissions remain PENDING for async grading. |
 | GET | `/submissions/{id}` | JWT | Fetch one submission. |
+
+#### Submission Behavior by Question Type
+
+**MCQ Submissions:**
+- `selectedOptionIds` (List of UUID) **REQUIRED** - the list of selected MCQ option IDs
+- Auto-graded and immediately marked as `status: "GRADED"`
+- Score calculated based on:
+  - **Single-Select MCQ**: Correct if exactly one option is selected and matches the correct option
+  - **Multiple-Select MCQ**: Correct if all selected options exactly match all correct options
+- Score is either full marks (if correct) or 0 (if incorrect)
+
+**Coding Submissions:**
+- `answerText` **REQUIRED** - the source code
+- Status set to `"PENDING"` for async grading
+- Client must poll `/api/code/execute/submit/{submissionId}/result` for results
+
+#### Submission Request DTO
+
+```java
+{
+  "sessionId": "UUID",           // UUID of the test session
+  "questionId": "UUID",           // UUID of the question
+  "answerText": "string",         // Required for CODING questions; ignored for MCQ
+  "selectedOptionIds": []         // Required for MCQ questions; List<UUID> of selected option IDs
+}
+```
+
+#### Submission Response DTO
+
+```java
+{
+  "id": "UUID",                   // Unique submission identifier
+  "sessionId": "UUID",            // Associated test session
+  "questionId": "UUID",           // Associated question
+  "answerText": "string",         // The submitted answer (JSON for MCQ, code for CODING)
+  "submittedAt": "LocalDateTime", // ISO-8601 timestamp of submission
+  "questionType": "MCQ|CODING",   // Type of question
+  "status": "PENDING|GRADED"      // PENDING (coding, awaiting Judge0 grading) or GRADED (MCQ auto-graded)
+}
+```
 
 
 ### Test Cases
@@ -330,19 +597,31 @@ POST /questions
   "mcqOptions": [
     {
       "text": "3",
-      "isCorrect": false
+      "isCorrect": false,
+      "imageUrl": null,
+      "displayOrder": 1
     },
     {
       "text": "4",
-      "isCorrect": true
+      "isCorrect": true,
+      "imageUrl": null,
+      "displayOrder": 2
     },
     {
       "text": "5",
-      "isCorrect": false
+      "isCorrect": false,
+      "imageUrl": null,
+      "displayOrder": 3
     }
   ]
 }
 ```
+
+**MCQ Option Fields:**
+- `text` (string): The option text/label
+- `isCorrect` (boolean): Whether this is a correct answer
+- `imageUrl` (string, optional): URL to an image for visual options
+- `displayOrder` (integer): Order in which the option is displayed
 
 ### 2. Add Test Cases for the Coding Question
 
@@ -384,15 +663,116 @@ PUT /questions/44444444-4444-4444-4444-444444444444
   "mcqOptions": [
     {
       "text": "4",
-      "isCorrect": false
+      "isCorrect": false,
+      "imageUrl": null,
+      "displayOrder": 1
     },
     {
       "text": "5",
-      "isCorrect": true
+      "isCorrect": true,
+      "imageUrl": null,
+      "displayOrder": 2
     }
   ]
 }
 ```
+
+### 3. MCQ Submission (Auto-Graded)
+
+For multiple-choice questions, send the selected option IDs. The submission is auto-graded immediately.
+
+```http
+POST /submissions
+```
+
+**Request (Single-Select MCQ):**
+```json
+{
+  "sessionId": "88888888-8888-8888-8888-888888888888",
+  "questionId": "44444444-4444-4444-4444-444444444444",
+  "selectedOptionIds": [
+    "55555555-5555-5555-5555-555555555555"
+  ]
+}
+```
+
+**Request (Multiple-Select MCQ):**
+```json
+{
+  "sessionId": "88888888-8888-8888-8888-888888888888",
+  "questionId": "44444444-4444-4444-4444-444444444444",
+  "selectedOptionIds": [
+    "55555555-5555-5555-5555-555555555555",
+    "66666666-6666-6666-6666-666666666666"
+  ]
+}
+```
+
+**Response (Immediately GRADED):**
+```json
+{
+  "success": true,
+  "status": 201,
+  "message": "Request completed successfully",
+  "data": {
+    "id": "99999999-9999-9999-9999-999999999999",
+    "sessionId": "88888888-8888-8888-8888-888888888888",
+    "questionId": "44444444-4444-4444-4444-444444444444",
+    "answerText": "[\"55555555-5555-5555-5555-555555555555\"]",
+    "submittedAt": "2026-05-18T10:35:00Z",
+    "questionType": "MCQ",
+    "status": "GRADED"
+  },
+  "errorCode": null,
+  "errors": null,
+  "timestamp": "2026-05-18T10:35:00Z",
+  "path": "/api/submissions"
+}
+```
+
+### 3.5. Coding Submission (Async Grading)
+
+For coding questions, send the source code. A `Submission` is created with status `PENDING`, and grading happens asynchronously.
+
+```http
+POST /submissions
+```
+
+```json
+{
+  "sessionId": "88888888-8888-8888-8888-888888888888",
+  "questionId": "44444444-4444-4444-4444-444444444444",
+  "answerText": "public class Main { public static void main(String[] args) throws Exception { java.util.Scanner sc = new java.util.Scanner(System.in); int a = sc.nextInt(); int b = sc.nextInt(); System.out.println(a + b); } }"
+}
+```
+
+**Response (PENDING - Async Grading):**
+```json
+{
+  "success": true,
+  "status": 201,
+  "message": "Request completed successfully",
+  "data": {
+    "id": "99999999-9999-9999-9999-999999999999",
+    "sessionId": "88888888-8888-8888-8888-888888888888",
+    "questionId": "44444444-4444-4444-4444-444444444444",
+    "answerText": "public class Main { ... }",
+    "submittedAt": "2026-05-18T10:36:00Z",
+    "questionType": "CODING",
+    "status": "PENDING"
+  },
+  "errorCode": null,
+  "errors": null,
+  "timestamp": "2026-05-18T10:36:00Z",
+  "path": "/api/submissions"
+}
+```
+
+**What happens next:**
+1. Backend asynchronously executes the code against ALL test cases for the question
+2. Results are aggregated and stored in `coding_submission_result`
+3. Submission status updates to `GRADED` upon completion
+4. Client polls `/api/code/execute/submit/{submissionId}/result` for the final result
 
 ### 4. Run Code (Sample Test Cases Only)
 
@@ -503,10 +883,38 @@ Response:
 }
 ```
 
+## Submission Endpoints Clarification
+
+The RxOne API provides two different submission flows for test sessions and code execution:
+
+### Test Session Submission Flow
+**Endpoint:** `POST /submissions` (in Route Inventory → Submissions)
+
+Used when candidates are taking a test with a defined session:
+- **MCQ Questions**: Auto-graded immediately, returns `status: "GRADED"` with scores calculated
+- **Coding Questions**: Marked as `status: "PENDING"`, requires polling `/api/code/execute/submit/{submissionId}/result` for async results
+- Links submission to a test session and tracks all answers taken during the test
+- Integrates with QuestionScore tracking for overall test performance
+
+### Granular Code Execution Flow
+**Endpoints:** `POST /api/code/execute/run` and `POST /api/code/execute/submit` (in Route Inventory → Code Execution)
+
+Used for direct code execution without a test session context:
+- `/run`: Quick feedback on sample test cases only, ephemeral (no Submission created)
+- `/submit`: Full grading on all test cases, creates a Submission, async results via polling
+
+**When to use each:**
+- **During Tests**: Use `/submissions` endpoint with sessionId
+- **Playground/Practice**: Use `/api/code/execute/playground` endpoint
+- **Direct Grading**: Use `/api/code/execute/submit` endpoint
+
 ## Current Limitations and Quirks
 
 - `/run` is ephemeral and only intended for candidates to test their code.
 - `/submit` is asynchronous to prevent long-running HTTP connections.
+- **MCQ Auto-Grading**: MCQ submissions via `/submissions` endpoint are immediately graded and return `status: "GRADED"`. Scoring is all-or-nothing (full marks if all selected options match correct options, zero if any mismatch).
+- **Coding Async Grading**: Coding submissions via `/submissions` endpoint return `status: "PENDING"` and require polling for results. Score is calculated proportionally based on passed test cases.
+- **Answer Format**: For MCQ submissions, `answerText` is JSON-serialized as an array of option UUIDs: `["uuid1", "uuid2"]`. For coding submissions, `answerText` contains the source code.
 - Status mapping from Judge0 is now more granular:
   - `3` -> `ACCEPTED`
   - `4` -> `WRONG_ANSWER`
