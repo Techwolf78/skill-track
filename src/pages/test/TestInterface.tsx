@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -19,14 +19,19 @@ import { cn } from "@/lib/utils";
 import { useNavigate, useParams } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import {
-  Clock, ChevronLeft, ChevronRight, Flag, Send, 
+  Clock, ChevronLeft, ChevronRight, Flag, Send,
   AlertTriangle, CheckCircle, Play, Terminal, XCircle,
-  Loader2, Save, FileText, Code2, Database, Lightbulb
+  Loader2, Save, FileText, Code2, Database, Lightbulb, Monitor
 } from "lucide-react";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import Editor from "@monaco-editor/react";
 import { apiClient } from "@/lib/api-client";
-import { testService, CodeTemplateEntry } from "@/lib/test-service";
+import { testService, CodeTemplateEntry, TestCaseResult } from "@/lib/test-service";
+import { ProctoringProvider, useProctoring } from "@/proctoring/ProctoringProvider";
+import { CameraPreview } from "@/proctoring/components/CameraPreview";
+import { ViolationToast } from "@/proctoring/components/ViolationToast";
+import { EnvironmentCheck } from "@/proctoring/components/EnvironmentCheck";
+import { Shield, ShieldAlert, ShieldCheck as ShieldCheckIcon } from "lucide-react";
 
 // Types
 interface Question {
@@ -57,7 +62,7 @@ interface TestSession {
   startedAt: string;
   endedAt?: string;
   remainingTimeSecs: number;
-  answers?: Record<string, any>;
+  answers?: Record<string, unknown>;
 }
 
 interface TestDetails {
@@ -113,13 +118,23 @@ export default function TestInterface() {
   const navigate = useNavigate();
   const { toast } = useToast();
 
+  return (
+    <ProctoringProvider sessionId={sessionId || "demo-session"}>
+      <TestInterfaceContent testId={testId} sessionId={sessionId} navigate={navigate} toast={toast} />
+    </ProctoringProvider>
+  );
+}
+
+function TestInterfaceContent({ testId, sessionId, navigate, toast }: { testId?: string; sessionId?: string; navigate: (path: string) => void; toast: (props: { title?: string; description?: string; variant?: "default" | "destructive" }) => void }) {
+  const { trustScore, isProctoringActive, startProctoring } = useProctoring();
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [test, setTest] = useState<TestDetails | null>(null);
   const [session, setSession] = useState<TestSession | null>(null);
   const [questions, setQuestions] = useState<Question[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [answers, setAnswers] = useState<Record<string, any>>({});
+  const [answers, setAnswers] = useState<Record<string, unknown>>({});
   const [flagged, setFlagged] = useState<Set<string>>(new Set());
   const [timeLeft, setTimeLeft] = useState(0);
   const [showSubmitDialog, setShowSubmitDialog] = useState(false);
@@ -131,32 +146,38 @@ export default function TestInterface() {
   const [isRunning, setIsRunning] = useState(false);
   const [isSubmittingCode, setIsSubmittingCode] = useState(false);
   const [output, setOutput] = useState<{ type: 'success' | 'error', message: string } | null>(null);
-  const [testCaseResults, setTestCaseResults] = useState<any[]>([]);
+  const [testCaseResults, setTestCaseResults] = useState<Record<string, unknown>[]>([]);
   const [submissionPhase, setSubmissionPhase] = useState<"idle" | "running" | "result">("idle");
 
-  useEffect(() => {
-    if (sessionId) {
-      fetchTestSession();
-    } else if (testId) {
-      fetchTestDirect();
-    }
-  }, [sessionId, testId]);
+  // Fullscreen enforcement
+  const [isFullscreen, setIsFullscreen] = useState(true);
+  const [fullscreenTimer, setFullscreenTimer] = useState(10);
 
-  const fetchTestDirect = async () => {
+
+  const enterFullscreen = () => {
+    document.documentElement.requestFullscreen().catch(err => {
+      console.error("Fullscreen error:", err);
+    });
+  };
+
+
+
+  const fetchTestDirect = useCallback(async () => {
     try {
       setLoading(true);
       const testResponse = await apiClient.get(`/tests/${testId}`);
       const testData = testResponse.data?.data || testResponse.data;
       setTest(testData);
-    } catch (error: any) {
-      console.error("Failed to fetch test:", error);
-      setError(error.response?.data?.message || "Failed to load test");
+    } catch (error: unknown) {
+      const err = error as { response?: { data?: { message?: string } } };
+      console.error("Failed to fetch test:", err);
+      setError(err.response?.data?.message || "Failed to load test");
     } finally {
       setLoading(false);
     }
-  };
+  }, [testId]);
 
-const fetchTestSession = async () => {
+  const fetchTestSession = useCallback(async () => {
   try {
     setLoading(true);
     setError(null);
@@ -171,7 +192,7 @@ const fetchTestSession = async () => {
     console.log("🚀 STEP 3: Fetching test with ID:", sessionData.testId);
     
     const testResponse = await apiClient.get(`/tests/${sessionData.testId}`);
-    let testData = testResponse.data?.data || testResponse.data;
+    const testData = testResponse.data?.data || testResponse.data;
     console.log("✅ STEP 4: Raw Test Data:", testData);
     
     console.log("📋 STEP 5: Test questions array:", testData.questions);
@@ -185,14 +206,14 @@ const fetchTestSession = async () => {
     
     // Fetch question details if not populated
     if (testData.questions && testData.questions.length > 0) {
-      const hasQuestionDetails = testData.questions.some((tq: any) => tq.question?.prompt);
+      const hasQuestionDetails = testData.questions.some((tq: { question?: { prompt?: string } }) => tq.question?.prompt);
       console.log("🔍 STEP 6: Questions already have details?", hasQuestionDetails);
       
       if (!hasQuestionDetails) {
         console.log("🚀 STEP 7: Fetching individual question details for", testData.questions.length, "questions");
         
         const questionsWithDetails = await Promise.all(
-          testData.questions.map(async (tq: any, idx: number) => {
+          testData.questions.map(async (tq: { questionId: string }, idx: number) => {
             console.log(`  📥 Fetching question ${idx + 1}: ${tq.questionId}`);
             try {
               const questionData = await testService.getQuestionById(tq.questionId);
@@ -218,13 +239,25 @@ const fetchTestSession = async () => {
     setTest(testData);
     console.log("🎯 FINAL: Test state updated:", testData);
     
-  } catch (error: any) {
-    console.error("❌ FATAL: Failed to fetch test session:", error);
-    setError(error.response?.data?.message || "Failed to load test");
+    // Auto-start proctoring as checks were done in gateway
+    startProctoring();
+    
+  } catch (error: unknown) {
+    const err = error as { response?: { data?: { message?: string } } };
+    console.error("❌ FATAL: Failed to fetch test session:", err);
+    setError(err.response?.data?.message || "Failed to load test");
   } finally {
     setLoading(false);
   }
-};
+  }, [sessionId, testId]);
+
+  useEffect(() => {
+    if (sessionId) {
+      fetchTestSession();
+    } else if (testId) {
+      fetchTestDirect();
+    }
+  }, [sessionId, testId, fetchTestSession, fetchTestDirect]);
 
   // Process questions when test data is loaded
 // Update this useEffect in TestInterface.tsx
@@ -252,7 +285,7 @@ useEffect(() => {
           type: tq.question?.questionType || tq.question?.type || "MCQ",
           prompt: tq.question?.prompt || "No prompt",
           marks: tq.marks,
-          options: tq.question?.mcqOptions?.map((opt: any) => opt.text),
+          options: tq.question?.mcqOptions?.map((opt: { text: string }) => opt.text),
           problemStatement: tq.question?.prompt,
           sampleInput: tq.question?.sampleInput,
           sampleOutput: tq.question?.sampleOutput,
@@ -308,32 +341,9 @@ useEffect(() => {
   }, [session, test]);
 
   // Timer effect
-  useEffect(() => {
-    if (timeLeft <= 0 || !sessionId) return;
-    
-    const timer = setInterval(() => {
-      setTimeLeft(prev => {
-        if (prev <= 1) {
-          clearInterval(timer);
-          handleAutoSubmit();
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-    
-    return () => clearInterval(timer);
-  }, [timeLeft, sessionId]);
 
-  const handleAutoSubmit = async () => {
-    toast({
-      title: "Time's Up!",
-      description: "Your test has been automatically submitted.",
-    });
-    await submitTest();
-  };
 
-  const submitTest = async () => {
+  const submitTest = useCallback(async () => {
     if (!sessionId) {
       navigate(`/test/${testId}/results`);
       return;
@@ -357,20 +367,82 @@ useEffect(() => {
 
       toast({ title: "Success", description: "Test submitted successfully" });
       navigate(`/test/${testId}/results?session=${sessionId}`);
-    } catch (error: any) {
-      console.error("Failed to submit test:", error);
+    } catch (error: unknown) {
+      const err = error as { response?: { data?: { message?: string } } };
+      console.error("Failed to submit test:", err);
       toast({
         title: "Error",
-        description: error.response?.data?.message || "Failed to submit test",
+        description: err.response?.data?.message || "Failed to submit test",
         variant: "destructive",
       });
     } finally {
       setSubmitting(false);
       setShowSubmitDialog(false);
     }
-  };
+  }, [sessionId, answers, session, testId, navigate, toast]);
 
-  const handleRunCode = async () => {
+  const handleAutoSubmit = useCallback(async () => {
+    toast({
+      title: "Time's Up!",
+      description: "Your test has been automatically submitted.",
+    });
+    await submitTest();
+  }, [toast, submitTest]);
+
+  // Fullscreen enforcement effects
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+    document.addEventListener("fullscreenchange", handleFullscreenChange);
+    return () => document.removeEventListener("fullscreenchange", handleFullscreenChange);
+  }, []);
+
+  useEffect(() => {
+    let timer: NodeJS.Timeout;
+    if (isProctoringActive && !isFullscreen) {
+      if (fullscreenTimer === 10) {
+        toast({
+          title: "Fullscreen Required",
+          description: "Please return to fullscreen mode immediately.",
+          variant: "destructive"
+        });
+      }
+      timer = setInterval(() => {
+        setFullscreenTimer(prev => {
+          if (prev <= 1) {
+            clearInterval(timer);
+            handleAutoSubmit(); // Auto-submit if timer hits 0
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    } else {
+      setFullscreenTimer(10);
+    }
+    return () => clearInterval(timer);
+  }, [isProctoringActive, isFullscreen, toast, handleAutoSubmit, fullscreenTimer]);
+
+  // Timer effect
+  useEffect(() => {
+    if (timeLeft <= 0 || !sessionId) return;
+    
+    const timer = setInterval(() => {
+      setTimeLeft(prev => {
+        if (prev <= 1) {
+          clearInterval(timer);
+          handleAutoSubmit();
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    
+    return () => clearInterval(timer);
+  }, [timeLeft, sessionId, handleAutoSubmit]);
+
+  const handleRunCode = useCallback(async () => {
     if (questions.length === 0) return;
     const currentQ = questions[currentIndex];
     if (!currentQ || currentQ.type !== "CODING") return;
@@ -388,13 +460,13 @@ useEffect(() => {
         sourceCode: code,
       });
       
-      const mappedTestCases = resultsArray.map((tc: any) => ({
+      const mappedTestCases = resultsArray.map((tc: TestCaseResult) => ({
         passed: tc.status === "ACCEPTED",
         ...tc
       }));
 
       setTestCaseResults(mappedTestCases);
-      const passedCount = mappedTestCases.filter((tc: any) => tc.passed).length;
+      const passedCount = mappedTestCases.filter((tc: { passed: boolean }) => tc.passed).length;
       
       if (mappedTestCases.length > 0) {
         if (passedCount === mappedTestCases.length) {
@@ -406,18 +478,19 @@ useEffect(() => {
          setOutput({ type: 'error', message: "No test cases returned." });
       }
       setSubmissionPhase("result");
-    } catch (error: any) {
-      console.error("Run code error:", error);
+    } catch (error: unknown) {
+      const err = error as { response?: { data?: { message?: string } } };
+      console.error("Run code error:", err);
       setOutput({ 
         type: 'error', 
-        message: error.response?.data?.message || "Failed to execute code. Please try again."
+        message: err.response?.data?.message || "Failed to execute code. Please try again."
       });
     } finally {
       setIsRunning(false);
     }
-  };
+  }, [questions, currentIndex, sessionId, language, code]);
 
-  const handleSubmitQuestion = async () => {
+  const handleSubmitQuestion = useCallback(async () => {
     if (questions.length === 0) return;
     const currentQ = questions[currentIndex];
     if (!currentQ) return;
@@ -468,9 +541,10 @@ useEffect(() => {
         } else {
           throw new Error("Grading timed out. Please try again.");
         }
-      } catch (error: any) {
-        console.error("Submit error:", error);
-        const msg = error.response?.data?.message || error.message || "Failed to submit solution";
+      } catch (error: unknown) {
+        const err = error as { response?: { data?: { message?: string } }; message?: string };
+        console.error("Submit error:", err);
+        const msg = err.response?.data?.message || err.message || "Failed to submit solution";
         toast({ title: "Error", description: msg, variant: "destructive" });
         setOutput({ type: 'error', message: msg });
       } finally {
@@ -495,17 +569,18 @@ useEffect(() => {
         answerText: answerText
       });
       toast({ title: "Saved", description: "Answer saved successfully" });
-    } catch (error: any) {
-      console.error("Submit error:", error);
+    } catch (error: unknown) {
+      const err = error as { response?: { data?: { message?: string } } };
+      console.error("Submit error:", err);
       toast({
         title: "Error",
-        description: error.response?.data?.message || "Failed to submit answer",
+        description: err.response?.data?.message || "Failed to submit answer",
         variant: "destructive",
       });
     } finally {
       setIsSubmittingCode(false);
     }
-  };
+  }, [questions, currentIndex, sessionId, language, code, answers, toast]);
 
   const formatTime = (seconds: number) => {
     const hours = Math.floor(seconds / 3600);
@@ -603,9 +678,39 @@ useEffect(() => {
   }
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
-      {/* Header */}
-      <header className="sticky top-0 z-40 border-b bg-card/90 backdrop-blur px-6 py-4 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+    <div className="min-h-screen bg-background flex flex-col relative">
+      {/* Fullscreen Enforcement Overlay */}
+      {!isFullscreen && isProctoringActive && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-md">
+          <div className="bg-background p-8 rounded-xl border-2 border-destructive shadow-2xl text-center max-w-md animate-in zoom-in duration-300">
+            <div className="mx-auto mb-6 w-20 h-20 rounded-full bg-destructive/10 flex items-center justify-center animate-pulse">
+              <Monitor className="w-10 h-10 text-destructive" />
+            </div>
+            <h2 className="text-2xl font-bold mb-2">FULLSCREEN EXITED</h2>
+            <p className="text-muted-foreground mb-6 text-sm">
+              You must be in fullscreen mode to continue the test. The test will be auto-submitted in:
+            </p>
+            <div className="text-6xl font-black text-destructive mb-8 tabular-nums">
+              {fullscreenTimer}s
+            </div>
+            <Button 
+              size="lg" 
+              variant="destructive" 
+              className="w-full h-14 text-xl font-bold shadow-lg hover:shadow-destructive/20 transition-all hover:scale-105"
+              onClick={enterFullscreen}
+            >
+              Go Fullscreen Now
+            </Button>
+          </div>
+        </div>
+      )}
+
+      <div className={cn(
+        "flex-1 flex flex-col overflow-hidden",
+        !isFullscreen && isProctoringActive && "blur-md pointer-events-none"
+      )}>
+        {/* Header */}
+        <header className="sticky top-0 z-40 border-b bg-card/90 backdrop-blur px-6 py-4 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
           <h1 className="text-xl font-semibold">{test?.title || "Test"}</h1>
           <p className="text-xs text-muted-foreground">{test?.description}</p>
@@ -618,6 +723,19 @@ useEffect(() => {
             <Clock className="w-4 h-4 inline mr-2" />
             {formatTime(timeLeft)}
           </div>
+          
+          <div className={cn(
+            "flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-bold transition-all",
+            trustScore > 80 ? "bg-green-500/10 text-green-600 border border-green-500/20" :
+            trustScore > 50 ? "bg-yellow-500/10 text-yellow-600 border border-yellow-500/20" :
+            "bg-red-500/10 text-red-600 border border-red-500/20 animate-pulse"
+          )}>
+            {trustScore > 80 ? <ShieldCheckIcon className="w-4 h-4" /> : 
+             trustScore > 50 ? <Shield className="w-4 h-4" /> : 
+             <ShieldAlert className="w-4 h-4" />}
+            <span className="hidden sm:inline">Trust Score:</span> {trustScore}%
+          </div>
+
           <div className="text-sm text-muted-foreground">
             Q{currentIndex + 1}/{questions.length}
           </div>
@@ -698,7 +816,7 @@ useEffect(() => {
                   {currentQuestion.type === "MCQ" && currentQuestion.options && (
                     <div className="space-y-4">
                       <RadioGroup
-                        value={answers[currentQuestion.id] || ""}
+                        value={(answers[currentQuestion.id] as string) || ""}
                         onValueChange={(value) => setAnswers({ ...answers, [currentQuestion.id]: value })}
                         className="space-y-2 pt-2"
                       >
@@ -763,7 +881,7 @@ useEffect(() => {
                           </div>
                         )}
 
-                        {((test as any)?.examples || currentQuestion.sampleInput) && (
+                        {(((test as unknown) as { examples?: { input: string; output: string; explanation?: string }[] })?.examples || currentQuestion.sampleInput) && (
                           <div className="space-y-3">
                             <div className="text-xs font-semibold text-muted-foreground">Examples:</div>
                             {(currentQuestion.sampleInput ? [
@@ -772,7 +890,7 @@ useEffect(() => {
                                 output: currentQuestion.sampleOutput, 
                                 explanation: currentQuestion.sampleExplanation 
                               }
-                            ] : ((test as any)?.examples || [])).map((ex: any, idx: number) => (
+                            ] : (((test as unknown) as { examples?: { input: string; output: string; explanation?: string }[] })?.examples || [])).map((ex: { input: string; output: string; explanation?: string }, idx: number) => (
                               <div key={idx} className="space-y-2 last:border-0 border-b pb-3 border-dashed">
                                 <div className="grid gap-3 md:grid-cols-2">
                                   <div className="rounded-lg bg-background p-2 border">
@@ -794,7 +912,7 @@ useEffect(() => {
                           </div>
                         )}
 
-                        {currentQuestion.hints && (currentQuestion.hints as any).length > 0 && (
+                        {currentQuestion.hints && (currentQuestion.hints as string[]).length > 0 && (
                           <Accordion type="single" collapsible className="w-full">
                             <AccordionItem value="hints" className="border-none">
                               <AccordionTrigger className="text-xs font-semibold text-primary py-1 hover:no-underline">
@@ -804,7 +922,7 @@ useEffect(() => {
                               </AccordionTrigger>
                               <AccordionContent className="pt-2">
                                 <ul className="space-y-2">
-                                  {(currentQuestion.hints as any).map((hint: string, hIdx: number) => (
+                                  {(currentQuestion.hints as string[]).map((hint: string, hIdx: number) => (
                                     <li key={hIdx} className="text-sm bg-yellow-500/5 p-2 rounded border border-yellow-500/10">
                                       <span className="font-semibold text-xs text-yellow-600 mr-1">Hint {hIdx + 1}:</span> {hint}
                                     </li>
@@ -1014,6 +1132,10 @@ useEffect(() => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <CameraPreview position="bottom-right" size="small" showOnHover />
+      <ViolationToast />
+      </div>
     </div>
   );
 }

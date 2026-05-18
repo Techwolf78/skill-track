@@ -254,22 +254,10 @@ export default function InviteCandidates() {
     candidateId: string,
     scheduleId: string,
   ) => {
-    // Priority: Find all invitations for this candidate
-    const candidateInvitations = invitations.filter(
-      (i) => i.candidateId === candidateId,
-    );
-
-    // 1. If any invitation is ACCEPTED, show that first regardless of schedule
-    const accepted = candidateInvitations.find((i) => i.status === "ACCEPTED");
-    if (accepted) return accepted;
-
-    // 2. Otherwise, look for a match specifically for the SELECTED schedule
-    const scheduleMatch = candidateInvitations.find(
-      (i) => i.scheduleId === scheduleId,
-    );
-    if (scheduleMatch) return scheduleMatch;
-
-    return null;
+    // Find invitations for this candidate and the SELECTED schedule
+    return invitations.find(
+      (i) => i.candidateId === candidateId && i.scheduleId === scheduleId,
+    ) || null;
   };
 
   const formatDateTime = (dateStr: string) => {
