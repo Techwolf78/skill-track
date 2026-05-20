@@ -39,7 +39,7 @@ interface Question {
   type: "MCQ" | "CODING";
   prompt: string;
   marks: number;
-  options?: string[];
+  options?: any[];
   problemStatement?: string;
   sampleInput?: string;
   sampleOutput?: string;
@@ -285,7 +285,7 @@ useEffect(() => {
           type: tq.question?.questionType || tq.question?.type || "MCQ",
           prompt: tq.question?.prompt || "No prompt",
           marks: tq.marks,
-          options: tq.question?.mcqOptions?.map((opt: { text: string }) => opt.text),
+          options: tq.question?.mcqOptions || [],
           problemStatement: tq.question?.prompt,
           sampleInput: tq.question?.sampleInput,
           sampleOutput: tq.question?.sampleOutput,
@@ -562,11 +562,10 @@ useEffect(() => {
     
     setIsSubmittingCode(true);
     try {
-      const answerText = typeof currentAnswer === 'string' ? currentAnswer : JSON.stringify(currentAnswer);
       await apiClient.post("/submissions", {
         sessionId: sessionId,
         questionId: currentQ.id,
-        answerText: answerText
+        selectedOptionIds: [currentAnswer]
       });
       toast({ title: "Saved", description: "Answer saved successfully" });
     } catch (error: unknown) {
@@ -820,20 +819,23 @@ useEffect(() => {
                         onValueChange={(value) => setAnswers({ ...answers, [currentQuestion.id]: value })}
                         className="space-y-2 pt-2"
                       >
-                        {currentQuestion.options.map((option, idx) => (
-                          <Label 
-                            key={idx} 
-                            className={cn(
-                              "flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-all",
-                              answers[currentQuestion.id] === option 
-                                ? "border-primary bg-primary/5 ring-1 ring-primary" 
-                                : "border-border hover:bg-muted/50 hover:border-primary/30"
-                            )}
-                          >
-                            <RadioGroupItem value={option} id={`option-${idx}`} />
-                            <span className="text-sm">{option}</span>
-                          </Label>
-                        ))}
+                        {currentQuestion.options.map((option: any, idx: number) => {
+                          const optionId = option.id || option.text;
+                          return (
+                            <Label 
+                              key={idx} 
+                              className={cn(
+                                "flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-all",
+                                answers[currentQuestion.id] === optionId 
+                                  ? "border-primary bg-primary/5 ring-1 ring-primary" 
+                                  : "border-border hover:bg-muted/50 hover:border-primary/30"
+                              )}
+                            >
+                              <RadioGroupItem value={optionId} id={`option-${idx}`} />
+                              <span className="text-sm">{option.text || option}</span>
+                            </Label>
+                          );
+                        })}
                       </RadioGroup>
                       <div className="flex justify-end">
                         <Button 

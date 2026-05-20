@@ -7,7 +7,7 @@ import { componentTagger } from "lovable-tagger";
 export default defineConfig(({ mode }) => ({
   server: {
     host: "::",
-    port: 8080,
+    port: 5173,
     hmr: {
       overlay: false,
     },
@@ -17,6 +17,7 @@ export default defineConfig(({ mode }) => ({
         // target: "http://192.168.1.68:8080",
         // target: "http://169.254.98.61:8080",
         // target: "http://192.168.1.63:8080",
+        // target: "http://167.235.49.94",
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api/, ""),
       },
