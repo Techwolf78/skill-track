@@ -29,6 +29,7 @@ import Settings from "./pages/SuperAdmin/Settings";
 import DSAPlayground from "./pages/SuperAdmin/DSAPlayground";
 import Reports from "./pages/SuperAdmin/Reports";
 import TestSchedules from "./pages/SuperAdmin/TestSchedules";
+import SeedData from "./pages/SeedData";
 import { AuthProvider } from "./lib/auth-context";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ProtectedRoute } from "./components/ProtectedRoute";
@@ -71,6 +72,7 @@ const App = () => (
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
               <Route path="/unauthorized" element={<NotFound />} />
+              <Route path="/seed-data" element={<SeedData />} />
               {/* SuperAdmin Routes (SUPERADMIN role only) */}
               <Route
                 path="/superadmin"
