@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -47,7 +47,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
-  testService,
   Subject,
   Question,
   Topic,
@@ -56,6 +55,13 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { QuestionPreview } from "./QuestionPreview";
+import {
+  useQuestionsQuery,
+  useSubjectsQuery,
+  useTopicsQuery,
+  useSubtopicsQuery,
+  useDeleteQuestionMutation,
+} from "@/hooks/use-query-hooks";
 
 const difficultyColors = {
   Easy: "bg-green-500/10 text-green-500 border-green-500/20",
@@ -67,11 +73,14 @@ export default function QuestionBank() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState("");
-  const [questions, setQuestions] = useState<Question[]>([]);
-  const [subjects, setSubjects] = useState<Subject[]>([]);
-  const [topics, setTopics] = useState<Topic[]>([]);
-  const [subtopics, setSubtopics] = useState<Subtopic[]>([]);
-  const [loading, setLoading] = useState(true);
+
+  const { data: questions = [], isLoading: questionsLoading, refetch: refetchQuestions } = useQuestionsQuery();
+  const { data: subjects = [], isLoading: subjectsLoading, refetch: refetchSubjects } = useSubjectsQuery();
+  const { data: topics = [], isLoading: topicsLoading, refetch: refetchTopics } = useTopicsQuery();
+  const { data: subtopics = [], isLoading: subtopicsLoading, refetch: refetchSubtopics } = useSubtopicsQuery();
+
+  const loading = questionsLoading || subjectsLoading || topicsLoading || subtopicsLoading;
+
   const [activeTab, setActiveTab] = useState<"mcq" | "coding">("mcq");
   const [difficultyFilter, setDifficultyFilter] = useState<
     "All" | "Easy" | "Medium" | "Hard" | "EASY" | "MEDIUM" | "HARD"
@@ -87,58 +96,33 @@ export default function QuestionBank() {
 const [previewQuestion, setPreviewQuestion] = useState<Question | null>(null);
 const [previewOpen, setPreviewOpen] = useState(false);
 
+  const deleteQuestionMutation = useDeleteQuestionMutation();
+
   // Fetch questions and subjects from backend
-  const fetchData = async () => {
-    try {
-      setLoading(true);
-
-      const [allQuestions, allSubjects, allTopics, allSubtopics] =
-        await Promise.all([
-          testService.getAllQuestions(),
-          testService.getAllSubjects(),
-          testService.getAllTopics(),
-          testService.getAllSubtopics(),
-        ]);
-
-      setQuestions(allQuestions);
-      setSubjects(allSubjects);
-      setTopics(allTopics);
-      setSubtopics(allSubtopics);
-    } catch (error: unknown) {
-      const errorMessage =
-        error instanceof Error ? error.message : "Failed to load questions";
-      console.error("Failed to fetch data:", error);
-      toast({
-        title: "Error",
-        description: errorMessage,
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchData();
-  }, []);
+  const fetchData = useCallback(() => {
+    refetchQuestions();
+    refetchSubjects();
+    refetchTopics();
+    refetchSubtopics();
+  }, [refetchQuestions, refetchSubjects, refetchTopics, refetchSubtopics]);
 
   const handleDelete = async (id: string) => {
     if (!confirm("Are you sure you want to delete this question?")) return;
 
     try {
-      await testService.deleteQuestion(id);
+      await deleteQuestionMutation.mutateAsync(id);
       toast({
         title: "Success",
         description: "Question deleted successfully",
       });
-      fetchData();
-    } catch (error: any) {
+    } catch (error) {
       console.error("Failed to delete question:", error);
 
       // Handle the 400 Bad Request with IllegalStateException for test usage
-      const errorData = error.response?.data;
+      const err = error as { response?: { data?: { message?: string } } } & Error;
+      const errorData = err.response?.data;
       const errorMessage =
-        errorData?.message || error.message || "Failed to delete question";
+        errorData?.message || err.message || "Failed to delete question";
 
       toast({
         title: "Deletion Restricted",
@@ -759,7 +743,7 @@ const handlePreview = (question: Question) => {
               <Label>Difficulty</Label>
               <Select
                 value={difficultyFilter}
-                onValueChange={(v) => setDifficultyFilter(v as any)}
+                onValueChange={(v) => setDifficultyFilter(v as "All" | "Easy" | "Medium" | "Hard" | "EASY" | "MEDIUM" | "HARD")}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="All Difficulties" />

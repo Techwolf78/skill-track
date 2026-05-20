@@ -45,17 +45,19 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { candidateService, type Candidate } from "@/lib/candidate-service";
-import { organisationService, type OrganisationResponse } from "@/lib/organisation-service";
-import { BulkUploadCandidates } from "../Admin/BulkUploadCandidates";
-import { EditCandidateDialog } from "../Admin/EditCandidateDialog";
-import { DeleteConfirmDialog } from "../Admin/DeleteConfirmDialog";
+import {
+  useCandidatesQuery,
+  useOrganisationsQuery,
+  useCreateCandidateMutation,
+  useDeleteCandidateMutation,
+} from "@/hooks/use-query-hooks";
 
 export default function Students() {
   const [searchTerm, setSearchTerm] = useState("");
-  const [loading, setLoading] = useState(true);
-  const [candidates, setCandidates] = useState<Candidate[]>([]);
-  const [organisations, setOrganisations] = useState<OrganisationResponse[]>([]);
+  const { data: candidates = [], isLoading: candidatesLoading, refetch: refetchCandidates } = useCandidatesQuery();
+  const { data: organisations = [], isLoading: orgsLoading, refetch: refetchOrgs } = useOrganisationsQuery();
+  const loading = candidatesLoading || orgsLoading;
+
   const [selectedOrganisation, setSelectedOrganisation] = useState<string>("all");
   
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
@@ -87,30 +89,13 @@ export default function Students() {
 
   const { toast } = useToast();
 
-  const fetchData = useCallback(async () => {
-    try {
-      setLoading(true);
-      const [candidatesData, orgsData] = await Promise.all([
-        candidateService.getCandidates(),
-        organisationService.getOrganisations()
-      ]);
-      setCandidates(candidatesData);
-      setOrganisations(orgsData);
-    } catch (error) {
-      console.error("Failed to fetch data:", error);
-      toast({
-        title: "Error",
-        description: "Failed to load data",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
-    }
-  }, [toast]);
+  const createCandidateMutation = useCreateCandidateMutation();
+  const deleteCandidateMutation = useDeleteCandidateMutation();
 
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+  const fetchData = useCallback(() => {
+    refetchCandidates();
+    refetchOrgs();
+  }, [refetchCandidates, refetchOrgs]);
 
   const filteredCandidates = candidates.filter((candidate) => {
     const matchesSearch = 
@@ -150,7 +135,7 @@ export default function Students() {
         if (value) extraFields[key] = value;
       });
 
-      await candidateService.createCandidate({
+      await createCandidateMutation.mutateAsync({
         ...formData,
         extraFields: Object.keys(extraFields).length > 0 ? extraFields : undefined,
       });
@@ -161,7 +146,6 @@ export default function Students() {
         name: "", email: "", password: "", phoneNumber: "", organisationId: "",
         extraFields: { college: "", course: "", year: "", skills: "", city: "" }
       });
-      fetchData();
     } catch (error: any) {
       toast({ 
         title: "Error", 
@@ -177,10 +161,9 @@ export default function Students() {
     if (!candidateToDelete) return;
     setDeleting(true);
     try {
-      await candidateService.deleteCandidate(candidateToDelete.id);
+      await deleteCandidateMutation.mutateAsync(candidateToDelete.id);
       toast({ title: "Success", description: "Candidate deleted successfully" });
       setIsDeleteDialogOpen(false);
-      fetchData();
     } catch (error: any) {
       toast({ title: "Error", description: "Failed to delete candidate", variant: "destructive" });
     } finally {

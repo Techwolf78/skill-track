@@ -48,10 +48,15 @@ import { DeleteConfirmDialog } from "./DeleteConfirmDialog";
 
 import { useAuth } from "@/lib/auth-context";
 
+import {
+  useCandidatesQuery,
+  useCreateCandidateMutation,
+  useDeleteCandidateMutation,
+} from "@/hooks/use-query-hooks";
+
 export default function AdminCandidates() {
   const [searchTerm, setSearchTerm] = useState("");
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
-  const [loading, setLoading] = useState(true);
   const [isBulkUploadOpen, setIsBulkUploadOpen] = useState(false);
   // Add state for edit dialog
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
@@ -64,7 +69,6 @@ export default function AdminCandidates() {
     null,
   );
   const [deleting, setDeleting] = useState(false);
-  const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [expandedRow, setExpandedRow] = useState<string | null>(null);
   const [emailError, setEmailError] = useState<string | null>(null);
   const [formData, setFormData] = useState({
@@ -85,44 +89,19 @@ export default function AdminCandidates() {
   const { toast } = useToast();
   const { user } = useAuth();
 
-  // Fetch candidates only (organisations come from candidate data)
-  const fetchData = useCallback(async () => {
-    try {
-      setLoading(true);
-      const unfilteredData = await candidateService.getCandidates();
-      
-      // Log each candidate's organization ID for debugging
-      unfilteredData.forEach(c => {
-        console.log(`Candidate: ${c.user.name}, Org ID: ${c.organisation?.id}, Org Name: ${c.organisation?.name}`);
-      });
-      
-      // Get organisation ID from user context
-      const orgId = user?.organisationData?.id || (user as any)?.organisationId;
-      
-      console.log("Admin Dashboard - Current User Org ID:", orgId);
-      
-      // Filter candidates that belong to the current admin's organisation
-      const filteredData = orgId 
-        ? unfilteredData.filter(c => c.organisation.id === orgId)
-        : unfilteredData;
-        
-      console.log(`Filtered ${filteredData.length} candidates for org ${orgId}`);
-      setCandidates(filteredData);
-    } catch (error) {
-      console.error("Failed to fetch data:", error);
-      toast({
-        title: "Error",
-        description: "Failed to load candidates",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
-    }
-  }, [toast]);
+  const { data: unfilteredCandidates = [], isLoading: loading, refetch: refetchCandidates } = useCandidatesQuery();
+  const createCandidateMutation = useCreateCandidateMutation();
+  const deleteCandidateMutation = useDeleteCandidateMutation();
 
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+  // Get organisation ID from user context
+  const orgId = user?.organisationData?.id || (user as any)?.organisationId;
+
+  // Filter candidates that belong to the current admin's organisation
+  const candidates = orgId
+    ? unfilteredCandidates.filter(c => c.organisation?.id === orgId)
+    : unfilteredCandidates;
+
+  const fetchData = refetchCandidates;
 
   // Extract unique organisations from candidates for the dropdown
   const organisations = Array.from(
@@ -225,7 +204,7 @@ export default function AdminCandidates() {
 
     setSubmitting(true);
     try {
-      await candidateService.createCandidate({
+      await createCandidateMutation.mutateAsync({
         name: formData.name,
         email: formData.email,
         password: formData.password,
@@ -257,7 +236,6 @@ export default function AdminCandidates() {
       });
       setEmailError(null);
       setIsAddDialogOpen(false);
-      fetchData(); // Refresh the list
     } catch (error: any) {
       console.error("Failed to create candidate:", error);
 
@@ -308,15 +286,13 @@ export default function AdminCandidates() {
 
     setDeleting(true);
     try {
-      await candidateService.deleteCandidate(candidateToDelete.id);
+      await deleteCandidateMutation.mutateAsync(candidateToDelete.id);
 
       toast({
         title: "Success",
         description: "Candidate deleted successfully",
       });
 
-      // Refresh the list
-      fetchData();
       setIsDeleteDialogOpen(false);
       setCandidateToDelete(null);
     } catch (error: any) {

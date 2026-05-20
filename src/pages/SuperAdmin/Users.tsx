@@ -51,12 +51,12 @@ import {
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { userService, type UserResponse } from "@/lib/user-service";
 import {
-  organisationService,
   type OrganisationResponse,
 } from "@/lib/organisation-service";
 import { useToast } from "@/hooks/use-toast";
 import * as XLSX from "xlsx";
 import { saveAs } from "file-saver";
+import { useOrganisationsQuery } from "@/hooks/use-query-hooks";
 
 export default function Users() {
   const { toast } = useToast();
@@ -99,26 +99,12 @@ export default function Users() {
   const [userToDelete, setUserToDelete] = useState<UserResponse | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  const [organisations, setOrganisations] = useState<OrganisationResponse[]>(
-    [],
-  );
+  const { data: organisations = [] } = useOrganisationsQuery();
 
   const { data: users = [], isLoading } = useQuery({
     queryKey: ["users"],
     queryFn: userService.getUsers,
   });
-
-  useEffect(() => {
-    const fetchOrgs = async () => {
-      try {
-        const orgs = await organisationService.getOrganisations();
-        setOrganisations(orgs);
-      } catch (error) {
-        console.error("Failed to fetch organisations:", error);
-      }
-    };
-    if (isAddUserOpen) fetchOrgs();
-  }, [isAddUserOpen]);
 
   const filteredUsers = (users as UserResponse[]).filter((user) => {
     // Exclude CANDIDATE role completely

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -39,52 +39,38 @@ import {
   Archive,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { testService, Test } from "@/lib/test-service";
+import { Test } from "@/lib/test-service";
 import { useAuth } from "@/lib/auth-context";
+import {
+  useTestsQuery,
+  useCreateTestMutation,
+  useDeleteTestMutation,
+} from "@/hooks/use-query-hooks";
 
 export default function AdminTests() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { user } = useAuth();
   const [searchTerm, setSearchTerm] = useState("");
-  const [tests, setTests] = useState<Test[]>([]);
-  const [loading, setLoading] = useState(true);
+
+  const { data: allTests = [], isLoading: loading } = useTestsQuery();
+
+  const tests = useMemo(() => {
+    if (user?.role === "ADMIN" && user.organisationData?.id) {
+      const adminOrgId = user.organisationData.id;
+      return allTests.filter((t) => t.organisationId === adminOrgId);
+    } else if (user?.role === "SUPERADMIN") {
+      return allTests;
+    }
+    return [];
+  }, [allTests, user]);
+
   const [activeFilter, setActiveFilter] = useState<
     "all" | "published" | "draft" | "archived" | "inactive"
   >("all");
 
-  const fetchTests = useCallback(async () => {
-    try {
-      setLoading(true);
-
-      const allTests = await testService.getAllTests();
-
-      if (user?.role === "ADMIN" && user.organisationData?.id) {
-        const adminOrgId = user.organisationData.id;
-        const filtered = allTests.filter(
-          (t) => t.organisationId === adminOrgId,
-        );
-        setTests(filtered);
-      } else if (user?.role === "SUPERADMIN") {
-        setTests(allTests);
-      } else {
-        setTests([]);
-      }
-    } catch (error: any) {
-      console.error("Failed to fetch tests:", error);
-      toast({
-        title: "Error",
-        description: error.response?.data?.message || "Failed to load tests",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
-    }
-  }, [toast, user]);
-
-  useEffect(() => {
-    fetchTests();
-  }, [fetchTests]);
+  const deleteTestMutation = useDeleteTestMutation();
+  const createTestMutation = useCreateTestMutation();
 
   // Apply filters based on search term and status filter
   const getFilteredTests = () => {
@@ -136,17 +122,17 @@ export default function AdminTests() {
 
   const handleDelete = async (testId: string) => {
     try {
-      await testService.deleteTest(testId);
+      await deleteTestMutation.mutateAsync(testId);
       toast({
         title: "Test Deleted",
         description: "The test has been deleted successfully.",
       });
-      fetchTests();
-    } catch (error: any) {
-      console.error("Failed to delete test:", error);
+    } catch (error) {
+      const err = error as { response?: { data?: { message?: string } } } & Error;
+      console.error("Failed to delete test:", err);
       toast({
         title: "Error",
-        description: error.response?.data?.message || "Failed to delete test",
+        description: err.response?.data?.message || "Failed to delete test",
         variant: "destructive",
       });
     }
@@ -156,7 +142,7 @@ export default function AdminTests() {
     try {
       const duplicateTest = {
         title: `${test.title} (Copy)`,
-        description: test.description,
+        description: test.description || "",
         durationMins: test.durationMins,
         difficulty: test.difficulty,
         status: "DRAFT" as const,
@@ -164,19 +150,20 @@ export default function AdminTests() {
         isActive: true,
       };
 
-      const newTest = await testService.createTest(duplicateTest);
+      const newTest = await createTestMutation.mutateAsync(duplicateTest);
       toast({
         title: "Test Duplicated",
         description: "The test has been duplicated successfully.",
       });
 
       navigate(`/admin/tests/edit/${newTest.id}`);
-    } catch (error: any) {
-      console.error("Failed to duplicate test:", error);
+    } catch (error) {
+      const err = error as { response?: { data?: { message?: string } } } & Error;
+      console.error("Failed to duplicate test:", err);
       toast({
         title: "Error",
         description:
-          error.response?.data?.message || "Failed to duplicate test",
+          err.response?.data?.message || "Failed to duplicate test",
         variant: "destructive",
       });
     }
@@ -344,7 +331,7 @@ export default function AdminTests() {
           {/* Filter Tabs - Tabs Component from shadcn */}
           <Tabs
             value={activeFilter}
-            onValueChange={(v) => setActiveFilter(v as any)}
+            onValueChange={(v) => setActiveFilter(v as "all" | "published" | "draft" | "archived" | "inactive")}
             className="w-full lg:w-auto"
           >
             <TabsList className="bg-white/50 backdrop-blur-sm border border-slate-200 p-1 h-auto w-full lg:w-auto">

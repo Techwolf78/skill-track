@@ -46,6 +46,21 @@ import {
   CheckCircle,
   FileJson,
 } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
+import {
+  useSubjectsQuery,
+  useTopicsQuery,
+  useSubtopicsQuery,
+  useCreateSubjectMutation,
+  useUpdateSubjectMutation,
+  useDeleteSubjectMutation,
+  useCreateTopicMutation,
+  useUpdateTopicMutation,
+  useDeleteTopicMutation,
+  useCreateSubtopicMutation,
+  useUpdateSubtopicMutation,
+  useDeleteSubtopicMutation,
+} from "@/hooks/use-query-hooks";
 import { testService, Subject, Topic, Subtopic } from "@/lib/test-service";
 import { useToast } from "@/hooks/use-toast";
 import { Textarea } from "@/components/ui/textarea";
@@ -54,10 +69,25 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 export default function ManageSubjects() {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const [loading, setLoading] = useState(true);
-  const [subjects, setSubjects] = useState<Subject[]>([]);
-  const [topics, setTopics] = useState<Topic[]>([]);
-  const [subtopics, setSubtopics] = useState<Subtopic[]>([]);
+  const queryClient = useQueryClient();
+
+  const { data: subjects = [], isLoading: subjectsLoading } = useSubjectsQuery();
+  const { data: topics = [], isLoading: topicsLoading } = useTopicsQuery();
+  const { data: subtopics = [], isLoading: subtopicsLoading } = useSubtopicsQuery();
+  const loading = subjectsLoading || topicsLoading || subtopicsLoading;
+
+  const createSubjectMutation = useCreateSubjectMutation();
+  const updateSubjectMutation = useUpdateSubjectMutation();
+  const deleteSubjectMutation = useDeleteSubjectMutation();
+
+  const createTopicMutation = useCreateTopicMutation();
+  const updateTopicMutation = useUpdateTopicMutation();
+  const deleteTopicMutation = useDeleteTopicMutation();
+
+  const createSubtopicMutation = useCreateSubtopicMutation();
+  const updateSubtopicMutation = useUpdateSubtopicMutation();
+  const deleteSubtopicMutation = useDeleteSubtopicMutation();
+
   const [expandedSubjects, setExpandedSubjects] = useState<Set<string>>(
     new Set(),
   );
@@ -97,35 +127,6 @@ export default function ManageSubjects() {
   const [selectedSubjectForSubtopic, setSelectedSubjectForSubtopic] =
     useState("");
   const [selectedTopicForSubtopic, setSelectedTopicForSubtopic] = useState("");
-
-  const fetchData = useCallback(async () => {
-    try {
-      setLoading(true);
-      const [allSubjects, allTopics, allSubtopics] = await Promise.all([
-        testService.getAllSubjects(),
-        testService.getAllTopics(),
-        testService.getAllSubtopics(),
-      ]);
-      setSubjects(allSubjects);
-      setTopics(allTopics);
-      setSubtopics(allSubtopics);
-    } catch (error: unknown) {
-      const errorMessage =
-        error instanceof Error ? error.message : "Failed to load data";
-      console.error("Failed to fetch data:", error);
-      toast({
-        title: "Error",
-        description: errorMessage,
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
-    }
-  }, [toast]);
-
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
 
   const toggleSubject = (subjectId: string) => {
     const newExpanded = new Set(expandedSubjects);
@@ -172,11 +173,10 @@ export default function ManageSubjects() {
       return;
     }
     try {
-      await testService.createSubject(subjectName);
+      await createSubjectMutation.mutateAsync(subjectName);
       toast({ title: "Success", description: "Subject added successfully" });
       setSubjectDialogOpen(false);
       setSubjectName("");
-      fetchData();
     } catch (error: unknown) {
       const errorMessage =
         error instanceof Error ? error.message : "Failed to add subject";
@@ -192,12 +192,11 @@ export default function ManageSubjects() {
     if (!subjectName.trim() || !editingItem || editingItem.type !== "subject")
       return;
     try {
-      await testService.updateSubject(editingItem.id, subjectName);
+      await updateSubjectMutation.mutateAsync({ id: editingItem.id, name: subjectName });
       toast({ title: "Success", description: "Subject updated successfully" });
       setSubjectDialogOpen(false);
       setSubjectName("");
       setEditingItem(null);
-      fetchData();
     } catch (error: unknown) {
       const errorMessage =
         error instanceof Error ? error.message : "Failed to update subject";
@@ -228,12 +227,11 @@ export default function ManageSubjects() {
       return;
     }
     try {
-      await testService.createTopic(topicName, selectedSubjectForTopic);
+      await createTopicMutation.mutateAsync({ name: topicName, subjectId: selectedSubjectForTopic });
       toast({ title: "Success", description: "Topic added successfully" });
       setTopicDialogOpen(false);
       setTopicName("");
       setSelectedSubjectForTopic("");
-      fetchData();
     } catch (error: unknown) {
       const errorMessage =
         error instanceof Error ? error.message : "Failed to add topic";
@@ -257,17 +255,16 @@ export default function ManageSubjects() {
       return;
     }
     try {
-      await testService.updateTopic(
-        editingItem.id,
-        topicName,
-        editingItem.subjectId,
-      );
+      await updateTopicMutation.mutateAsync({
+        id: editingItem.id,
+        name: topicName,
+        subjectId: editingItem.subjectId,
+      });
       toast({ title: "Success", description: "Topic updated successfully" });
       setTopicDialogOpen(false);
       setTopicName("");
       setSelectedSubjectForTopic("");
       setEditingItem(null);
-      fetchData();
     } catch (error: unknown) {
       const errorMessage =
         error instanceof Error ? error.message : "Failed to update topic";
@@ -298,13 +295,12 @@ export default function ManageSubjects() {
       return;
     }
     try {
-      await testService.createSubtopic(subtopicName, selectedTopicForSubtopic);
+      await createSubtopicMutation.mutateAsync({ name: subtopicName, topicId: selectedTopicForSubtopic });
       toast({ title: "Success", description: "Subtopic added successfully" });
       setSubtopicDialogOpen(false);
       setSubtopicName("");
       setSelectedSubjectForSubtopic("");
       setSelectedTopicForSubtopic("");
-      fetchData();
     } catch (error: unknown) {
       const errorMessage =
         error instanceof Error ? error.message : "Failed to add subtopic";
@@ -328,18 +324,17 @@ export default function ManageSubjects() {
       return;
     }
     try {
-      await testService.updateSubtopic(
-        editingItem.id,
-        subtopicName,
-        editingItem.topicId,
-      );
+      await updateSubtopicMutation.mutateAsync({
+        id: editingItem.id,
+        name: subtopicName,
+        topicId: editingItem.topicId,
+      });
       toast({ title: "Success", description: "Subtopic updated successfully" });
       setSubtopicDialogOpen(false);
       setSubtopicName("");
       setSelectedSubjectForSubtopic("");
       setSelectedTopicForSubtopic("");
       setEditingItem(null);
-      fetchData();
     } catch (error: unknown) {
       const errorMessage =
         error instanceof Error ? error.message : "Failed to update subtopic";
@@ -357,20 +352,19 @@ export default function ManageSubjects() {
     try {
       switch (itemToDelete.type) {
         case "subject":
-          await testService.deleteSubject(itemToDelete.id);
+          await deleteSubjectMutation.mutateAsync(itemToDelete.id);
           break;
         case "topic":
-          await testService.deleteTopic(itemToDelete.id);
+          await deleteTopicMutation.mutateAsync(itemToDelete.id);
           break;
         case "subtopic":
-          await testService.deleteSubtopic(itemToDelete.id);
+          await deleteSubtopicMutation.mutateAsync(itemToDelete.id);
           break;
       }
       toast({
         title: "Success",
         description: `${itemToDelete.type} deleted successfully`,
       });
-      fetchData();
     } catch (error: unknown) {
       const errorMessage =
         error instanceof Error
@@ -523,7 +517,9 @@ export default function ManageSubjects() {
           message: `Successfully created ${subjectsCreated} subjects, ${topicsCreated} topics, and ${subtopicsCreated} subtopics!`,
         });
         setBulkJsonData("");
-        fetchData(); // Refresh the tree view
+        queryClient.invalidateQueries({ queryKey: ["subjects"] });
+        queryClient.invalidateQueries({ queryKey: ["topics"] });
+        queryClient.invalidateQueries({ queryKey: ["subtopics"] });
 
         // Auto close after 2 seconds on success
         setTimeout(() => {
