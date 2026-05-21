@@ -12,7 +12,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {CreateTestRequest} from "@/lib/test-service"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -47,14 +46,21 @@ import {
   FileQuestion,
   Users,
 } from "lucide-react";
-import { testService, TestViewModel } from "@/lib/test-service";
+import { testService, TestViewModel, CreateTestRequest } from "@/lib/test-service";
 import { useToast } from "@/hooks/use-toast";
+import { useMemo } from "react";
+import {
+  useTestsQuery,
+  useInactiveTestsQuery,
+  useCreateTestMutation,
+  useUpdateTestMutation,
+  useDeleteTestMutation,
+  useActivateTestMutation,
+} from "@/hooks/use-query-hooks";
 
 export default function Tests() {
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState("");
-  const [tests, setTests] = useState<TestViewModel[]>([]);
-  const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("all");
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [selectedTest, setSelectedTest] = useState<TestViewModel | null>(null);
@@ -62,41 +68,31 @@ export default function Tests() {
   const [currentUserId, setCurrentUserId] = useState<string>("");
   const { toast } = useToast();
 
-  const fetchTests = useCallback(async () => {
-    try {
-      setLoading(true);
-      
-      // Fetch both active and inactive tests from backend
-      const [activeData, inactiveData] = await Promise.all([
-        testService.getAllTests(),
-        testService.getInactiveTests()
-      ]);
+  const { data: activeTests = [], isLoading: activeLoading, refetch: refetchActive } = useTestsQuery();
+  const { data: inactiveTests = [], isLoading: inactiveLoading, refetch: refetchInactive } = useInactiveTestsQuery();
 
-      const activeViewModels = activeData.map((t) => testService.toViewModel(t));
-      const inactiveViewModels = inactiveData.map((t) => testService.toViewModel(t));
+  const loading = activeLoading || inactiveLoading;
 
-      setTests([...activeViewModels, ...inactiveViewModels]);
-    } catch (error: unknown) {
-      const errorMessage =
-        error instanceof Error
-          ? error.message
-          : "Failed to load tests. Please try again.";
-      console.error("Failed to fetch tests:", error);
-      toast({
-        title: "Error",
-        description: errorMessage,
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
-    }
-  }, [toast]);
+  const tests = useMemo(() => {
+    const activeViewModels = activeTests.map((t) => testService.toViewModel(t));
+    const inactiveViewModels = inactiveTests.map((t) => testService.toViewModel(t));
+    return [...activeViewModels, ...inactiveViewModels];
+  }, [activeTests, inactiveTests]);
+
+  const deleteTestMutation = useDeleteTestMutation();
+  const createTestMutation = useCreateTestMutation();
+  const updateTestMutation = useUpdateTestMutation();
+  const activateTestMutation = useActivateTestMutation();
+
+  const fetchTests = useCallback(() => {
+    refetchActive();
+    refetchInactive();
+  }, [refetchActive, refetchInactive]);
 
   useEffect(() => {
     const user = JSON.parse(localStorage.getItem("user") || "{}");
     setCurrentUserId(user.id || "");
-    fetchTests();
-  }, [fetchTests]);
+  }, []);
 
   const handleDeleteClick = (test: TestViewModel) => {
     setSelectedTest(test);
@@ -108,12 +104,11 @@ export default function Tests() {
 
     setDeleting(true);
     try {
-      await testService.deleteTest(selectedTest.id);
+      await deleteTestMutation.mutateAsync(selectedTest.id);
       toast({
         title: "Success",
         description: `"${selectedTest.name}" has been deactivated successfully.`,
       });
-      await fetchTests();
     } catch (error: unknown) {
       const errorMessage =
         error instanceof Error
@@ -154,12 +149,11 @@ export default function Tests() {
         isActive: true, // New tests should be active
       };
 
-      await testService.createTest(createRequest);
+      await createTestMutation.mutateAsync(createRequest);
       toast({
         title: "Success",
         description: `"${test.name}" has been duplicated successfully.`,
       });
-      await fetchTests();
     } catch (error: unknown) {
       const errorMessage =
         error instanceof Error
@@ -176,14 +170,14 @@ export default function Tests() {
 
   const handlePublish = async (test: TestViewModel) => {
     try {
-      await testService.updateTest(test.id, {
-        status: "PUBLISHED",
+      await updateTestMutation.mutateAsync({
+        id: test.id,
+        test: { status: "PUBLISHED" },
       });
       toast({
         title: "Test Published",
         description: `"${test.name}" has been published successfully.`,
       });
-      await fetchTests();
     } catch (error: unknown) {
       const errorMessage =
         error instanceof Error
@@ -200,14 +194,14 @@ export default function Tests() {
 
   const handleArchive = async (test: TestViewModel) => {
     try {
-      await testService.updateTest(test.id, {
-        status: "ARCHIVED",
+      await updateTestMutation.mutateAsync({
+        id: test.id,
+        test: { status: "ARCHIVED" },
       });
       toast({
         title: "Test Archived",
         description: `"${test.name}" has been archived successfully.`,
       });
-      await fetchTests();
     } catch (error: unknown) {
       const errorMessage =
         error instanceof Error
@@ -224,14 +218,14 @@ export default function Tests() {
 
   const handleMoveToDraft = async (test: TestViewModel) => {
     try {
-      await testService.updateTest(test.id, {
-        status: "DRAFT",
+      await updateTestMutation.mutateAsync({
+        id: test.id,
+        test: { status: "DRAFT" },
       });
       toast({
         title: "Test Moved to Draft",
         description: `"${test.name}" has been moved to drafts.`,
       });
-      await fetchTests();
     } catch (error: unknown) {
       const errorMessage =
         error instanceof Error
@@ -475,9 +469,8 @@ export default function Tests() {
                           className="text-primary"
                           onClick={async () => {
                             try {
-                              await testService.activateTest(test.id);
+                              await activateTestMutation.mutateAsync(test.id);
                               toast({ title: "Success", description: "Test reactivated" });
-                              fetchTests();
                             } catch (e) {
                               toast({ title: "Error", description: "Failed to reactivate", variant: "destructive" });
                             }

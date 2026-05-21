@@ -47,8 +47,13 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
-import { testService, Question } from "@/lib/test-service";
+import { Question } from "@/lib/test-service";
 import { useAuth } from "@/lib/auth-context";
+import {
+  useQuestionsQuery,
+  useSubjectsQuery,
+  useDeleteQuestionMutation,
+} from "@/hooks/use-query-hooks";
 
 const difficultyColors: Record<string, string> = {
   EASY: "bg-green-500/10 text-green-500 border-green-500/20",
@@ -61,49 +66,21 @@ export default function AdminQuestionBank() {
   const { toast } = useToast();
   const { user } = useAuth();
 
-  const [loading, setLoading] = useState(true);
-  const [questions, setQuestions] = useState<Question[]>([]);
+  const { data: questions = [], isLoading: questionsLoading } = useQuestionsQuery();
+  const { data: subjects = [], isLoading: subjectsLoading } = useSubjectsQuery();
+  const loading = questionsLoading || subjectsLoading;
+
   const [searchTerm, setSearchTerm] = useState("");
   const [activeTab, setActiveTab] = useState<"MCQ" | "CODING">("MCQ");
   const [difficultyFilter, setDifficultyFilter] = useState<string>("ALL");
   const [subjectFilter, setSubjectFilter] = useState<string>("all");
-  const [subjects, setSubjects] = useState<{ id: string; name: string }[]>([]);
 
   // Delete dialog state
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [selectedQuestion, setSelectedQuestion] = useState<Question | null>(null);
   const [deleting, setDeleting] = useState(false);
 
-  useEffect(() => {
-    fetchQuestions();
-    fetchSubjects();
-  }, []);
-
-  const fetchQuestions = async () => {
-    try {
-      setLoading(true);
-      const allQuestions = await testService.getAllQuestions();
-      setQuestions(allQuestions);
-    } catch (error) {
-      console.error("Failed to fetch questions:", error);
-      toast({
-        title: "Error",
-        description: "Failed to load questions",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchSubjects = async () => {
-    try {
-      const allSubjects = await testService.getAllSubjects();
-      setSubjects(allSubjects);
-    } catch (error) {
-      console.error("Failed to fetch subjects:", error);
-    }
-  };
+  const deleteQuestionMutation = useDeleteQuestionMutation();
 
   const handleDeleteClick = (question: Question) => {
     setSelectedQuestion(question);
@@ -115,17 +92,17 @@ export default function AdminQuestionBank() {
 
     setDeleting(true);
     try {
-      await testService.deleteQuestion(selectedQuestion.id);
+      await deleteQuestionMutation.mutateAsync(selectedQuestion.id);
       toast({
         title: "Success",
         description: "Question deleted successfully",
       });
-      fetchQuestions();
-    } catch (error: any) {
-      console.error("Failed to delete question:", error);
+    } catch (error) {
+      const err = error as { response?: { data?: { message?: string } } } & Error;
+      console.error("Failed to delete question:", err);
       toast({
         title: "Error",
-        description: error.response?.data?.message || "Failed to delete question",
+        description: err.response?.data?.message || "Failed to delete question",
         variant: "destructive",
       });
     } finally {

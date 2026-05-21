@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -52,6 +52,14 @@ import { testService, Test, TestScheduleExtended } from "@/lib/test-service";
 import { useNavigate } from "react-router-dom";
 import { apiClient } from "@/lib/api-client";
 import { useAuth } from "@/lib/auth-context";
+import { useQuery } from "@tanstack/react-query";
+import {
+  useTestSchedulesQuery,
+  useTestsQuery,
+  useOrganisationsQuery,
+  useCreateTestScheduleMutation,
+  useUpdateTestScheduleStatusMutation,
+} from "@/hooks/use-query-hooks";
 
 interface Organisation {
   id: string;
@@ -66,10 +74,6 @@ interface ScheduleWithOrg extends TestScheduleExtended {
 }
 
 export default function TestSchedules() {
-  const [schedules, setSchedules] = useState<ScheduleWithOrg[]>([]);
-  const [tests, setTests] = useState<Test[]>([]);
-  const [organisations, setOrganisations] = useState<Organisation[]>([]);
-  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -85,103 +89,83 @@ export default function TestSchedules() {
   const navigate = useNavigate();
   const { user } = useAuth();
 
-  const fetchData = useCallback(async () => {
-    try {
-      setLoading(true);
-      const [schedulesData, testsData, orgsData, invitationsResponse] =
-        await Promise.all([
-          testService.getAllTestSchedules(),
-          testService.getAllTests(),
-          apiClient.get("/organisations").then((res) => res.data.data || []),
-          apiClient
-            .get("/candidate-invitations")
-            .catch(() => ({ data: { data: [] } })),
-        ]);
+  const { data: schedulesData = [], isLoading: schedulesLoading, refetch: refetchSchedules } = useTestSchedulesQuery();
+  const { data: testsData = [], isLoading: testsLoading, refetch: refetchTests } = useTestsQuery();
+  const { data: orgsData = [], isLoading: orgsLoading, refetch: refetchOrgs } = useOrganisationsQuery();
 
-      const invitations = invitationsResponse.data.data || [];
-
-      console.log("📋 Loaded Schedules:", schedulesData);
-      console.log("📋 Loaded Tests:", testsData);
-      console.log("📋 Loaded Organisations:", orgsData);
-      console.log("📋 Loaded Invitations:", invitations);
-
-      // Create a quick map of organisationId to name from orgsData
-      const orgMap = new Map();
-      orgsData.forEach((org: Organisation) => {
-        orgMap.set(org.id, org.name);
-      });
-
-      const schedulesWithOrg = schedulesData.map((schedule) => {
-        const test = testsData.find((t) => t.id === schedule.testId);
-
-        // Get organisation name from test.organisationId using the orgMap
-        let organisationName = "Unknown Organisation";
-
-        // First try to get from test.organisationId
-        if (test?.organisationId && orgMap.has(test.organisationId)) {
-          organisationName = orgMap.get(test.organisationId);
-        }
-        // Fallback to schedule.organisationId if available
-        else if (
-          schedule.organisationId &&
-          orgMap.has(schedule.organisationId)
-        ) {
-          organisationName = orgMap.get(schedule.organisationId);
-        }
-
-        // Count invitations for this schedule
-        const invitedCount = invitations.filter(
-          (inv: any) =>
-            inv.testScheduleId === schedule.id ||
-            inv.scheduleId === schedule.id,
-        ).length;
-
-        console.log(
-          `Schedule ${schedule.id} -> Test: ${test?.title}, Org: ${organisationName}, Invited: ${invitedCount}`,
-        );
-
-        return {
-          ...schedule,
-          test,
-          organisationName,
-          invitedCount,
-        };
-      });
-
-      setSchedules(schedulesWithOrg);
-      setTests(testsData.filter((t) => t.status === "PUBLISHED"));
-      setOrganisations(orgsData);
-    } catch (error) {
-      console.error("Failed to fetch data:", error);
-      toast({
-        title: "Error",
-        description: "Failed to load test schedules",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
+  const { data: invitations = [], isLoading: invitationsLoading, refetch: refetchInvitations } = useQuery({
+    queryKey: ["candidate-invitations"],
+    queryFn: async () => {
+      try {
+        const res = await apiClient.get("/candidate-invitations");
+        return res.data.data || [];
+      } catch (e) {
+        return [];
+      }
     }
-  }, [toast]);
+  });
 
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+  const loading = schedulesLoading || testsLoading || orgsLoading || invitationsLoading;
+
+  const createScheduleMutation = useCreateTestScheduleMutation();
+  const updateStatusMutation = useUpdateTestScheduleStatusMutation();
+
+  const schedules = useMemo(() => {
+    const orgMap = new Map();
+    orgsData.forEach((org) => {
+      orgMap.set(org.id, org.name);
+    });
+
+    return schedulesData.map((schedule) => {
+      const test = testsData.find((t) => t.id === schedule.testId);
+      let organisationName = "Unknown Organisation";
+      if (test?.organisationId && orgMap.has(test.organisationId)) {
+        organisationName = orgMap.get(test.organisationId);
+      } else {
+        const scheduleOrgId = (schedule as { organisationId?: string }).organisationId;
+        if (scheduleOrgId && orgMap.has(scheduleOrgId)) {
+          organisationName = orgMap.get(scheduleOrgId);
+        }
+      }
+
+      const invitedCount = invitations.filter(
+        (inv: { testScheduleId?: string; scheduleId?: string }) => inv.testScheduleId === schedule.id || inv.scheduleId === schedule.id
+      ).length;
+
+      return {
+        ...schedule,
+        test,
+        organisationName,
+        invitedCount,
+      };
+    });
+  }, [schedulesData, testsData, orgsData, invitations]);
+
+  const tests = useMemo(() => testsData.filter((t) => t.status === "PUBLISHED"), [testsData]);
+  const organisations = orgsData;
+
+  const fetchData = useCallback(() => {
+    refetchSchedules();
+    refetchTests();
+    refetchOrgs();
+    refetchInvitations();
+  }, [refetchSchedules, refetchTests, refetchOrgs, refetchInvitations]);
 
   const handleUpdateStatus = async (scheduleId: string, newStatus: string) => {
     setUpdatingStatus(scheduleId);
     try {
-      await testService.updateTestScheduleStatus(scheduleId, newStatus);
+      await updateStatusMutation.mutateAsync({ scheduleId, status: newStatus });
       
       toast({
         title: "Success",
         description: `Schedule status updated to ${newStatus}`,
       });
-      fetchData(); // Refresh the data
-    } catch (error: any) {
-      console.error("Failed to update status:", error);
+    } catch (error) {
+      const err = error as { response?: { data?: { message?: string } } } & Error;
+      console.error("Failed to update status:", err);
       toast({
         title: "Error",
-        description: error.response?.data?.message || "Failed to update status",
+        description: err.response?.data?.message || "Failed to update status",
         variant: "destructive",
       });
     } finally {
@@ -236,15 +220,12 @@ export default function TestSchedules() {
 
     setSubmitting(true);
     try {
-      const newSchedule = await testService.createTestSchedule({
+      await createScheduleMutation.mutateAsync({
         testId: formData.testId,
-        organisationId: formData.organisationId,
         startTime: formData.startTime,
         endTime: formData.endTime,
         maxCandidates: formData.maxCandidates,
       });
-
-      console.log("✅ Schedule created:", newSchedule);
 
       toast({
         title: "Success",
@@ -258,13 +239,13 @@ export default function TestSchedules() {
         endTime: "",
         maxCandidates: 100,
       });
-      fetchData();
-    } catch (error: any) {
-      console.error("Failed to create schedule:", error);
+    } catch (error) {
+      const err = error as { response?: { data?: { message?: string } } } & Error;
+      console.error("Failed to create schedule:", err);
       toast({
         title: "Error",
         description:
-          error.response?.data?.message || "Failed to create schedule",
+          err.response?.data?.message || "Failed to create schedule",
         variant: "destructive",
       });
     } finally {
