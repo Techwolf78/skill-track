@@ -1,4 +1,4 @@
- import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -7,41 +7,64 @@ import type { TestResult, TestScheduleExtended, TestSession } from "@/lib/test-s
 import { candidateService } from "@/lib/candidate-service";
 import type { Candidate } from "@/lib/candidate-service";
 import { Button } from "@/components/ui/button";
- import { Badge } from "@/components/ui/badge";
- import {
-   Card,
-   CardContent,
-   CardDescription,
-   CardHeader,
-   CardTitle,
-   CardFooter,
- } from "@/components/ui/card";
- import {
-   Select,
-   SelectContent,
-   SelectItem,
-   SelectTrigger,
-   SelectValue,
- } from "@/components/ui/select";
- import {
-   Table,
-   TableBody,
-   TableCell,
-   TableHead,
-   TableHeader,
-   TableRow,
- } from "@/components/ui/table";
- import { Download, TrendingUp, TrendingDown, Users, Target, Award, RefreshCw, AlertCircle, CheckCircle2, Copy, Check } from "lucide-react";
- 
- export default function Reports() {
+import { Badge } from "@/components/ui/badge";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+  CardFooter,
+} from "@/components/ui/card";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Download, TrendingUp, TrendingDown, Users, Target, Award, RefreshCw, AlertCircle, CheckCircle2, Copy, Check } from "lucide-react";
+
+const topPerformers = [
+  { rank: 1, name: "Sneha Gupta", college: "Tech College", batch: "CSE 2025", score: 95 },
+  { rank: 2, name: "Priya Patel", college: "ABC Engineering", batch: "CSE 2024", score: 92 },
+  { rank: 3, name: "Rahul Sharma", college: "ABC Engineering", batch: "CSE 2024", score: 88 },
+  { rank: 4, name: "Amit Kumar", college: "XYZ Institute", batch: "IT 2024", score: 85 },
+  { rank: 5, name: "Vikram Singh", college: "ABC Engineering", batch: "MCA 2024", score: 82 },
+];
+
+const batchPerformance = [
+  { batch: "CSE 2024", college: "ABC Engineering", students: 45, avgScore: 78, passRate: 89 },
+  { batch: "IT 2024", college: "XYZ Institute", students: 32, avgScore: 72, passRate: 84 },
+  { batch: "CSE 2025", college: "Tech College", students: 60, avgScore: 81, passRate: 92 },
+  { batch: "MCA 2024", college: "ABC Engineering", students: 28, avgScore: 68, passRate: 75 },
+];
+
+const topicWise = [
+  { topic: "Data Structures", avgScore: 75, difficulty: "Medium" },
+  { topic: "Algorithms", avgScore: 68, difficulty: "Hard" },
+  { topic: "Python", avgScore: 82, difficulty: "Easy" },
+  { topic: "Java", avgScore: 71, difficulty: "Medium" },
+  { topic: "SQL", avgScore: 79, difficulty: "Medium" },
+];
+
+function ManualResultFetcher() {
   const [schedules, setSchedules] = useState<TestScheduleExtended[]>([]);
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [sessions, setSessions] = useState<TestSession[]>([]);
   const [selectedScheduleId, setSelectedScheduleId] = useState<string>("");
-  
+
   const [loadingData, setLoadingData] = useState(true);
   const [errorLoadingData, setErrorLoadingData] = useState("");
-  
+
   // Advanced Manual Mode States
   const [manualSessionId, setManualSessionId] = useState("");
   const [manualCandidateId, setManualCandidateId] = useState("");
@@ -103,7 +126,7 @@ import { Button } from "@/components/ui/button";
       try {
         const response = await testService.pollResultBySessionId(sid);
         const statusCode = response.statusCode || response.status;
-        
+
         if (statusCode === 202) {
           pollingRefs.current[sid] = setTimeout(poll, 3000);
         } else if (statusCode === 200) {
@@ -215,7 +238,7 @@ import { Button } from "@/components/ui/button";
           <CheckCircle2 className="h-4 w-4 text-success" />
           <AlertTitle>Result Ready</AlertTitle>
           <AlertDescription>
-            Score: {state.result.totalScore} / {state.result.maxScore} ({state.result.percentage.toFixed(1)}%) — 
+            Score: {state.result.totalScore} / {state.result.maxScore} ({state.result.percentage.toFixed(1)}%) —
             Status: <strong className={state.result.passed ? "text-success" : "text-destructive"}>{state.result.passed ? "PASSED" : "FAILED"}</strong>
           </AlertDescription>
         </Alert>
@@ -226,18 +249,7 @@ import { Button } from "@/components/ui/button";
   };
 
   return (
-    <div className="p-8 space-y-6 animate-fade-in">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-heading font-bold">Reports & Analytics</h1>
-          <p className="text-muted-foreground mt-1">
-            Performance insights and detailed reports
-          </p>
-        </div>
-      </div>
-
-      <Card className="border-primary/20 bg-card">
+    <Card className="mt-8 border-primary/20 bg-card">
       <CardHeader className="flex flex-col md:flex-row md:items-center justify-between pb-6 gap-4 border-b bg-muted/10">
         <div>
           <CardTitle className="text-xl font-heading font-bold flex items-center gap-2">
@@ -249,10 +261,10 @@ import { Button } from "@/components/ui/button";
           </CardDescription>
         </div>
         <div className="flex items-center gap-3">
-          <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={loadAllData} 
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={loadAllData}
             disabled={loadingData}
             className="flex items-center gap-1.5"
           >
@@ -269,7 +281,7 @@ import { Button } from "@/components/ui/button";
           </Button>
         </div>
       </CardHeader>
-      
+
       <CardContent className="pt-6 space-y-6">
         {errorLoadingData && (
           <Alert variant="destructive">
@@ -316,20 +328,20 @@ import { Button } from "@/components/ui/button";
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="manualSessionId">Manual Session ID</Label>
-                <Input 
-                  id="manualSessionId" 
-                  placeholder="Paste UUID session ID" 
-                  value={manualSessionId} 
-                  onChange={(e) => setManualSessionId(e.target.value)} 
+                <Input
+                  id="manualSessionId"
+                  placeholder="Paste UUID session ID"
+                  value={manualSessionId}
+                  onChange={(e) => setManualSessionId(e.target.value)}
                 />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="manualCandidateId">Manual Candidate ID (For Force Grading)</Label>
-                <Input 
-                  id="manualCandidateId" 
-                  placeholder="Paste UUID candidate ID" 
-                  value={manualCandidateId} 
-                  onChange={(e) => setManualCandidateId(e.target.value)} 
+                <Input
+                  id="manualCandidateId"
+                  placeholder="Paste UUID candidate ID"
+                  value={manualCandidateId}
+                  onChange={(e) => setManualCandidateId(e.target.value)}
                 />
               </div>
             </div>
@@ -446,8 +458,8 @@ import { Button } from "@/components/ui/button";
                           </TableCell>
                           <TableCell className="text-right">
                             <div className="flex items-center justify-end gap-2">
-                              <Button 
-                                size="sm" 
+                              <Button
+                                size="sm"
                                 variant="outline"
                                 onClick={() => startPollingSession(session.id)}
                                 disabled={state.status === "POLLING"}
@@ -455,8 +467,8 @@ import { Button } from "@/components/ui/button";
                               >
                                 Fetch / Poll
                               </Button>
-                              <Button 
-                                size="sm" 
+                              <Button
+                                size="sm"
                                 variant="ghost"
                                 onClick={() => handleForceGenerate(session.id, session.candidateId)}
                                 disabled={state.status === "POLLING"}
@@ -476,7 +488,24 @@ import { Button } from "@/components/ui/button";
           </div>
         )}
       </CardContent>
-      </Card>
+    </Card>
+  );
+}
+
+export default function Reports() {
+  return (
+    <div className="p-8 space-y-6 animate-fade-in">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-heading font-bold">Reports & Analytics</h1>
+          <p className="text-muted-foreground mt-1">
+            Performance insights and detailed reports
+          </p>
+        </div>
+      </div>
+
+      <ManualResultFetcher />
     </div>
   );
 }
