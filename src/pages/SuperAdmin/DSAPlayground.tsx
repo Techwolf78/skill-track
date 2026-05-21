@@ -45,6 +45,8 @@ import {
 } from "@/lib/test-service";
 import { apiClient } from "@/lib/api-client";
 import { mapFriendlyError, QuestionMetadata } from "@/lib/judge0";
+import { useAuth } from "@/lib/auth-context";
+import { ROLES } from "@/lib/roles";
 
 interface TestCaseUI {
   input: string;
@@ -163,6 +165,9 @@ export default function DSAPlayground() {
   const navigate = useNavigate();
   const { id } = useParams();
   const { toast } = useToast();
+  const { user } = useAuth();
+  
+  const backRoute = user?.role === ROLES.SUPERADMIN ? "/superadmin/questions" : "/admin/questions";
 
   const [question, setQuestion] = useState<QuestionUI | null>(null);
   const [loading, setLoading] = useState(true);
@@ -552,7 +557,7 @@ export default function DSAPlayground() {
           <p className="text-destructive text-lg font-semibold">
             Question not found
           </p>
-          <Button onClick={() => navigate("/superadmin/questions")}>
+          <Button onClick={() => navigate(backRoute)}>
             Back to Question Bank
           </Button>
         </div>
@@ -568,7 +573,7 @@ export default function DSAPlayground() {
             variant="ghost"
             size="sm"
             className="text-[#eff1f6cc] hover:text-white"
-            onClick={() => navigate("/superadmin/questions")}
+            onClick={() => navigate(backRoute)}
           >
             <ArrowLeft className="w-4 h-4 mr-2" />
             Exit Playground

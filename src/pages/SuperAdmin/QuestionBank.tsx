@@ -427,6 +427,7 @@ const handlePreview = (question: Question) => {
                   <TableHead className="font-semibold">Subject</TableHead>
                   <TableHead className="font-semibold">Difficulty</TableHead>
                   <TableHead className="font-semibold">Marks</TableHead>
+                  <TableHead className="font-semibold">Visibility</TableHead>
                   <TableHead className="font-semibold">Options</TableHead>
                   <TableHead className="font-semibold text-right">
                     Actions
@@ -487,6 +488,11 @@ const handlePreview = (question: Question) => {
                         <Badge variant="secondary">{q.marks || 0} marks</Badge>
                       </TableCell>
                       <TableCell>
+                        <Badge variant={q.visibility === "PUBLIC" ? "default" : "outline"} className={q.visibility === "PUBLIC" ? "bg-blue-500/10 text-blue-500 border-blue-500/20 hover:bg-blue-500/20" : "bg-gray-500/10 text-gray-500 border-gray-500/20"}>
+                          {q.visibility === "PUBLIC" ? "Public" : "Org Owned"}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
                         <Badge variant="secondary">
                           {q.mcqOptions?.length || 0} options
                         </Badge>
@@ -543,6 +549,9 @@ const handlePreview = (question: Question) => {
                   </TableHead>
                   <TableHead className="font-bold text-xs uppercase tracking-wider py-4">
                     Marks
+                  </TableHead>
+                  <TableHead className="font-bold text-xs uppercase tracking-wider py-4">
+                    Visibility
                   </TableHead>
                   <TableHead className="font-bold text-xs uppercase tracking-wider py-4 text-right pr-6">
                     Actions
@@ -623,6 +632,18 @@ const handlePreview = (question: Question) => {
                           <Trophy className="w-3.5 h-3.5 text-yellow-500" />
                           {q.marks || 0}
                         </div>
+                      </TableCell>
+                      <TableCell className="py-4">
+                        <span
+                          className={cn(
+                            "text-xs font-bold px-2.5 py-1 rounded-full border",
+                            q.visibility === "PUBLIC"
+                              ? "bg-blue-500/10 text-blue-500 border-blue-500/20"
+                              : "bg-gray-500/10 text-gray-500 border-gray-500/20"
+                          )}
+                        >
+                          {q.visibility === "PUBLIC" ? "Public" : "Org Owned"}
+                        </span>
                       </TableCell>
                       <TableCell className="py-4 text-right pr-6">
                         {/* REMOVED opacity-0 group-hover:opacity-100 - Now always visible */}

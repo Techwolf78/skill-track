@@ -116,6 +116,7 @@ export interface CreateQuestionRequest {
   // Coding specific
   codeTemplate?: Record<string, CodeTemplateEntry>;
   examples?: Array<{ input: string; output: string; explanation?: string }>;
+  visibility?: "PUBLIC" | "ORG_OWNED";
 }
 
 // Updated UpdateQuestionRequest to match backend API
@@ -147,6 +148,7 @@ export interface UpdateQuestionRequest {
   // Coding specific
   codeTemplate?: Record<string, CodeTemplateEntry>;
   examples?: Array<{ input: string; output: string; explanation?: string }>;
+  visibility?: "PUBLIC" | "ORG_OWNED";
 }
 
 // Updated TestCase DTOs to match backend
@@ -286,6 +288,8 @@ export interface Question {
   correctAnswer?: string;
   // Coding specific
   codeTemplate?: Record<string, CodeTemplateEntry>;
+  visibility?: "PUBLIC" | "ORG_OWNED";
+  organisationId?: string;
 }
 
 export interface TestQuestion {
@@ -387,6 +391,7 @@ export interface CreateTestScheduleExtendedRequest {
 export interface TestSession {
   id: string;
   testId: string;
+  scheduleId?: string;
   candidateId: string;
   status: "STARTED" | "SUBMITTED" | "EVALUATED" | "EXPIRED";
   startedAt: string;
@@ -884,6 +889,14 @@ export const testService = {
   },
 
   // ==================== Test Session APIs ====================
+  startTestSession: async (invitationId: string, ipAddress: string): Promise<TestSession> => {
+    const response = await apiClient.post<TestSession>("/test-sessions/start", {
+      invitationId,
+      ipAddress,
+    });
+    return unwrapResponse(response);
+  },
+
   getAllSessions: async (): Promise<TestSession[]> => {
     const response = await apiClient.get<TestSession[]>("/test-sessions");
     return unwrapArrayResponse(response);
@@ -902,6 +915,11 @@ export const testService = {
     return unwrapResponse(response);
   },
 
+  getTestPaper: async (sessionId: string): Promise<Test> => {
+    const response = await apiClient.get<Test>(`/test-sessions/${sessionId}/paper`);
+    return unwrapResponse(response);
+  },
+
   // ==================== Test Result APIs ====================
   calculateResult: async (sessionId: string, candidateId: string): Promise<TestResult> => {
     const response = await apiClient.post<TestResult>("/test-results", {
@@ -911,8 +929,21 @@ export const testService = {
     return unwrapResponse(response);
   },
 
+  calculateResultWithStatus: async (sessionId: string, candidateId: string): Promise<BaseResponse<TestResult | null>> => {
+    const response = await apiClient.post<BaseResponse<TestResult | null>>("/test-results", {
+      sessionId,
+      candidateId,
+    });
+    return response.data;
+  },
+
   getResultBySessionId: async (sessionId: string): Promise<TestResult> => {
     const response = await apiClient.get<TestResult>(`/test-results/session/${sessionId}`);
     return unwrapResponse(response);
+  },
+
+  pollResultBySessionId: async (sessionId: string): Promise<BaseResponse<TestResult | null>> => {
+    const response = await apiClient.get<BaseResponse<TestResult | null>>(`/test-results/session/${sessionId}`);
+    return response.data;
   },
 };

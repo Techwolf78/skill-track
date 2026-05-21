@@ -36,11 +36,14 @@ export interface RegisterRequest {
 
 export interface BaseResponse<T> {
   success: boolean;
+  status: number;
+  statusCode?: number;
   message: string;
   data: T;
   errorCode?: string;
   errors?: unknown;
   timestamp: string;
+  path?: string;
 }
 
 export const authService = {

@@ -7,7 +7,7 @@ export const ROLES = {
   SUPERADMIN: 'SUPERADMIN',
   ADMIN: 'ADMIN',
   TRAINER: 'TRAINER',
-  STUDENT: 'STUDENT',
+  CANDIDATE: 'CANDIDATE',
 } as const;
 
 export type UserRole = typeof ROLES[keyof typeof ROLES];
@@ -39,4 +39,8 @@ export const canAccessAdmin = (userRole: string | undefined): boolean => {
 
 export const canAccessAdminOrSuperAdmin = (userRole: string | undefined): boolean => {
   return hasAnyRole(userRole, [ROLES.ADMIN, ROLES.SUPERADMIN]);
+};
+
+export const canMutateTaxonomy = (userRole: string | undefined): boolean => {
+  return hasRole(userRole, ROLES.SUPERADMIN);
 };

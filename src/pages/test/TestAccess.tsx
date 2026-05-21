@@ -16,8 +16,13 @@ import {
   Volume2, Eye, Ban, AlertTriangle
 } from "lucide-react";
 import { apiClient } from "@/lib/api-client";
+import { testService } from "@/lib/test-service";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import { authService } from "@/lib/auth-service";
+import { useAuth } from "@/lib/auth-context";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 interface CheckState {
   camera: "pending" | "success" | "error";
@@ -42,12 +47,19 @@ export default function TestAccess() {
     mic: "pending",
     browser: "pending",
   });
+  
+  // Embedded login state
+  const { login: loginToContext, isAuthenticated } = useAuth();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
 
   useEffect(() => {
     if (token) {
       validateToken();
     }
-  }, [token]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token, isAuthenticated]);
 
   useEffect(() => {
     const handleFullscreenChange = () => {
@@ -63,6 +75,10 @@ export default function TestAccess() {
       const response = await apiClient.get(`/candidate-invitations/validate/${token}`);
       const invitation = response.data?.data || response.data;
       
+      if (!isAuthenticated) {
+        throw new Error("Please log in to continue.");
+      }
+
       if (invitation.scheduleId) {
         const scheduleResponse = await apiClient.get(`/test-schedules/${invitation.scheduleId}`);
         const schedule = scheduleResponse.data?.data || scheduleResponse.data;
@@ -144,18 +160,7 @@ export default function TestAccess() {
     if (!allChecksPassed) return;
 
     try {
-      const response = await apiClient.post("/test-sessions", {
-        testId: testData.testId,
-        scheduleId: testData.scheduleId,
-        candidateId: testData.candidateId,
-      });
-
-      const session = response.data?.data || response.data;
-      
-      // Update invitation status
-      await apiClient.patch(`/candidate-invitations/${testData.invitationId}`, {
-        status: "ACCEPTED"
-      });
+      const session = await testService.startTestSession(testData.invitationId, "0.0.0.0");
 
       navigate(`/test/${testData.testId}/session/${session.id}`);
     } catch (error: any) {
@@ -164,6 +169,29 @@ export default function TestAccess() {
         description: error.response?.data?.message || "Failed to start test",
         variant: "destructive",
       });
+    }
+  };
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoggingIn(true);
+    try {
+      const response = await authService.login({ email, password });
+      loginToContext(response.accessToken, response.user);
+      toast({
+        title: "Login Successful",
+        description: "Re-validating your test access...",
+      });
+      // Re-validate token now that we have a session
+      await validateToken();
+    } catch (err: any) {
+      toast({
+        title: "Login Failed",
+        description: err.response?.data?.message || err.message || "Invalid credentials",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoggingIn(false);
     }
   };
 
@@ -181,16 +209,46 @@ export default function TestAccess() {
       <div className="min-h-screen flex items-center justify-center p-4 bg-background">
         <Card className="max-w-md w-full border-destructive/20 shadow-2xl">
           <CardHeader className="text-center">
-            <div className="mx-auto mb-4 w-16 h-16 rounded-full bg-destructive/10 flex items-center justify-center">
-              <AlertCircle className="w-8 h-8 text-destructive" />
+            <div className="mx-auto mb-4 w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
+              <Shield className="w-8 h-8 text-primary" />
             </div>
-            <CardTitle className="text-2xl">Access Denied</CardTitle>
+            <CardTitle className="text-2xl">Authentication Required</CardTitle>
             <CardDescription className="text-base mt-2">
-              {error || "This test invitation is invalid or has expired. Please contact your administrator."}
+              {error || "Please log in to access this test."}
             </CardDescription>
           </CardHeader>
+          <CardContent>
+            <form onSubmit={handleLogin} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="email">Email</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder="candidate@email.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="password">Password</Label>
+                <Input
+                  id="password"
+                  type="password"
+                  placeholder="••••••••"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                />
+              </div>
+              <Button type="submit" className="w-full h-12 text-lg mt-4" disabled={isLoggingIn}>
+                {isLoggingIn ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : null}
+                {isLoggingIn ? "Logging in..." : "Login to Continue"}
+              </Button>
+            </form>
+          </CardContent>
           <CardFooter>
-            <Button onClick={() => navigate("/")} className="w-full h-12 text-lg">
+            <Button onClick={() => navigate("/")} variant="ghost" className="w-full">
               Return to Homepage
             </Button>
           </CardFooter>

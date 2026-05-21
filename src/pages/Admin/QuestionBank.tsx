@@ -256,6 +256,7 @@ export default function AdminQuestionBank() {
                   <TableHead className="font-semibold">Subject</TableHead>
                   <TableHead className="font-semibold">Difficulty</TableHead>
                   <TableHead className="font-semibold">Marks</TableHead>
+                  <TableHead className="font-semibold">Visibility</TableHead>
                   <TableHead className="font-semibold text-center">Used in Tests</TableHead>
                   <TableHead className="font-semibold text-right">Actions</TableHead>
                 </TableRow>
@@ -320,6 +321,11 @@ export default function AdminQuestionBank() {
                       </TableCell>
                       <TableCell>
                         <Badge variant="secondary">{question.marks || 0} marks</Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={question.visibility === "PUBLIC" ? "default" : "outline"} className={question.visibility === "PUBLIC" ? "bg-blue-500/10 text-blue-500 border-blue-500/20 hover:bg-blue-500/20" : "bg-gray-500/10 text-gray-500 border-gray-500/20"}>
+                          {question.visibility === "PUBLIC" ? "Public" : "Org Owned"}
+                        </Badge>
                       </TableCell>
                       <TableCell className="text-center">
                         <Badge variant="secondary">0</Badge>

@@ -178,78 +178,86 @@ function TestInterfaceContent({ testId, sessionId, navigate, toast }: { testId?:
   }, [testId]);
 
   const fetchTestSession = useCallback(async () => {
-  try {
-    setLoading(true);
-    setError(null);
-    
-    console.log("🚀 STEP 1: Fetching session for ID:", sessionId);
-    
-    const sessionResponse = await apiClient.get(`/test-sessions/${sessionId}`);
-    const sessionData = sessionResponse.data?.data || sessionResponse.data;
-    console.log("✅ STEP 2: Session Data:", sessionData);
-    setSession(sessionData);
-
-    console.log("🚀 STEP 3: Fetching test with ID:", sessionData.testId);
-    
-    const testResponse = await apiClient.get(`/tests/${sessionData.testId}`);
-    const testData = testResponse.data?.data || testResponse.data;
-    console.log("✅ STEP 4: Raw Test Data:", testData);
-    
-    console.log("📋 STEP 5: Test questions array:", testData.questions);
-    console.log("📋 STEP 5.1: Number of questions:", testData.questions?.length);
-    
-    // Log first question structure
-    if (testData.questions && testData.questions.length > 0) {
-      console.log("📋 STEP 5.2: First question (raw):", testData.questions[0]);
-      console.log("📋 STEP 5.3: Does first question have 'question' property?", testData.questions[0].question);
-    }
-    
-    // Fetch question details if not populated
-    if (testData.questions && testData.questions.length > 0) {
-      const hasQuestionDetails = testData.questions.some((tq: { question?: { prompt?: string } }) => tq.question?.prompt);
-      console.log("🔍 STEP 6: Questions already have details?", hasQuestionDetails);
+    try {
+      setLoading(true);
+      setError(null);
       
-      if (!hasQuestionDetails) {
-        console.log("🚀 STEP 7: Fetching individual question details for", testData.questions.length, "questions");
+      console.log("🚀 STEP 1: Fetching session for ID:", sessionId);
+      const sessionResponse = await apiClient.get(`/test-sessions/${sessionId}`);
+      const sessionData = sessionResponse.data?.data || sessionResponse.data;
+      console.log("✅ STEP 2: Session Data:", sessionData);
+      setSession(sessionData);
+
+      console.log("🚀 STEP 3: Fetching paper for session:", sessionId);
+      if (!sessionId) throw new Error("No session ID provided");
+      
+      const testData = await testService.getTestPaper(sessionId);
+      console.log("✅ STEP 4: Paper Data:", testData);
+      console.log("✅ DIAGNOSTIC - testData keys:", Object.keys(testData || {}));
+      console.log("✅ DIAGNOSTIC - testData stringified:", JSON.stringify(testData));
+      
+      const paperResponse = testData as any;
+      if (paperResponse && paperResponse.paper) {
+        const paper = paperResponse.paper;
         
-        const questionsWithDetails = await Promise.all(
-          testData.questions.map(async (tq: { questionId: string }, idx: number) => {
-            console.log(`  📥 Fetching question ${idx + 1}: ${tq.questionId}`);
-            try {
-              const questionData = await testService.getQuestionById(tq.questionId);
-              console.log(`  ✅ Question ${idx + 1} details:`, {
-                id: questionData.id,
-                type: questionData.questionType,
-                prompt: questionData.prompt?.substring(0, 50),
-                hasCodeTemplate: !!questionData.codeTemplate
-              });
-              return { ...tq, question: questionData };
-            } catch (err) {
-              console.error(`  ❌ Failed to fetch question ${tq.questionId}:`, err);
-              return tq;
+        // Map the snapshot questions back to the format TestInterface expects
+        const mappedQuestions = (paper.questions || []).map((q: any) => {
+          return {
+            id: q.snapshotQuestionId || q.sourceQuestionId,
+            testId: paper.testId,
+            questionId: q.sourceQuestionId,
+            orderIndex: q.orderIndex,
+            marks: q.marks,
+            timeLimitSecs: q.coding?.timeLimitSecs,
+            question: {
+              id: q.sourceQuestionId,
+              type: q.type,
+              questionType: q.type,
+              prompt: q.prompt,
+              marks: q.marks,
+              mcqOptions: q.options || [],
+              sampleInput: q.coding?.examples?.[0]?.input || "",
+              sampleOutput: q.coding?.examples?.[0]?.expectedOutput || "",
+              sampleExplanation: q.coding?.examples?.[0]?.explanation || "",
+              codeTemplate: q.coding?.starterCode,
+              difficulty: q.coding?.difficulty,
+              constraints: q.coding?.constraints,
+              timeLimitSecs: q.coding?.timeLimitSecs,
+              memoryLimitMb: q.coding?.memoryLimitMB,
+              hints: q.coding?.hints,
+              tags: q.coding?.tags,
+              title: q.coding?.title || q.prompt,
             }
-          })
-        );
-        
-        testData.questions = questionsWithDetails;
-        console.log("✅ STEP 8: Updated test data with question details");
+          };
+        });
+
+        const mappedTestDetails: TestDetails = {
+          id: paper.testId,
+          title: paper.title,
+          description: paper.description,
+          durationMins: paper.durationMins,
+          difficulty: paper.difficulty || "MEDIUM",
+          passMark: paper.passMark || 40,
+          questions: mappedQuestions
+        };
+
+        setTest(mappedTestDetails);
+      } else {
+        setTest(testData as any);
       }
+      
+      // Auto-start proctoring as checks were done in gateway
+      startProctoring();
+      
+    } catch (error: unknown) {
+      const err = error as { response?: { data?: { message?: string } } };
+      console.error("❌ FATAL: Failed to fetch test session:", err);
+      setError(err.response?.data?.message || "Failed to load test");
+    } finally {
+      setLoading(false);
     }
-    
-    setTest(testData);
-    console.log("🎯 FINAL: Test state updated:", testData);
-    
-    // Auto-start proctoring as checks were done in gateway
-    startProctoring();
-    
-  } catch (error: unknown) {
-    const err = error as { response?: { data?: { message?: string } } };
-    console.error("❌ FATAL: Failed to fetch test session:", err);
-    setError(err.response?.data?.message || "Failed to load test");
-  } finally {
-    setLoading(false);
-  }
-  }, [sessionId, testId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessionId]);
 
   useEffect(() => {
     if (sessionId) {
@@ -354,18 +362,7 @@ useEffect(() => {
       // Use the new dedicated submit endpoint
       await testService.submitSession(sessionId, answers);
 
-      // Calculate and save test results using the service
-      try {
-        if (session?.candidateId) {
-          await testService.calculateResult(sessionId, session.candidateId);
-          console.log("Test results calculated and saved successfully");
-        }
-      } catch (calcError) {
-        console.error("Failed to calculate test results:", calcError);
-        // We continue anyway, as the session is already submitted
-      }
-
-      toast({ title: "Success", description: "Test submitted successfully" });
+      toast({ title: "Success", description: "Test submitted successfully, your responses have been recorded" });
       navigate(`/test/${testId}/results?session=${sessionId}`);
     } catch (error: unknown) {
       const err = error as { response?: { data?: { message?: string } } };
@@ -379,7 +376,7 @@ useEffect(() => {
       setSubmitting(false);
       setShowSubmitDialog(false);
     }
-  }, [sessionId, answers, session, testId, navigate, toast]);
+  }, [sessionId, answers, testId, navigate, toast]);
 
   const handleAutoSubmit = useCallback(async () => {
     toast({

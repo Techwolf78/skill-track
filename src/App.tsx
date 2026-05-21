@@ -22,7 +22,7 @@ import TestDetails from "./pages/SuperAdmin/TestDetails"; // Add this import
 import TestScheduleDetails from "./pages/SuperAdmin/TestScheduleDetails";
 import InviteCandidates from "./pages/SuperAdmin/InviteCandidates";
 import InvitedCandidatesHistory from "./pages/SuperAdmin/InvitedCandidatesHistory";
-import TestAccess from "./pages/Test/TestAccess";
+import TestAccess from "./pages/test/TestAccess";
 import EditQuestion from "./pages/SuperAdmin/EditQuestion";
 import AddQuestion from "./pages/SuperAdmin/AddQuestion";
 import Settings from "./pages/SuperAdmin/Settings";
@@ -44,8 +44,8 @@ import AdminTestsEdit from "./pages/Admin/TestsEdit";
 import AdminTestDetails from "./pages/Admin/TestDetails";
 
 // Test Taking
-import TestInterface from "./pages/Test/TestInterface";
-import TestResults from "./pages/Test/TestResults";
+import TestInterface from "./pages/test/TestInterface";
+import TestResults from "./pages/test/TestResults";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -117,6 +117,10 @@ const App = () => (
                 <Route index element={<AdminDashboardAdmin />} />
                 <Route path="candidates" element={<AdminCandidates />} />
                 <Route path="questions" element={<AdminQuestionBank />} />
+                <Route path="questions/playground/:id" element={<DSAPlayground />} />
+                <Route path="questions/add" element={<AddQuestion />} />
+                <Route path="questions/create" element={<AddQuestion />} />
+                <Route path="questions/edit/:id" element={<EditQuestion />} />
                 <Route path="tests" element={<AdminTests />} />
                 <Route path="tests/create" element={<AdminTestCreate />} />
                 <Route path="tests/edit/:id" element={<AdminTestsEdit />} />

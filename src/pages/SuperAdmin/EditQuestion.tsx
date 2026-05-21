@@ -54,6 +54,8 @@ import {
   UpdateQuestionRequest,
   CodeTemplateEntry,
 } from "@/lib/test-service";
+import { useAuth } from "@/lib/auth-context";
+import { ROLES } from "@/lib/roles";
 import { useToast } from "@/hooks/use-toast";
 
 interface TestCaseForm {
@@ -205,6 +207,8 @@ export default function EditQuestion() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { user } = useAuth();
+  const isSuperAdmin = user?.role === ROLES.SUPERADMIN;
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -225,6 +229,7 @@ export default function EditQuestion() {
   const [difficulty, setDifficulty] = useState<"EASY" | "MEDIUM" | "HARD">(
     "MEDIUM",
   );
+  const [visibility, setVisibility] = useState<"PUBLIC" | "ORG_OWNED">("ORG_OWNED");
   const [constraints, setConstraints] = useState("");
   const [memoryLimitMb, setMemoryLimitMb] = useState<number>(256);
   const [timeLimitSecs, setTimeLimitSecs] = useState<number>(1);
@@ -286,6 +291,9 @@ export default function EditQuestion() {
           : true,
       );
       setSampleExplanation(questionData.sampleExplanation || "");
+      if (questionData.visibility) {
+        setVisibility(questionData.visibility as "PUBLIC" | "ORG_OWNED");
+      }
 
       // Handle question type
       const qType = questionData.questionType;
@@ -801,6 +809,7 @@ export default function EditQuestion() {
         marks: marks,
         title: title || undefined,
         difficulty: difficulty,
+        visibility: visibility,
         constraints: constraints || undefined,
         memoryLimitMb: memoryLimitMb,
         timeLimitSecs: timeLimitSecs,
@@ -1303,7 +1312,7 @@ export default function EditQuestion() {
                   </div>
                 )}
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-3 gap-4">
                   <div className="space-y-2">
                     <Label>Difficulty {questionType === "CODING" && "*"}</Label>
                     <Select
@@ -1331,6 +1340,23 @@ export default function EditQuestion() {
                       max={100}
                       placeholder="e.g., 5"
                     />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Visibility</Label>
+                    <Select
+                      value={visibility}
+                      onValueChange={(val: "PUBLIC" | "ORG_OWNED") => setVisibility(val)}
+                      disabled={!isSuperAdmin}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select visibility" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="ORG_OWNED">Org Owned</SelectItem>
+                        {isSuperAdmin && <SelectItem value="PUBLIC">Public</SelectItem>}
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
 

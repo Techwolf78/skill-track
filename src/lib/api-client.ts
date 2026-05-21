@@ -51,8 +51,20 @@ apiClient.interceptors.response.use(
           error.message = fullMessage;
           data.message = fullMessage; // For components using error.response?.data?.message
         }
+      } else if (data.errorCode) {
+        error.message = `${data.errorCode}: ${data.message || "An error occurred"}`;
+        data.message = error.message;
       } else if (data.message) {
         error.message = data.message;
+      }
+    }
+
+    if (error.response?.status === 403) {
+      // Access denied — user lacks permission for this resource
+      console.warn("Access denied:", error.response?.data);
+      // Optional: if the UI expects an error message to be surfaced directly
+      if (!error.response?.data?.message) {
+        error.message = "Access Denied: You do not have permission to perform this action.";
       }
     }
 
