@@ -89,11 +89,27 @@ export default function TestSchedules() {
   const navigate = useNavigate();
   const { user } = useAuth();
 
-  const { data: schedulesData = [], isLoading: schedulesLoading, refetch: refetchSchedules } = useTestSchedulesQuery();
-  const { data: testsData = [], isLoading: testsLoading, refetch: refetchTests } = useTestsQuery();
-  const { data: orgsData = [], isLoading: orgsLoading, refetch: refetchOrgs } = useOrganisationsQuery();
+  const {
+    data: schedulesData = [],
+    isLoading: schedulesLoading,
+    refetch: refetchSchedules,
+  } = useTestSchedulesQuery();
+  const {
+    data: testsData = [],
+    isLoading: testsLoading,
+    refetch: refetchTests,
+  } = useTestsQuery();
+  const {
+    data: orgsData = [],
+    isLoading: orgsLoading,
+    refetch: refetchOrgs,
+  } = useOrganisationsQuery();
 
-  const { data: invitations = [], isLoading: invitationsLoading, refetch: refetchInvitations } = useQuery({
+  const {
+    data: invitations = [],
+    isLoading: invitationsLoading,
+    refetch: refetchInvitations,
+  } = useQuery({
     queryKey: ["candidate-invitations"],
     queryFn: async () => {
       try {
@@ -102,10 +118,11 @@ export default function TestSchedules() {
       } catch (e) {
         return [];
       }
-    }
+    },
   });
 
-  const loading = schedulesLoading || testsLoading || orgsLoading || invitationsLoading;
+  const loading =
+    schedulesLoading || testsLoading || orgsLoading || invitationsLoading;
 
   const createScheduleMutation = useCreateTestScheduleMutation();
   const updateStatusMutation = useUpdateTestScheduleStatusMutation();
@@ -122,14 +139,16 @@ export default function TestSchedules() {
       if (test?.organisationId && orgMap.has(test.organisationId)) {
         organisationName = orgMap.get(test.organisationId);
       } else {
-        const scheduleOrgId = (schedule as { organisationId?: string }).organisationId;
+        const scheduleOrgId = (schedule as { organisationId?: string })
+          .organisationId;
         if (scheduleOrgId && orgMap.has(scheduleOrgId)) {
           organisationName = orgMap.get(scheduleOrgId);
         }
       }
 
       const invitedCount = invitations.filter(
-        (inv: { testScheduleId?: string; scheduleId?: string }) => inv.testScheduleId === schedule.id || inv.scheduleId === schedule.id
+        (inv: { testScheduleId?: string; scheduleId?: string }) =>
+          inv.testScheduleId === schedule.id || inv.scheduleId === schedule.id,
       ).length;
 
       return {
@@ -141,7 +160,10 @@ export default function TestSchedules() {
     });
   }, [schedulesData, testsData, orgsData, invitations]);
 
-  const tests = useMemo(() => testsData.filter((t) => t.status === "PUBLISHED"), [testsData]);
+  const tests = useMemo(
+    () => testsData.filter((t) => t.status === "PUBLISHED"),
+    [testsData],
+  );
   const organisations = orgsData;
 
   const fetchData = useCallback(() => {
@@ -155,13 +177,15 @@ export default function TestSchedules() {
     setUpdatingStatus(scheduleId);
     try {
       await updateStatusMutation.mutateAsync({ scheduleId, status: newStatus });
-      
+
       toast({
         title: "Success",
         description: `Schedule status updated to ${newStatus}`,
       });
     } catch (error) {
-      const err = error as { response?: { data?: { message?: string } } } & Error;
+      const err = error as {
+        response?: { data?: { message?: string } };
+      } & Error;
       console.error("Failed to update status:", err);
       toast({
         title: "Error",
@@ -240,12 +264,13 @@ export default function TestSchedules() {
         maxCandidates: 100,
       });
     } catch (error) {
-      const err = error as { response?: { data?: { message?: string } } } & Error;
+      const err = error as {
+        response?: { data?: { message?: string } };
+      } & Error;
       console.error("Failed to create schedule:", err);
       toast({
         title: "Error",
-        description:
-          err.response?.data?.message || "Failed to create schedule",
+        description: err.response?.data?.message || "Failed to create schedule",
         variant: "destructive",
       });
     } finally {
@@ -364,7 +389,7 @@ export default function TestSchedules() {
     for (const update of schedulesToUpdate) {
       try {
         await testService.updateTestScheduleStatus(update.id, update.newStatus);
-        
+
         console.log(
           `✅ Updated schedule ${update.id}: ${update.currentStatus} → ${update.newStatus}`,
         );
@@ -529,7 +554,7 @@ export default function TestSchedules() {
                           <DropdownMenuItem
                             onClick={() =>
                               navigate(
-                                `/${user?.role === "ADMIN" ? "admin" : "superadmin"}/schedules/${schedule.id}`,
+                                `/${user?.role === "ADMIN" ? "admin" : "superadmin"}/test-schedules/${schedule.id}`,
                               )
                             }
                           >
@@ -544,7 +569,7 @@ export default function TestSchedules() {
                               onClick={() => {
                                 if (action.value === "view") {
                                   navigate(
-                                    `/${user?.role === "ADMIN" ? "admin" : "superadmin"}/schedules/${schedule.id}`,
+                                    `/${user?.role === "ADMIN" ? "admin" : "superadmin"}/test-schedules/${schedule.id}`,
                                   );
                                 } else {
                                   handleUpdateStatus(schedule.id, action.value);
