@@ -37,6 +37,7 @@ import {
   CheckCircle,
   FileText,
   Archive,
+  RefreshCw,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Test } from "@/lib/test-service";
@@ -53,7 +54,7 @@ export default function AdminTests() {
   const { user } = useAuth();
   const [searchTerm, setSearchTerm] = useState("");
 
-  const { data: allTests = [], isLoading: loading } = useTestsQuery();
+  const { data: allTests = [], isLoading: loading, refetch } = useTestsQuery();
 
   const tests = useMemo(() => {
     if (user?.role === "ADMIN" && user.organisationData?.id) {
@@ -255,27 +256,7 @@ export default function AdminTests() {
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50/30">
-      <div className="p-6 lg:p-8 space-y-6 animate-fade-in">
-        {/* Header Section */}
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-          <div>
-            <h1 className="text-3xl lg:text-4xl font-heading font-bold bg-gradient-to-r from-slate-900 to-slate-700 bg-clip-text text-transparent">
-              Test Library
-            </h1>
-            <p className="text-muted-foreground mt-1 text-sm">
-              Create, manage, and organize your assessments
-            </p>
-          </div>
-          <Button
-            variant="hero"
-            onClick={() => navigate("/admin/tests/create")}
-            className="shadow-lg shadow-primary/20 hover:shadow-primary/30 transition-all duration-300 group"
-          >
-            <Plus className="w-4 h-4 mr-2 group-hover:rotate-90 transition-transform duration-300" />
-            Create New Test
-          </Button>
-        </div>
+    <div className="space-y-6 animate-fade-in">
 
         {/* Stats Cards Grid */}
         {/* Stats Cards Grid - Reduced Size */}
@@ -313,22 +294,39 @@ export default function AdminTests() {
           ))}
         </div>
 
-        {/* Search and Filter Tabs */}
-        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-          {/* Search Bar */}
-          {/* Search Bar */}
-          {/* Search Bar */}
-          <div className="relative flex-1 max-w-md">
+        {/* Search and Action Buttons */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div className="relative flex-1 max-w-md w-full">
             <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 z-10" />
             <Input
               placeholder="Search tests by name or description..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10 h-11 bg-white border-slate-200 focus:border-primary/50 transition-all"
+              className="pl-10 h-11 bg-white border-slate-200 focus:border-primary/50 transition-all w-full"
             />
           </div>
+          <div className="flex gap-2 shrink-0">
+            <Button
+              variant="outline"
+              onClick={() => refetch()}
+              className="h-11 border-slate-200"
+            >
+              <RefreshCw className="w-4 h-4 mr-2" />
+              Refresh
+            </Button>
+            <Button
+              variant="hero"
+              onClick={() => navigate("/admin/tests/create")}
+              className="shadow-lg shadow-primary/20 hover:shadow-primary/30 transition-all duration-300 group h-11"
+            >
+              <Plus className="w-4 h-4 mr-2 group-hover:rotate-90 transition-transform duration-300" />
+              Create New Test
+            </Button>
+          </div>
+        </div>
 
-          {/* Filter Tabs - Tabs Component from shadcn */}
+        {/* Filter Tabs - Tabs Component from shadcn */}
+        <div className="flex justify-start">
           <Tabs
             value={activeFilter}
             onValueChange={(v) => setActiveFilter(v as "all" | "published" | "draft" | "archived" | "inactive")}
@@ -544,7 +542,6 @@ export default function AdminTests() {
             </Table>
           </div>
         </Card>
-      </div>
     </div>
   );
 }

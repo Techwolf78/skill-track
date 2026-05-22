@@ -417,16 +417,18 @@ export default function TestSchedules() {
   }, [autoCheckAndUpdateStatuses]);
 
   return (
-    <div className="p-8 space-y-6 animate-fade-in">
-      {/* Header */}
-      <div className="flex items-center justify-between flex-wrap gap-4">
-        <div>
-          <h1 className="text-3xl font-heading font-bold">Test Schedules</h1>
-          <p className="text-muted-foreground mt-1">
-            Schedule tests for organisations and their candidates
-          </p>
+    <div className="space-y-6 animate-fade-in">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="relative max-w-md w-full">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <Input
+            placeholder="Search schedules..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-10 w-full"
+          />
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 shrink-0">
           <Button
             variant="outline"
             onClick={() => autoCheckAndUpdateStatuses()}
@@ -439,17 +441,6 @@ export default function TestSchedules() {
             Create Schedule
           </Button>
         </div>
-      </div>
-
-      {/* Search */}
-      <div className="relative max-w-md">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-        <Input
-          placeholder="Search by test or organisation..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="pl-10"
-        />
       </div>
 
       {/* Schedules Table */}

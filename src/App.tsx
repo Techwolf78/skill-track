@@ -8,6 +8,7 @@ import Register from "./pages/Register";
 import NotFound from "./pages/NotFound";
 import NationalLandingPage from "./pages/NationalLandingPage";
 import { AdminLayout } from "./components/layout/AdminLayout";
+import { AssessmentsLayout } from "./components/layout/AssessmentsLayout";
 import AdminDashboard from "./pages/SuperAdmin/Dashboard";
 import Organisations from "./pages/SuperAdmin/Organisations";
 import Students from "./pages/SuperAdmin/SuperAdminCandidates";
@@ -91,10 +92,15 @@ const App = () => (
                   path="questions/playground/:id"
                   element={<DSAPlayground />}
                 />
-                <Route path="tests" element={<Tests />} />
-                <Route path="test-schedules" element={<TestSchedules />} />
+                
+                {/* Assessments Tab Group */}
+                <Route element={<AssessmentsLayout />}>
+                  <Route path="tests" element={<Tests />} />
+                  <Route path="test-schedules" element={<TestSchedules />} />
+                  <Route path="invitations" element={<InviteCandidates />} />
+                </Route>
+
                 <Route path="test-schedules/:id" element={<TestScheduleDetails />} />
-                <Route path="invitations" element={<InviteCandidates />} />
                 <Route path="invitations-history" element={<InvitedCandidatesHistory />} />
                 <Route path="tests/create" element={<TestCreate />} />
                 <Route path="tests/edit/:id" element={<TestsEdit />} />
@@ -123,14 +129,19 @@ const App = () => (
                 <Route path="questions/add" element={<AddQuestion />} />
                 <Route path="questions/create" element={<AddQuestion />} />
                 <Route path="questions/edit/:id" element={<EditQuestion />} />
-                <Route path="tests" element={<AdminTests />} />
+                
+                {/* Assessments Tab Group */}
+                <Route element={<AssessmentsLayout />}>
+                  <Route path="tests" element={<AdminTests />} />
+                  <Route path="schedules" element={<TestSchedules />} />
+                  <Route path="invitations" element={<InviteCandidates />} />
+                </Route>
+
                 <Route path="tests/create" element={<AdminTestCreate />} />
                 <Route path="tests/edit/:id" element={<AdminTestsEdit />} />
                 <Route path="tests/:id" element={<AdminTestDetails />} />
                 <Route path="tests/:id/questions" element={<TestQuestions />} />
-                <Route path="schedules" element={<TestSchedules />} />
                 <Route path="schedules/:id" element={<TestScheduleDetails />} />
-                <Route path="invitations" element={<InviteCandidates />} />
                 <Route path="invitations-history" element={<InvitedCandidatesHistory />} />
               </Route>
               {/* Student Test Taking */}

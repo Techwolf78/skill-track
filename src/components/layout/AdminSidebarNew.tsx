@@ -1,12 +1,10 @@
-import { NavLink, useNavigate } from "react-router-dom";
+import { NavLink, useNavigate, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import {
   LayoutDashboard,
   Users,
   FileQuestion,
   ClipboardList,
-  CalendarDays,
-  UserPlus,
   LogOut,
   ChevronLeft,
   ChevronRight,
@@ -19,20 +17,31 @@ const navItems = [
   { icon: LayoutDashboard, label: "Dashboard", path: "/admin", end: true },
   { icon: Users, label: "Candidates", path: "/admin/candidates" },
   { icon: FileQuestion, label: "Question Bank", path: "/admin/questions" },
-  { icon: ClipboardList, label: "Tests", path: "/admin/tests" },
-  { icon: CalendarDays, label: "Test Schedules", path: "/admin/schedules" },
-  { icon: UserPlus, label: "Invitations", path: "/admin/invitations" },
+  { 
+    icon: ClipboardList, 
+    label: "Assessments", 
+    path: "/admin/tests",
+    matchPaths: ["/admin/tests", "/admin/schedules", "/admin/invitations"]
+  },
 ];
 
 export function AdminSidebar() {
   const [collapsed, setCollapsed] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
   const { user } = useAuth();
 
   const handleLogout = () => {
     localStorage.removeItem("token");
     localStorage.removeItem("user");
     navigate("/login");
+  };
+
+  const isItemActive = (item: { path: string; end?: boolean; matchPaths?: string[] }) => {
+    if (item.matchPaths) {
+      return item.matchPaths.some(p => location.pathname.startsWith(p));
+    }
+    return item.end ? location.pathname === item.path : location.pathname.startsWith(item.path);
   };
 
   return (
@@ -63,24 +72,24 @@ export function AdminSidebar() {
 
       {/* Navigation */}
       <nav className="flex-1 py-6 px-3 space-y-1 overflow-y-auto">
-        {navItems.map((item) => (
-          <NavLink
-            key={item.path}
-            to={item.path}
-            end={item.end}
-            className={({ isActive }) =>
-              cn(
+        {navItems.map((item) => {
+          const active = isItemActive(item);
+          return (
+            <NavLink
+              key={item.path}
+              to={item.path}
+              className={cn(
                 "flex items-center gap-3 px-3 py-3 rounded-lg transition-all duration-200 group",
-                isActive
+                active
                   ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-primary"
                   : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-              )
-            }
-          >
-            <item.icon className={cn("w-5 h-5 flex-shrink-0", collapsed && "mx-auto")} />
-            {!collapsed && <span className="font-medium">{item.label}</span>}
-          </NavLink>
-        ))}
+              )}
+            >
+              <item.icon className={cn("w-5 h-5 flex-shrink-0", collapsed && "mx-auto")} />
+              {!collapsed && <span className="font-medium">{item.label}</span>}
+            </NavLink>
+          );
+        })}
       </nav>
 
       {/* Bottom section */}

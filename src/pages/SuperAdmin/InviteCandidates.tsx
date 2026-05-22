@@ -284,24 +284,7 @@ export default function InviteCandidates() {
   });
 
   return (
-    <div className="p-8 space-y-6 animate-fade-in">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-heading font-bold">Invite Candidates</h1>
-          <p className="text-muted-foreground mt-1">
-            Send test invitations to candidates
-          </p>
-        </div>
-        <Button
-          variant="outline"
-          onClick={() => navigate("../invitations-history")}
-          className="gap-2"
-        >
-          <Clock className="w-4 h-4" />
-          View Invitation History
-        </Button>
-      </div>
+    <div className="space-y-6 animate-fade-in">
 
       {/* Select Schedule */}
       <div className="bg-muted/30 rounded-lg p-4 space-y-3">
@@ -335,22 +318,32 @@ export default function InviteCandidates() {
       </div>
 
       {/* Search */}
-      <div className="flex items-center justify-between gap-4">
-        <div className="relative flex-1 max-w-md">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input
-            placeholder="Search candidates by name or email..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10"
-          />
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="flex flex-col sm:flex-row gap-2 flex-1 max-w-2xl w-full">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Input
+              placeholder="Search candidates by name or email..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10 w-full"
+            />
+          </div>
+          <Button
+            variant="outline"
+            onClick={() => navigate("../invitations-history")}
+            className="gap-2 shrink-0"
+          >
+            <Clock className="w-4 h-4" />
+            View History
+          </Button>
         </div>
 
         {selectedCandidates.length > 0 && (
           <Button
             onClick={handleBulkInvite}
             disabled={submitting || !selectedSchedule}
-            className="gap-2"
+            className="gap-2 shrink-0"
           >
             {submitting ? (
               <Loader2 className="w-4 h-4 animate-spin" />

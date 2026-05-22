@@ -1,4 +1,4 @@
-import { NavLink, useNavigate } from "react-router-dom";
+import { NavLink, useNavigate, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import {
   LayoutDashboard,
@@ -12,7 +12,6 @@ import {
   ChevronLeft,
   ChevronRight,
   UserRound,
-  Send,
 } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -23,21 +22,32 @@ const navItems = [
   { icon: UserRound, label: "Users", path: "/superadmin/users" },
   { icon: Users, label: "Candidates", path: "/superadmin/students" },
   { icon: FileQuestion, label: "Question Bank", path: "/superadmin/questions" },
-  { icon: ClipboardList, label: "Tests", path: "/superadmin/tests" },
-  { icon: Building2, label: "Test Schedules", path: "/superadmin/test-schedules" },
-  { icon: Send, label: "Invite Candidates", path: "/superadmin/invitations" },
-    { icon: BarChart3, label: "Reports", path: "/superadmin/reports" },
+  { 
+    icon: ClipboardList, 
+    label: "Assessments", 
+    path: "/superadmin/tests",
+    matchPaths: ["/superadmin/tests", "/superadmin/test-schedules", "/superadmin/invitations"]
+  },
+  { icon: BarChart3, label: "Reports", path: "/superadmin/reports" },
   { icon: Settings, label: "Settings", path: "/superadmin/settings" },
 ];
 
 export function SuperAdminSidebar() {
   const [collapsed, setCollapsed] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
 
   const handleLogout = () => {
     localStorage.removeItem("token");
     localStorage.removeItem("user");
     navigate("/login");
+  };
+
+  const isItemActive = (item: { path: string; end?: boolean; matchPaths?: string[] }) => {
+    if (item.matchPaths) {
+      return item.matchPaths.some(p => location.pathname.startsWith(p));
+    }
+    return item.end ? location.pathname === item.path : location.pathname.startsWith(item.path);
   };
 
   return (
@@ -61,24 +71,24 @@ export function SuperAdminSidebar() {
 
       {/* Navigation */}
       <nav className="flex-1 py-6 px-3 space-y-1 overflow-y-auto">
-        {navItems.map((item) => (
-          <NavLink
-            key={item.path}
-            to={item.path}
-            end={item.end}
-            className={({ isActive }) =>
-              cn(
+        {navItems.map((item) => {
+          const active = isItemActive(item);
+          return (
+            <NavLink
+              key={item.path}
+              to={item.path}
+              className={cn(
                 "flex items-center gap-3 px-3 py-3 rounded-lg transition-all duration-200 group",
-                isActive
+                active
                   ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-primary"
                   : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-              )
-            }
-          >
-            <item.icon className={cn("w-5 h-5 flex-shrink-0", collapsed && "mx-auto")} />
-            {!collapsed && <span className="font-medium">{item.label}</span>}
-          </NavLink>
-        ))}
+              )}
+            >
+              <item.icon className={cn("w-5 h-5 flex-shrink-0", collapsed && "mx-auto")} />
+              {!collapsed && <span className="font-medium">{item.label}</span>}
+            </NavLink>
+          );
+        })}
       </nav>
 
       {/* Bottom section */}
