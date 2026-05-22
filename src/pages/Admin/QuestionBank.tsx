@@ -54,6 +54,7 @@ import {
   useSubjectsQuery,
   useDeleteQuestionMutation,
 } from "@/hooks/use-query-hooks";
+import { QuestionPreview } from "../SuperAdmin/QuestionPreview";
 
 const difficultyColors: Record<string, string> = {
   EASY: "bg-green-500/10 text-green-500 border-green-500/20",
@@ -79,6 +80,10 @@ export default function AdminQuestionBank() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [selectedQuestion, setSelectedQuestion] = useState<Question | null>(null);
   const [deleting, setDeleting] = useState(false);
+
+  // Preview dialog state
+  const [previewQuestion, setPreviewQuestion] = useState<Question | null>(null);
+  const [previewOpen, setPreviewOpen] = useState(false);
 
   const deleteQuestionMutation = useDeleteQuestionMutation();
 
@@ -113,15 +118,8 @@ export default function AdminQuestionBank() {
   };
 
   const handleView = (question: Question) => {
-    if (question.questionType === "CODING") {
-      navigate(`/admin/questions/playground/${question.id}`);
-    } else {
-      // For MCQ, show a dialog or navigate to view page
-      toast({
-        title: "Question Preview",
-        description: question.prompt?.substring(0, 200),
-      });
-    }
+    setPreviewQuestion(question);
+    setPreviewOpen(true);
   };
 
   const handleEdit = (question: Question) => {
@@ -381,6 +379,13 @@ export default function AdminQuestionBank() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Add Question Preview Dialog */}
+      <QuestionPreview
+        question={previewQuestion}
+        open={previewOpen}
+        onOpenChange={setPreviewOpen}
+      />
     </div>
   );
 }

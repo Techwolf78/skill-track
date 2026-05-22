@@ -41,6 +41,7 @@ import {
   FileText,
   Shield,
   Terminal,
+  FolderTree,
 } from "lucide-react";
 import {
   testService,
@@ -57,6 +58,12 @@ import {
 import { useAuth } from "@/lib/auth-context";
 import { ROLES } from "@/lib/roles";
 import { useToast } from "@/hooks/use-toast";
+import QuickManageSubjects from "@/components/QuickManageSubjects";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 interface TestCaseForm {
   id?: string;
@@ -229,7 +236,9 @@ export default function EditQuestion() {
   const [difficulty, setDifficulty] = useState<"EASY" | "MEDIUM" | "HARD">(
     "MEDIUM",
   );
-  const [visibility, setVisibility] = useState<"PUBLIC" | "ORG_OWNED">("ORG_OWNED");
+  const [visibility, setVisibility] = useState<"PUBLIC" | "ORG_OWNED">(
+    "ORG_OWNED",
+  );
   const [constraints, setConstraints] = useState("");
   const [memoryLimitMb, setMemoryLimitMb] = useState<number>(256);
   const [timeLimitSecs, setTimeLimitSecs] = useState<number>(1);
@@ -237,6 +246,7 @@ export default function EditQuestion() {
   const [hints, setHints] = useState<string[]>([]);
   const [tags, setTags] = useState<string[]>([]);
   const [shuffleOptions, setShuffleOptions] = useState(true);
+  const [manageSubjectsOpen, setManageSubjectsOpen] = useState(false);
 
   // Assertion-Reason specific
   const [assertion, setAssertion] = useState("");
@@ -309,10 +319,12 @@ export default function EditQuestion() {
       if (questionData.mcqType === "ASSERTION_REASON") {
         if (questionData.assertion) setAssertion(questionData.assertion);
         if (questionData.reason) setReason(questionData.reason);
-        
+
         // Extract from prompt if missing
         if (!questionData.assertion || !questionData.reason) {
-          const match = questionData.prompt?.match(/Assertion \(A\): (.*?)\.? Reason \(R\): (.*?)\.?$/);
+          const match = questionData.prompt?.match(
+            /Assertion \(A\): (.*?)\.? Reason \(R\): (.*?)\.?$/,
+          );
           if (match) {
             if (!questionData.assertion) setAssertion(match[1]);
             if (!questionData.reason) setReason(match[2]);
@@ -334,9 +346,16 @@ export default function EditQuestion() {
       }
 
       // Extract IDs - use snake_case from backend with camelCase fallback
-      const subjectId = questionData.subject_id || questionData.subject?.id || questionData.subjectId;
-      const topicId = questionData.topic_id || questionData.topic?.id || questionData.topicId;
-      const subtopicId = questionData.subtopic_id || questionData.subtopic?.id || questionData.subtopicId;
+      const subjectId =
+        questionData.subject_id ||
+        questionData.subject?.id ||
+        questionData.subjectId;
+      const topicId =
+        questionData.topic_id || questionData.topic?.id || questionData.topicId;
+      const subtopicId =
+        questionData.subtopic_id ||
+        questionData.subtopic?.id ||
+        questionData.subtopicId;
 
       setSelectedSubject(subjectId || "");
 
@@ -454,6 +473,40 @@ export default function EditQuestion() {
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  const handleRefresh = async () => {
+    try {
+      const [allSubjects, allTopicsData] = await Promise.all([
+        testService.getAllSubjects(),
+        testService.getAllTopics(),
+      ]);
+
+      setSubjects(allSubjects);
+      setAllTopics(allTopicsData);
+
+      if (selectedSubject) {
+        const filteredTopics = allTopicsData.filter((topic) => {
+          return (
+            topic.subjectId === selectedSubject ||
+            topic.subject?.id === selectedSubject
+          );
+        });
+        setTopics(filteredTopics);
+
+        if (selectedTopic) {
+          try {
+            const subtopicsData =
+              await testService.getSubtopicsByTopic(selectedTopic);
+            setSubtopics(subtopicsData);
+          } catch (error) {
+            console.error("Failed to fetch subtopics:", error);
+          }
+        }
+      }
+    } catch (error) {
+      console.error("Failed to refresh subjects/topics:", error);
+    }
+  };
 
   const handleSubjectChange = (subjectId: string) => {
     setSelectedSubject(subjectId);
@@ -720,8 +773,9 @@ export default function EditQuestion() {
 
   const handleUpdate = async () => {
     // Validation
-    const isAssertionReason = questionType === "MCQ" && mcqSubType === "ASSERTION_REASON";
-    
+    const isAssertionReason =
+      questionType === "MCQ" && mcqSubType === "ASSERTION_REASON";
+
     if (!isAssertionReason && !prompt.trim()) {
       toast({
         title: "Validation Error",
@@ -730,7 +784,7 @@ export default function EditQuestion() {
       });
       return;
     }
-    
+
     if (isAssertionReason && (!assertion.trim() || !reason.trim())) {
       toast({
         title: "Validation Error",
@@ -798,7 +852,10 @@ export default function EditQuestion() {
 
     setSaving(true);
     try {
-      const questionData: UpdateQuestionRequest & { question_type?: string, type?: string } = {
+      const questionData: UpdateQuestionRequest & {
+        question_type?: string;
+        type?: string;
+      } = {
         questionType: questionType,
         question_type: questionType, // Sent to workaround potential Jackson snake-case mapping issues
         type: questionType, // Extra fallback
@@ -833,7 +890,7 @@ export default function EditQuestion() {
         if (mcqSubType === "ASSERTION_REASON") {
           // Combine assertion and reason into prompt
           questionData.prompt = `Assertion (A): ${assertion}. Reason (R): ${reason}.`;
-          
+
           questionData.mcqOptions = [
             {
               text: "Both A and R are true and R is correct explanation of A",
@@ -955,15 +1012,14 @@ export default function EditQuestion() {
         <div className="bg-muted/30 rounded-lg p-4">
           <p className="text-sm font-medium mb-2">Standard Options:</p>
           <ul className="text-sm text-muted-foreground space-y-1">
-            <li>
-              A) Both A and R are true and R is correct explanation of A
-            </li>
+            <li>A) Both A and R are true and R is correct explanation of A</li>
             <li>B) Both A and R are true but R is not correct explanation</li>
             <li>C) A is true but R is false</li>
             <li>D) A is false but R is true</li>
           </ul>
           <p className="text-xs text-muted-foreground mt-4">
-            💡 These standard options are automatically used for Assertion & Reason questions.
+            💡 These standard options are automatically used for Assertion &
+            Reason questions.
           </p>
         </div>
       );
@@ -1107,17 +1163,17 @@ export default function EditQuestion() {
           </div>
         ))}
 
-{mcqOptions.length < (mcqSubType === "TRUE_FALSE" ? 2 : 6) && (
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={addMcqOption}
-            >
-              <Plus className="w-4 h-4 mr-1" />
-              Add Option
-            </Button>
-          )}
+        {mcqOptions.length < (mcqSubType === "TRUE_FALSE" ? 2 : 6) && (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={addMcqOption}
+          >
+            <Plus className="w-4 h-4 mr-1" />
+            Add Option
+          </Button>
+        )}
 
         <div className="flex items-center space-x-2 mt-4">
           <Checkbox
@@ -1218,7 +1274,29 @@ export default function EditQuestion() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <Label>Subject *</Label>
+                <div className="flex items-center justify-between">
+                  <Label>Subject *</Label>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="link"
+                        size="sm"
+                        className="h-auto p-0 text-xs flex items-center gap-1 text-primary hover:underline"
+                        onClick={() => setManageSubjectsOpen(true)}
+                      >
+                        <FolderTree className="w-3.5 h-3.5" />
+                        Manage Subjects
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p className="text-xs max-w-xs font-normal text-muted-foreground">
+                        Add, rename, or delete subjects, topics, and subtopics
+                        inline without discarding your draft question.
+                      </p>
+                    </TooltipContent>
+                  </Tooltip>
+                </div>
                 <Select
                   value={selectedSubject}
                   onValueChange={handleSubjectChange}
@@ -1346,7 +1424,9 @@ export default function EditQuestion() {
                     <Label>Visibility</Label>
                     <Select
                       value={visibility}
-                      onValueChange={(val: "PUBLIC" | "ORG_OWNED") => setVisibility(val)}
+                      onValueChange={(val: "PUBLIC" | "ORG_OWNED") =>
+                        setVisibility(val)
+                      }
                       disabled={!isSuperAdmin}
                     >
                       <SelectTrigger>
@@ -1354,7 +1434,9 @@ export default function EditQuestion() {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="ORG_OWNED">Org Owned</SelectItem>
-                        {isSuperAdmin && <SelectItem value="PUBLIC">Public</SelectItem>}
+                        {isSuperAdmin && (
+                          <SelectItem value="PUBLIC">Public</SelectItem>
+                        )}
                       </SelectContent>
                     </Select>
                   </div>
@@ -1390,7 +1472,9 @@ export default function EditQuestion() {
               </div>
 
               {/* Question Prompt - Hide for Assertion & Reason */}
-              {!(questionType === "MCQ" && mcqSubType === "ASSERTION_REASON") && (
+              {!(
+                questionType === "MCQ" && mcqSubType === "ASSERTION_REASON"
+              ) && (
                 <div className="space-y-2">
                   <Label>Question Prompt *</Label>
                   <Textarea
@@ -1962,34 +2046,40 @@ export default function EditQuestion() {
                   </Badge>
                 </div>
               )}
-{shouldShowOptionsPreview() && (
-  <div className="rounded-lg bg-muted/30 p-4">
-    <p className="text-sm font-medium mb-2">Options:</p>
-    <div className="space-y-1">
-      {mcqOptions.map((opt, idx) => (
-        <div key={idx} className="flex items-center gap-2 text-sm">
-          <div
-            className={`w-2 h-2 rounded-full ${opt.isCorrect ? "bg-green-500" : "bg-gray-300"}`}
-          />
-          <span
-            className={
-              opt.isCorrect
-                ? "text-green-600"
-                : "text-muted-foreground"
-            }
-          >
-            {opt.text || `Option ${idx + 1}`}
-          </span>
-          {opt.isCorrect && (
-            <Badge variant="outline" className="text-green-600 text-xs">
-              Correct
-            </Badge>
-          )}
-        </div>
-      ))}
-    </div>
-  </div>
-)}
+              {shouldShowOptionsPreview() && (
+                <div className="rounded-lg bg-muted/30 p-4">
+                  <p className="text-sm font-medium mb-2">Options:</p>
+                  <div className="space-y-1">
+                    {mcqOptions.map((opt, idx) => (
+                      <div
+                        key={idx}
+                        className="flex items-center gap-2 text-sm"
+                      >
+                        <div
+                          className={`w-2 h-2 rounded-full ${opt.isCorrect ? "bg-green-500" : "bg-gray-300"}`}
+                        />
+                        <span
+                          className={
+                            opt.isCorrect
+                              ? "text-green-600"
+                              : "text-muted-foreground"
+                          }
+                        >
+                          {opt.text || `Option ${idx + 1}`}
+                        </span>
+                        {opt.isCorrect && (
+                          <Badge
+                            variant="outline"
+                            className="text-green-600 text-xs"
+                          >
+                            Correct
+                          </Badge>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
               {questionType === "CODING" && testCases.length > 0 && (
                 <div className="rounded-lg bg-muted/30 p-4">
                   <p className="text-sm font-medium mb-2">Test Cases:</p>
@@ -2069,6 +2159,12 @@ export default function EditQuestion() {
           </Card>
         </div>
       </div>
+      {/* Quick Manage Subjects Dialog */}
+      <QuickManageSubjects
+        open={manageSubjectsOpen}
+        onOpenChange={setManageSubjectsOpen}
+        onRefresh={handleRefresh}
+      />
     </div>
   );
 }
