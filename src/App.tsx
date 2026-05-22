@@ -22,7 +22,7 @@ import TestDetails from "./pages/SuperAdmin/TestDetails"; // Add this import
 import TestScheduleDetails from "./pages/SuperAdmin/TestScheduleDetails";
 import InviteCandidates from "./pages/SuperAdmin/InviteCandidates";
 import InvitedCandidatesHistory from "./pages/SuperAdmin/InvitedCandidatesHistory";
-import TestAccess from "./pages/test/TestAccess";
+import TestAccess from "./pages/Test/TestAccess";
 import EditQuestion from "./pages/SuperAdmin/EditQuestion";
 import AddQuestion from "./pages/SuperAdmin/AddQuestion";
 import Settings from "./pages/SuperAdmin/Settings";
@@ -45,8 +45,8 @@ import AdminTestsEdit from "./pages/Admin/TestsEdit";
 import AdminTestDetails from "./pages/Admin/TestDetails";
 
 // Test Taking
-import TestInterface from "./pages/test/TestInterface";
-import TestResults from "./pages/test/TestResults";
+import TestInterface from "./pages/Test/TestInterface";
+import TestResults from "./pages/Test/TestResults";
 
 const queryClient = new QueryClient({
   defaultOptions: {
