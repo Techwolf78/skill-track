@@ -114,7 +114,14 @@ export default function TestSchedules() {
     queryFn: async () => {
       try {
         const res = await apiClient.get("/candidate-invitations");
-        return res.data.data || [];
+        const data = res.data?.data;
+        if (Array.isArray(data)) {
+          return data;
+        }
+        if (data && typeof data === "object" && "content" in data && Array.isArray((data as any).content)) {
+          return (data as any).content;
+        }
+        return [];
       } catch (e) {
         return [];
       }

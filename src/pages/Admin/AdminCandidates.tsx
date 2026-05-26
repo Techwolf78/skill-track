@@ -298,9 +298,9 @@ export default function AdminCandidates() {
     } catch (error: any) {
       console.error("Failed to delete candidate:", error);
       toast({
-        title: "Error",
+        title: "Delete Failed",
         description:
-          error.response?.data?.message || "Failed to delete candidate",
+          error.response?.data?.message || "Failed to delete candidate. This action is restricted by the backend (e.g. if the candidate has active test sessions, submissions, or invitations).",
         variant: "destructive",
       });
     } finally {

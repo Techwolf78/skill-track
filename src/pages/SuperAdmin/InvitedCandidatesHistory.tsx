@@ -76,7 +76,14 @@ export default function InvitedCandidatesHistory() {
       
       setSchedules(schedulesWithTests);
       setCandidates(candidatesData);
-      setInvitations(invitationsResponse.data.data || []);
+      const invData = invitationsResponse.data?.data;
+      if (Array.isArray(invData)) {
+        setInvitations(invData);
+      } else if (invData && typeof invData === "object" && "content" in invData && Array.isArray((invData as any).content)) {
+        setInvitations((invData as any).content);
+      } else {
+        setInvitations([]);
+      }
     } catch (error) {
       console.error("Failed to fetch data:", error);
       toast({

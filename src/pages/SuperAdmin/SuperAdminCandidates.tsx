@@ -51,6 +51,10 @@ import {
   useCreateCandidateMutation,
   useDeleteCandidateMutation,
 } from "@/hooks/use-query-hooks";
+import { Candidate } from "@/lib/candidate-service";
+import { BulkUploadCandidates } from "../Admin/BulkUploadCandidates";
+import { EditCandidateDialog } from "../Admin/EditCandidateDialog";
+import { DeleteConfirmDialog } from "../Admin/DeleteConfirmDialog";
 
 export default function Students() {
   const [searchTerm, setSearchTerm] = useState("");
@@ -165,7 +169,11 @@ export default function Students() {
       toast({ title: "Success", description: "Candidate deleted successfully" });
       setIsDeleteDialogOpen(false);
     } catch (error: any) {
-      toast({ title: "Error", description: "Failed to delete candidate", variant: "destructive" });
+      toast({ 
+        title: "Delete Failed", 
+        description: error.response?.data?.message || "Failed to delete candidate. This action is restricted by the backend (e.g. if the candidate has active test sessions, submissions, or invitations).", 
+        variant: "destructive" 
+      });
     } finally {
       setDeleting(false);
     }
@@ -392,7 +400,13 @@ export default function Students() {
         />
       )}
       {isDeleteDialogOpen && candidateToDelete && (
-        <DeleteConfirmDialog isOpen={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen} onConfirm={handleDeleteConfirm} deleting={deleting} title="Delete Candidate" description={`Are you sure you want to delete ${candidateToDelete.user.name}? This action cannot be undone.`} />
+        <DeleteConfirmDialog 
+          open={isDeleteDialogOpen} 
+          onOpenChange={setIsDeleteDialogOpen} 
+          candidateName={candidateToDelete.user.name || ""} 
+          onConfirm={handleDeleteConfirm} 
+          loading={deleting} 
+        />
       )}
     </div>
   );

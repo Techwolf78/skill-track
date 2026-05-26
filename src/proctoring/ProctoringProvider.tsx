@@ -15,6 +15,7 @@ interface ProctoringContextType extends ProctoringState {
   startProctoring: () => void;
   stopProctoring: () => void;
   videoRef: React.RefObject<HTMLVideoElement | null>;
+  syncViolations: () => Promise<boolean>;
 }
 
 const ProctoringContext = createContext<ProctoringContextType | undefined>(undefined);
@@ -41,7 +42,7 @@ export const ProctoringProvider: React.FC<{ children: React.ReactNode; sessionId
     switch (type) {
       case "MULTI_FACE": severity = "HIGH"; break;
       case "LOOK_AWAY": severity = "MEDIUM"; break;
-      case "TAB_SWITCH": severity = "MEDIUM"; break;
+      case "TAB_SWITCH": severity = "HIGH"; break;
       case "EXTENDED_TAB_SWITCH": severity = "HIGH"; break;
       case "SPEECH": severity = "MEDIUM"; break;
       case "DEVTOOLS_OPEN": severity = "CRITICAL"; break;
@@ -49,10 +50,41 @@ export const ProctoringProvider: React.FC<{ children: React.ReactNode; sessionId
       case "SCREEN_RECORD": severity = "CRITICAL"; break;
     }
 
+    // Capture compressed low-resolution frame for visual proof on HIGH/CRITICAL violations
+    let evidence: string | undefined = undefined;
+    if (severity === "CRITICAL" || severity === "HIGH") {
+      const video = document.querySelector("video");
+      if (video && !video.paused && !video.ended) {
+        try {
+          const canvas = document.createElement("canvas");
+          canvas.width = 200;
+          canvas.height = 150;
+          const ctx = canvas.getContext("2d");
+          if (ctx) {
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            const data = imgData.data;
+            // Convert to grayscale to minimize base64 payload size by ~66%
+            for (let i = 0; i < data.length; i += 4) {
+              const brightness = 0.34 * data[i] + 0.5 * data[i + 1] + 0.16 * data[i + 2];
+              data[i] = brightness;
+              data[i + 1] = brightness;
+              data[i + 2] = brightness;
+            }
+            ctx.putImageData(imgData, 0, 0);
+            evidence = canvas.toDataURL("image/jpeg", 0.6); // 60% quality compressed JPEG
+          }
+        } catch (e) {
+          console.error("Failed to capture video frame evidence:", e);
+        }
+      }
+    }
+
     const newViolation = store.current.addViolation({
       type,
       severity,
       metadata,
+      evidence,
     });
 
     setState(prev => ({
@@ -61,7 +93,12 @@ export const ProctoringProvider: React.FC<{ children: React.ReactNode; sessionId
       trustScore: store.current.getScore()
     }));
 
-    // Removed redundant sonner toast to avoid duplicate notifications
+    // Non-blocking real-time alert sync for critical/high violations
+    if (severity === "CRITICAL" || severity === "HIGH") {
+      store.current.syncSingleViolation(newViolation).catch(err => {
+        console.error("Failed to sync critical violation immediately:", err);
+      });
+    }
   }, []);
 
   const handleViolation = useCallback((type: ViolationType, meta?: Record<string, unknown>) => {
@@ -122,8 +159,25 @@ export const ProctoringProvider: React.FC<{ children: React.ReactNode; sessionId
     behaviorAnalyzer.current.init();
   }, [sessionId]);
 
+  // Flush cached offline violations when connection returns
+  useEffect(() => {
+    const handleOnline = () => {
+      console.log("🌐 Connection restored. Syncing unsynced violations to backend...");
+      store.current.syncUnsynced().catch(err => {
+        console.error("Failed to sync offline queue:", err);
+      });
+    };
+
+    window.addEventListener("online", handleOnline);
+    return () => window.removeEventListener("online", handleOnline);
+  }, []);
+
   const startProctoring = () => setState(prev => ({ ...prev, isProctoringActive: true }));
   const stopProctoring = () => setState(prev => ({ ...prev, isProctoringActive: false }));
+
+  const syncViolations = useCallback(async () => {
+    return await store.current.syncToBackend();
+  }, []);
 
   return (
     <ProctoringContext.Provider value={{ 
@@ -131,7 +185,8 @@ export const ProctoringProvider: React.FC<{ children: React.ReactNode; sessionId
       addViolation, 
       startProctoring, 
       stopProctoring,
-      videoRef 
+      videoRef,
+      syncViolations
     }}>
       {children}
     </ProctoringContext.Provider>

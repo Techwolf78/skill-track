@@ -67,13 +67,14 @@ export function useCameraMonitor(
   useEffect(() => {
     if (!detector || !videoRef.current || !isActive) return;
 
-    let frameId: number;
+    let timeoutId: NodeJS.Timeout;
     let lastViolationTime = 0;
     const VIOLATION_COOLDOWN = 3000; // 3 seconds
+    const DETECTION_INTERVAL = 1500; // 1.5 seconds
 
     const detect = async () => {
       if (!videoRef.current || videoRef.current.paused || videoRef.current.ended) {
-        frameId = requestAnimationFrame(detect);
+        timeoutId = setTimeout(detect, DETECTION_INTERVAL);
         return;
       }
 
@@ -94,11 +95,13 @@ export function useCameraMonitor(
         console.error("Face detection error:", err);
       }
 
-      frameId = requestAnimationFrame(detect);
+      if (isActive) {
+        timeoutId = setTimeout(detect, DETECTION_INTERVAL);
+      }
     };
 
-    detect();
-    return () => cancelAnimationFrame(frameId);
+    timeoutId = setTimeout(detect, DETECTION_INTERVAL);
+    return () => clearTimeout(timeoutId);
   }, [detector, isActive, onViolation]);
 
   return { videoRef, error, isInitializing };

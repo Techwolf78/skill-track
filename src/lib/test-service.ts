@@ -433,16 +433,21 @@ const unwrapArrayResponse = <T>(response: {
   if (Array.isArray(data)) {
     return data;
   }
-  if (
-    data &&
-    typeof data === "object" &&
-    "data" in data &&
-    Array.isArray((data as BaseResponse<T[]>).data)
-  ) {
-    return (data as BaseResponse<T[]>).data;
+  if (data && typeof data === "object" && "data" in data) {
+    const nestedData = (data as any).data;
+    if (Array.isArray(nestedData)) {
+      return nestedData;
+    }
+    if (nestedData && typeof nestedData === "object" && "content" in nestedData && Array.isArray(nestedData.content)) {
+      return nestedData.content;
+    }
+  }
+  if (data && typeof data === "object" && "content" in data && Array.isArray((data as any).content)) {
+    return (data as any).content;
   }
   return [];
 };
+
 
 // ==================== Service ====================
 export const testService = {

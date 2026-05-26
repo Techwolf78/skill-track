@@ -161,6 +161,7 @@ export function useDeleteCandidateMutation() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["candidates"] });
     },
+    throwOnError: false,
   });
 }
 

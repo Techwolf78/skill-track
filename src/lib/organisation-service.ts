@@ -57,7 +57,14 @@ export const organisationService = {
         "/organisations",
       );
 
-    return response.data?.data ?? [];
+    const data = response.data?.data;
+    if (Array.isArray(data)) {
+      return data;
+    }
+    if (data && typeof data === "object" && "content" in data && Array.isArray((data as any).content)) {
+      return (data as any).content;
+    }
+    return [];
   },
 
   getOrganisationById: async (id: string): Promise<OrganisationResponse> => {

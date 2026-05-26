@@ -101,10 +101,16 @@ export default function InviteCandidates() {
       setSchedules(schedulesWithTests);
       setCandidates(candidatesData);
 
-      // Fetch invitations
       try {
         const response = await apiClient.get("/candidate-invitations");
-        setInvitations(response.data.data || []);
+        const invData = response.data?.data;
+        if (Array.isArray(invData)) {
+          setInvitations(invData);
+        } else if (invData && typeof invData === "object" && "content" in invData && Array.isArray((invData as any).content)) {
+          setInvitations((invData as any).content);
+        } else {
+          setInvitations([]);
+        }
       } catch (error) {
         console.log("No invitations data yet");
       }

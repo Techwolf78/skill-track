@@ -117,16 +117,21 @@ export default function TestInterface() {
   const { testId, sessionId } = useParams();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const [checked, setChecked] = useState(false);
 
   return (
     <ProctoringProvider sessionId={sessionId || "demo-session"}>
-      <TestInterfaceContent testId={testId} sessionId={sessionId} navigate={navigate} toast={toast} />
+      {!checked ? (
+        <EnvironmentCheck onComplete={() => setChecked(true)} />
+      ) : (
+        <TestInterfaceContent testId={testId} sessionId={sessionId} navigate={navigate} toast={toast} />
+      )}
     </ProctoringProvider>
   );
 }
 
 function TestInterfaceContent({ testId, sessionId, navigate, toast }: { testId?: string; sessionId?: string; navigate: (path: string) => void; toast: (props: { title?: string; description?: string; variant?: "default" | "destructive" }) => void }) {
-  const { trustScore, isProctoringActive, startProctoring } = useProctoring();
+  const { violations, trustScore, isProctoringActive, startProctoring, syncViolations } = useProctoring();
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -359,6 +364,13 @@ useEffect(() => {
     
     setSubmitting(true);
     try {
+      // Gracefully sync proctoring violations to backend before submission
+      try {
+        await syncViolations();
+      } catch (syncErr) {
+        console.warn("Failed to sync proctoring violations (endpoint might not be deployed yet):", syncErr);
+      }
+
       // Use the new dedicated submit endpoint
       await testService.submitSession(sessionId, answers);
 
@@ -376,7 +388,7 @@ useEffect(() => {
       setSubmitting(false);
       setShowSubmitDialog(false);
     }
-  }, [sessionId, answers, testId, navigate, toast]);
+  }, [sessionId, answers, testId, navigate, toast, syncViolations]);
 
   const handleAutoSubmit = useCallback(async () => {
     toast({
@@ -420,6 +432,109 @@ useEffect(() => {
     }
     return () => clearInterval(timer);
   }, [isProctoringActive, isFullscreen, toast, handleAutoSubmit, fullscreenTimer]);
+
+  // Feature 1: Clipboard & Keyboard Interception
+  useEffect(() => {
+    if (!isProctoringActive) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // DevTools keys
+      if (
+        e.key === "F12" ||
+        (e.ctrlKey && e.shiftKey && (e.key === "I" || e.key === "i" || e.key === "J" || e.key === "j" || e.key === "C" || e.key === "c")) ||
+        (e.metaKey && e.altKey && (e.key === "I" || e.key === "i"))
+      ) {
+        e.preventDefault();
+        toast({
+          title: "Blocked Action",
+          description: "Developer tools access is restricted during the test.",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      // Copy/Paste/Cut shortcuts
+      if ((e.ctrlKey || e.metaKey) && (e.key === "c" || e.key === "C" || e.key === "v" || e.key === "V" || e.key === "x" || e.key === "X")) {
+        e.preventDefault();
+        toast({
+          title: "Blocked Shortcut",
+          description: "Copying and pasting are disabled during the test.",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      // Print Screen
+      if (e.key === "PrintScreen") {
+        e.preventDefault();
+        navigator.clipboard.writeText("").catch(() => {});
+        toast({
+          title: "Screenshot Detected",
+          description: "Screenshots are blocked and your clipboard has been cleared.",
+          variant: "destructive"
+        });
+      }
+    };
+
+    const handleCopy = (e: ClipboardEvent) => {
+      e.preventDefault();
+      toast({
+        title: "Copy Blocked",
+        description: "Exfiltrating test contents is not permitted.",
+        variant: "destructive"
+      });
+    };
+
+    const handlePaste = (e: ClipboardEvent) => {
+      e.preventDefault();
+      toast({
+        title: "Paste Blocked",
+        description: "Pasting text into the editor is disabled.",
+        variant: "destructive"
+      });
+    };
+
+    const handleContextMenu = (e: MouseEvent) => {
+      e.preventDefault();
+    };
+
+    window.addEventListener("keydown", handleKeyDown, true);
+    document.addEventListener("copy", handleCopy, true);
+    document.addEventListener("paste", handlePaste, true);
+    document.addEventListener("contextmenu", handleContextMenu, true);
+
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown, true);
+      document.removeEventListener("copy", handleCopy, true);
+      document.removeEventListener("paste", handlePaste, true);
+      document.removeEventListener("contextmenu", handleContextMenu, true);
+    };
+  }, [isProctoringActive, toast]);
+
+  // Feature 2: Hard "3-Strikes" Tab Switch Policy
+  useEffect(() => {
+    if (!isProctoringActive) return;
+
+    const tabSwitches = violations.filter(v => v.type === "TAB_SWITCH" || v.type === "EXTENDED_TAB_SWITCH");
+    const count = tabSwitches.length;
+
+    if (count > 0) {
+      if (count >= 3) {
+        toast({
+          title: "Test Auto-Submitted",
+          description: "You have exceeded the maximum of 3 allowed tab switches.",
+          variant: "destructive"
+        });
+        submitTest();
+      } else {
+        toast({
+          title: "Security Violation",
+          description: `Warning: Tab switch detected (${count}/3). Reaching 3 switches will auto-submit your test.`,
+          variant: "destructive"
+        });
+      }
+    }
+  }, [violations, isProctoringActive, submitTest, toast]);
 
   // Timer effect
   useEffect(() => {

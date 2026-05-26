@@ -36,7 +36,14 @@ export const userService = {
   getUsers: async (): Promise<UserResponse[]> => {
     const response =
       await apiClient.get<BaseResponse<UserResponse[]>>("/users");
-    return response.data.data || [];
+    const data = response.data?.data;
+    if (Array.isArray(data)) {
+      return data;
+    }
+    if (data && typeof data === "object" && "content" in data && Array.isArray((data as any).content)) {
+      return (data as any).content;
+    }
+    return [];
   },
 
   getUserById: async (id: string): Promise<UserResponse> => {
