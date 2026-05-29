@@ -308,5 +308,6 @@ export function useDeleteQuestionMutation() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["questions"] });
     },
+    throwOnError: false,
   });
 }

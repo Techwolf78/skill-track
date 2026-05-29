@@ -55,7 +55,7 @@ const queryClient = new QueryClient({
       throwOnError: true,
     },
     mutations: {
-      throwOnError: true,
+      throwOnError: false,
     },
   },
 });
