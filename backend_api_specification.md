@@ -232,18 +232,6 @@ All endpoints below are relative to the base URL (typically `http://localhost:80
 - **Authentication / Security Rule**: `@sec.isAdminOrSuperAdmin()`
 - **Method Signature**: `public ResponseEntity<BaseResponse<List<CodeRunResponseDTO>>> playground(@RequestBody @Valid com.gryphon.rxone.DTO.CodeExecution.PlaygroundRequest request)`
 
-### LogController
-- **Base Path**: `/logs`
-- **Class-level Security**: `@sec.isAdminOrSuperAdmin()`
-
-#### `[GET] /logs`
-- **Authentication / Security Rule**: `@sec.isAdminOrSuperAdmin()`
-- **Method Signature**: `public ResponseEntity<String> getAllLogs()`
-
-#### `[GET] /logs/level/{level}`
-- **Authentication / Security Rule**: `@sec.isAdminOrSuperAdmin()`
-- **Method Signature**: `public ResponseEntity<String> getLogsByLevel(@PathVariable String level)`
-
 ### OrganisationController
 - **Base Path**: `/organisations`
 
