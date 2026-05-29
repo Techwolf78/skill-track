@@ -12,6 +12,7 @@ import {
   ChevronLeft,
   ChevronRight,
   UserRound,
+  Terminal,
 } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -29,6 +30,7 @@ const navItems = [
     matchPaths: ["/superadmin/tests", "/superadmin/test-schedules", "/superadmin/invitations"]
   },
   { icon: BarChart3, label: "Reports", path: "/superadmin/reports" },
+  { icon: Terminal, label: "System Logs", path: "/superadmin/logs" },
   { icon: Settings, label: "Settings", path: "/superadmin/settings" },
 ];
 

@@ -31,6 +31,7 @@ import DSAPlayground from "./pages/SuperAdmin/DSAPlayground";
 import Reports from "./pages/SuperAdmin/Reports";
 import TestSchedules from "./pages/SuperAdmin/TestSchedules";
 import SeedData from "./pages/SeedData";
+import Logs from "./pages/SuperAdmin/Logs";
 import { AuthProvider } from "./lib/auth-context";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ProtectedRoute } from "./components/ProtectedRoute";
@@ -112,6 +113,7 @@ const App = () => (
                 <Route path="reports" element={<Reports />} />
                 <Route path="settings" element={<Settings />} />
                 <Route path="subjects/manage" element={<ManageSubjects />} />
+                <Route path="logs" element={<Logs />} />
               </Route>
               {/* Admin Routes (ADMIN role only) */}
               <Route
@@ -143,6 +145,7 @@ const App = () => (
                 <Route path="tests/:id/questions" element={<TestQuestions />} />
                 <Route path="schedules/:id" element={<TestScheduleDetails />} />
                 <Route path="invitations-history" element={<InvitedCandidatesHistory />} />
+                <Route path="logs" element={<Logs />} />
               </Route>
               {/* Student Test Taking */}
               <Route path="/test/:testId" element={<TestInterface />} />
