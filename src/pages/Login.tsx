@@ -103,7 +103,7 @@ export default function Login() {
         title: "Access Granted!",
         description: "Starting your test session...",
       });
-      navigate(`/test/${studentCode}`);
+      navigate(`/test/access/${studentCode}`);
     } catch (error: unknown) {
       let errorMessage = "Invalid test code or email.";
       if (axios.isAxiosError(error)) {

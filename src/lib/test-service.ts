@@ -912,8 +912,8 @@ export const testService = {
     return allSessions.filter((s) => s.testId === testId);
   },
 
-  submitSession: async (id: string, answers?: Record<string, any>): Promise<TestSession> => {
-    const response = await apiClient.post<TestSession>(`/test-sessions/${id}/submit`, {
+  submitSession: async (id: string, answers?: Record<string, any>): Promise<string> => {
+    const response = await apiClient.post<string>(`/test-sessions/${id}/submit`, {
       answers,
       submittedAt: new Date().toISOString(),
     });

@@ -4,6 +4,9 @@ const API_BASE_URL = "/api";
 
 export const apiClient = axios.create({
   baseURL: API_BASE_URL,
+  withCredentials: true,
+  xsrfCookieName: "XSRF-TOKEN",
+  xsrfHeaderName: "X-XSRF-TOKEN",
   headers: {
     "Content-Type": "application/json",
   },
@@ -38,24 +41,24 @@ apiClient.interceptors.response.use(
 
     // Enhance the error object with standard BaseResponse error details
     if (error.response?.data && typeof error.response.data === "object") {
-      const data = error.response.data as any;
+      const data = error.response.data as Record<string, unknown>;
 
       // Extract field validation errors
       if (data.errors && typeof data.errors === "object") {
-        const errorEntries = Object.entries(data.errors);
+        const errorEntries = Object.entries(data.errors as Record<string, string>);
         if (errorEntries.length > 0) {
           const validationMsg = errorEntries
             .map(([field, msg]) => `${field}: ${msg}`)
             .join("\n");
-          const fullMessage = `${data.message || "Validation failed"}:\n${validationMsg}`;
+          const fullMessage = `${(data.message as string) || "Validation failed"}:\n${validationMsg}`;
           error.message = fullMessage;
           data.message = fullMessage; // For components using error.response?.data?.message
         }
       } else if (data.errorCode) {
-        error.message = `${data.errorCode}: ${data.message || "An error occurred"}`;
+        error.message = `${data.errorCode as string}: ${(data.message as string) || "An error occurred"}`;
         data.message = error.message;
       } else if (data.message) {
-        error.message = data.message;
+        error.message = data.message as string;
       }
     }
 
@@ -63,7 +66,8 @@ apiClient.interceptors.response.use(
       // Access denied — user lacks permission for this resource
       console.warn("Access denied:", error.response?.data);
       // Optional: if the UI expects an error message to be surfaced directly
-      if (!error.response?.data?.message) {
+      const responseData = error.response?.data as Record<string, unknown> | undefined;
+      if (!responseData?.message) {
         error.message = "Access Denied: You do not have permission to perform this action.";
       }
     }

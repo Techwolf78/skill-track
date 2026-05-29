@@ -27,6 +27,12 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import Editor from "@monaco-editor/react";
 import { apiClient } from "@/lib/api-client";
 import { testService, CodeTemplateEntry, TestCaseResult } from "@/lib/test-service";
+import { LANGUAGE_MAP, type LanguageKey, resolveStarterCode, getAvailableLanguages } from "@/lib/exam/languageMap";
+import { formatTime } from "@/lib/exam/formatTime";
+import { isTerminalStatus, mapTestCaseResults, buildSubmitOutputMessage, buildRunOutputMessage } from "@/lib/exam/codeExecution";
+import { isDevToolsKey, isClipboardShortcut, isPrintScreen } from "@/lib/proctoring/keyboardSecurity";
+import { countTabSwitches, shouldAutoSubmitOnTabSwitch } from "@/lib/proctoring/violationLogic";
+import { computeFullscreenPolicy, tickFullscreenTimer, resetFullscreenTimer, FULLSCREEN_GRACE_PERIOD } from "@/lib/proctoring/fullscreenLogic";
 import { ProctoringProvider, useProctoring } from "@/proctoring/ProctoringProvider";
 import { CameraPreview } from "@/proctoring/components/CameraPreview";
 import { ViolationToast } from "@/proctoring/components/ViolationToast";
@@ -103,15 +109,6 @@ interface TestQuestion {
   };
 }
 
-// Language mapping for display
-const LANGUAGE_MAP = {
-  python3: { name: "Python 3", slug: "python3", monaco: "python" },
-  javascript: { name: "JavaScript", slug: "javascript", monaco: "javascript" },
-  java: { name: "Java", slug: "java", monaco: "java" },
-  cpp: { name: "C++", slug: "cpp", monaco: "cpp" },
-} as const;
-
-type LanguageKey = keyof typeof LANGUAGE_MAP;
 
 export default function TestInterface() {
   const { testId, sessionId } = useParams();
@@ -167,20 +164,17 @@ function TestInterfaceContent({ testId, sessionId, navigate, toast }: { testId?:
 
 
 
-  const fetchTestDirect = useCallback(async () => {
-    try {
-      setLoading(true);
-      const testResponse = await apiClient.get(`/tests/${testId}`);
-      const testData = testResponse.data?.data || testResponse.data;
-      setTest(testData);
-    } catch (error: unknown) {
-      const err = error as { response?: { data?: { message?: string } } };
-      console.error("Failed to fetch test:", err);
-      setError(err.response?.data?.message || "Failed to load test");
-    } finally {
-      setLoading(false);
+  // Session validation
+  useEffect(() => {
+    if (!sessionId) {
+      toast({
+        title: "Access Denied",
+        description: "Direct test access is no longer permitted. Please use your secure invitation link.",
+        variant: "destructive",
+      });
+      navigate("/login");
     }
-  }, [testId]);
+  }, [sessionId, navigate, toast]);
 
   const fetchTestSession = useCallback(async () => {
     try {
@@ -267,10 +261,8 @@ function TestInterfaceContent({ testId, sessionId, navigate, toast }: { testId?:
   useEffect(() => {
     if (sessionId) {
       fetchTestSession();
-    } else if (testId) {
-      fetchTestDirect();
     }
-  }, [sessionId, testId, fetchTestSession, fetchTestDirect]);
+  }, [sessionId, fetchTestSession]);
 
   // Process questions when test data is loaded
 // Update this useEffect in TestInterface.tsx

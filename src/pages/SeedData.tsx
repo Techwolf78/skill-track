@@ -1174,8 +1174,15 @@ export default function SeedData() {
       addLog("Retrieving token hashes to generate direct test access links...", "info");
       let listInv: any[] = [];
       try {
-        const invResponse = await apiClient.get("/candidate-invitations");
-        listInv = invResponse.data?.data || [];
+        const invResponse = await apiClient.get("/candidate-invitations?size=100");
+        const invData = invResponse.data?.data;
+        if (Array.isArray(invData)) {
+          listInv = invData;
+        } else if (invData && typeof invData === "object" && "content" in invData && Array.isArray((invData as any).content)) {
+          listInv = (invData as any).content;
+        } else {
+          listInv = [];
+        }
       } catch (invGetError) {}
 
       candidatesList.forEach((cand, idx) => {
