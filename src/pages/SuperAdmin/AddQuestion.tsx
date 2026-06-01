@@ -229,6 +229,7 @@ export default function AddQuestion() {
   const { toast } = useToast();
   const { user } = useAuth();
   const isSuperAdmin = user?.role === ROLES.SUPERADMIN;
+  const backRoute = isSuperAdmin ? "/superadmin/questions" : "/admin/questions";
   const [loading, setLoading] = useState(false);
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [topics, setTopics] = useState<Topic[]>([]);
@@ -305,6 +306,14 @@ export default function AddQuestion() {
   useEffect(() => {
     fetchInitialData();
   }, [fetchInitialData]);
+
+  useEffect(() => {
+    if (isSuperAdmin) {
+      setVisibility("PUBLIC");
+    } else {
+      setVisibility("ORG_OWNED");
+    }
+  }, [isSuperAdmin]);
 
   const handleRefresh = async () => {
     try {
@@ -796,7 +805,7 @@ export default function AddQuestion() {
         title: "Success",
         description: "Question added successfully",
       });
-      navigate("/superadmin/questions");
+      navigate(backRoute);
     } catch (error) {
       console.error("Failed to create question:", error);
       toast({
@@ -1011,7 +1020,7 @@ export default function AddQuestion() {
         <Button
           variant="ghost"
           size="icon"
-          onClick={() => navigate("/superadmin/questions")}
+          onClick={() => navigate(backRoute)}
         >
           <ArrowLeft className="w-5 h-5" />
         </Button>
@@ -1887,7 +1896,7 @@ export default function AddQuestion() {
               </Button>
               <Button
                 variant="outline"
-                onClick={() => navigate("/superadmin/questions")}
+                onClick={() => navigate(backRoute)}
                 className="w-full"
               >
                 Cancel

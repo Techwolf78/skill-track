@@ -56,6 +56,7 @@ import {
   CodeTemplateEntry,
 } from "@/lib/test-service";
 import { useAuth } from "@/lib/auth-context";
+import { authService } from "@/lib/auth-service";
 import { ROLES } from "@/lib/roles";
 import { useToast } from "@/hooks/use-toast";
 import QuickManageSubjects from "@/components/QuickManageSubjects";
@@ -216,6 +217,7 @@ export default function EditQuestion() {
   const { toast } = useToast();
   const { user } = useAuth();
   const isSuperAdmin = user?.role === ROLES.SUPERADMIN;
+  const backRoute = isSuperAdmin ? "/superadmin/questions" : "/admin/questions";
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -303,6 +305,18 @@ export default function EditQuestion() {
       setSampleExplanation(questionData.sampleExplanation || "");
       if (questionData.visibility) {
         setVisibility(questionData.visibility as "PUBLIC" | "ORG_OWNED");
+      }
+
+      const currentUser = authService.getCurrentUser();
+      const userIsSuperAdmin = currentUser?.role === "SUPERADMIN";
+      if (!userIsSuperAdmin && questionData.visibility === "PUBLIC") {
+        toast({
+          title: "Access Denied",
+          description: "Only SuperAdmins can edit public questions",
+          variant: "destructive",
+        });
+        navigate(backRoute);
+        return;
       }
 
       // Handle question type
@@ -464,7 +478,7 @@ export default function EditQuestion() {
         description: "Failed to load question",
         variant: "destructive",
       });
-      navigate("/superadmin/questions");
+      navigate(backRoute);
     } finally {
       setLoading(false);
     }
@@ -989,7 +1003,7 @@ export default function EditQuestion() {
         title: "Success",
         description: "Question updated successfully",
       });
-      navigate("/superadmin/questions");
+      navigate(backRoute);
     } catch (error) {
       console.error("Failed to update question:", error);
       toast({
@@ -1210,7 +1224,7 @@ export default function EditQuestion() {
         <Button
           variant="ghost"
           size="icon"
-          onClick={() => navigate("/superadmin/questions")}
+          onClick={() => navigate(backRoute)}
         >
           <ArrowLeft className="w-5 h-5" />
         </Button>
@@ -2122,7 +2136,7 @@ export default function EditQuestion() {
               </Button>
               <Button
                 variant="outline"
-                onClick={() => navigate("/superadmin/questions")}
+                onClick={() => navigate(backRoute)}
                 className="w-full"
               >
                 Cancel

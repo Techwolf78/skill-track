@@ -76,6 +76,13 @@ export default function AdminQuestionBank() {
   const [difficultyFilter, setDifficultyFilter] = useState<string>("ALL");
   const [subjectFilter, setSubjectFilter] = useState<string>("all");
 
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 10;
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, activeTab, difficultyFilter, subjectFilter]);
+
   // Delete dialog state
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [selectedQuestion, setSelectedQuestion] = useState<Question | null>(null);
@@ -130,16 +137,32 @@ export default function AdminQuestionBank() {
     navigate("/admin/questions/add");
   };
 
+  const getDifficultyFromQuestion = (question: Question): string => {
+    if (question.difficulty) return question.difficulty;
+    if (question.marks) {
+      if (question.marks <= 2) return "EASY";
+      if (question.marks <= 5) return "MEDIUM";
+      return "HARD";
+    }
+    return "MEDIUM";
+  };
+
   const filteredQuestions = questions.filter((question) => {
     const matchesType = question.questionType === activeTab;
     const matchesSearch = 
       question.prompt?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       question.title?.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesDifficulty = difficultyFilter === "ALL" || question.difficulty === difficultyFilter;
+    const matchesDifficulty = difficultyFilter === "ALL" || getDifficultyFromQuestion(question) === difficultyFilter;
     const matchesSubject = subjectFilter === "all" || question.subjectId === subjectFilter;
     
     return matchesType && matchesSearch && matchesDifficulty && matchesSubject;
   });
+
+  const totalPages = Math.ceil(filteredQuestions.length / ITEMS_PER_PAGE);
+  const paginatedQuestions = filteredQuestions.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE
+  );
 
   const getSubjectName = (subjectId: string) => {
     const subject = subjects.find(s => s.id === subjectId);
@@ -255,7 +278,7 @@ export default function AdminQuestionBank() {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filteredQuestions.map((question) => (
+                  paginatedQuestions.map((question) => (
                     <TableRow key={question.id} className="hover:bg-muted/30">
                       <TableCell>
                         <div>
@@ -286,13 +309,9 @@ export default function AdminQuestionBank() {
                         {getSubjectName(question.subjectId)}
                       </TableCell>
                       <TableCell>
-                        {question.difficulty ? (
-                          <Badge className={difficultyColors[question.difficulty]}>
-                            {question.difficulty}
-                          </Badge>
-                        ) : (
-                          <span className="text-muted-foreground text-sm">-</span>
-                        )}
+                        <Badge className={difficultyColors[getDifficultyFromQuestion(question)]}>
+                          {getDifficultyFromQuestion(question)}
+                        </Badge>
                       </TableCell>
                       <TableCell>
                         <Badge variant="secondary">{question.marks || 0} marks</Badge>
@@ -307,15 +326,15 @@ export default function AdminQuestionBank() {
                       </TableCell>
                       <TableCell className="text-right">
                         <DropdownMenu>
-               <DropdownMenuTrigger asChild>
-  <Button
-    variant="ghost"
-    size="icon"
-    className="text-muted-foreground hover:text-orange-600 hover:bg-orange-50/40 dark:hover:bg-orange-950/10"
-  >
-    <MoreVertical className="w-4 h-4" />
-  </Button>
-</DropdownMenuTrigger>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="text-muted-foreground hover:text-orange-600 hover:bg-orange-50/40 dark:hover:bg-orange-950/10"
+                            >
+                              <MoreVertical className="w-4 h-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
                             <DropdownMenuItem onClick={() => handleView(question)}>
                               <Eye className="w-4 h-4 mr-2" />
@@ -341,6 +360,50 @@ export default function AdminQuestionBank() {
                 )}
               </TableBody>
             </Table>
+
+            {/* Pagination Controls */}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between px-6 py-4 border-t bg-muted/20">
+                <p className="text-xs text-muted-foreground font-medium">
+                  Showing <span className="font-semibold text-foreground">{(currentPage - 1) * ITEMS_PER_PAGE + 1}</span> to{" "}
+                  <span className="font-semibold text-foreground">{Math.min(currentPage * ITEMS_PER_PAGE, filteredQuestions.length)}</span> of{" "}
+                  <span className="font-semibold text-foreground">{filteredQuestions.length}</span> questions
+                </p>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+                    disabled={currentPage === 1}
+                    className="h-8 text-xs font-semibold"
+                  >
+                    Previous
+                  </Button>
+                  <div className="flex items-center gap-1">
+                    {Array.from({ length: totalPages }, (_, idx) => idx + 1).map((page) => (
+                      <Button
+                        key={page}
+                        variant={currentPage === page ? "default" : "outline"}
+                        size="sm"
+                        className="w-8 h-8 p-0 text-xs font-semibold"
+                        onClick={() => setCurrentPage(page)}
+                      >
+                        {page}
+                      </Button>
+                    ))}
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
+                    disabled={currentPage === totalPages}
+                    className="h-8 text-xs font-semibold"
+                  >
+                    Next
+                  </Button>
+                </div>
+              </div>
+            )}
           </div>
         </TabsContent>
       </Tabs>

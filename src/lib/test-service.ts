@@ -562,14 +562,32 @@ export const testService = {
     topicId?: string,
     subtopicId?: string,
   ): Promise<Question[]> => {
-    const params = new URLSearchParams();
-    if (subjectId) params.append("subjectId", subjectId);
-    if (topicId) params.append("topicId", topicId);
-    if (subtopicId) params.append("subtopicId", subtopicId);
+    let allQuestions: Question[] = [];
+    let page = 0;
+    const size = 50;
+    let hasMore = true;
+    const maxPages = 100;
 
-    const url = `/questions${params.toString() ? `?${params.toString()}` : ""}`;
-    const response = await apiClient.get<Question[]>(url);
-    return unwrapArrayResponse(response);
+    while (hasMore && page < maxPages) {
+      const params = new URLSearchParams();
+      if (subjectId) params.append("subjectId", subjectId);
+      if (topicId) params.append("topicId", topicId);
+      if (subtopicId) params.append("subtopicId", subtopicId);
+      params.append("page", page.toString());
+      params.append("size", size.toString());
+
+      const url = `/questions?${params.toString()}`;
+      const response = await apiClient.get<Question[]>(url);
+      const content = unwrapArrayResponse(response);
+      allQuestions = [...allQuestions, ...content];
+
+      if (content.length < size) {
+        hasMore = false;
+      } else {
+        page++;
+      }
+    }
+    return allQuestions;
   },
 
   getQuestionById: async (id: string): Promise<Question> => {

@@ -197,16 +197,6 @@ export function QuestionPreview({ question, open, onOpenChange }: QuestionPrevie
 
     return (
       <div className="space-y-4">
-        {isImageBased && (
-          <div className="rounded-lg bg-muted/30 p-4 text-center">
-            <p className="text-sm text-muted-foreground mb-2">Reference Image:</p>
-            <div className="w-full h-48 bg-muted rounded-lg flex items-center justify-center">
-              <ImageIcon className="w-12 h-12 text-muted-foreground" />
-              <span className="ml-2 text-muted-foreground">Question Image Placeholder</span>
-            </div>
-          </div>
-        )}
-        
         <div className="space-y-3">
           <p className="text-sm font-medium">Options:</p>
           {question.mcqOptions?.map((option, idx) => {

@@ -54,6 +54,7 @@ import {
 } from "@/lib/test-service";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import { authService } from "@/lib/auth-service";
 import { QuestionPreview } from "./QuestionPreview";
 import {
   useQuestionsQuery,
@@ -74,6 +75,15 @@ export default function QuestionBank() {
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState("");
 
+  const currentUser = authService.getCurrentUser();
+  const isSuperAdmin = currentUser?.role === "SUPERADMIN";
+
+  const canMutateQuestion = (q: Question) => {
+    if (isSuperAdmin) return true;
+    if (q.visibility === "PUBLIC") return false;
+    return true;
+  };
+
   const { data: questions = [], isLoading: questionsLoading, refetch: refetchQuestions } = useQuestionsQuery();
   const { data: subjects = [], isLoading: subjectsLoading, refetch: refetchSubjects } = useSubjectsQuery();
   const { data: topics = [], isLoading: topicsLoading, refetch: refetchTopics } = useTopicsQuery();
@@ -87,14 +97,21 @@ export default function QuestionBank() {
   >("All");
   const [tagSearch, setTagSearch] = useState("");
 
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 10;
+
   // Filter states
   const [filterSubject, setFilterSubject] = useState<string>("all");
   const [filterTopic, setFilterTopic] = useState<string>("all");
   const [filterSubtopic, setFilterSubtopic] = useState<string>("all");
   const [filterDialogOpen, setFilterDialogOpen] = useState(false);
   // Add this state in the component (after other useState declarations)
-const [previewQuestion, setPreviewQuestion] = useState<Question | null>(null);
-const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewQuestion, setPreviewQuestion] = useState<Question | null>(null);
+  const [previewOpen, setPreviewOpen] = useState(false);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, tagSearch, filterSubject, filterTopic, filterSubtopic, difficultyFilter, activeTab]);
 
   const deleteQuestionMutation = useDeleteQuestionMutation();
 
@@ -264,10 +281,20 @@ const handlePreview = (question: Question) => {
   // Filter MCQ questions (type === "MCQ")
   const mcqQuestions = questions.filter((q) => q.questionType === "MCQ");
   const filteredMCQ = filterQuestions(mcqQuestions);
+  const mcqTotalPages = Math.ceil(filteredMCQ.length / ITEMS_PER_PAGE);
+  const paginatedMCQ = filteredMCQ.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE
+  );
 
   // Filter Coding questions (type === "CODING")
   const codingQuestions = questions.filter((q) => q.questionType === "CODING");
   const filteredCoding = filterQuestions(codingQuestions);
+  const codingTotalPages = Math.ceil(filteredCoding.length / ITEMS_PER_PAGE);
+  const paginatedCoding = filteredCoding.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE
+  );
 
   if (loading) {
     return (
@@ -429,7 +456,7 @@ const handlePreview = (question: Question) => {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filteredMCQ.map((q) => (
+                  paginatedMCQ.map((q) => (
                     <TableRow
                       key={q.id}
                       className="hover:bg-muted/30 transition-colors"
@@ -439,18 +466,51 @@ const handlePreview = (question: Question) => {
                           <span className="line-clamp-2">
                             {q.title || q.prompt}
                           </span>
-                          {q.tags && q.tags.length > 0 && (
-                            <div className="flex flex-wrap gap-1">
-                              {q.tags.map((tag, idx) => (
-                                <span
-                                  key={idx}
-                                  className="text-[10px] bg-muted px-1.5 py-0.5 rounded text-muted-foreground"
-                                >
-                                  {tag}
-                                </span>
-                              ))}
-                            </div>
-                          )}
+                          <div className="flex flex-wrap gap-1 items-center mt-1">
+                            {q.mcqType && (
+                              <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded border ${
+                                q.mcqType === "SINGLE_CORRECT"
+                                  ? "bg-blue-500/10 text-blue-600 border-blue-500/20"
+                                  : q.mcqType === "MULTIPLE_CORRECT"
+                                  ? "bg-indigo-500/10 text-indigo-600 border-indigo-500/20"
+                                  : q.mcqType === "TRUE_FALSE"
+                                  ? "bg-amber-500/10 text-amber-600 border-amber-500/20"
+                                  : q.mcqType === "IMAGE_SINGLE_CORRECT"
+                                  ? "bg-purple-500/10 text-purple-600 border-purple-500/20"
+                                  : q.mcqType === "IMAGE_MULTIPLE_CORRECT"
+                                  ? "bg-pink-500/10 text-pink-600 border-pink-500/20"
+                                  : q.mcqType === "ASSERTION_REASON"
+                                  ? "bg-teal-500/10 text-teal-600 border-teal-500/20"
+                                  : q.mcqType === "FILL_IN_THE_BLANK"
+                                  ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/20"
+                                  : "bg-slate-500/10 text-slate-600 border-slate-500/20"
+                              }`}>
+                                {q.mcqType === "SINGLE_CORRECT"
+                                  ? "Single Choice"
+                                  : q.mcqType === "MULTIPLE_CORRECT"
+                                  ? "Multiple Choice"
+                                  : q.mcqType === "TRUE_FALSE"
+                                  ? "True / False"
+                                  : q.mcqType === "IMAGE_SINGLE_CORRECT"
+                                  ? "Image Single"
+                                  : q.mcqType === "IMAGE_MULTIPLE_CORRECT"
+                                  ? "Image Multiple"
+                                  : q.mcqType === "ASSERTION_REASON"
+                                  ? "Assertion & Reason"
+                                  : q.mcqType === "FILL_IN_THE_BLANK"
+                                  ? "Fill in Blank"
+                                  : (q.mcqType as string).replace(/_/g, " ")}
+                              </span>
+                            )}
+                            {q.tags && q.tags.map((tag, idx) => (
+                              <span
+                                key={idx}
+                                className="text-[10px] bg-muted px-1.5 py-0.5 rounded text-muted-foreground"
+                              >
+                                {tag}
+                              </span>
+                            ))}
+                          </div>
                         </div>
                       </TableCell>
                       <TableCell>
@@ -493,17 +553,21 @@ const handlePreview = (question: Question) => {
                               <Eye className="w-4 h-4 mr-2" />
                               Preview
                             </DropdownMenuItem>
-                            <DropdownMenuItem onSelect={() => handleEdit(q.id)}>
-                              <Edit className="w-4 h-4 mr-2" />
-                              Edit
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              className="text-destructive"
-                              onSelect={() => handleDelete(q.id)}
-                            >
-                              <Trash2 className="w-4 h-4 mr-2" />
-                              Delete
-                            </DropdownMenuItem>
+                            {canMutateQuestion(q) && (
+                              <DropdownMenuItem onSelect={() => handleEdit(q.id)}>
+                                <Edit className="w-4 h-4 mr-2" />
+                                Edit
+                              </DropdownMenuItem>
+                            )}
+                            {canMutateQuestion(q) && (
+                              <DropdownMenuItem
+                                className="text-destructive"
+                                onSelect={() => handleDelete(q.id)}
+                              >
+                                <Trash2 className="w-4 h-4 mr-2" />
+                                Delete
+                              </DropdownMenuItem>
+                            )}
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </TableCell>
@@ -512,6 +576,50 @@ const handlePreview = (question: Question) => {
                 )}
               </TableBody>
             </Table>
+
+            {/* Pagination Controls */}
+            {mcqTotalPages > 1 && (
+              <div className="flex items-center justify-between px-6 py-4 border-t bg-muted/20">
+                <p className="text-xs text-muted-foreground font-medium">
+                  Showing <span className="font-semibold text-foreground">{(currentPage - 1) * ITEMS_PER_PAGE + 1}</span> to{" "}
+                  <span className="font-semibold text-foreground">{Math.min(currentPage * ITEMS_PER_PAGE, filteredMCQ.length)}</span> of{" "}
+                  <span className="font-semibold text-foreground">{filteredMCQ.length}</span> MCQ questions
+                </p>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+                    disabled={currentPage === 1}
+                    className="h-8 text-xs font-semibold"
+                  >
+                    Previous
+                  </Button>
+                  <div className="flex items-center gap-1">
+                    {Array.from({ length: mcqTotalPages }, (_, idx) => idx + 1).map((page) => (
+                      <Button
+                        key={page}
+                        variant={currentPage === page ? "default" : "outline"}
+                        size="sm"
+                        className="w-8 h-8 p-0 text-xs font-semibold"
+                        onClick={() => setCurrentPage(page)}
+                      >
+                        {page}
+                      </Button>
+                    ))}
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage((prev) => Math.min(prev + 1, mcqTotalPages))}
+                    disabled={currentPage === mcqTotalPages}
+                    className="h-8 text-xs font-semibold"
+                  >
+                    Next
+                  </Button>
+                </div>
+              </div>
+            )}
           </div>
         </TabsContent>
 
@@ -556,7 +664,7 @@ const handlePreview = (question: Question) => {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filteredCoding.map((q, index) => (
+                  paginatedCoding.map((q, index) => (
                     <TableRow
                       key={q.id}
                       className={cn(
@@ -570,7 +678,7 @@ const handlePreview = (question: Question) => {
                             className="font-semibold text-sm text-foreground group-hover:text-primary transition-colors cursor-pointer line-clamp-1"
                             onClick={() => handleSolve(q.id)}
                           >
-                            {index + 1}. {q.title || q.prompt}
+                            {(currentPage - 1) * ITEMS_PER_PAGE + index + 1}. {q.title || q.prompt}
                           </span>
                           {q.tags && q.tags.length > 0 && (
                             <div className="flex flex-wrap gap-1">
@@ -630,7 +738,6 @@ const handlePreview = (question: Question) => {
                         </span>
                       </TableCell>
                       <TableCell className="py-4 text-right pr-6">
-                        {/* REMOVED opacity-0 group-hover:opacity-100 - Now always visible */}
                         <div className="flex items-center justify-end gap-1">
                           <Button
                             variant="ghost"
@@ -641,15 +748,17 @@ const handlePreview = (question: Question) => {
                           >
                             <Play className="w-4 h-4" />
                           </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 text-muted-foreground hover:text-foreground"
-                            onClick={() => handleEdit(q.id)}
-                            title="Edit"
-                          >
-                            <Edit className="w-3.5 h-3.5" />
-                          </Button>
+                          {canMutateQuestion(q) && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                              onClick={() => handleEdit(q.id)}
+                              title="Edit"
+                            >
+                              <Edit className="w-3.5 h-3.5" />
+                            </Button>
+                          )}
 
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
@@ -668,13 +777,15 @@ const handlePreview = (question: Question) => {
                                 <Eye className="w-4 h-4 mr-2" />
                                 Preview
                               </DropdownMenuItem>
-                              <DropdownMenuItem
-                                className="text-destructive focus:bg-destructive/10 focus:text-destructive"
-                                onSelect={() => handleDelete(q.id)}
-                              >
-                                <Trash2 className="w-4 h-4 mr-2" />
-                                Delete
-                              </DropdownMenuItem>
+                              {canMutateQuestion(q) && (
+                                <DropdownMenuItem
+                                  className="text-destructive focus:bg-destructive/10 focus:text-destructive"
+                                  onSelect={() => handleDelete(q.id)}
+                                >
+                                  <Trash2 className="w-4 h-4 mr-2" />
+                                  Delete
+                                </DropdownMenuItem>
+                              )}
                             </DropdownMenuContent>
                           </DropdownMenu>
                         </div>
@@ -684,6 +795,50 @@ const handlePreview = (question: Question) => {
                 )}
               </TableBody>
             </Table>
+
+            {/* Pagination Controls */}
+            {codingTotalPages > 1 && (
+              <div className="flex items-center justify-between px-6 py-4 border-t bg-muted/20">
+                <p className="text-xs text-muted-foreground font-medium">
+                  Showing <span className="font-semibold text-foreground">{(currentPage - 1) * ITEMS_PER_PAGE + 1}</span> to{" "}
+                  <span className="font-semibold text-foreground">{Math.min(currentPage * ITEMS_PER_PAGE, filteredCoding.length)}</span> of{" "}
+                  <span className="font-semibold text-foreground">{filteredCoding.length}</span> Coding questions
+                </p>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+                    disabled={currentPage === 1}
+                    className="h-8 text-xs font-semibold"
+                  >
+                    Previous
+                  </Button>
+                  <div className="flex items-center gap-1">
+                    {Array.from({ length: codingTotalPages }, (_, idx) => idx + 1).map((page) => (
+                      <Button
+                        key={page}
+                        variant={currentPage === page ? "default" : "outline"}
+                        size="sm"
+                        className="w-8 h-8 p-0 text-xs font-semibold"
+                        onClick={() => setCurrentPage(page)}
+                      >
+                        {page}
+                      </Button>
+                    ))}
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage((prev) => Math.min(prev + 1, codingTotalPages))}
+                    disabled={currentPage === codingTotalPages}
+                    className="h-8 text-xs font-semibold"
+                  >
+                    Next
+                  </Button>
+                </div>
+              </div>
+            )}
           </div>
         </TabsContent>
       </Tabs>
