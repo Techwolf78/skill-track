@@ -31,7 +31,7 @@ export default function Login() {
   const { toast } = useToast();
   const { login: loginToContext } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
-  const [adminEmail, setAdminEmail] = useState("admin@company.com");
+  const [adminEmail, setAdminEmail] = useState("superadmin@gryphonacademy.co.in");
   const [adminPassword, setAdminPassword] = useState("");
   const [studentCode, setStudentCode] = useState("");
   const [studentEmail, setStudentEmail] = useState("");
@@ -125,8 +125,8 @@ export default function Login() {
   };
 
   const fillAdminCredentials = () => {
-    setAdminEmail("admin@company.com");
-    setAdminPassword("Admin@123");
+    setAdminEmail("superadmin@gryphonacademy.co.in");
+    setAdminPassword("password123");
   };
 
   const fillStudentCredentials = () => {

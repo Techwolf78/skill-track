@@ -85,12 +85,23 @@ function ManualResultFetcher() {
     try {
       setLoadingData(true);
       setErrorLoadingData("");
-      const [schedulesData, candidatesData, sessionsData] = await Promise.all([
+      const [schedulesData, candidatesData, sessionsData, testsData] = await Promise.all([
         testService.getAllTestSchedules(),
         candidateService.getCandidates(),
         testService.getAllSessions(),
+        testService.getAllTests(),
       ]);
-      setSchedules(schedulesData);
+
+      // Map test titles into schedules
+      const schedulesWithTests = schedulesData.map((sch) => {
+        const test = testsData.find((t) => t.id === sch.testId);
+        return {
+          ...sch,
+          test: test || sch.test,
+        };
+      });
+
+      setSchedules(schedulesWithTests);
       setCandidates(candidatesData);
       setSessions(sessionsData);
     } catch (err: any) {
@@ -307,10 +318,15 @@ function ManualResultFetcher() {
               <SelectContent>
                 {schedules.map((sch) => {
                   const dateStr = sch.startTime ? new Date(sch.startTime).toLocaleDateString() : "No date";
-                  const testTitle = sch.test?.title || `Test ID: ${sch.testId}`;
+                  const testTitle = sch.test?.title || "Unknown Test";
+                  const testIdAbbrev = sch.testId ? sch.testId.slice(0, 8) : "N/A";
                   return (
                     <SelectItem key={sch.id} value={sch.id}>
-                      {testTitle} (Starts: {dateStr}) — Status: {sch.status}
+                      <span className="font-semibold text-foreground mr-1.5">{testTitle}</span>
+                      <span className="text-[10px] text-muted-foreground font-mono bg-muted/80 px-1 py-0.5 rounded mr-2">ID: {testIdAbbrev}...</span>
+                      <span className="text-xs text-muted-foreground">
+                        (Starts: {dateStr}) — Status: {sch.status}
+                      </span>
                     </SelectItem>
                   );
                 })}
