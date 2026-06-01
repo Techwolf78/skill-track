@@ -596,15 +596,35 @@ export const testService = {
     await apiClient.delete(`/questions/${id}`);
   },
 
-  // ==================== Test Case APIs ====================
-  getAllTestCases: async (): Promise<TestCase[]> => {
-    const response = await apiClient.get<TestCase[]>("/test-cases");
-    return unwrapArrayResponse(response);
+  getAllTestCases: async (codingQuestionId?: string): Promise<TestCase[]> => {
+    let allTestCases: TestCase[] = [];
+    let page = 0;
+    const size = 20;
+    let hasMore = true;
+    
+    // Limit global scans to a max of 200 test cases (10 pages) to prevent excessive DB load.
+    // Question-specific scans are limited to 100 pages (2000 test cases).
+    const maxPages = codingQuestionId ? 100 : 10;
+
+    while (hasMore && page < maxPages) {
+      const url = codingQuestionId
+        ? `/test-cases?codingQuestionId=${codingQuestionId}&page=${page}&size=${size}`
+        : `/test-cases?page=${page}&size=${size}`;
+      const response = await apiClient.get<any>(url);
+      const content = unwrapArrayResponse(response);
+      allTestCases = [...allTestCases, ...content];
+
+      if (content.length < size) {
+        hasMore = false;
+      } else {
+        page++;
+      }
+    }
+    return allTestCases;
   },
 
   getTestCasesByCodingQuestion: async (codingQuestionId: string): Promise<TestCase[]> => {
-    const allTestCases = await testService.getAllTestCases();
-    return allTestCases.filter((tc: TestCase) => tc.codingQuestionId === codingQuestionId);
+    return testService.getAllTestCases(codingQuestionId);
   },
 
   createTestCase: async (dto: CreateTestCaseRequest): Promise<TestCase> => {

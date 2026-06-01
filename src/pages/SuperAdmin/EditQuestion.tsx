@@ -276,7 +276,7 @@ export default function EditQuestion() {
           testService.getQuestionById(id!),
           testService.getAllSubjects(),
           testService.getAllTopics(),
-          testService.getAllTestCases(),
+          testService.getAllTestCases(id!),
         ]);
 
       console.log("Fetched Question Data:", questionData);
@@ -941,7 +941,7 @@ export default function EditQuestion() {
       // If coding question, update test cases with codingQuestionId
       if (questionType === "CODING") {
         // Get existing test cases
-        const existingTestCases = await testService.getAllTestCases();
+        const existingTestCases = await testService.getAllTestCases(id!);
         const questionTestCases = existingTestCases.filter(
           (tc) => tc.codingQuestionId === id,
         );
