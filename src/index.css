@@ -74,7 +74,7 @@
      --sidebar-ring: 11 100% 60%;
      
      /* Gradients */
-     --gradient-primary: linear-gradient(135deg, hsl(11, 100%, 60%) 0%, hsl(25, 100%, 55%) 100%);
+     --gradient-primary: linear-gradient(135deg, hsl(32, 100%, 63%) 0%, hsl(11, 100%, 60%) 50%, hsl(4, 100%, 43%) 100%);
      --gradient-accent: linear-gradient(135deg, hsl(191, 100%, 50%) 0%, hsl(200, 100%, 45%) 100%);
      --gradient-hero: linear-gradient(135deg, hsl(220, 30%, 12%) 0%, hsl(220, 35%, 18%) 100%);
      --gradient-card: linear-gradient(180deg, hsl(0, 0%, 100%) 0%, hsl(220, 14%, 98%) 100%);
@@ -189,6 +189,11 @@
    .animate-bounce-in {
      animation: bounceIn 0.6s ease-out;
    }
+
+   .animate-gradient-flow {
+     background-size: 200% auto;
+     animation: gradientFlow 5s linear infinite;
+   }
  }
  
  @keyframes fadeIn {
@@ -226,5 +231,17 @@
    100% {
      opacity: 1;
      transform: scale(1);
+   }
+ }
+
+ @keyframes gradientFlow {
+   0% {
+     background-position: 0% 50%;
+   }
+   50% {
+     background-position: 100% 50%;
+   }
+   100% {
+     background-position: 0% 50%;
    }
  }

@@ -45,7 +45,9 @@ apiClient.interceptors.response.use(
 
       // Extract field validation errors
       if (data.errors && typeof data.errors === "object") {
-        const errorEntries = Object.entries(data.errors as Record<string, string>);
+        const errorEntries = Object.entries(
+          data.errors as Record<string, string>,
+        );
         if (errorEntries.length > 0) {
           const validationMsg = errorEntries
             .map(([field, msg]) => `${field}: ${msg}`)
@@ -66,9 +68,12 @@ apiClient.interceptors.response.use(
       // Access denied — user lacks permission for this resource
       console.warn("Access denied:", error.response?.data);
       // Optional: if the UI expects an error message to be surfaced directly
-      const responseData = error.response?.data as Record<string, unknown> | undefined;
+      const responseData = error.response?.data as
+        | Record<string, unknown>
+        | undefined;
       if (!responseData?.message) {
-        error.message = "Access Denied: You do not have permission to perform this action.";
+        error.message =
+          "Access Denied: You do not have permission to perform this action.";
       }
     }
 

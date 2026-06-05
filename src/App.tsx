@@ -92,7 +92,7 @@ const App = () => (
                   path="questions/playground/:id"
                   element={<DSAPlayground />}
                 />
-                
+
                 {/* Assessments Tab Group */}
                 <Route element={<AssessmentsLayout />}>
                   <Route path="tests" element={<Tests />} />
@@ -100,8 +100,14 @@ const App = () => (
                   <Route path="invitations" element={<InviteCandidates />} />
                 </Route>
 
-                <Route path="test-schedules/:id" element={<TestScheduleDetails />} />
-                <Route path="invitations-history" element={<InvitedCandidatesHistory />} />
+                <Route
+                  path="test-schedules/:id"
+                  element={<TestScheduleDetails />}
+                />
+                <Route
+                  path="invitations-history"
+                  element={<InvitedCandidatesHistory />}
+                />
                 <Route path="tests/create" element={<TestCreate />} />
                 <Route path="tests/edit/:id" element={<TestsEdit />} />
                 <Route path="tests/:id" element={<TestDetails />} />
@@ -125,11 +131,14 @@ const App = () => (
                 <Route index element={<AdminDashboardAdmin />} />
                 <Route path="candidates" element={<AdminCandidates />} />
                 <Route path="questions" element={<AdminQuestionBank />} />
-                <Route path="questions/playground/:id" element={<DSAPlayground />} />
+                <Route
+                  path="questions/playground/:id"
+                  element={<DSAPlayground />}
+                />
                 <Route path="questions/add" element={<AddQuestion />} />
                 <Route path="questions/create" element={<AddQuestion />} />
                 <Route path="questions/edit/:id" element={<EditQuestion />} />
-                
+
                 {/* Assessments Tab Group */}
                 <Route element={<AssessmentsLayout />}>
                   <Route path="tests" element={<AdminTests />} />
@@ -142,7 +151,10 @@ const App = () => (
                 <Route path="tests/:id" element={<AdminTestDetails />} />
                 <Route path="tests/:id/questions" element={<TestQuestions />} />
                 <Route path="schedules/:id" element={<TestScheduleDetails />} />
-                <Route path="invitations-history" element={<InvitedCandidatesHistory />} />
+                <Route
+                  path="invitations-history"
+                  element={<InvitedCandidatesHistory />}
+                />
               </Route>
               {/* Student Test Taking */}
               <Route path="/test/:testId" element={<TestInterface />} />

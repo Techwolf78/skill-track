@@ -1,5 +1,7 @@
 // src/components/QuestionPreview.tsx
 import { useState } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
+import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -86,9 +88,19 @@ const difficultyColors: Record<string, string> = {
 };
 
 export function QuestionPreview({ question, open, onOpenChange }: QuestionPreviewProps) {
-
+  const navigate = useNavigate();
+  const location = useLocation();
 
   if (!question) return null;
+
+  const handleOpenPlayground = () => {
+    const isSuperAdmin = location.pathname.startsWith("/superadmin");
+    const playgroundUrl = isSuperAdmin
+      ? `/superadmin/questions/playground/${question.id}`
+      : `/admin/questions/playground/${question.id}`;
+    onOpenChange(false);
+    navigate(playgroundUrl);
+  };
 
   const isMcq = question.questionType === "MCQ";
   const mcqType = question.mcqType as McqType;
@@ -371,9 +383,22 @@ export function QuestionPreview({ question, open, onOpenChange }: QuestionPrevie
                     View question details and simulate candidate experience
                   </DialogDescription>
                 </div>
-                <Badge variant="outline" className="bg-primary/10">
-                  {isMcq ? "MCQ" : "Coding"}
-                </Badge>
+                <div className="flex items-center gap-2">
+                  {!isMcq && (
+                    <Button 
+                      variant="hero" 
+                      size="sm" 
+                      onClick={handleOpenPlayground}
+                      className="gap-1.5"
+                    >
+                      <Terminal className="w-4 h-4" />
+                      Open Playground
+                    </Button>
+                  )}
+                  <Badge variant="outline" className="bg-primary/10">
+                    {isMcq ? "MCQ" : "Coding"}
+                  </Badge>
+                </div>
               </div>
             </DialogHeader>
 
