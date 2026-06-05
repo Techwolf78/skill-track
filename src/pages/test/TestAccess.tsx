@@ -31,7 +31,7 @@ interface CheckState {
 }
 
 export default function TestAccess() {
-  const { token } = useParams();
+  const { id, token } = useParams();
   const navigate = useNavigate();
   const { toast } = useToast();
   
@@ -55,11 +55,15 @@ export default function TestAccess() {
   const [isLoggingIn, setIsLoggingIn] = useState(false);
 
   useEffect(() => {
-    if (token) {
+    if (id && token) {
       validateToken();
+    } else if (token && !id) {
+      // Legacy token-only routing fallback
+      setError("This link is outdated. Please use the secure invitation link containing both ID and token.");
+      setLoading(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token, isAuthenticated]);
+  }, [id, token, isAuthenticated]);
 
   useEffect(() => {
     const handleFullscreenChange = () => {
@@ -69,15 +73,58 @@ export default function TestAccess() {
     return () => document.removeEventListener("fullscreenchange", handleFullscreenChange);
   }, []);
 
+  const parseJwt = (tokenStr: string) => {
+    try {
+      const base64Url = tokenStr.split('.')[1];
+      const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+      const jsonPayload = decodeURIComponent(
+        window
+          .atob(base64)
+          .split('')
+          .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+          .join('')
+      );
+      return JSON.parse(jsonPayload);
+    } catch (e) {
+      return null;
+    }
+  };
+
   const validateToken = async () => {
     try {
       setLoading(true);
-      const response = await apiClient.get(`/candidate-invitations/validate/${token}`);
-      const invitation = response.data?.data || response.data;
-      
-      if (!isAuthenticated) {
-        throw new Error("Please log in to continue.");
+      if (!id || !token) {
+        throw new Error("Invalid link parameters.");
       }
+
+      // 1. Post to validate endpoint to authenticate the candidate
+      const authResponse = await apiClient.post("/candidate-invitations/validate", {
+        id,
+        token,
+      });
+
+      const authData = authResponse.data?.data || authResponse.data;
+      if (!authData || !authData.accessToken) {
+        throw new Error("Authentication failed.");
+      }
+
+      // 2. Decode user from JWT and log in context
+      const decoded = parseJwt(authData.accessToken);
+      if (decoded) {
+        const userData = {
+          id: decoded.id,
+          name: decoded.name,
+          email: decoded.sub,
+          role: decoded.role,
+        };
+        loginToContext(authData.accessToken, userData);
+      } else {
+        throw new Error("Failed to parse authentication token.");
+      }
+
+      // 3. Fetch invitation details using the newly acquired credentials
+      const invitationResponse = await apiClient.get(`/candidate-invitations/${id}`);
+      const invitation = invitationResponse.data?.data || invitationResponse.data;
 
       if (invitation.scheduleId) {
         const scheduleResponse = await apiClient.get(`/test-schedules/${invitation.scheduleId}`);
@@ -107,7 +154,7 @@ export default function TestAccess() {
       setError(null);
     } catch (error: any) {
       console.error("Token validation error:", error);
-      setError(error.response?.data?.message || "Invalid or expired invitation link");
+      setError(error.response?.data?.message || error.message || "Invalid or expired invitation link");
     } finally {
       setLoading(false);
     }

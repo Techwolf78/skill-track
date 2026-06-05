@@ -22,7 +22,7 @@ import TestDetails from "./pages/SuperAdmin/TestDetails"; // Add this import
 import TestScheduleDetails from "./pages/SuperAdmin/TestScheduleDetails";
 import InviteCandidates from "./pages/SuperAdmin/InviteCandidates";
 import InvitedCandidatesHistory from "./pages/SuperAdmin/InvitedCandidatesHistory";
-import TestAccess from "./pages/Test/TestAccess";
+import TestAccess from "./pages/test/TestAccess";
 import EditQuestion from "./pages/SuperAdmin/EditQuestion";
 import AddQuestion from "./pages/SuperAdmin/AddQuestion";
 import Settings from "./pages/SuperAdmin/Settings";
@@ -34,7 +34,7 @@ import { AuthProvider } from "./lib/auth-context";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { ROLES } from "./lib/roles";
-
+ 
 // Admin pages
 import AdminDashboardAdmin from "./pages/Admin/Dashboard";
 import AdminCandidates from "./pages/Admin/AdminCandidates";
@@ -43,10 +43,10 @@ import AdminTests from "./pages/Admin/Tests";
 import AdminTestCreate from "./pages/Admin/TestCreate";
 import AdminTestsEdit from "./pages/Admin/TestsEdit";
 import AdminTestDetails from "./pages/Admin/TestDetails";
-
+ 
 // Test Taking
-import TestInterface from "./pages/Test/TestInterface";
-import TestResults from "./pages/Test/TestResults";
+import TestInterface from "./pages/test/TestInterface";
+import TestResults from "./pages/test/TestResults";
 
 // Candidate Dashboard pages
 import { CandidateLayout } from "./pages/Candidate/CandidateLayout";
@@ -173,7 +173,9 @@ const App = () => (
                 element={<TestInterface />}
               />
               <Route path="/test/:testId/results" element={<TestResults />} />
-              <Route path="/test/access/:token" element={<TestAccess />} />{" "}
+              <Route path="/test/access/:id/:token" element={<TestAccess />} />
+              <Route path="/tests/access/:id/:token" element={<TestAccess />} />
+              <Route path="/test/access/:token" element={<TestAccess />} />
               {/* ← Add this line */}
 
               {/* Candidate Dashboard Routes */}

@@ -228,8 +228,8 @@ export default function InviteCandidates() {
     }
   };
 
-  const copyTestLink = (token: string) => {
-    const testUrl = `${baseUrl}/test/access/${token}`;
+  const copyTestLink = (id: string, token: string) => {
+    const testUrl = `${baseUrl}/test/access/${id}/${token}`;
     navigator.clipboard.writeText(testUrl);
     setCopiedToken(token);
     toast({
@@ -502,7 +502,7 @@ export default function InviteCandidates() {
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => copyTestLink(invitation.token)}
+                    onClick={() => copyTestLink(invitation.id, invitation.token)}
                     className="h-8 px-2"
                     disabled={displayStatus === "EXPIRED"}
                   >
