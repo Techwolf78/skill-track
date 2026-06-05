@@ -1196,7 +1196,7 @@ export default function SeedData() {
 
         const matchInv = listInv.find((inv: any) => inv.candidateId === cId && inv.scheduleId === schedId);
         if (matchInv && matchInv.token) {
-          const testLink = `${window.location.origin}/test/access/${matchInv.token}`;
+          const testLink = `${window.location.origin}/test/access/${matchInv.id}/${matchInv.token}`;
           newSeededCandidates.push({
             name: cand.name,
             email: cand.email,
@@ -1216,7 +1216,7 @@ export default function SeedData() {
             email: cand.email,
             token: `demo-invite-token-${idx}`,
             testTitle: testNames[0],
-            link: `${window.location.origin}/test/access/demo-invite-token-${idx}`
+            link: `${window.location.origin}/test/access/demo-invite-id-${idx}/demo-invite-token-${idx}`
           });
         });
       }

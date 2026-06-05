@@ -665,10 +665,12 @@ useEffect(() => {
           sourceCode: code,
         });
 
+        // Wait 10 seconds before starting to poll (grades take time to compute)
+        await new Promise(resolve => setTimeout(resolve, 10000));
+
         // Polling for results
         let gradingResult = null;
         for (let i = 0; i < 30; i++) { // 60 seconds max
-          await new Promise(resolve => setTimeout(resolve, 2000));
           try {
             const res = await testService.getCodeResult(submissionId);
             if (res.status !== "PENDING" && res.status !== "PROCESSING") {
@@ -678,6 +680,7 @@ useEffect(() => {
           } catch (e) {
             // Ignore polling errors
           }
+          await new Promise(resolve => setTimeout(resolve, 2000));
         }
 
         if (gradingResult) {
