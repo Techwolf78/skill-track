@@ -68,7 +68,11 @@ export default function Login() {
     } catch (error: unknown) {
       console.error("Login failed:", error);
       let errorMessage = "Invalid credentials. Please try again.";
+      let errorTitle = "Login Failed";
       if (axios.isAxiosError(error)) {
+        if (error.response?.status === 429) {
+          errorTitle = "Rate Limit Exceeded";
+        }
         errorMessage =
           error.response?.data?.message ||
           error.response?.data?.data?.message ||
@@ -77,7 +81,7 @@ export default function Login() {
         errorMessage = error.message;
       }
       toast({
-        title: "Login Failed",
+        title: errorTitle,
         description: errorMessage,
         variant: "destructive",
       });
@@ -106,7 +110,11 @@ export default function Login() {
       navigate(`/test/access/${studentCode}`);
     } catch (error: unknown) {
       let errorMessage = "Invalid test code or email.";
+      let errorTitle = "Access Denied";
       if (axios.isAxiosError(error)) {
+        if (error.response?.status === 429) {
+          errorTitle = "Rate Limit Exceeded";
+        }
         errorMessage =
           error.response?.data?.message ||
           error.response?.data ||
@@ -115,7 +123,7 @@ export default function Login() {
         errorMessage = error.message;
       }
       toast({
-        title: "Access Denied",
+        title: errorTitle,
         description: errorMessage,
         variant: "destructive",
       });
@@ -304,15 +312,7 @@ export default function Login() {
                 >
                   {isLoading ? "Signing in..." : "Sign in as Admin"}
                 </Button>
-                <p className="text-center text-sm text-muted-foreground mt-4">
-                  Don't have an account?{" "}
-                  <Link
-                    to="/register"
-                    className="text-primary font-semibold hover:underline"
-                  >
-                    Create one here
-                  </Link>
-                </p>
+
               </form>
             </TabsContent>
 

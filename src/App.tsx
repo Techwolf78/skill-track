@@ -4,7 +4,6 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Login from "./pages/Login";
-import Register from "./pages/Register";
 import NotFound from "./pages/NotFound";
 import NationalLandingPage from "./pages/NationalLandingPage";
 import { AdminLayout } from "./components/layout/AdminLayout";
@@ -49,6 +48,18 @@ import AdminTestDetails from "./pages/Admin/TestDetails";
 import TestInterface from "./pages/Test/TestInterface";
 import TestResults from "./pages/Test/TestResults";
 
+// Candidate Dashboard pages
+import { CandidateLayout } from "./pages/Candidate/CandidateLayout";
+import CandidateDashboard from "./pages/Candidate/Dashboard";
+import MyAssessments from "./pages/Candidate/MyAssessments";
+import ResultsReports from "./pages/Candidate/ResultsReports";
+import Certificates from "./pages/Candidate/Certificates";
+import Profile from "./pages/Candidate/Profile";
+import Notifications from "./pages/Candidate/Notifications";
+import Support from "./pages/Candidate/Support";
+import CandidateSettings from "./pages/Candidate/Settings";
+import CandidateAssessmentFlow from "./pages/Candidate/CandidateAssessmentFlow";
+
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -71,7 +82,6 @@ const App = () => (
             <Routes>
               <Route path="/" element={<NationalLandingPage />} />
               <Route path="/login" element={<Login />} />
-              <Route path="/register" element={<Register />} />
               <Route path="/unauthorized" element={<NotFound />} />
               <Route path="/seed-data" element={<SeedData />} />
               {/* SuperAdmin Routes (SUPERADMIN role only) */}
@@ -165,6 +175,20 @@ const App = () => (
               <Route path="/test/:testId/results" element={<TestResults />} />
               <Route path="/test/access/:token" element={<TestAccess />} />{" "}
               {/* ← Add this line */}
+
+              {/* Candidate Dashboard Routes */}
+              <Route path="/candidate" element={<CandidateLayout />}>
+                <Route index element={<CandidateDashboard />} />
+                <Route path="assessments" element={<MyAssessments />} />
+                <Route path="results" element={<ResultsReports />} />
+                <Route path="certificates" element={<Certificates />} />
+                <Route path="profile" element={<Profile />} />
+                <Route path="notifications" element={<Notifications />} />
+                <Route path="support" element={<Support />} />
+                <Route path="settings" element={<CandidateSettings />} />
+                <Route path="flow" element={<CandidateAssessmentFlow />} />
+              </Route>
+
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
             </Routes>

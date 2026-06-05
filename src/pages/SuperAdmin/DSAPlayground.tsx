@@ -42,9 +42,10 @@ import {
   TestCase,
   CodeExecutionResponse,
   TestCaseResult,
+  GradingResult,
 } from "@/lib/test-service";
 import { apiClient } from "@/lib/api-client";
-import { mapFriendlyError, QuestionMetadata } from "@/lib/judge0";
+import { mapFriendlyError, QuestionMetadata, ProblemType } from "@/lib/judge0";
 import { useAuth } from "@/lib/auth-context";
 import { ROLES } from "@/lib/roles";
 
@@ -161,6 +162,19 @@ int main() {
   return defaultCodes[language] || defaultCodes.python3;
 };
 
+interface ExecutionResultItem {
+  status: string;
+  actualOutput?: string;
+  stdout?: string;
+  stderr?: string;
+  compileOutput?: string;
+  expectedOutput?: string;
+}
+
+interface PlaygroundExecutionResponse {
+  data: ExecutionResultItem[];
+}
+
 export default function DSAPlayground() {
   const navigate = useNavigate();
   const { id } = useParams();
@@ -272,7 +286,7 @@ export default function DSAPlayground() {
           functionName: "solve",
           parameterTypes: [],
           returnType: { type: "any" },
-          category: "array" as any,
+          category: ProblemType.ARRAY,
         },
       };
 
@@ -314,7 +328,7 @@ export default function DSAPlayground() {
         sourceCode: code,
       };
 
-      const response = await apiClient.post<any>("/api/code/execute/playground", requestBody);
+      const response = await apiClient.post<PlaygroundExecutionResponse>("/api/code/execute/playground", requestBody);
       console.log("Run Code Response:", response.data);
       const resultsArray = Array.isArray(response.data.data) ? response.data.data : [];
 
@@ -328,7 +342,7 @@ export default function DSAPlayground() {
       };
 
       const sampleCases = question.testCases.filter((tc) => !tc.isHidden);
-      const mappedResults = resultsArray.map((res: any, idx: number) => ({
+      const mappedResults = resultsArray.map((res: ExecutionResultItem, idx: number) => ({
         status: res.status,
         input: sampleCases[idx]?.input || "",
         output: res.actualOutput || res.stdout || res.stderr || res.compileOutput || "",
@@ -366,7 +380,7 @@ export default function DSAPlayground() {
           message = "Logic failed on sample case.";
         } else if (topLevelId >= 7) {
           title = "Runtime Error";
-          message = resultsArray.find((r:any) => r.status !== "ACCEPTED")?.stderr || "Runtime error";
+          message = resultsArray.find((r: ExecutionResultItem) => r.status !== "ACCEPTED")?.stderr || "Runtime error";
         }
 
         const friendlyHint = mapFriendlyError(message, language);
@@ -377,7 +391,7 @@ export default function DSAPlayground() {
         setVerdict({ type, title, message });
         setSubmissionPhase("result");
       } else {
-        const passedCount = resultsArray.filter((r: any) => r.status === "ACCEPTED").length;
+        const passedCount = resultsArray.filter((r: ExecutionResultItem) => r.status === "ACCEPTED").length;
         const totalCount = resultsArray.length;
         setConsoleOutput(
           (prev) =>
@@ -405,12 +419,21 @@ export default function DSAPlayground() {
         }
         setSubmissionPhase("result");
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Judge0 Error:", error);
+      const err = error as { response?: { status?: number; data?: { message?: string } } };
+      const isRateLimit = err.response?.status === 429;
+      if (isRateLimit) {
+        toast({
+          title: "Rate Limit Exceeded",
+          description: err.response?.data?.message || "Code execution limit: 10 requests/minute. Try again in 60 seconds.",
+          variant: "destructive"
+        });
+      }
       setVerdict({
         type: "error",
-        title: "System Error",
-        message: error?.response?.data?.message || "Something went wrong. Please try again.",
+        title: isRateLimit ? "Rate Limit Exceeded" : "System Error",
+        message: err.response?.data?.message || "Something went wrong. Please try again.",
       });
     } finally {
       setIsExecuting(false);
@@ -431,7 +454,7 @@ export default function DSAPlayground() {
 
     try {
       const backendLanguage = language === "python3" ? "python" : language;
-      const response = await apiClient.post<any>("/api/code/execute/submit", {
+      const response = await apiClient.post<{ data: string }>("/api/code/execute/submit", {
         sessionId: "00000000-0000-0000-0000-000000000000",
         questionId: question.id,
         language: backendLanguage,
@@ -445,11 +468,11 @@ export default function DSAPlayground() {
 
       setConsoleOutput(prev => prev + "> Submission accepted. Waiting for grading...\n");
 
-      let executionResult: any = null;
+      let executionResult: GradingResult | null = null;
       for (let i = 0; i < 30; i++) { // Poll for up to 60 seconds
         await new Promise(resolve => setTimeout(resolve, 2000));
         try {
-          const res = await apiClient.get<any>(`/api/code/execute/result/${submissionId}`);
+          const res = await apiClient.get<{ data: GradingResult }>(`/api/code/execute/result/${submissionId}`);
           if (res.data.data && res.data.data.status !== "PENDING" && res.data.data.status !== "PROCESSING") {
             executionResult = res.data.data;
             break;
@@ -511,12 +534,21 @@ export default function DSAPlayground() {
       }
 
       setSubmissionPhase("result");
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Submission error:", error);
+      const err = error as { response?: { status?: number; data?: { message?: string } }; message?: string };
+      const isRateLimit = err.response?.status === 429;
+      if (isRateLimit) {
+        toast({
+          title: "Rate Limit Exceeded",
+          description: err.response?.data?.message || "Code execution limit: 10 requests/minute. Try again in 60 seconds.",
+          variant: "destructive"
+        });
+      }
       setVerdict({
         type: "error",
-        title: "System Error",
-        message: error?.response?.data?.message || error?.message || "Failed to process submission.",
+        title: isRateLimit ? "Rate Limit Exceeded" : "System Error",
+        message: err.response?.data?.message || err.message || "Failed to process submission.",
       });
     } finally {
       setIsSubmitting(false);

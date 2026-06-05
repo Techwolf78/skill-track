@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
+import axios from "axios";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -45,7 +46,7 @@ interface Question {
   type: "MCQ" | "CODING";
   prompt: string;
   marks: number;
-  options?: any[];
+  options?: unknown[];
   problemStatement?: string;
   sampleInput?: string;
   sampleOutput?: string;
@@ -58,6 +59,41 @@ interface Question {
   hints?: string[];
   tags?: string[];
   title?: string;
+}
+
+interface RawPaperQuestion {
+  snapshotQuestionId?: string;
+  sourceQuestionId: string;
+  orderIndex: number;
+  marks: number;
+  type: "MCQ" | "CODING";
+  prompt: string;
+  options?: unknown[];
+  coding?: {
+    timeLimitSecs?: number;
+    memoryLimitMB?: number;
+    starterCode?: Record<string, CodeTemplateEntry>;
+    difficulty?: string;
+    constraints?: string;
+    hints?: string[];
+    tags?: string[];
+    title?: string;
+    examples?: Array<{ input: string; expectedOutput: string; explanation?: string }>;
+  };
+}
+
+interface RawTestPaper {
+  testId: string;
+  title: string;
+  description?: string;
+  durationMins: number;
+  difficulty?: string;
+  passMark?: number;
+  questions?: RawPaperQuestion[];
+}
+
+interface RawTestPaperResponse {
+  paper?: RawTestPaper;
 }
 
 interface TestSession {
@@ -195,12 +231,12 @@ function TestInterfaceContent({ testId, sessionId, navigate, toast }: { testId?:
       console.log("✅ DIAGNOSTIC - testData keys:", Object.keys(testData || {}));
       console.log("✅ DIAGNOSTIC - testData stringified:", JSON.stringify(testData));
       
-      const paperResponse = testData as any;
+      const paperResponse = testData as unknown as RawTestPaperResponse;
       if (paperResponse && paperResponse.paper) {
         const paper = paperResponse.paper;
         
         // Map the snapshot questions back to the format TestInterface expects
-        const mappedQuestions = (paper.questions || []).map((q: any) => {
+        const mappedQuestions = (paper.questions || []).map((q: RawPaperQuestion) => {
           return {
             id: q.snapshotQuestionId || q.sourceQuestionId,
             testId: paper.testId,
@@ -214,7 +250,7 @@ function TestInterfaceContent({ testId, sessionId, navigate, toast }: { testId?:
               questionType: q.type,
               prompt: q.prompt,
               marks: q.marks,
-              mcqOptions: q.options || [],
+              mcqOptions: q.options as { text: string; isCorrect: boolean }[] || [],
               sampleInput: q.coding?.examples?.[0]?.input || "",
               sampleOutput: q.coding?.examples?.[0]?.expectedOutput || "",
               sampleExplanation: q.coding?.examples?.[0]?.explanation || "",
@@ -242,7 +278,7 @@ function TestInterfaceContent({ testId, sessionId, navigate, toast }: { testId?:
 
         setTest(mappedTestDetails);
       } else {
-        setTest(testData as any);
+        setTest(testData as unknown as TestDetails);
       }
       
       // Auto-start proctoring as checks were done in gateway
@@ -583,16 +619,28 @@ useEffect(() => {
       }
       setSubmissionPhase("result");
     } catch (error: unknown) {
-      const err = error as { response?: { data?: { message?: string } } };
-      console.error("Run code error:", err);
+      console.error("Run code error:", error);
+      let errMsg = "Failed to execute code. Please try again.";
+      if (axios.isAxiosError(error)) {
+        if (error.response?.status === 429) {
+          toast({
+            title: "Rate Limit Exceeded",
+            description: error.response?.data?.message || "You have reached the request limit. Please wait a moment before trying again.",
+            variant: "destructive"
+          });
+        }
+        errMsg = error.response?.data?.message || error.message;
+      } else if (error instanceof Error) {
+        errMsg = error.message;
+      }
       setOutput({ 
         type: 'error', 
-        message: err.response?.data?.message || "Failed to execute code. Please try again."
+        message: errMsg
       });
     } finally {
       setIsRunning(false);
     }
-  }, [questions, currentIndex, sessionId, language, code]);
+  }, [questions, currentIndex, sessionId, language, code, toast]);
 
   const handleSubmitQuestion = useCallback(async () => {
     if (questions.length === 0) return;
@@ -646,10 +694,25 @@ useEffect(() => {
           throw new Error("Grading timed out. Please try again.");
         }
       } catch (error: unknown) {
-        const err = error as { response?: { data?: { message?: string } }; message?: string };
-        console.error("Submit error:", err);
-        const msg = err.response?.data?.message || err.message || "Failed to submit solution";
-        toast({ title: "Error", description: msg, variant: "destructive" });
+        console.error("Submit error:", error);
+        let msg = "Failed to submit solution";
+        let isRateLimit = false;
+        if (axios.isAxiosError(error)) {
+          if (error.response?.status === 429) {
+            isRateLimit = true;
+            toast({
+              title: "Rate Limit Exceeded",
+              description: error.response?.data?.message || "You have reached the request limit. Please wait a moment before trying again.",
+              variant: "destructive"
+            });
+          }
+          msg = error.response?.data?.message || error.message;
+        } else if (error instanceof Error) {
+          msg = error.message;
+        }
+        if (!isRateLimit) {
+          toast({ title: "Error", description: msg, variant: "destructive" });
+        }
         setOutput({ type: 'error', message: msg });
       } finally {
         setIsSubmittingCode(false);
@@ -923,8 +986,10 @@ useEffect(() => {
                         onValueChange={(value) => setAnswers({ ...answers, [currentQuestion.id]: value })}
                         className="space-y-2 pt-2"
                       >
-                        {currentQuestion.options.map((option: any, idx: number) => {
-                          const optionId = option.id || option.text;
+                        {currentQuestion.options.map((optionItem: unknown, idx: number) => {
+                          const option = optionItem as { id?: string; text?: string } | string;
+                          const optionId = (typeof option === "object" && option !== null ? (option.id || option.text || "") : option) as string;
+                          const optionText = (typeof option === "object" && option !== null ? (option.text || "") : option) as string;
                           return (
                             <Label 
                               key={idx} 
@@ -936,7 +1001,7 @@ useEffect(() => {
                               )}
                             >
                               <RadioGroupItem value={optionId} id={`option-${idx}`} />
-                              <span className="text-sm">{option.text || option}</span>
+                              <span className="text-sm">{optionText}</span>
                             </Label>
                           );
                         })}

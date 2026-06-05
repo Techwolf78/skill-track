@@ -158,20 +158,12 @@ const NotFound = () => {
               Home
             </a>
             {!user && (
-              <>
-                <a
-                  href="/login"
-                  className="text-sm text-primary hover:text-primary/80 transition-colors hover:underline"
-                >
-                  Login
-                </a>
-                <a
-                  href="/register"
-                  className="text-sm text-primary hover:text-primary/80 transition-colors hover:underline"
-                >
-                  Register
-                </a>
-              </>
+              <a
+                href="/login"
+                className="text-sm text-primary hover:text-primary/80 transition-colors hover:underline"
+              >
+                Login
+              </a>
             )}
             <a
               href="/#features"

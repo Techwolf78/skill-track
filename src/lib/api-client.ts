@@ -39,6 +39,19 @@ apiClient.interceptors.response.use(
       // window.location.href = "/login";
     }
 
+    if (error.response?.status === 429) {
+      const data = error.response.data as Record<string, unknown> | undefined;
+      const retryAfter = error.response.headers?.["retry-after"] || error.response.headers?.["Retry-After"];
+      const defaultMsg = `Too many requests. Please try again${retryAfter ? ` in ${retryAfter} seconds` : " later"}.`;
+      const finalMsg = data?.message ? (data.message as string) : defaultMsg;
+      
+      error.message = finalMsg;
+      if (data) {
+        data.message = finalMsg;
+      }
+      console.warn("Rate limit exceeded:", finalMsg);
+    }
+
     // Enhance the error object with standard BaseResponse error details
     if (error.response?.data && typeof error.response.data === "object") {
       const data = error.response.data as Record<string, unknown>;

@@ -116,13 +116,17 @@ export default function Register() {
     } catch (error: unknown) {
       console.error("Registration failed:", error);
       let errorMessage = "Registration failed. Please try again.";
+      let errorTitle = "Registration Failed";
       if (axios.isAxiosError(error)) {
+        if (error.response?.status === 429) {
+          errorTitle = "Rate Limit Exceeded";
+        }
         errorMessage = error.response?.data?.message || error.response?.data || error.message;
       } else if (error instanceof Error) {
         errorMessage = error.message;
       }
       toast({
-        title: "Registration Failed",
+        title: errorTitle,
         description: errorMessage,
         variant: "destructive",
       });
