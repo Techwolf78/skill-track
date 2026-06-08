@@ -22,7 +22,8 @@ import { useToast } from "@/hooks/use-toast";
 import {
   Clock, ChevronLeft, ChevronRight, Flag, Send,
   AlertTriangle, CheckCircle, Play, Terminal, XCircle,
-  Loader2, Save, FileText, Code2, Database, Lightbulb, Monitor
+  Loader2, Save, FileText, Code2, Database, Lightbulb, Monitor,
+  Wifi, WifiOff
 } from "lucide-react";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import Editor from "@monaco-editor/react";
@@ -39,6 +40,7 @@ import { CameraPreview } from "@/proctoring/components/CameraPreview";
 import { ViolationToast } from "@/proctoring/components/ViolationToast";
 import { EnvironmentCheck } from "@/proctoring/components/EnvironmentCheck";
 import { Shield, ShieldAlert, ShieldCheck as ShieldCheckIcon } from "lucide-react";
+import { AnswerStore } from "@/lib/exam/answerStorage";
 
 // Types
 interface Question {
@@ -191,6 +193,10 @@ function TestInterfaceContent({ testId, sessionId, navigate, toast }: { testId?:
   const [isFullscreen, setIsFullscreen] = useState(true);
   const [fullscreenTimer, setFullscreenTimer] = useState(10);
 
+  // Connection and caching state
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [unsyncedCount, setUnsyncedCount] = useState(0);
+
 
   const enterFullscreen = () => {
     document.documentElement.requestFullscreen().catch(err => {
@@ -283,6 +289,12 @@ function TestInterfaceContent({ testId, sessionId, navigate, toast }: { testId?:
       
       // Auto-start proctoring as checks were done in gateway
       startProctoring();
+
+      if (sessionId) {
+        const cachedAnswers = AnswerStore.getAnswers(sessionId);
+        setAnswers(prev => ({ ...prev, ...cachedAnswers }));
+        setUnsyncedCount(AnswerStore.getOfflineQueue(sessionId).length);
+      }
       
     } catch (error: unknown) {
       const err = error as { response?: { data?: { message?: string } } };
@@ -348,14 +360,30 @@ useEffect(() => {
   }
 }, [test]);
 
-  // Initialize code editor when question changes
+// Initialize code editor when question changes
 // Update the code editor initialization
 useEffect(() => {
   const currentQ = questions[currentIndex];
-  if (currentQ?.type === "CODING" && currentQ.codeTemplate) {
+  if (currentQ?.type === "CODING" && currentQ.codeTemplate && sessionId) {
     console.log("🎯 Initializing code editor for language:", language);
-    console.log("🎯 Available templates:", Object.keys(currentQ.codeTemplate));
     
+    // 1. Check if there is an answer already set in local state (which holds the submitted code)
+    const submitted = answers[currentQ.id] as { code?: string; language?: string } | undefined;
+    if (submitted && typeof submitted === "object" && submitted.language === language && submitted.code) {
+      console.log("🎯 Setting code from submitted answer for", language);
+      setCode(submitted.code);
+      return;
+    }
+    
+    // 2. Check if there is a draft in local storage
+    const draft = AnswerStore.getDraft(sessionId, currentQ.id, language);
+    if (draft !== null) {
+      console.log("🎯 Setting code from draft for", language);
+      setCode(draft);
+      return;
+    }
+
+    // 3. Fallback to starter template
     const template = currentQ.codeTemplate[language];
     if (template?.code) {
       console.log("🎯 Setting code from template for", language);
@@ -366,11 +394,27 @@ useEffect(() => {
       if (firstLang && currentQ.codeTemplate[firstLang]?.code) {
         console.log("🎯 Falling back to first available language:", firstLang);
         setLanguage(firstLang as LanguageKey);
-        setCode(currentQ.codeTemplate[firstLang].code);
+        
+        // Also check if fallback language has a draft
+        const fallbackDraft = AnswerStore.getDraft(sessionId, currentQ.id, firstLang);
+        if (fallbackDraft !== null) {
+          setCode(fallbackDraft);
+        } else {
+          setCode(currentQ.codeTemplate[firstLang].code);
+        }
       }
     }
   }
-}, [currentIndex, questions, language]);
+}, [currentIndex, questions, language, answers, sessionId]);
+
+// Save code draft on change
+useEffect(() => {
+  if (questions.length === 0 || !sessionId) return;
+  const currentQ = questions[currentIndex];
+  if (currentQ?.type === "CODING" && code) {
+    AnswerStore.saveDraft(sessionId, currentQ.id, language, code);
+  }
+}, [code, currentIndex, questions, language, sessionId]);
 
   // Set time left from session or test
   useEffect(() => {
@@ -391,6 +435,47 @@ useEffect(() => {
     }
     
     setSubmitting(true);
+
+    if (!navigator.onLine) {
+      toast({
+        title: "Submission Blocked",
+        description: "You are offline. Please reconnect to the internet to submit your test.",
+        variant: "destructive"
+      });
+      setSubmitting(false);
+      setShowSubmitDialog(false);
+      return;
+    }
+
+    const pendingQueue = AnswerStore.getOfflineQueue(sessionId);
+    if (pendingQueue.length > 0) {
+      toast({
+        title: "Syncing Pending Answers",
+        description: "We are uploading your remaining answers first. Please wait...",
+      });
+      try {
+        const syncSuccess = await AnswerStore.syncOfflineQueue(sessionId);
+        setUnsyncedCount(AnswerStore.getOfflineQueue(sessionId).length);
+        if (!syncSuccess) {
+          toast({
+            title: "Sync Failed",
+            description: "Some answers failed to upload. Please try again.",
+            variant: "destructive"
+          });
+          setSubmitting(false);
+          return;
+        }
+      } catch (err) {
+        toast({
+          title: "Sync Error",
+          description: "An error occurred while uploading answers.",
+          variant: "destructive"
+        });
+        setSubmitting(false);
+        return;
+      }
+    }
+
     try {
       // Gracefully sync proctoring violations to backend before submission
       try {
@@ -401,6 +486,9 @@ useEffect(() => {
 
       // Use the new dedicated submit endpoint
       await testService.submitSession(sessionId, answers);
+
+      // Clear local storage session cache
+      AnswerStore.clearSession(sessionId);
 
       toast({ title: "Success", description: "Test submitted successfully, your responses have been recorded" });
       navigate(`/test/${testId}/results?session=${sessionId}`);
@@ -539,6 +627,49 @@ useEffect(() => {
     };
   }, [isProctoringActive, toast]);
 
+  // Network Status Monitoring & Auto-syncing
+  useEffect(() => {
+    const handleOnline = () => {
+      setIsOnline(true);
+      toast({
+        title: "Connection Restored",
+        description: "You are back online. Syncing local answers...",
+      });
+      if (sessionId) {
+        AnswerStore.syncOfflineQueue(sessionId, (qId, success, result) => {
+          if (success) {
+            if (result) {
+              setAnswers(prev => ({ ...prev, [qId]: result }));
+            }
+            setUnsyncedCount(AnswerStore.getOfflineQueue(sessionId).length);
+          }
+        });
+      }
+    };
+
+    const handleOffline = () => {
+      setIsOnline(false);
+      toast({
+        title: "Connection Lost",
+        description: "You are offline. Your submissions will be cached locally.",
+        variant: "destructive",
+      });
+    };
+
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
+
+    // Initial check
+    if (sessionId) {
+      setUnsyncedCount(AnswerStore.getOfflineQueue(sessionId).length);
+    }
+
+    return () => {
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
+    };
+  }, [sessionId, toast]);
+
   // Feature 2: Hard "3-Strikes" Tab Switch Policy
   useEffect(() => {
     if (!isProctoringActive) return;
@@ -657,6 +788,38 @@ useEffect(() => {
       setSubmissionPhase("running");
       setOutput(null);
 
+      if (!isOnline) {
+        // Offline handling for coding submission
+        const offlineResult = {
+          code: code,
+          language: language,
+          result: {
+            submissionId: "offline-pending",
+            status: "PENDING_SYNC",
+            testCasesPassed: 0,
+            testCasesTotal: 0,
+            scoreAwarded: 0,
+            maxScore: currentQ.marks,
+            execTimeMs: 0
+          }
+        };
+        const updatedAnswers = { ...answers, [currentQ.id]: offlineResult };
+        setAnswers(updatedAnswers);
+        AnswerStore.saveAnswer(sessionId, currentQ.id, offlineResult);
+        AnswerStore.queueOfflineSubmission(sessionId, currentQ.id, "CODING", { code, language });
+        setUnsyncedCount(AnswerStore.getOfflineQueue(sessionId).length);
+        
+        toast({
+          title: "Offline Mode",
+          description: "No internet connection. Your solution has been saved locally and queued for synchronization.",
+          variant: "destructive"
+        });
+        setOutput({ type: 'success', message: "✓ Saved locally (Pending sync)" });
+        setIsSubmittingCode(false);
+        setSubmissionPhase("result");
+        return;
+      }
+
       try {
         const submissionId = await testService.submitCode({
           sessionId: sessionId,
@@ -684,7 +847,9 @@ useEffect(() => {
         }
 
         if (gradingResult) {
-          setAnswers({ ...answers, [currentQ.id]: { code: code, language: language, result: gradingResult } });
+          const finalResult = { code: code, language: language, result: gradingResult };
+          setAnswers({ ...answers, [currentQ.id]: finalResult });
+          AnswerStore.saveAnswer(sessionId, currentQ.id, finalResult);
           toast({ title: "Success", description: `Solution submitted! ${gradingResult.testCasesPassed}/${gradingResult.testCasesTotal} passed.` });
           setSubmissionPhase("result");
           
@@ -698,6 +863,40 @@ useEffect(() => {
         }
       } catch (error: unknown) {
         console.error("Submit error:", error);
+
+        // Check if network error occurred while online
+        const isNetworkError = axios.isAxiosError(error) && (!error.response || error.code === "ERR_NETWORK" || error.code === "ECONNABORTED");
+        if (isNetworkError) {
+          const offlineResult = {
+            code: code,
+            language: language,
+            result: {
+              submissionId: "offline-pending",
+              status: "PENDING_SYNC",
+              testCasesPassed: 0,
+              testCasesTotal: 0,
+              scoreAwarded: 0,
+              maxScore: currentQ.marks,
+              execTimeMs: 0
+            }
+          };
+          const updatedAnswers = { ...answers, [currentQ.id]: offlineResult };
+          setAnswers(updatedAnswers);
+          AnswerStore.saveAnswer(sessionId, currentQ.id, offlineResult);
+          AnswerStore.queueOfflineSubmission(sessionId, currentQ.id, "CODING", { code, language });
+          setUnsyncedCount(AnswerStore.getOfflineQueue(sessionId).length);
+          
+          toast({
+            title: "Network Error",
+            description: "Connection to server failed. Your solution has been saved locally and queued for sync.",
+            variant: "destructive"
+          });
+          setOutput({ type: 'success', message: "✓ Saved locally (Pending sync)" });
+          setIsSubmittingCode(false);
+          setSubmissionPhase("result");
+          return;
+        }
+
         let msg = "Failed to submit solution";
         let isRateLimit = false;
         if (axios.isAxiosError(error)) {
@@ -731,16 +930,46 @@ useEffect(() => {
     }
     
     setIsSubmittingCode(true);
+
+    if (!isOnline) {
+      AnswerStore.saveAnswer(sessionId, currentQ.id, currentAnswer);
+      AnswerStore.queueOfflineSubmission(sessionId, currentQ.id, "MCQ", currentAnswer);
+      setUnsyncedCount(AnswerStore.getOfflineQueue(sessionId).length);
+      toast({
+        title: "Offline Mode",
+        description: "No internet connection. Your answer has been saved locally.",
+        variant: "destructive"
+      });
+      setIsSubmittingCode(false);
+      return;
+    }
+
     try {
       await apiClient.post("/submissions", {
         sessionId: sessionId,
         questionId: currentQ.id,
         selectedOptionIds: [currentAnswer]
       });
+      AnswerStore.saveAnswer(sessionId, currentQ.id, currentAnswer);
       toast({ title: "Saved", description: "Answer saved successfully" });
     } catch (error: unknown) {
+      console.error("Submit error:", error);
+      
+      const isNetworkError = axios.isAxiosError(error) && (!error.response || error.code === "ERR_NETWORK" || error.code === "ECONNABORTED");
+      if (isNetworkError) {
+        AnswerStore.saveAnswer(sessionId, currentQ.id, currentAnswer);
+        AnswerStore.queueOfflineSubmission(sessionId, currentQ.id, "MCQ", currentAnswer);
+        setUnsyncedCount(AnswerStore.getOfflineQueue(sessionId).length);
+        toast({
+          title: "Network Error",
+          description: "Connection failed. Your answer has been saved locally and queued.",
+          variant: "destructive"
+        });
+        setIsSubmittingCode(false);
+        return;
+      }
+
       const err = error as { response?: { data?: { message?: string } } };
-      console.error("Submit error:", err);
       toast({
         title: "Error",
         description: err.response?.data?.message || "Failed to submit answer",
@@ -749,7 +978,7 @@ useEffect(() => {
     } finally {
       setIsSubmittingCode(false);
     }
-  }, [questions, currentIndex, sessionId, language, code, answers, toast]);
+  }, [questions, currentIndex, sessionId, language, code, answers, toast, isOnline]);
 
   const formatTime = (seconds: number) => {
     const hours = Math.floor(seconds / 3600);
@@ -885,6 +1114,20 @@ useEffect(() => {
           <p className="text-xs text-muted-foreground">{test?.description}</p>
         </div>
         <div className="flex items-center gap-3 flex-wrap">
+          {(!isOnline || unsyncedCount > 0) && (
+            <div className={cn(
+              "flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-bold border transition-all animate-pulse",
+              !isOnline 
+                ? "bg-orange-500/10 text-orange-600 border-orange-500/20" 
+                : "bg-yellow-500/10 text-yellow-600 border-yellow-500/20"
+            )}>
+              {!isOnline ? <WifiOff className="w-4 h-4" /> : <Wifi className="w-4 h-4" />}
+              <span>
+                {!isOnline ? "Offline" : "Syncing..."} {unsyncedCount > 0 && `(${unsyncedCount} unsynced)`}
+              </span>
+            </div>
+          )}
+
           <div className={cn(
             "rounded-lg px-3 py-2 text-sm font-mono font-medium",
             timeLeft < 300 ? "bg-red-500/10 text-red-500 animate-pulse" : "bg-muted"

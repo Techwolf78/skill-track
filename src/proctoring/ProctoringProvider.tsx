@@ -146,6 +146,59 @@ export const ProctoringProvider: React.FC<{ children: React.ReactNode; sessionId
     return () => clearInterval(interval);
   }, [state.isProctoringActive, state.violations, addViolation]);
 
+  // Periodic Camera Snapshot capturing/auditing
+  useEffect(() => {
+    if (!state.isProctoringActive) return;
+
+    const interval = setInterval(() => {
+      const video = document.querySelector("video");
+      if (video && !video.paused && !video.ended) {
+        try {
+          const canvas = document.createElement("canvas");
+          canvas.width = 160;
+          canvas.height = 120;
+          const ctx = canvas.getContext("2d");
+          if (ctx) {
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            const data = imgData.data;
+            // Convert to grayscale to minimize base64 payload size by ~66%
+            for (let i = 0; i < data.length; i += 4) {
+              const brightness = 0.34 * data[i] + 0.5 * data[i + 1] + 0.16 * data[i + 2];
+              data[i] = brightness;
+              data[i + 1] = brightness;
+              data[i + 2] = brightness;
+            }
+            ctx.putImageData(imgData, 0, 0);
+            const snapshotBase64 = canvas.toDataURL("image/jpeg", 0.5); // 50% quality compressed JPEG
+
+            // Store in LocalStorage
+            const storageKey = `rxone_camera_snapshots_${sessionId}`;
+            const snapshotsRaw = localStorage.getItem(storageKey);
+            const snapshots = snapshotsRaw ? JSON.parse(snapshotsRaw) : [];
+            
+            snapshots.push({
+              timestamp: Date.now(),
+              image: snapshotBase64
+            });
+
+            // Enforce max 20 snapshots cap to stay well under browser quota
+            if (snapshots.length > 20) {
+              snapshots.shift();
+            }
+
+            localStorage.setItem(storageKey, JSON.stringify(snapshots));
+            console.log(`📸 Saved periodic camera snapshot evidence. Total snapshots: ${snapshots.length}`);
+          }
+        } catch (e) {
+          console.error("Failed to capture periodic camera snapshot:", e);
+        }
+      }
+    }, 60000); // Capture every 60 seconds
+
+    return () => clearInterval(interval);
+  }, [state.isProctoringActive, sessionId]);
+
   useEffect(() => {
     // Initial Load
     setState(prev => ({
