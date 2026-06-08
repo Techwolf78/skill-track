@@ -42,7 +42,7 @@ import {
   Target,
   AlertCircle,
 } from "lucide-react";
-import { testService, Test, CreateTestRequest } from "@/lib/test-service";
+import { testService, Test, CreateTestRequest, TestQuestion, Question } from "@/lib/test-service";
 import { useToast } from "@/hooks/use-toast";
 
 export default function TestsEdit() {
@@ -50,12 +50,24 @@ export default function TestsEdit() {
   const navigate = useNavigate();
   const { toast } = useToast();
 
+  const formatDuration = (secs: number) => {
+    if (secs <= 0) return "N/A";
+    if (secs % 60 === 0) {
+      const mins = secs / 60;
+      return `${mins} min${mins > 1 ? "s" : ""}`;
+    }
+    const mins = Math.floor(secs / 60);
+    const remainingSecs = secs % 60;
+    if (mins === 0) return `${remainingSecs} sec`;
+    return `${mins} min ${remainingSecs} sec`;
+  };
+
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [test, setTest] = useState<Test | null>(null);
-  const [questionsData, setQuestionsData] = useState<any[]>([]);
+  const [questionsData, setQuestionsData] = useState<(TestQuestion & { question?: Question })[]>([]);
 
   // Form state
   const [formData, setFormData] = useState<Partial<CreateTestRequest>>({
@@ -119,7 +131,7 @@ export default function TestsEdit() {
     } else {
       navigate("/superadmin/tests");
     }
-  }, [id, fetchTest]);
+  }, [id, fetchTest, navigate]);
 
   const handleInputChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
@@ -188,12 +200,12 @@ export default function TestsEdit() {
         description: "Test has been updated successfully.",
       });
       navigate("/superadmin/tests");
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Failed to update test:", error);
       toast({
         title: "Error",
         description:
-          error.message || "Failed to update test. Please try again.",
+          error instanceof Error ? error.message : "Failed to update test. Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -210,12 +222,12 @@ export default function TestsEdit() {
         description: `"${test?.title}" has been deleted successfully.`,
       });
       navigate("/superadmin/tests");
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Failed to delete test:", error);
       toast({
         title: "Error",
         description:
-          error.message || "Failed to delete test. Please try again.",
+          error instanceof Error ? error.message : "Failed to delete test. Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -476,7 +488,7 @@ export default function TestsEdit() {
                             <Badge variant="secondary">{tq.marks} marks</Badge>
                             {tq.timeLimitSecs > 0 && (
                               <Badge variant="outline">
-                                {tq.timeLimitSecs} seconds
+                                {formatDuration(tq.timeLimitSecs)}
                               </Badge>
                             )}
                             <Badge variant="outline">
@@ -567,7 +579,7 @@ export default function TestsEdit() {
                 <Label>Created By</Label>
                 <Input
                   value={
-                    test.createdBy?.name || test.createdBy?.email || "Unknown"
+                    test.createdById || "Unknown"
                   }
                   disabled
                 />

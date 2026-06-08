@@ -42,7 +42,7 @@ import {
   AlertCircle,
   X,
 } from "lucide-react";
-import { testService, Test, CreateTestRequest } from "@/lib/test-service";
+import { testService, Test, CreateTestRequest, TestQuestion, Question } from "@/lib/test-service";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth-context";
 
@@ -52,6 +52,18 @@ export default function AdminTestsEdit() {
   const { toast } = useToast();
   const { user } = useAuth();
 
+  const formatDuration = (secs: number) => {
+    if (secs <= 0) return "N/A";
+    if (secs % 60 === 0) {
+      const mins = secs / 60;
+      return `${mins} min${mins > 1 ? "s" : ""}`;
+    }
+    const mins = Math.floor(secs / 60);
+    const remainingSecs = secs % 60;
+    if (mins === 0) return `${remainingSecs} sec`;
+    return `${mins} min ${remainingSecs} sec`;
+  };
+
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -60,8 +72,8 @@ export default function AdminTestsEdit() {
   const [deleting, setDeleting] = useState(false);
   const [deletingQuestion, setDeletingQuestion] = useState(false);
   const [test, setTest] = useState<Test | null>(null);
-  const [questionsData, setQuestionsData] = useState<any[]>([]);
-  const [selectedQuestion, setSelectedQuestion] = useState<any>(null);
+  const [questionsData, setQuestionsData] = useState<(TestQuestion & { question?: Question })[]>([]);
+  const [selectedQuestion, setSelectedQuestion] = useState<(TestQuestion & { question?: Question }) | null>(null);
 
   // Form state
   const [formData, setFormData] = useState<Partial<CreateTestRequest>>({
@@ -194,12 +206,12 @@ export default function AdminTestsEdit() {
         description: "Test has been updated successfully.",
       });
       navigate("/admin/tests");
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Failed to update test:", error);
       toast({
         title: "Error",
         description:
-          error.message || "Failed to update test. Please try again.",
+          error instanceof Error ? error.message : "Failed to update test. Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -216,12 +228,12 @@ export default function AdminTestsEdit() {
         description: `"${test?.title}" has been deleted successfully.`,
       });
       navigate("/admin/tests");
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Failed to delete test:", error);
       toast({
         title: "Error",
         description:
-          error.message || "Failed to delete test. Please try again.",
+          error instanceof Error ? error.message : "Failed to delete test. Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -236,7 +248,7 @@ export default function AdminTestsEdit() {
     try {
       setDeletingQuestion(true);
       // Call API to remove question from test
-      await testService.removeQuestionFromTest(id!, selectedQuestion.id);
+      await testService.removeQuestionFromTest(selectedQuestion.id);
 
       toast({
         title: "Success",
@@ -245,12 +257,12 @@ export default function AdminTestsEdit() {
 
       // Refresh the test data
       await fetchTest();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Failed to remove question:", error);
       toast({
         title: "Error",
         description:
-          error.message || "Failed to remove question. Please try again.",
+          error instanceof Error ? error.message : "Failed to remove question. Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -542,7 +554,7 @@ export default function AdminTestsEdit() {
                             <span>•</span>
                             <span>{item.marks} marks</span>
                             <span>•</span>
-                            <span>{item.timeLimitSecs}s</span>
+                            <span>{formatDuration(item.timeLimitSecs)}</span>
                           </div>
                         </div>
                       </div>

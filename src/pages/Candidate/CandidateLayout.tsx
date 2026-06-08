@@ -43,12 +43,13 @@ export function CandidateLayout() {
     return item.end ? location.pathname === item.path : location.pathname.startsWith(item.path);
   };
 
-  // Static mock user details for demonstration
-  const mockCandidate = {
-    name: "Alex Rivera",
-    email: "alex.rivera@gryphonacademy.co.in",
-    avatar: "AR"
-  };
+  // Read real user from localStorage (set on login)
+  const storedUser = (() => {
+    try { return JSON.parse(localStorage.getItem("user") || "{}"); } catch { return {}; }
+  })();
+  const candidateName: string = storedUser?.name || "Candidate";
+  const candidateEmail: string = storedUser?.email || "";
+  const candidateAvatar: string = candidateName.split(" ").map((n: string) => n[0]).join("").slice(0, 2).toUpperCase();
 
   return (
     <div className="flex min-h-screen bg-background">
@@ -104,11 +105,11 @@ export function CandidateLayout() {
         {!collapsed && (
           <div className="p-4 mx-3 mb-2 rounded-xl bg-sidebar-accent/50 border border-sidebar-border flex items-center gap-3">
             <div className="w-9 h-9 rounded-full bg-gradient-accent flex items-center justify-center text-accent-foreground font-bold shadow-sm">
-              {mockCandidate.avatar}
+              {candidateAvatar}
             </div>
             <div className="min-w-0 flex-1">
-              <p className="text-sm font-semibold text-sidebar-foreground truncate">{mockCandidate.name}</p>
-              <p className="text-xs text-sidebar-foreground/60 truncate">{mockCandidate.email}</p>
+              <p className="text-sm font-semibold text-sidebar-foreground truncate">{candidateName}</p>
+              <p className="text-xs text-sidebar-foreground/60 truncate">{candidateEmail}</p>
             </div>
           </div>
         )}

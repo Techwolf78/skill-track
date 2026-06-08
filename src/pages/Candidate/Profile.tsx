@@ -20,20 +20,28 @@ import {
 import { toast } from "sonner";
 
 export default function Profile() {
+  // Read real user from localStorage
+  const storedUser = (() => {
+    try { return JSON.parse(localStorage.getItem("user") || "{}"); } catch { return {}; }
+  })();
+  const realName: string = storedUser?.name || "";
+  const realEmail: string = storedUser?.email || "";
+  const realPhone: string = storedUser?.phoneNumber || "";
+
   const [formData, setFormData] = useState({
-    name: "Alex Rivera",
-    email: "alex.rivera@gryphonacademy.co.in",
-    phone: "+91 98765 43210",
-    location: "Mumbai, India",
-    university: "State Institute of Technology",
-    degree: "B.Tech in Computer Science",
-    gradYear: "2026",
-    cgpa: "8.9/10"
+    name: realName,
+    email: realEmail,
+    phone: realPhone,
+    location: "",
+    university: "",
+    degree: "",
+    gradYear: "",
+    cgpa: ""
   });
 
-  const [skills, setSkills] = useState(["React", "Node.js", "JavaScript", "Python", "SQL", "HTML/CSS"]);
+  const [skills, setSkills] = useState<string[]>([]);
   const [newSkill, setNewSkill] = useState("");
-  const [resume, setResume] = useState<string | null>("alex_rivera_resume.pdf");
+  const [resume, setResume] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
 
   // Profile completion calculations
@@ -72,8 +80,8 @@ export default function Profile() {
     toast.info(`Skill '${skill}' removed.`);
   };
 
-  const handleResumeUpload = (e: any) => {
-    const file = e.target.files[0];
+  const handleResumeUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
     if (file) {
       setIsUploading(true);
       setTimeout(() => {

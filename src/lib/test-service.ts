@@ -989,4 +989,11 @@ export const testService = {
     const response = await apiClient.get<BaseResponse<TestResult | null>>(`/test-results/session/${sessionId}`);
     return response.data;
   },
+
+  downloadScorecard: async (sessionId: string): Promise<Blob> => {
+    const response = await apiClient.get<Blob>(`/test-results/session/${sessionId}/scorecard`, {
+      responseType: "blob",
+    });
+    return response.data;
+  },
 };

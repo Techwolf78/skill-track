@@ -180,8 +180,11 @@ export default function DSAPlayground() {
   const { id } = useParams();
   const { toast } = useToast();
   const { user } = useAuth();
-  
-  const backRoute = user?.role === ROLES.SUPERADMIN ? "/superadmin/questions" : "/admin/questions";
+
+  const backRoute =
+    user?.role === ROLES.SUPERADMIN
+      ? "/superadmin/questions"
+      : "/admin/questions";
 
   const [question, setQuestion] = useState<QuestionUI | null>(null);
   const [loading, setLoading] = useState(true);
@@ -328,9 +331,14 @@ export default function DSAPlayground() {
         sourceCode: code,
       };
 
-      const response = await apiClient.post<PlaygroundExecutionResponse>("/api/code/execute/playground", requestBody);
+      const response = await apiClient.post<PlaygroundExecutionResponse>(
+        "/api/code/execute/playground",
+        requestBody,
+      );
       console.log("Run Code Response:", response.data);
-      const resultsArray = Array.isArray(response.data.data) ? response.data.data : [];
+      const resultsArray = Array.isArray(response.data.data)
+        ? response.data.data
+        : [];
 
       const statusToId: Record<string, number> = {
         ACCEPTED: 3,
@@ -342,14 +350,21 @@ export default function DSAPlayground() {
       };
 
       const sampleCases = question.testCases.filter((tc) => !tc.isHidden);
-      const mappedResults = resultsArray.map((res: ExecutionResultItem, idx: number) => ({
-        status: res.status,
-        input: sampleCases[idx]?.input || "",
-        output: res.actualOutput || res.stdout || res.stderr || res.compileOutput || "",
-        expected: res.expectedOutput || sampleCases[idx]?.expected || "",
-        isHidden: false,
-        id: statusToId[res.status] || 4,
-      }));
+      const mappedResults = resultsArray.map(
+        (res: ExecutionResultItem, idx: number) => ({
+          status: res.status,
+          input: sampleCases[idx]?.input || "",
+          output:
+            res.actualOutput ||
+            res.stdout ||
+            res.stderr ||
+            res.compileOutput ||
+            "",
+          expected: res.expectedOutput || sampleCases[idx]?.expected || "",
+          isHidden: false,
+          id: statusToId[res.status] || 4,
+        }),
+      );
 
       setTestCaseResults(mappedResults);
       setConsoleOutput("> Execution finished.\n");
@@ -371,7 +386,10 @@ export default function DSAPlayground() {
 
         if (topLevelId === 6) {
           title = "Compilation Error";
-          message = resultsArray[0]?.compileOutput || resultsArray[0]?.stderr || "Compilation failed";
+          message =
+            resultsArray[0]?.compileOutput ||
+            resultsArray[0]?.stderr ||
+            "Compilation failed";
         } else if (topLevelId === 5) {
           title = "Time Limit Exceeded";
           message = "Your code took too long to run.";
@@ -380,7 +398,10 @@ export default function DSAPlayground() {
           message = "Logic failed on sample case.";
         } else if (topLevelId >= 7) {
           title = "Runtime Error";
-          message = resultsArray.find((r: ExecutionResultItem) => r.status !== "ACCEPTED")?.stderr || "Runtime error";
+          message =
+            resultsArray.find(
+              (r: ExecutionResultItem) => r.status !== "ACCEPTED",
+            )?.stderr || "Runtime error";
         }
 
         const friendlyHint = mapFriendlyError(message, language);
@@ -391,7 +412,9 @@ export default function DSAPlayground() {
         setVerdict({ type, title, message });
         setSubmissionPhase("result");
       } else {
-        const passedCount = resultsArray.filter((r: ExecutionResultItem) => r.status === "ACCEPTED").length;
+        const passedCount = resultsArray.filter(
+          (r: ExecutionResultItem) => r.status === "ACCEPTED",
+        ).length;
         const totalCount = resultsArray.length;
         setConsoleOutput(
           (prev) =>
@@ -411,7 +434,7 @@ export default function DSAPlayground() {
             message: "All sample cases passed!",
           });
         } else {
-           setVerdict({
+          setVerdict({
             type: "fail",
             title: "Error",
             message: "No test cases returned.",
@@ -421,19 +444,25 @@ export default function DSAPlayground() {
       }
     } catch (error: unknown) {
       console.error("Judge0 Error:", error);
-      const err = error as { response?: { status?: number; data?: { message?: string } } };
+      const err = error as {
+        response?: { status?: number; data?: { message?: string } };
+      };
       const isRateLimit = err.response?.status === 429;
       if (isRateLimit) {
         toast({
           title: "Rate Limit Exceeded",
-          description: err.response?.data?.message || "Code execution limit: 10 requests/minute. Try again in 60 seconds.",
-          variant: "destructive"
+          description:
+            err.response?.data?.message ||
+            "Code execution limit: 10 requests/minute. Try again in 60 seconds.",
+          variant: "destructive",
         });
       }
       setVerdict({
         type: "error",
         title: isRateLimit ? "Rate Limit Exceeded" : "System Error",
-        message: err.response?.data?.message || "Something went wrong. Please try again.",
+        message:
+          err.response?.data?.message ||
+          "Something went wrong. Please try again.",
       });
     } finally {
       setIsExecuting(false);
@@ -454,40 +483,21 @@ export default function DSAPlayground() {
 
     try {
       const backendLanguage = language === "python3" ? "python" : language;
-      const response = await apiClient.post<{ data: string }>("/api/code/execute/submit", {
-        sessionId: "00000000-0000-0000-0000-000000000000",
+      const requestBody = {
         questionId: question.id,
         language: backendLanguage,
         sourceCode: code,
-      });
+        runAll: true,
+      };
 
-      const submissionId = response.data.data;
-      if (!submissionId) {
-        throw new Error("No submission ID returned");
-      }
-
-      setConsoleOutput(prev => prev + "> Submission accepted. Waiting for grading...\n");
-
-      let executionResult: GradingResult | null = null;
-      for (let i = 0; i < 30; i++) { // Poll for up to 60 seconds
-        await new Promise(resolve => setTimeout(resolve, 2000));
-        try {
-          const res = await apiClient.get<{ data: GradingResult }>(`/api/code/execute/result/${submissionId}`);
-          if (res.data.data && res.data.data.status !== "PENDING" && res.data.data.status !== "PROCESSING") {
-            executionResult = res.data.data;
-            break;
-          }
-        } catch (e) {
-          // ignore error while polling if it's just a 404 or temporary
-        }
-      }
-
-      if (!executionResult) {
-        throw new Error("Submission polling timed out.");
-      }
-
-      setTestCaseResults([]);
-      setConsoleOutput("> Verification finished.\n");
+      const response = await apiClient.post<PlaygroundExecutionResponse>(
+        "/api/code/execute/playground",
+        requestBody,
+      );
+      console.log("Submit Code Response:", response.data);
+      const resultsArray = Array.isArray(response.data.data)
+        ? response.data.data
+        : [];
 
       const statusToId: Record<string, number> = {
         ACCEPTED: 3,
@@ -498,57 +508,127 @@ export default function DSAPlayground() {
         INTERNAL_ERROR: 13,
       };
 
-      const topLevelId = statusToId[executionResult.status] || 4;
+      const testCases = question.testCases;
+      const mappedResults = resultsArray.map(
+        (res: ExecutionResultItem, idx: number) => ({
+          status: res.status,
+          input: testCases[idx]?.input || "",
+          output:
+            res.actualOutput ||
+            res.stdout ||
+            res.stderr ||
+            res.compileOutput ||
+            "",
+          expected: res.expectedOutput || testCases[idx]?.expected || "",
+          isHidden: !!testCases[idx]?.isHidden,
+          id: statusToId[res.status] || 4,
+        }),
+      );
+
+      setTestCaseResults(mappedResults);
+      setConsoleOutput("> Verification finished.\n");
+
+      let overallStatus = "ACCEPTED";
+      for (const res of resultsArray) {
+        if (res.status !== "ACCEPTED") {
+          overallStatus = res.status;
+          break;
+        }
+      }
+
+      const topLevelId = statusToId[overallStatus] || 4;
 
       if (topLevelId !== 3) {
-        let title = "Wrong Answer";
-        let message = "Failed on test cases.";
+        const type: "fail" | "error" = "fail";
+        let title = "Error";
+        let message = overallStatus;
 
         if (topLevelId === 6) {
           title = "Compilation Failed";
-          message = "Compilation failed";
+          message =
+            resultsArray[0]?.compileOutput ||
+            resultsArray[0]?.stderr ||
+            "Compilation failed";
         } else if (topLevelId === 5) {
           title = "Time Limit Exceeded";
-          message = "Exceeded time on test case.";
+          message = "Your code took too long to run.";
+        } else if (topLevelId === 4) {
+          title = "Wrong Answer";
+          message = "Failed on test cases.";
         } else if (topLevelId >= 7) {
           title = "Runtime Error";
-          message = "Crash during validation.";
+          message =
+            resultsArray.find(
+              (r: ExecutionResultItem) => r.status !== "ACCEPTED",
+            )?.stderr || "Runtime error";
         }
 
-        setVerdict({ type: "fail", title, message });
+        const friendlyHint = mapFriendlyError(message, language);
+        if (friendlyHint) {
+          message = friendlyHint + "\n\nOriginal Error:\n" + message;
+        }
+
+        setVerdict({ type, title, message });
+        setSubmissionPhase("result");
       } else {
-        const passedCount = executionResult.testCasesPassed;
-        const totalCount = executionResult.testCasesTotal;
-        const score = executionResult.scoreAwarded;
-        
-        setVerdict({
-          type: "success",
-          title: "Accepted",
-          message: `All test cases passed! (${passedCount}/${totalCount}). Score: ${score}`,
-        });
+        const passedCount = resultsArray.filter(
+          (r: ExecutionResultItem) => r.status === "ACCEPTED",
+        ).length;
+        const totalCount = resultsArray.length;
+        setConsoleOutput(
+          (prev) =>
+            prev +
+            `> Verification Results: ${passedCount}/${totalCount} Passed\n`,
+        );
 
-        toast({
-          title: "Success!",
-          description: `Solution accepted! (${passedCount}/${totalCount})`,
-        });
+        if (passedCount > 0 && passedCount < totalCount) {
+          setVerdict({
+            type: "fail",
+            title: "Wrong Answer",
+            message: `Failed on some hidden cases.`,
+          });
+        } else if (passedCount > 0) {
+          setVerdict({
+            type: "success",
+            title: "Accepted",
+            message: `All test cases passed! (${passedCount}/${totalCount})`,
+          });
+          toast({
+            title: "Success!",
+            description: `Solution accepted! (${passedCount}/${totalCount})`,
+          });
+        } else {
+          setVerdict({
+            type: "fail",
+            title: "Error",
+            message: "No test cases returned.",
+          });
+        }
+        setSubmissionPhase("result");
       }
-
-      setSubmissionPhase("result");
     } catch (error: unknown) {
       console.error("Submission error:", error);
-      const err = error as { response?: { status?: number; data?: { message?: string } }; message?: string };
+      const err = error as {
+        response?: { status?: number; data?: { message?: string } };
+        message?: string;
+      };
       const isRateLimit = err.response?.status === 429;
       if (isRateLimit) {
         toast({
           title: "Rate Limit Exceeded",
-          description: err.response?.data?.message || "Code execution limit: 10 requests/minute. Try again in 60 seconds.",
-          variant: "destructive"
+          description:
+            err.response?.data?.message ||
+            "Code execution limit: 10 requests/minute. Try again in 60 seconds.",
+          variant: "destructive",
         });
       }
       setVerdict({
         type: "error",
         title: isRateLimit ? "Rate Limit Exceeded" : "System Error",
-        message: err.response?.data?.message || err.message || "Failed to process submission.",
+        message:
+          err.response?.data?.message ||
+          err.message ||
+          "Failed to process submission.",
       });
     } finally {
       setIsSubmitting(false);
@@ -756,7 +836,7 @@ export default function DSAPlayground() {
                             <Badge
                               key={i}
                               variant="outline"
-                              className="border-[#3e3e3e] text-[10px] py-0"
+                              className="border-orange-500/30 text-orange-300 text-[10px] py-0"
                             >
                               {tag}
                             </Badge>
@@ -938,7 +1018,7 @@ export default function DSAPlayground() {
                                 </span>
                                 <Badge
                                   variant="outline"
-                                  className="text-[10px] border-[#3e3e3e]"
+                                  className="text-[10px] border-orange-500/30 text-orange-300 bg-orange-500/5"
                                 >
                                   {tc.weight || 0}% weight
                                 </Badge>

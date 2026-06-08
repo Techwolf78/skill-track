@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -56,6 +56,9 @@ const topicWise = [
   { topic: "SQL", avgScore: 79, difficulty: "Medium" },
 ];
 
+const RESULT_POLL_INTERVAL_MS = 3000;
+const MAX_RESULT_POLL_ATTEMPTS = 40;
+
 function ManualResultFetcher() {
   const [schedules, setSchedules] = useState<TestScheduleExtended[]>([]);
   const [candidates, setCandidates] = useState<Candidate[]>([]);
@@ -78,6 +81,7 @@ function ManualResultFetcher() {
   }>>({});
 
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [pdfLoadingSessionId, setPdfLoadingSessionId] = useState<string | null>(null);
   const pollingRefs = useRef<Record<string, NodeJS.Timeout>>({});
 
   // Fetch all initial data
@@ -126,32 +130,70 @@ function ManualResultFetcher() {
     setTimeout(() => setCopiedId(null), 2000);
   };
 
+  const handleViewScorecard = async (sid: string) => {
+    try {
+      setPdfLoadingSessionId(sid);
+      const blob = await testService.downloadScorecard(sid);
+      const url = URL.createObjectURL(blob);
+      window.open(url, "_blank", "noopener,noreferrer");
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+    } catch (error: any) {
+      window.alert(error.message || "Scorecard PDF is not available yet.");
+    } finally {
+      setPdfLoadingSessionId(null);
+    }
+  };
+
   // Polling logic for a specific session ID
   const startPollingSession = (sid: string) => {
+    if (pollingRefs.current[sid]) {
+      clearTimeout(pollingRefs.current[sid]);
+      delete pollingRefs.current[sid];
+    }
+
     setSessionStates(prev => ({
       ...prev,
       [sid]: { status: "POLLING", message: "Fetching / Polling results...", result: null }
     }));
 
-    const poll = async () => {
+    const poll = async (attempt = 1) => {
       try {
         const response = await testService.pollResultBySessionId(sid);
         const statusCode = response.statusCode || response.status;
 
         if (statusCode === 202) {
-          pollingRefs.current[sid] = setTimeout(poll, 3000);
+          if (attempt >= MAX_RESULT_POLL_ATTEMPTS) {
+            delete pollingRefs.current[sid];
+            setSessionStates(prev => ({
+              ...prev,
+              [sid]: {
+                status: "ERROR",
+                message: response.message || "Result is still not available after polling. Try Force Grade, then poll again.",
+                result: null
+              }
+            }));
+            return;
+          }
+
+          pollingRefs.current[sid] = setTimeout(
+            () => poll(attempt + 1),
+            RESULT_POLL_INTERVAL_MS
+          );
         } else if (statusCode === 200) {
+          delete pollingRefs.current[sid];
           setSessionStates(prev => ({
             ...prev,
             [sid]: { status: "SUCCESS", message: "Result fetched successfully.", result: response.data }
           }));
         } else {
+          delete pollingRefs.current[sid];
           setSessionStates(prev => ({
             ...prev,
             [sid]: { status: "ERROR", message: response.message || "Unknown error", result: null }
           }));
         }
       } catch (error: any) {
+        delete pollingRefs.current[sid];
         setSessionStates(prev => ({
           ...prev,
           [sid]: { status: "ERROR", message: error.message || "Failed to fetch results", result: null }
@@ -181,6 +223,21 @@ function ManualResultFetcher() {
         }));
       }
     } catch (error: any) {
+      const statusCode = error.response?.status;
+      const message = error.message || "";
+      if (statusCode === 409 || message.toLowerCase().includes("already exists")) {
+        try {
+          const existingResult = await testService.getResultBySessionId(sid);
+          setSessionStates(prev => ({
+            ...prev,
+            [sid]: { status: "SUCCESS", message: "Existing result loaded.", result: existingResult }
+          }));
+          return;
+        } catch {
+          // Fall through to the original error if the existing result cannot be loaded.
+        }
+      }
+
       setSessionStates(prev => ({
         ...prev,
         [sid]: { status: "ERROR", message: error.message || "Failed to trigger grading", result: null }
@@ -200,7 +257,44 @@ function ManualResultFetcher() {
   };
 
   // Filters sessions for the selected schedule
-  const filteredSessions = sessions.filter(s => s.scheduleId === selectedScheduleId);
+  const filteredSessions = useMemo(
+    () => sessions.filter(s => s.scheduleId === selectedScheduleId),
+    [sessions, selectedScheduleId]
+  );
+
+  useEffect(() => {
+    if (!selectedScheduleId || filteredSessions.length === 0) return;
+
+    let cancelled = false;
+
+    filteredSessions.forEach(async (session) => {
+      const currentState = sessionStates[session.id];
+      if (currentState?.status === "SUCCESS" || currentState?.status === "POLLING") {
+        return;
+      }
+
+      try {
+        const response = await testService.pollResultBySessionId(session.id);
+        const statusCode = response.statusCode || response.status;
+        if (!cancelled && statusCode === 200 && response.data) {
+          setSessionStates(prev => ({
+            ...prev,
+            [session.id]: {
+              status: "SUCCESS",
+              message: "Result loaded.",
+              result: response.data
+            }
+          }));
+        }
+      } catch {
+        // Existing result hydration is best-effort; manual actions still surface errors.
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedScheduleId, filteredSessions, sessionStates]);
 
   // Helper to map candidate ID to object
   const getCandidateForSession = (candidateId: string) => {
@@ -483,6 +577,18 @@ function ManualResultFetcher() {
                               >
                                 Fetch / Poll
                               </Button>
+                              {state.status === "SUCCESS" && state.result && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => handleViewScorecard(session.id)}
+                                  disabled={pdfLoadingSessionId === session.id}
+                                  className="h-8 text-xs"
+                                >
+                                  <Download className={`h-3.5 w-3.5 mr-1 ${pdfLoadingSessionId === session.id ? "animate-pulse" : ""}`} />
+                                  View PDF
+                                </Button>
+                              )}
                               <Button
                                 size="sm"
                                 variant="ghost"

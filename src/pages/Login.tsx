@@ -33,9 +33,10 @@ export default function Login() {
   const [isLoading, setIsLoading] = useState(false);
   const [adminEmail, setAdminEmail] = useState("superadmin@gryphonacademy.co.in");
   const [adminPassword, setAdminPassword] = useState("");
-  const [studentCode, setStudentCode] = useState("");
   const [studentEmail, setStudentEmail] = useState("");
+  const [studentPassword, setStudentPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [showStudentPassword, setShowStudentPassword] = useState(false);
 
   const handleAdminLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -94,22 +95,22 @@ export default function Login() {
     e.preventDefault();
     setIsLoading(true);
     try {
-      // Assuming students use their email as login for now
       const response = await authService.login({
         email: studentEmail,
-        password: "password", // Default or handled by backend
+        password: studentPassword,
       });
 
-      // Use the login function from AuthContext to update React state immediately
       loginToContext(response.accessToken, response.user);
 
       toast({
-        title: "Access Granted!",
-        description: "Starting your test session...",
+        title: "Login Successful!",
+        description: `Welcome, ${response.user.name || studentEmail}!`,
       });
-      navigate(`/test/access/${studentCode}`);
+
+      const redirectPath = getRedirectPathForRole(response.user.role);
+      navigate(redirectPath);
     } catch (error: unknown) {
-      let errorMessage = "Invalid test code or email.";
+      let errorMessage = "Invalid email or password.";
       let errorTitle = "Access Denied";
       if (axios.isAxiosError(error)) {
         if (error.response?.status === 429) {
@@ -117,7 +118,7 @@ export default function Login() {
         }
         errorMessage =
           error.response?.data?.message ||
-          error.response?.data ||
+          error.response?.data?.data?.message ||
           error.message;
       } else if (error instanceof Error) {
         errorMessage = error.message;
@@ -138,8 +139,8 @@ export default function Login() {
   };
 
   const fillStudentCredentials = () => {
-    setStudentCode("TEST-2024-001");
-    setStudentEmail("student@company.com");
+    setStudentEmail("deepgryphon@gmail.com");
+    setStudentPassword("");
   };
 
   return (
@@ -319,40 +320,53 @@ export default function Login() {
             <TabsContent value="student" className="mt-6">
               <div className="flex items-center justify-between gap-3 mb-4">
                 <p className="text-sm text-muted-foreground">
-                  Need a sample student login? Use quick fill.
+                  Login with your candidate email and password.
                 </p>
                 <button
                   type="button"
                   onClick={fillStudentCredentials}
                   className="text-sm font-medium text-primary hover:underline"
                 >
-                  Fill Student
+                  Fill Sample
                 </button>
               </div>
               <form onSubmit={handleStudentAccess} className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="testCode">Test Access Code</Label>
-                  <Input
-                    id="testCode"
-                    type="text"
-                    placeholder="Enter test code (e.g., TEST-2024-001)"
-                    className="h-12 font-mono uppercase tracking-wider"
-                    value={studentCode}
-                    onChange={(event) => setStudentCode(event.target.value)}
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="studentEmail">Your Email</Label>
+                  <Label htmlFor="studentEmail">Email Address</Label>
                   <Input
                     id="studentEmail"
                     type="email"
-                    placeholder="student@email.com"
+                    placeholder="candidate@email.com"
                     className="h-12"
                     value={studentEmail}
                     onChange={(event) => setStudentEmail(event.target.value)}
                     required
                   />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="studentPassword">Password</Label>
+                  <div className="relative">
+                    <Input
+                      id="studentPassword"
+                      type={showStudentPassword ? "text" : "password"}
+                      placeholder="••••••••"
+                      className="h-12 pr-10"
+                      value={studentPassword}
+                      onChange={(event) => setStudentPassword(event.target.value)}
+                      required
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowStudentPassword(!showStudentPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      {showStudentPassword ? (
+                        <EyeOff className="w-5 h-5" />
+                      ) : (
+                        <Eye className="w-5 h-5" />
+                      )}
+                    </button>
+                  </div>
                 </div>
                 <Button
                   type="submit"
@@ -361,10 +375,10 @@ export default function Login() {
                   className="w-full"
                   disabled={isLoading}
                 >
-                  {isLoading ? "Verifying..." : "Start Test"}
+                  {isLoading ? "Signing in..." : "Sign in as Candidate"}
                 </Button>
                 <p className="text-center text-sm text-muted-foreground">
-                  Enter the test code provided by your trainer
+                  Use the credentials shared by your assessment administrator
                 </p>
               </form>
             </TabsContent>

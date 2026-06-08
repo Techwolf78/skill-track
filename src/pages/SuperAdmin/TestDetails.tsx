@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import {
@@ -44,19 +44,25 @@ export default function TestDetails() {
   const navigate = useNavigate();
   const { toast } = useToast();
 
+  const formatDuration = (secs: number) => {
+    if (secs <= 0) return "N/A";
+    if (secs % 60 === 0) {
+      const mins = secs / 60;
+      return `${mins} min${mins > 1 ? "s" : ""}`;
+    }
+    const mins = Math.floor(secs / 60);
+    const remainingSecs = secs % 60;
+    if (mins === 0) return `${remainingSecs} sec`;
+    return `${mins} min ${remainingSecs} sec`;
+  };
+
   const [loading, setLoading] = useState(true);
   const [test, setTest] = useState<Test | null>(null);
   const [questions, setQuestions] = useState<
     (Question & { marks: number; timeLimitSecs: number; orderIndex: number })[]
   >([]);
 
-  useEffect(() => {
-    if (id) {
-      fetchTestDetails();
-    }
-  }, [id]);
-
-  const fetchTestDetails = async () => {
+  const fetchTestDetails = useCallback(async () => {
     try {
       setLoading(true);
       const testData = await testService.getTestById(id!);
@@ -84,17 +90,23 @@ export default function TestDetails() {
 
         setQuestions(enrichedQuestions);
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Failed to fetch test details:", error);
       toast({
         title: "Error",
-        description: error.message || "Failed to load test details",
+        description: error instanceof Error ? error.message : "Failed to load test details",
         variant: "destructive",
       });
     } finally {
       setLoading(false);
     }
-  };
+  }, [id, toast]);
+
+  useEffect(() => {
+    if (id) {
+      fetchTestDetails();
+    }
+  }, [id, fetchTestDetails]);
 
   const handleEdit = () => {
     navigate(`/superadmin/tests/edit/${id}`);
@@ -112,10 +124,10 @@ export default function TestDetails() {
         description: "Test has been published successfully.",
       });
       fetchTestDetails();
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: "Error",
-        description: error.message || "Failed to publish test",
+        description: error instanceof Error ? error.message : "Failed to publish test",
         variant: "destructive",
       });
     }
@@ -129,10 +141,10 @@ export default function TestDetails() {
         description: "Test has been archived successfully.",
       });
       fetchTestDetails();
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: "Error",
-        description: error.message || "Failed to archive test",
+        description: error instanceof Error ? error.message : "Failed to archive test",
         variant: "destructive",
       });
     }
@@ -158,7 +170,6 @@ export default function TestDetails() {
         instructions: test!.instructions,
         status: "DRAFT",
         passMark: test!.passMark,
-        createdById: user.id,
       });
 
       toast({
@@ -166,10 +177,10 @@ export default function TestDetails() {
         description: "Test duplicated successfully.",
       });
       navigate("/superadmin/tests");
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: "Error",
-        description: error.message || "Failed to duplicate test",
+        description: error instanceof Error ? error.message : "Failed to duplicate test",
         variant: "destructive",
       });
     }
@@ -188,10 +199,10 @@ export default function TestDetails() {
           description: "Test deleted successfully.",
         });
         navigate("/superadmin/tests");
-      } catch (error: any) {
+      } catch (error: unknown) {
         toast({
           title: "Error",
-          description: error.message || "Failed to delete test",
+          description: error instanceof Error ? error.message : "Failed to delete test",
           variant: "destructive",
         });
       }
@@ -407,9 +418,7 @@ export default function TestDetails() {
                   <div className="mt-1 flex items-center gap-2">
                     <User className="w-4 h-4 text-muted-foreground" />
                     <span>
-                      {test.createdBy?.name ||
-                        test.createdBy?.email ||
-                        "Unknown"}
+                      {test.createdById || "Unknown"}
                     </span>
                   </div>
                 </div>
@@ -527,13 +536,13 @@ export default function TestDetails() {
                               className="flex items-center gap-1 w-fit"
                             >
                               {getQuestionTypeIcon(
-                                question.questionType || question.type || "MCQ",
+                                question.questionType || "MCQ",
                               )}
-                              {question.questionType || question.type || "MCQ"}
+                              {question.questionType || "MCQ"}
                             </Badge>
                           </TableCell>
                           <TableCell>{question.marks}</TableCell>
-                          <TableCell>{question.timeLimitSecs} sec</TableCell>
+                          <TableCell>{formatDuration(question.timeLimitSecs)}</TableCell>
                         </TableRow>
                       ))}
                     </TableBody>

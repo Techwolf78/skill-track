@@ -25,9 +25,12 @@ export const getRedirectPathForRole = (role: string): string => {
     case 'ADMIN':
       return '/admin';
     case 'TRAINER':
-      return '/trainer'; // or '/dashboard' if trainer uses student dashboard
+      return '/trainer';
+    case 'CANDIDATE':
+      return '/candidate';
     case 'STUDENT':
+      return '/candidate';
     default:
-      return '/dashboard';
+      return '/candidate';
   }
 };

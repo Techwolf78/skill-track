@@ -76,7 +76,7 @@ export default function TestQuestions() {
 
   // Marks and time limit for selected questions
   const [defaultMarks, setDefaultMarks] = useState<number>(5);
-  const [defaultTimeLimit, setDefaultTimeLimit] = useState<number>(60);
+  const [defaultTimeLimit, setDefaultTimeLimit] = useState<number>(10);
 
   const fetchTestAndQuestions = useCallback(async () => {
     try {
@@ -165,7 +165,7 @@ const handleAddQuestions = async () => {
           questionId: questionId,
           orderIndex: currentOrderIndex,
           marks: defaultMarks,
-          timeLimitSecs: defaultTimeLimit,
+          timeLimitSecs: defaultTimeLimit * 60,
         };
         
         console.log("Adding question:", requestData);
@@ -175,7 +175,7 @@ const handleAddQuestions = async () => {
           questionId,
           currentOrderIndex,
           defaultMarks,
-          defaultTimeLimit
+          defaultTimeLimit * 60
         );
         
         console.log("Question added successfully:", response);
@@ -525,7 +525,7 @@ const handleAddQuestions = async () => {
                 />
               </div>
               <div className="flex items-center gap-2">
-                <Label className="text-xs text-white/80">Time (sec):</Label>
+                <Label className="text-xs text-white/80">Time (min):</Label>
                 <Input
                   type="number"
                   value={defaultTimeLimit}
@@ -533,7 +533,7 @@ const handleAddQuestions = async () => {
                     setDefaultTimeLimit(parseInt(e.target.value) || 0)
                   }
                   className="w-20 h-8 text-sm bg-white/10 text-white border-white/20"
-                  min={30}
+                  min={1}
                 />
               </div>
               <Button
