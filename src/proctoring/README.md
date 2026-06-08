@@ -38,6 +38,8 @@ graph TD
     D -->|useDevToolsDetector| H[Window Size & Console Checks]
     D -->|useScreenMonitor| I[Display Media Stream Track]
     C --> J[Security Restrictions]
+    C --> R[Webcam Auditing]
+    R -->|Periodic Grayscale Snapshot 60s| S[(LocalStorage Cache)]
     J -->|Block| K[Clipboard Copy/Paste/Cut]
     J -->|Block| L[F12 & DevTools Shortcuts]
     J -->|Enforce| M[3-Strikes Tab Auto-Submit]
@@ -155,3 +157,13 @@ Mounted globally as capturing listeners inside `TestInterface.tsx`:
 - **Immediate Alerts**: Critical/High violations (e.g. devtools opening, tab switches) are POSTed to the backend immediately.
 - **Deferred Batching**: Low/Medium warnings are queued locally and uploaded in a single bulk batch request right before final session submission.
 - **Network Outage Resilience**: Sync calls track status locally using `synced: boolean`. If a network connection is lost, violations are cached. A window `online` reconnect listener automatically flushes all pending logs to `/api/test-sessions/:id/violations/batch` when connectivity is recovered.
+
+---
+
+## 8. Periodic Webcam Auditing
+
+To maintain continuous visual validation of candidate presence without triggering excessive network load:
+- **Interval**: A background worker captures a video frame every **60 seconds**.
+- **Optimization**: The captured frame is rendered to a small canvas (`160x120`), converted to grayscale to reduce memory footprint by ~66%, and compressed as a 50% quality JPEG.
+- **Persistence**: Saved locally in `localStorage` under `rxone_camera_snapshots_${sessionId}`.
+- **Quota Safeguard**: Retains a rolling history of the **latest 20 snapshots** max, keeping browser storage consumption extremely low (~40KB total) and completely avoiding browser quota exceptions.
