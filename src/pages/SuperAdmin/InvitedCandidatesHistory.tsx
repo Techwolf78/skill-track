@@ -49,10 +49,6 @@ export default function InvitedCandidatesHistory() {
 
   const baseUrl = window.location.origin;
 
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
-
   const fetchData = useCallback(async () => {
     try {
       setLoading(true);
@@ -95,6 +91,10 @@ export default function InvitedCandidatesHistory() {
       setLoading(false);
     }
   }, [toast]);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
 
   const copyTestLink = (id: string, token: string) => {
     const testUrl = `${baseUrl}/test/access/${id}/${token}`;

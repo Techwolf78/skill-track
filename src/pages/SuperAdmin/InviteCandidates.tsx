@@ -74,10 +74,6 @@ export default function InviteCandidates() {
 
   const baseUrl = window.location.origin; // Gets http://localhost:8080 or production URL
 
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
-
   const fetchData = useCallback(async () => {
     try {
       setLoading(true);
@@ -125,6 +121,10 @@ export default function InviteCandidates() {
       setLoading(false);
     }
   }, [toast]);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
 
   const handleInvite = async () => {
     if (!selectedSchedule) {
