@@ -54,6 +54,19 @@ export default function TestAccess() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isLoggingIn, setIsLoggingIn] = useState(false);
+  const [showColdStartMessage, setShowColdStartMessage] = useState(false);
+
+  useEffect(() => {
+    let timer: any;
+    if (loading || isLoggingIn) {
+      timer = setTimeout(() => {
+        setShowColdStartMessage(true);
+      }, 4000);
+    } else {
+      setShowColdStartMessage(false);
+    }
+    return () => clearTimeout(timer);
+  }, [loading, isLoggingIn]);
 
   useEffect(() => {
     // Check for mobile or tablet user agents, plus iPad desktop mode detection
@@ -258,6 +271,11 @@ export default function TestAccess() {
       <div className="min-h-screen flex flex-col items-center justify-center bg-background gap-4">
         <Loader2 className="w-12 h-12 animate-spin text-primary" />
         <p className="text-muted-foreground animate-pulse font-medium">Preparing your secure environment...</p>
+        {showColdStartMessage && (
+          <p className="text-center text-xs text-amber-500 animate-pulse max-w-xs px-4">
+            ⏳ Backend is waking up... Cold start on Render free tier can take up to 50 seconds. Please wait.
+          </p>
+        )}
       </div>
     );
   }
@@ -332,6 +350,11 @@ export default function TestAccess() {
                 {isLoggingIn ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : null}
                 {isLoggingIn ? "Logging in..." : "Login to Continue"}
               </Button>
+              {showColdStartMessage && (
+                <p className="text-center text-xs text-amber-500 animate-pulse mt-2">
+                  ⏳ Backend is waking up... Cold start on Render free tier can take up to 50 seconds. Please wait.
+                </p>
+              )}
             </form>
           </CardContent>
           <CardFooter>
