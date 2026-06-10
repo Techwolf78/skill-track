@@ -10,7 +10,8 @@ export class ObjectDetector {
     if (this.model || this.isInitializing) return;
     this.isInitializing = true;
     try {
-      this.model = await cocoSsd.load();
+      const modelUrl = import.meta.env.VITE_COCOSSD_MODEL_URL || undefined;
+      this.model = await cocoSsd.load(modelUrl ? { modelUrl } : undefined);
     } catch (err) {
       console.error("Failed to load COCO-SSD model:", err);
     } finally {

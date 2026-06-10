@@ -1,6 +1,7 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from "axios";
+import { toast } from "sonner";
 
-const API_BASE_URL = "/api";
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "/api";
 
 export const apiClient = axios.create({
   baseURL: API_BASE_URL,
@@ -41,8 +42,17 @@ apiClient.interceptors.response.use(
 
     if (error.response?.status === 429) {
       const data = error.response.data as Record<string, unknown> | undefined;
-      const retryAfter = error.response.headers?.["retry-after"] || error.response.headers?.["Retry-After"];
-      const defaultMsg = `Too many requests. Please try again${retryAfter ? ` in ${retryAfter} seconds` : " later"}.`;
+      const retryAfterHeader = error.response.headers?.["retry-after"] || error.response.headers?.["Retry-After"];
+      
+      let secondsLeft = 30;
+      if (retryAfterHeader) {
+        const parsed = parseInt(retryAfterHeader as string, 10);
+        if (!isNaN(parsed) && parsed > 0) {
+          secondsLeft = parsed;
+        }
+      }
+
+      const defaultMsg = `Too many requests. Please try again in ${secondsLeft} seconds.`;
       const finalMsg = data?.message ? (data.message as string) : defaultMsg;
       
       error.message = finalMsg;
@@ -50,6 +60,29 @@ apiClient.interceptors.response.use(
         data.message = finalMsg;
       }
       console.warn("Rate limit exceeded:", finalMsg);
+
+      // Trigger a countdown timer toast using Sonner
+      const toastId = toast.error("Rate Limit Exceeded", {
+        description: `Too many requests. Please wait ${secondsLeft}s before retrying.`,
+        duration: (secondsLeft + 1) * 1000,
+      });
+
+      const interval = setInterval(() => {
+        secondsLeft -= 1;
+        if (secondsLeft <= 0) {
+          clearInterval(interval);
+          toast.dismiss(toastId);
+          toast.success("Rate Limit Lifted", {
+            description: "You may now retry your request.",
+            duration: 3000,
+          });
+        } else {
+          toast.error("Rate Limit Exceeded", {
+            id: toastId,
+            description: `Too many requests. Please wait ${secondsLeft}s before retrying.`,
+          });
+        }
+      }, 1000);
     }
 
     // Enhance the error object with standard BaseResponse error details

@@ -70,16 +70,25 @@ export function useCameraMonitor(
     let timeoutId: NodeJS.Timeout;
     let lastViolationTime = 0;
     const VIOLATION_COOLDOWN = 3000; // 3 seconds
-    const DETECTION_INTERVAL = 1500; // 1.5 seconds
+    let detectionInterval = 1500; // 1.5 seconds
 
     const detect = async () => {
       if (!videoRef.current || videoRef.current.paused || videoRef.current.ended) {
-        timeoutId = setTimeout(detect, DETECTION_INTERVAL);
+        timeoutId = setTimeout(detect, detectionInterval);
         return;
       }
 
       try {
+        const t0 = performance.now();
         const faces = await detector.estimateFaces(videoRef.current);
+        const t1 = performance.now();
+        const duration = t1 - t0;
+
+        if (duration > 1000) {
+          console.warn(`Face detection took ${duration.toFixed(2)}ms (exceeding 1s). Degrading interval to 5s.`);
+          detectionInterval = 5000;
+        }
+
         const now = Date.now();
 
         if (now - lastViolationTime > VIOLATION_COOLDOWN) {
@@ -96,11 +105,11 @@ export function useCameraMonitor(
       }
 
       if (isActive) {
-        timeoutId = setTimeout(detect, DETECTION_INTERVAL);
+        timeoutId = setTimeout(detect, detectionInterval);
       }
     };
 
-    timeoutId = setTimeout(detect, DETECTION_INTERVAL);
+    timeoutId = setTimeout(detect, detectionInterval);
     return () => clearTimeout(timeoutId);
   }, [detector, isActive, onViolation]);
 

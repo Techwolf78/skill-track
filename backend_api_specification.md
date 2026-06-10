@@ -1,1637 +1,1566 @@
-# RxOne Backend: Complete Developer API Specification Report
-This document provides a highly detailed, comprehensive guide to the RxOne backend architecture, database model, authentication/authorization layers, API endpoints, DTO models, and system enums. It is designed to act as the single source of truth for the frontend development team to facilitate flawless integration.
+# RxOne Backend API Specification
 
-## 1. System & Architectural Overview
-- **Backend Framework**: Spring Boot (Java 17+)
-- **Database**: PostgreSQL (Migrations managed by Flyway)
-- **API Architecture**: REST APIs exposing structured JSON responses
-- **Common Envelope Format**: Every API response is wrapped in a standard `BaseResponse<T>` schema:
-  ```json
-  {
-    "success": boolean,
-    "status": integer,
-    "message": "string",
-    "data": T,
-    "errorCode": "string",
-    "errors": null or Object/Array,
-    "timestamp": "ISO-8601 string",
-    "path": "string",
-    "correlationId": "string"
+Updated from the current Spring Boot controllers and DTOs in this repository.
+
+This document is intended for frontend integration. It lists every active controller endpoint, request and response shapes, auth requirements, status behavior, rate limits, pagination, enums, and key workflow rules.
+
+## 1. Base Contract
+
+### Base URL
+
+Use the deployed API host provided by backend/devops. For local development, the application normally runs on:
+
+```text
+http://localhost:8080
+```
+
+All paths in this document are relative to the API host.
+
+### Content Types
+
+Most endpoints:
+
+```http
+Content-Type: application/json
+Accept: application/json
+```
+
+Bulk candidate upload:
+
+```http
+Content-Type: multipart/form-data
+```
+
+Scorecard PDF endpoint:
+
+```http
+Accept: application/pdf
+```
+
+### Authentication
+
+JWT is stateless. Send this header on all protected endpoints:
+
+```http
+Authorization: Bearer <accessToken>
+```
+
+Public endpoints:
+
+| Method | Path |
+|---|---|
+| `POST` | `/auth/register` |
+| `POST` | `/auth/login` |
+| `POST` | `/candidate-invitations/validate` |
+| `POST` | `/api/code/execute/callback` |
+
+Every other controller endpoint requires a valid JWT.
+
+### Roles
+
+| Role | Meaning |
+|---|---|
+| `SUPERADMIN` | Global access. Can create organisations, mutate public taxonomy, and create/update/delete public questions. |
+| `ADMIN` | Organisation-scoped access. Can manage own organisation tests, candidates, schedules, sessions, questions, and results. |
+| `CANDIDATE` | Candidate-scoped access. Can validate invitations, start sessions, view own session/test paper, submit answers/code, and read own results. |
+| `GUEST` | Enum exists, but active protected APIs are not designed around guest access. |
+| `TRAINER` | Enum exists, but `SecurityExpressions.isAnyRole()` currently only includes `ADMIN`, `SUPERADMIN`, and `CANDIDATE`. |
+
+### JSON Envelope
+
+Almost all JSON endpoints return `BaseResponse<T>`:
+
+```json
+{
+  "success": true,
+  "status": 200,
+  "message": "Request completed successfully",
+  "data": {},
+  "errorCode": null,
+  "errors": null,
+  "timestamp": "2026-06-10T10:00:00Z",
+  "path": null,
+  "correlationId": null
+}
+```
+
+Notes:
+
+- Success responses are often built without `path` and `correlationId`.
+- Error responses include `path`; global exception errors include `correlationId`.
+- `POST /api/code/execute/callback` returns empty `200 OK` with no envelope.
+- `GET /test-results/session/{sessionId}/scorecard` returns a PDF binary response, not a JSON envelope.
+- Rate-limit responses are raw JSON, not `BaseResponse`.
+
+### Error Envelope
+
+Standard error example:
+
+```json
+{
+  "success": false,
+  "status": 422,
+  "message": "Validation failed",
+  "data": null,
+  "errorCode": "VALIDATION_ERROR",
+  "errors": {
+    "email": "Invalid email format"
+  },
+  "timestamp": "2026-06-10T10:00:00Z",
+  "path": "/auth/register",
+  "correlationId": "4d0d5f61-4e5e-4a12-b9d8-0a8e0e29fb28"
+}
+```
+
+Common statuses:
+
+| HTTP | `errorCode` | When |
+|---|---|---|
+| `400` | `BAD_REQUEST` | Invalid state, malformed relationship, unsupported file, invalid business rule. |
+| `401` | `UNAUTHORIZED` | Missing/invalid token or invalid credentials/invitation token. |
+| `403` | `ACCESS_DENIED` | Authenticated user cannot access role/resource. |
+| `404` | `RESOURCE_NOT_FOUND` | Entity does not exist. |
+| `409` | `CONFLICT` | Duplicate data, optimistic lock conflict, immutable/unsafe operation. |
+| `422` | `VALIDATION_ERROR` | Bean validation failures from DTO annotations. |
+| `429` | Raw rate-limit JSON | Auth/code execution rate limit exceeded. |
+| `503` | `JUDGE0_UNAVAILABLE` | Judge0 circuit breaker/fallback. |
+| `500` | `INTERNAL_SERVER_ERROR` | Unhandled server error. |
+
+### Correlation ID
+
+The backend accepts and returns:
+
+```http
+X-Correlation-ID: <uuid-or-client-generated-id>
+```
+
+If omitted, the backend generates one and returns it in the response header.
+
+### Pagination
+
+Paginated endpoints return Spring `Page<T>` inside `data`.
+
+Default pagination varies:
+
+| Endpoint family | Default size |
+|---|---:|
+| `/subjects`, `/topics`, `/subtopics`, `/topics/subject/{id}`, `/subtopics/topic/{id}` | `10` |
+| Most other paginated endpoints | `20` |
+
+Query params:
+
+| Param | Type | Default | Notes |
+|---|---|---:|---|
+| `page` | integer | `0` | Zero-based page index. |
+| `size` | integer | family default | Page size. |
+| `sort` | string | none | Spring pageable endpoints may accept `sort=field,asc`; only use after backend confirmation for a field. |
+
+Page response shape:
+
+```json
+{
+  "content": [],
+  "pageable": {},
+  "totalElements": 0,
+  "totalPages": 0,
+  "last": true,
+  "size": 20,
+  "number": 0,
+  "sort": {},
+  "first": true,
+  "numberOfElements": 0,
+  "empty": true
+}
+```
+
+### CORS and CSRF
+
+- Allowed origins are configured by `app.cors.allowed-origins`.
+- Allowed methods: `GET`, `POST`, `PUT`, `DELETE`, `OPTIONS`, `PATCH`.
+- Allowed headers: `Authorization`, `Content-Type`, `Cache-Control`, `X-Requested-With`.
+- Exposed headers: `Authorization`.
+- Credentials are allowed.
+- CSRF is disabled by default with `app.csrf.enabled:false`.
+- If CSRF is enabled later, `/auth/**` is ignored by CSRF, but other state-changing endpoints may require the CSRF cookie/header flow.
+
+### Rate Limits
+
+Auth endpoints:
+
+- Applies to `/auth/login` and `/auth/register`.
+- Limit: 5 attempts per minute per IP.
+- Response: `429`, `Retry-After: 60`.
+
+Code execution endpoints:
+
+- Applies to `/api/code/execute/run` and `/api/code/execute/submit`.
+- Limit: 10 requests per minute per authenticated user per `sessionId` when `sessionId` is present.
+- Response: `429`, `Retry-After: 60`.
+
+Raw rate-limit response:
+
+```json
+{
+  "status": 429,
+  "error": "Too Many Requests",
+  "message": "Code execution limit: 10 requests/minute. Try again in 60 seconds."
+}
+```
+
+## 2. Endpoint Catalog
+
+There are 96 active controller endpoints.
+
+### Auth
+
+| Method | Path | Access | Request | Response |
+|---|---|---|---|---|
+| `POST` | `/auth/register` | Public | `RegisterRequest` | `201 BaseResponse<AuthResponse>` |
+| `POST` | `/auth/login` | Public | `LoginRequest` | `200 BaseResponse<AuthResponse>` |
+| `PATCH` | `/auth/reset-password` | Authenticated | `ResetPasswordRequest` | `200 BaseResponse<AuthResponse>` |
+
+Important:
+
+- `RegisterRequest.role` exists but the service always creates `Role.CANDIDATE`.
+- Registration requires an existing `organisationId`.
+- `reset-password` only supports `PasswordProvider.LOCAL`.
+
+### Admin
+
+| Method | Path | Access | Request | Query | Response |
+|---|---|---|---|---|---|
+| `POST` | `/admin/users` | `ADMIN`, `SUPERADMIN` | `CreateUserRequest` | `role: Role` required | `200 BaseResponse<String>` |
+
+Important:
+
+- Non-superadmin cannot create `SUPERADMIN`.
+- Non-superadmin cannot create a user for a different organisation.
+
+### Users
+
+| Method | Path | Access | Request | Query | Response |
+|---|---|---|---|---|---|
+| `GET` | `/users` | `ADMIN`, `SUPERADMIN` | none | `page`, `size` | `200 BaseResponse<Page<UserResponse>>` |
+| `GET` | `/users/{id}` | `ADMIN`, `SUPERADMIN`, scoped | none | none | `200 BaseResponse<UserResponse>` |
+| `PATCH` | `/users/{id}` | Any active role, scoped | `UpdateUserRequestPatch` | none | `200 BaseResponse<UserResponse>` |
+| `DELETE` | `/users/{id}` | `ADMIN`, `SUPERADMIN`, scoped | none | none | `200 BaseResponse<String>` |
+
+Scope:
+
+- `SUPERADMIN` can read all users.
+- `ADMIN` is limited to own organisation.
+- A candidate can patch only their own linked user via `canAccessUser`.
+
+### Organisations
+
+| Method | Path | Access | Request | Query | Response |
+|---|---|---|---|---|---|
+| `GET` | `/organisations` | `ADMIN`, `SUPERADMIN` | none | `page`, `size` | `200 BaseResponse<Page<OrganisationResponse>>` |
+| `POST` | `/organisations` | `SUPERADMIN` | `CreateOrganisationRequest` | none | `200 BaseResponse<OrganisationResponse>` |
+| `GET` | `/organisations/{id}` | `ADMIN`, `SUPERADMIN`, scoped | none | none | `200 BaseResponse<OrganisationResponse>` |
+| `PATCH` | `/organisations/{id}` | `ADMIN`, `SUPERADMIN`, scoped | `UpdateOrganisationRequest` | none | `200 BaseResponse<OrganisationResponse>` |
+
+Scope:
+
+- `ADMIN` can access only own organisation.
+- `SUPERADMIN` can access all.
+
+### Candidates
+
+| Method | Path | Access | Request | Query | Response |
+|---|---|---|---|---|---|
+| `POST` | `/candidates` | `ADMIN`, `SUPERADMIN` | `CreateCandidateRequest` | none | `200 BaseResponse<String>` |
+| `GET` | `/candidates` | `ADMIN`, `SUPERADMIN` | none | `page`, `size` | `200 BaseResponse<Page<CandidateResponse>>` |
+| `GET` | `/candidates/me` | `CANDIDATE` | none | none | `200 BaseResponse<CandidateResponse>` |
+| `POST` | `/candidates/bulk-upload` | `ADMIN`, `SUPERADMIN` | multipart `file` | none | `200 BaseResponse<BulkUploadResult>` |
+| `PATCH` | `/candidates/{id}` | Scoped candidate access | `UpdateCandidateRequest` | none | `200 BaseResponse<CandidateResponse>` |
+| `DELETE` | `/candidates/{id}` | Scoped candidate access | none | none | `200 BaseResponse<String>` |
+
+Bulk upload:
+
+- Field name must be `file`.
+- Allowed extensions: `.xlsx`, `.xls`, `.csv`.
+- Max file size: 10 MB.
+- Max rows: 10,000.
+- CSV/XLS columns are positional:
+  - column 1: `name`
+  - column 2: `email`
+  - column 3: `password`
+  - column 4: `phoneNumber`
+  - column 5: `organisationId`
+  - column 6: `extraFields.college`
+  - column 7: `extraFields.course`
+  - column 8: `extraFields.year`
+  - column 9: `extraFields.skills`
+- First CSV/Excel row is treated as header and skipped.
+
+### Candidate Invitations
+
+| Method | Path | Access | Request | Query | Response |
+|---|---|---|---|---|---|
+| `POST` | `/candidate-invitations` | `ADMIN`, `SUPERADMIN` | `CreateCandidateInvitationRequest` | none | `200 BaseResponse<CandidateInvitationResponse>` |
+| `GET` | `/candidate-invitations` | `ADMIN`, `SUPERADMIN`, `CANDIDATE` | none | `page`, `size` | `200 BaseResponse<Page<CandidateInvitationResponse>>` |
+| `GET` | `/candidate-invitations/{id}` | Any active role, scoped | none | none | `200 BaseResponse<CandidateInvitationResponse>` |
+| `PATCH` | `/candidate-invitations/{id}` | `ADMIN`, `SUPERADMIN`, scoped | `PatchCandidateInvitationRequest` | none | `200 BaseResponse<CandidateInvitationResponse>` |
+| `DELETE` | `/candidate-invitations/{id}` | `ADMIN`, `SUPERADMIN`, scoped | none | none | `200 BaseResponse<String>` |
+| `POST` | `/candidate-invitations/validate` | Public | `ValidateInvitationRequest` | none | `200 BaseResponse<CandidateAuthResponse>` |
+
+Important:
+
+- DTO currently marks `candidateId` required, but service also supports `candidateEmail` if `candidateId` is null. For reliable frontend use, send `candidateId`.
+- Candidate and schedule must belong to the same organisation.
+- `inviteLink` in response is relative: `/tests/access/{invitationId}/{token}`.
+- Validation accepts only `PENDING` or `ACCEPTED` invitations.
+- Validating a `PENDING` invitation changes it to `ACCEPTED`.
+- If schedule `endTime` has passed, validation marks invitation `EXPIRED` and returns unauthorized.
+
+### Subjects
+
+| Method | Path | Access | Request | Query | Response |
+|---|---|---|---|---|---|
+| `POST` | `/subjects` | `SUPERADMIN` | `CreateSubjectRequest` | none | `200 BaseResponse<SubjectResponse>` |
+| `GET` | `/subjects` | `ADMIN`, `SUPERADMIN` | none | `page`, `size` default `10` | `200 BaseResponse<Page<SubjectResponse>>` |
+| `GET` | `/subjects/{id}` | `ADMIN`, `SUPERADMIN` | none | none | `200 BaseResponse<SubjectResponse>` |
+| `PUT` | `/subjects/{id}` | `SUPERADMIN` | `UpdateSubjectRequest` | none | `200 BaseResponse<SubjectResponse>` |
+| `PATCH` | `/subjects/{id}` | `SUPERADMIN` | `UpdateSubjectRequest` | none | `200 BaseResponse<SubjectResponse>` |
+| `DELETE` | `/subjects/{id}` | `SUPERADMIN` | none | none | `200 BaseResponse<String>` |
+
+### Topics
+
+| Method | Path | Access | Request | Query | Response |
+|---|---|---|---|---|---|
+| `POST` | `/topics` | `SUPERADMIN` | `CreateTopicRequest` | none | `200 BaseResponse<TopicResponse>` |
+| `GET` | `/topics` | `ADMIN`, `SUPERADMIN` | none | `page`, `size`, `sort` | `200 BaseResponse<Page<TopicResponse>>` |
+| `GET` | `/topics/{id}` | `ADMIN`, `SUPERADMIN` | none | none | `200 BaseResponse<TopicResponse>` |
+| `GET` | `/topics/subject/{subjectId}` | `ADMIN`, `SUPERADMIN` | none | `page`, `size`, `sort` | `200 BaseResponse<Page<TopicResponse>>` |
+| `PUT` | `/topics/{id}` | `SUPERADMIN` | `UpdateTopicRequest` | none | `200 BaseResponse<TopicResponse>` |
+| `PATCH` | `/topics/{id}` | `SUPERADMIN` | `UpdateTopicRequest` | none | `200 BaseResponse<TopicResponse>` |
+| `DELETE` | `/topics/{id}` | `SUPERADMIN` | none | none | `200 BaseResponse<String>` |
+
+### Subtopics
+
+| Method | Path | Access | Request | Query | Response |
+|---|---|---|---|---|---|
+| `POST` | `/subtopics` | `SUPERADMIN` | `CreateSubtopicRequest` | none | `200 BaseResponse<SubtopicResponse>` |
+| `GET` | `/subtopics` | `ADMIN`, `SUPERADMIN` | none | `page`, `size`, `sort` | `200 BaseResponse<Page<SubtopicResponse>>` |
+| `GET` | `/subtopics/{id}` | `ADMIN`, `SUPERADMIN` | none | none | `200 BaseResponse<SubtopicResponse>` |
+| `GET` | `/subtopics/topic/{topicId}` | `ADMIN`, `SUPERADMIN` | none | `page`, `size`, `sort` | `200 BaseResponse<Page<SubtopicResponse>>` |
+| `PUT` | `/subtopics/{id}` | `SUPERADMIN` | `UpdateSubtopicRequest` | none | `200 BaseResponse<SubtopicResponse>` |
+| `PATCH` | `/subtopics/{id}` | `SUPERADMIN` | `UpdateSubtopicRequest` | none | `200 BaseResponse<SubtopicResponse>` |
+| `DELETE` | `/subtopics/{id}` | `SUPERADMIN` | none | none | `200 BaseResponse<String>` |
+
+### Questions
+
+| Method | Path | Access | Request | Query | Response |
+|---|---|---|---|---|---|
+| `POST` | `/questions` | `ADMIN`, `SUPERADMIN` | `CreateQuestionRequest` polymorphic | none | `200 BaseResponse<QuestionResponse>` |
+| `GET` | `/questions` | `ADMIN`, `SUPERADMIN` | none | `subjectId`, `topicId`, `subtopicId`, `page`, `size` | `200 BaseResponse<Page<QuestionResponse>>` |
+| `GET` | `/questions/{id}` | `ADMIN`, `SUPERADMIN`, scoped | none | none | `200 BaseResponse<QuestionResponse>` |
+| `PUT` | `/questions/{id}` | `ADMIN`, `SUPERADMIN`, scoped | `UpdateQuestionRequest` polymorphic | none | `200 BaseResponse<QuestionResponse>` |
+| `PATCH` | `/questions/{id}` | `ADMIN`, `SUPERADMIN`, scoped | `UpdateQuestionRequest` polymorphic | none | `200 BaseResponse<QuestionResponse>` |
+| `DELETE` | `/questions/{id}` | `ADMIN`, `SUPERADMIN`, scoped | none | none | `200 BaseResponse<String>` |
+
+Important:
+
+- `questionType` controls polymorphic request/response subtype: `MCQ` or `CODING`.
+- `visibility` is required on create.
+- `PUBLIC` questions can be created/updated/deleted only by `SUPERADMIN`.
+- `ORG_OWNED` questions are scoped to the current user's organisation.
+- `ADMIN` sees `PUBLIC` plus own `ORG_OWNED` questions.
+- Delete is blocked if the question is linked to a non-`DRAFT` test, has submissions, or has code execution runs.
+- Non-superadmin update is blocked when linked to a non-`DRAFT` test.
+
+### Tests
+
+| Method | Path | Access | Request | Query | Response |
+|---|---|---|---|---|---|
+| `POST` | `/tests` | `ADMIN`, `SUPERADMIN` | `CreateTestRequest` | none | `200 BaseResponse<TestResponse>` |
+| `GET` | `/tests` | `ADMIN`, `SUPERADMIN` | none | `page`, `size` | `200 BaseResponse<Page<TestResponse>>` |
+| `GET` | `/tests/{id}` | Any active role, scoped | none | none | `200 BaseResponse<TestResponse>` |
+| `PUT` | `/tests/{id}` | `ADMIN`, `SUPERADMIN`, scoped | `UpdateTestRequest` | none | `200 BaseResponse<TestResponse>` |
+| `PATCH` | `/tests/{id}` | `ADMIN`, `SUPERADMIN`, scoped | `UpdateTestRequest` | none | `200 BaseResponse<TestResponse>` |
+| `PATCH` | `/tests/{id}/inactive` | `ADMIN`, `SUPERADMIN`, scoped | none | none | `200 BaseResponse<String>` |
+| `GET` | `/tests/inactive` | `ADMIN`, `SUPERADMIN` | none | none | `200 BaseResponse<List<TestResponse>>` |
+| `PATCH` | `/tests/{id}/active` | `ADMIN`, `SUPERADMIN`, scoped | none | none | `200 BaseResponse<String>` |
+
+Important:
+
+- `durationMins` must be greater than zero.
+- `passMark` must be zero or greater.
+- Inline `questions` must not contain duplicate `questionId` or duplicate `orderIndex`.
+- `orderIndex` must be zero or greater.
+- Test question `marks` must be zero or greater.
+- An org-owned question cannot be assigned to a test from a different organisation.
+
+### Test Questions
+
+| Method | Path | Access | Request | Query | Response |
+|---|---|---|---|---|---|
+| `POST` | `/test-questions` | `ADMIN`, `SUPERADMIN` | `CreateTestQuestionRequest` | none | `200 BaseResponse<TestQuestionResponse>` |
+| `POST` | `/test-questions/bulk` | `ADMIN`, `SUPERADMIN` | `CreateTestQuestionRequest[]` | none | `200 BaseResponse<List<TestQuestionResponse>>` |
+| `GET` | `/test-questions/{id}` | `ADMIN`, `SUPERADMIN` | none | none | `200 BaseResponse<TestQuestionResponse>` |
+| `GET` | `/test-questions` | `ADMIN`, `SUPERADMIN` | none | `testId`, `questionId`, `page`, `size` | `200 BaseResponse<Page<TestQuestionResponse>>` |
+| `GET` | `/test-questions/test/{testId}` | `ADMIN`, `SUPERADMIN`, test scoped | none | none | `200 BaseResponse<List<TestQuestionDetailResponse>>` |
+| `GET` | `/test-questions/test/{testId}/grouped` | `ADMIN`, `SUPERADMIN`, test scoped | none | none | `200 BaseResponse<Map<String,List<TestQuestionDetailResponse>>>` |
+| `PUT` | `/test-questions/{id}` | `ADMIN`, `SUPERADMIN` | `UpdateTestQuestionRequest` | none | `200 BaseResponse<TestQuestionResponse>` |
+| `PATCH` | `/test-questions/{id}` | `ADMIN`, `SUPERADMIN` | `UpdateTestQuestionRequest` | none | `200 BaseResponse<TestQuestionResponse>` |
+| `DELETE` | `/test-questions/{id}` | `ADMIN`, `SUPERADMIN` | none | none | `200 BaseResponse<String>` |
+
+Important:
+
+- `POST /test-questions/bulk` accepts a raw array of `CreateTestQuestionRequest`, not `BulkAddTestQuestionsRequest`.
+- Duplicate question within a test returns conflict.
+- Duplicate order index within a test returns conflict.
+
+### Test Schedules
+
+| Method | Path | Access | Request | Query | Response |
+|---|---|---|---|---|---|
+| `POST` | `/test-schedules` | `ADMIN`, `SUPERADMIN` | `CreateTestScheduleRequest` | none | `200 BaseResponse<TestScheduleResponse>` |
+| `GET` | `/test-schedules` | `ADMIN`, `SUPERADMIN` | none | `page`, `size` | `200 BaseResponse<Page<TestScheduleResponse>>` |
+| `GET` | `/test-schedules/{id}` | Any active role, scoped | none | none | `200 BaseResponse<TestScheduleResponse>` |
+| `PATCH` | `/test-schedules/{id}` | `ADMIN`, `SUPERADMIN`, scoped | `PatchTestScheduleRequest` | none | `200 BaseResponse<TestScheduleResponse>` |
+| `DELETE` | `/test-schedules/{id}` | `ADMIN`, `SUPERADMIN`, scoped | none | none | `200 BaseResponse<String>` |
+
+Important:
+
+- Schedule organisation is derived from the linked test.
+- Patching `testId` must keep the same organisation.
+
+### Test Sessions
+
+| Method | Path | Access | Request | Query | Response |
+|---|---|---|---|---|---|
+| `POST` | `/test-sessions` | `ADMIN`, `SUPERADMIN` | `CreateTestSessionRequest` | none | `200 BaseResponse<TestSessionResponse>` |
+| `POST` | `/test-sessions/start` | `CANDIDATE` | `StartTestSessionRequest` | none | `200 BaseResponse<TestSessionResponse>` |
+| `GET` | `/test-sessions` | Any active role | none | `page`, `size` | `200 BaseResponse<Page<TestSessionResponse>>` |
+| `GET` | `/test-sessions/{id}` | Any active role, scoped | none | none | `200 BaseResponse<TestSessionResponse>` |
+| `GET` | `/test-sessions/{id}/paper` | Any active role, scoped | none | none | `200 BaseResponse<TestSessionPaperResponse>` |
+| `PATCH` | `/test-sessions/{id}` | Any active role, scoped | `PatchTestSessionRequest` | none | `200 BaseResponse<TestSessionResponse>` |
+| `POST` | `/test-sessions/{id}/submit` | Any active role, scoped | none | none | `200 BaseResponse<String>` |
+| `DELETE` | `/test-sessions/{id}` | `ADMIN`, `SUPERADMIN`, scoped | none | none | `200 BaseResponse<String>` |
+
+Candidate flow:
+
+1. `POST /candidate-invitations/validate` to get candidate JWT.
+2. `POST /test-sessions/start` with `invitationId`.
+3. `GET /test-sessions/{id}/paper`.
+4. Submit answers through `/submissions` and coding code through `/api/code/execute/*`.
+5. `POST /test-sessions/{id}/submit`.
+6. Poll `GET /test-results/session/{sessionId}`.
+
+Important:
+
+- Starting a session creates or reuses a test snapshot for the schedule.
+- A candidate cannot start another `ACTIVE`, `INACTIVE`, or `SUBMITTED` session for the same schedule.
+- When submitting a test, unanswered MCQs are auto-created with zero score.
+- For coding questions, latest accepted code run may be promoted into a grading submission.
+
+### Submissions
+
+| Method | Path | Access | Request | Query | Response |
+|---|---|---|---|---|---|
+| `POST` | `/submissions` | Any active role, scoped | `SubmissionRequestDTO` | none | `200 BaseResponse<SubmissionResponseDTO>` |
+| `GET` | `/submissions/{id}` | Any active role, scoped | none | none | `200 BaseResponse<SubmissionResponseDTO>` |
+
+Important:
+
+- Question must be attached to the session's test.
+- Session must be accessible by the current user.
+- Expired sessions reject submissions.
+- MCQ submissions must send `selectedOptionIds`; sending `answerText` for MCQ returns bad request.
+- MCQs are graded immediately.
+- Coding submissions move to `PENDING_GRADING` and are graded asynchronously.
+
+### Test Results
+
+| Method | Path | Access | Request | Query | Response |
+|---|---|---|---|---|---|
+| `POST` | `/test-results` | `ADMIN`, `SUPERADMIN` | `CreateTestResultDTO` | none | `200 BaseResponse<TestResultResponse>` or `202 BaseResponse<null>` |
+| `GET` | `/test-results/{id}` | Any active role, scoped | none | none | `200 BaseResponse<TestResultResponse>` |
+| `GET` | `/test-results/session/{sessionId}` | Any active role, session scoped | none | none | `200 BaseResponse<TestResultResponse>` or `202 BaseResponse<null>` |
+| `GET` | `/test-results/session/{sessionId}/scorecard` | Any active role, session scoped | none | none | `200 application/pdf` or `404` |
+
+Important:
+
+- `POST /test-results` may return `202` with `data: null` if session is not terminal or grading is still in progress.
+- `GET /test-results/session/{sessionId}` may return `202` with `data: null` until grading is ready.
+- Scorecard is a binary PDF response with `Content-Disposition: inline`.
+
+### Test Cases
+
+| Method | Path | Access | Request | Query | Response |
+|---|---|---|---|---|---|
+| `POST` | `/test-cases` | `ADMIN`, `SUPERADMIN` | `CreateTestCaseRequest` | none | `200 BaseResponse<TestCaseResponse>` |
+| `GET` | `/test-cases` | `ADMIN`, `SUPERADMIN` | none | `codingQuestionId`, `page`, `size` | `200 BaseResponse<Page<TestCaseResponse>>` |
+| `GET` | `/test-cases/{id}` | `ADMIN`, `SUPERADMIN` | none | none | `200 BaseResponse<TestCaseResponse>` |
+| `PATCH` | `/test-cases/update/{id}` | `ADMIN`, `SUPERADMIN` | `PatchTestCaseRequest` | none | `200 BaseResponse<TestCaseResponse>` |
+| `DELETE` | `/test-cases/delete/{id}` | `ADMIN`, `SUPERADMIN` | none | none | `200 BaseResponse<String>` |
+
+Important:
+
+- Test cases belong to coding questions.
+- `codingQuestionId` filter is optional on list.
+
+### Code Execution
+
+| Method | Path | Access | Request | Query | Response |
+|---|---|---|---|---|---|
+| `POST` | `/api/code/execute/run` | Any active role, scoped | `CodeRunRequest` | none | `200 BaseResponse<List<CodeRunResponseDTO>>` |
+| `POST` | `/api/code/execute/submit` | Any active role, scoped | `CodeRunRequest` | none | `202 BaseResponse<UUID>` |
+| `GET` | `/api/code/execute/submit/{submissionId}/result` | Any active role, submission scoped | none | none | `200 BaseResponse<CodingSubmissionResultDTO>` or `202 BaseResponse<null>` |
+| `POST` | `/api/code/execute/playground` | `ADMIN`, `SUPERADMIN` | `PlaygroundRequest` | none | `200 BaseResponse<List<CodeRunResponseDTO>>` |
+| `POST` | `/api/code/execute/callback` | Public | Judge0 callback payload | none | `200` empty body |
+
+Important:
+
+- `/run` executes code for quick feedback against sample/custom test input.
+- `/submit` creates a coding submission and starts async grading. Poll result endpoint using returned submission UUID.
+- Question must be a coding question.
+- Question must be attached to the session test.
+- `/playground` is admin-only and does not require a session.
+- Callback is for Judge0/backend integration, not normal frontend use.
+
+## 3. DTO Schemas
+
+Types:
+
+- `UUID` values are strings.
+- `LocalDateTime` values are ISO-8601 strings, normally without timezone unless backend serializes otherwise.
+- `Map<String,Object>` can contain arbitrary JSON object data.
+
+### Auth DTOs
+
+`RegisterRequest`
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `name` | string | yes | Not blank. |
+| `email` | string | yes | Valid email. |
+| `password` | string | yes | Minimum 8 chars. |
+| `phoneNumber` | string | no | Normalized server-side. |
+| `role` | `Role` | no | Defaults to `GUEST`, but service creates `CANDIDATE`. |
+| `organisationId` or `organisation_id` | UUID | yes | `JsonAlias` supports snake case. |
+
+`LoginRequest`
+
+| Field | Type | Required |
+|---|---|---|
+| `email` | string | yes |
+| `password` | string | yes |
+
+`ResetPasswordRequest`
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `oldPassword` | string | yes | Not blank. |
+| `newPassword` | string | yes | Minimum 8 chars; cannot match old password. |
+
+`AuthResponse`
+
+| Field | Type |
+|---|---|
+| `accessToken` | string |
+| `tokenType` | string, usually `Bearer` |
+| `expiresIn` | long milliseconds |
+| `user.id` | UUID |
+| `user.name` | string |
+| `user.email` | string |
+| `user.role` | string |
+| `user.phoneNumber` | string |
+| `user.organisationData.id` | UUID |
+| `user.organisationData.name` | string |
+| `user.organisationData.logoUrl` | string |
+
+### User DTOs
+
+`CreateUserRequest`
+
+| Field | Type | Required |
+|---|---|---|
+| `name` | string | yes |
+| `email` | string | yes |
+| `password` | string | yes, min 8 |
+| `phoneNumber` | string | no |
+| `organisationId` or `organisation_id` | UUID | yes |
+
+`UpdateUserRequestPatch`
+
+| Field | Type | Required |
+|---|---|---|
+| `name` | string | no |
+| `email` | string | no, valid email if present |
+| `password` | string | no, min 8 if present |
+| `phoneNumber` | string | no |
+
+`UserResponse`
+
+| Field | Type |
+|---|---|
+| `id` | UUID |
+| `name` | string |
+| `email` | string |
+| `phoneNumber` | string |
+| `role` | `Role` |
+| `organisation.id` | UUID |
+| `organisation.name` | string |
+| `createdAt` | datetime |
+| `updatedAt` | datetime |
+
+### Organisation DTOs
+
+`CreateOrganisationRequest`
+
+| Field | Type | Required |
+|---|---|---|
+| `name` | string | yes |
+| `logoUrl` | string | no |
+
+`UpdateOrganisationRequest`
+
+| Field | Type | Required |
+|---|---|---|
+| `name` | string | no |
+| `logoUrl` | string | no |
+
+`OrganisationResponse`
+
+| Field | Type |
+|---|---|
+| `id` | UUID |
+| `name` | string |
+| `logoUrl` | string |
+| `createdAt` | datetime |
+| `updatedAt` | datetime |
+
+### Candidate DTOs
+
+`CreateCandidateRequest`
+
+| Field | Type | Required |
+|---|---|---|
+| `name` | string | yes |
+| `email` | string | yes |
+| `password` | string | yes, min 8 |
+| `phoneNumber` | string | no |
+| `extraFields` | object | no |
+| `organisationId` or `organisation_id` | UUID | yes |
+
+`UpdateCandidateRequest`
+
+| Field | Type | Required |
+|---|---|---|
+| `name` | string | no |
+| `email` | string | no |
+| `phoneNumber` | string | no |
+| `extraFields` | object | no |
+
+`CandidateResponse`
+
+| Field | Type |
+|---|---|
+| `id` | UUID |
+| `userId` | UUID |
+| `name` | string |
+| `email` | string |
+| `phoneNumber` | string |
+| `organisation.id` | UUID |
+| `organisation.name` | string |
+| `extraFields` | object |
+| `isStale` | boolean |
+| `lastUpdated` | datetime |
+| `createdAt` | datetime |
+| `updatedAt` | datetime |
+
+`BulkUploadResult`
+
+| Field | Type |
+|---|---|
+| `totalRows` | integer |
+| `successCount` | integer |
+| `failCount` | integer |
+| `rows` | `BulkUploadRowResult[]` |
+
+`BulkUploadRowResult`
+
+| Field | Type |
+|---|---|
+| `rowNumber` | integer |
+| `email` | string |
+| `status` | `SUCCESS` or `FAILED` |
+| `errorMessage` | string/null |
+
+### Candidate Invitation DTOs
+
+`CreateCandidateInvitationRequest`
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `scheduleId` | UUID | yes | Schedule to invite for. |
+| `candidateId` | UUID | yes by DTO | Send this for reliable validation. |
+| `candidateEmail` | string | no | Service fallback if `candidateId` is null, but DTO currently marks `candidateId` required. |
+
+`PatchCandidateInvitationRequest`
+
+| Field | Type | Required |
+|---|---|---|
+| `status` | `InvitationStatus` | yes |
+
+`ValidateInvitationRequest`
+
+| Field | Type | Required |
+|---|---|---|
+| `id` | UUID | yes |
+| `token` | string | yes |
+
+`CandidateInvitationResponse`
+
+| Field | Type |
+|---|---|
+| `id` | UUID |
+| `scheduleId` | UUID |
+| `candidateId` | UUID |
+| `token` | string |
+| `status` | `InvitationStatus` |
+| `sentAt` | datetime |
+| `inviteLink` | string |
+
+`CandidateAuthResponse`
+
+| Field | Type |
+|---|---|
+| `accessToken` | string |
+| `tokenType` | string |
+| `expiresIn` | long milliseconds |
+
+### Taxonomy DTOs
+
+`CreateSubjectRequest`
+
+| Field | Type | Required |
+|---|---|---|
+| `name` | string | yes |
+
+`UpdateSubjectRequest`
+
+| Field | Type | Required |
+|---|---|---|
+| `name` | string | no |
+
+`SubjectResponse`
+
+| Field | Type |
+|---|---|
+| `id` | UUID |
+| `name` | string |
+| `createdAt` | datetime |
+| `updatedAt` | datetime |
+
+`CreateTopicRequest`
+
+| Field | Type | Required |
+|---|---|---|
+| `subject_id` | UUID | yes |
+| `name` | string | yes |
+
+`UpdateTopicRequest`
+
+| Field | Type | Required |
+|---|---|---|
+| `subject_id` | UUID | no |
+| `name` | string | no |
+
+`TopicResponse`
+
+| Field | Type |
+|---|---|
+| `id` | UUID |
+| `subjectId` | UUID |
+| `name` | string |
+| `createdAt` | datetime |
+| `updatedAt` | datetime |
+
+`CreateSubtopicRequest`
+
+| Field | Type | Required |
+|---|---|---|
+| `topic_id` | UUID | yes |
+| `name` | string | yes |
+
+`UpdateSubtopicRequest`
+
+| Field | Type | Required |
+|---|---|---|
+| `topic_id` | UUID | no |
+| `name` | string | no |
+
+`SubtopicResponse`
+
+| Field | Type |
+|---|---|
+| `id` | UUID |
+| `topicId` | UUID |
+| `name` | string |
+| `createdAt` | datetime |
+| `updatedAt` | datetime |
+
+### Question DTOs
+
+Question request and response DTOs are polymorphic by `questionType`.
+
+Common create fields:
+
+| Field | Type | Required | JSON name |
+|---|---|---|---|
+| `subjectId` | UUID | yes | `subject_id` |
+| `topicId` | UUID | no | `topic_id` |
+| `subtopicId` | UUID | no | `subtopic_id` |
+| `questionType` | `QuestionType` | yes | `questionType` |
+| `prompt` | string | yes | `prompt` |
+| `marks` | integer | yes, min 1 | `marks` |
+| `difficulty` | `Difficulty` | no | `difficulty` |
+| `visibility` | `QuestionVisibility` | yes | `visibility` |
+
+Common update fields:
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `subject_id` | UUID | no | `PUT` clears subject if omitted because service sets null; `PATCH` only changes if present. |
+| `topic_id` | UUID | no | Same behavior as subject. |
+| `subtopic_id` | UUID | no | Same behavior as subject. |
+| `questionType` | `QuestionType` | required by `PUT`, optional by `PATCH` | Controls subtype. |
+| `prompt` | string | required by `PUT`, optional by `PATCH` | |
+| `marks` | integer | required by `PUT`, optional by `PATCH` | |
+| `difficulty` | `Difficulty` | no | |
+| `visibility` | `QuestionVisibility` | no | |
+
+`CreateMcqQuestionRequest`
+
+| Field | Type | Required |
+|---|---|---|
+| common create fields | see above | yes/no as above |
+| `mcqType` | `McqType` | yes |
+| `multipleCorrect` | boolean | yes |
+| `shuffleOptions` | boolean | yes |
+| `mcqOptions` | object array | yes, non-empty |
+
+MCQ option object:
+
+| Field | Type | Notes |
+|---|---|---|
+| `id` | UUID | Optional on update; backend preserves provided id or generates one. |
+| `text` | string | Optional depending on question style. |
+| `isCorrect` | boolean | At least one option must have `true`. |
+| `imageUrl` | string | Optional for image MCQs. |
+| `displayOrder` | integer | Optional. |
+
+`CreateCodingQuestionRequest`
+
+| Field | Type | Required |
+|---|---|---|
+| common create fields | see above | yes/no as above |
+| `title` | string | yes |
+| `constraints` | string | no |
+| `memoryLimitMb` | integer | no, min 1 if present |
+| `timeLimitSecs` | integer | no, min 1 if present |
+| `sampleExplanation` | string | no |
+| `codeTemplate` | object | yes |
+| `examples` | object array | no |
+| `hints` | string array | no |
+| `tags` | string array | no |
+
+`QuestionResponse` common fields:
+
+| Field | Type |
+|---|---|
+| `id` | UUID |
+| `subjectId` | UUID |
+| `subjectName` | string |
+| `topicId` | UUID |
+| `topicName` | string |
+| `subtopicId` | UUID |
+| `subtopicName` | string |
+| `questionType` | `QuestionType` |
+| `visibility` | `QuestionVisibility` |
+| `organisationId` | UUID/null |
+| `prompt` | string |
+| `marks` | integer |
+| `difficulty` | `Difficulty` |
+| `createdAt` | datetime |
+| `updatedAt` | datetime |
+
+`McqQuestionResponse` adds:
+
+| Field | Type |
+|---|---|
+| `mcqType` | `McqType` |
+| `multipleCorrect` | boolean |
+| `shuffleOptions` | boolean |
+| `mcqOptions` | object array |
+
+`CodingQuestionResponse` adds:
+
+| Field | Type |
+|---|---|
+| `title` | string |
+| `constraints` | string |
+| `memoryLimitMb` | integer |
+| `timeLimitSecs` | integer |
+| `sampleExplanation` | string |
+| `codeTemplate` | object |
+| `examples` | object array |
+| `hints` | string array |
+| `tags` | string array |
+
+### Test DTOs
+
+`CreateTestRequest`
+
+| Field | Type | Required |
+|---|---|---|
+| `title` | string | yes |
+| `description` | string | no |
+| `durationMins` | integer | yes |
+| `difficulty` | `Difficulty` | no |
+| `instructions` | object | no |
+| `status` | `TestStatus` | yes |
+| `passMark` | integer | yes |
+| `questions` | `TestQuestionRequest[]` | no |
+
+`UpdateTestRequest`
+
+| Field | Type | Required |
+|---|---|---|
+| `title` | string | no |
+| `description` | string | no |
+| `durationMins` | integer | no |
+| `difficulty` | `Difficulty` | no |
+| `instructions` | object | no |
+| `status` | `TestStatus` | no |
+| `passMark` | integer | no |
+| `questions` | `TestQuestionRequest[]` | no |
+
+`TestQuestionRequest`
+
+| Field | Type | Required |
+|---|---|---|
+| `questionId` | UUID | yes |
+| `orderIndex` | integer | yes |
+| `marks` | integer | yes |
+
+`TestResponse`
+
+| Field | Type |
+|---|---|
+| `id` | UUID |
+| `createdById` | UUID |
+| `title` | string |
+| `description` | string |
+| `durationMins` | integer |
+| `difficulty` | `Difficulty` |
+| `instructions` | object |
+| `status` | `TestStatus` |
+| `passMark` | integer |
+| `questions` | `TestQuestionResponse[]` |
+| `createdAt` | datetime |
+| `updatedAt` | datetime |
+| `isActive` | boolean |
+| `organisationId` | UUID |
+
+### Test Question DTOs
+
+`CreateTestQuestionRequest`
+
+| Field | Type | Required |
+|---|---|---|
+| `testId` | UUID | yes |
+| `questionId` | UUID | yes |
+| `orderIndex` | integer | yes |
+| `marks` | integer | yes |
+| `sectionName` | string | no |
+
+`UpdateTestQuestionRequest`
+
+| Field | Type | Required |
+|---|---|---|
+| `testId` | UUID | no |
+| `questionId` | UUID | no |
+| `orderIndex` | integer | no |
+| `marks` | integer | no |
+| `sectionName` | string | no |
+
+`TestQuestionResponse`
+
+| Field | Type |
+|---|---|
+| `id` | UUID |
+| `testId` | UUID |
+| `questionId` | UUID |
+| `orderIndex` | integer |
+| `marks` | integer |
+| `createdAt` | datetime |
+| `updatedAt` | datetime |
+
+`TestQuestionDetailResponse`
+
+| Field | Type |
+|---|---|
+| `id` | UUID |
+| `testId` | UUID |
+| `question` | `QuestionResponse` |
+| `orderIndex` | integer |
+| `marks` | integer |
+| `sectionName` | string |
+| `createdAt` | datetime |
+| `updatedAt` | datetime |
+
+### Schedule DTOs
+
+`CreateTestScheduleRequest`
+
+| Field | Type | Required |
+|---|---|---|
+| `testId` | UUID | yes |
+| `startTime` | datetime | yes |
+| `endTime` | datetime | yes |
+| `maxCandidates` | integer | no |
+| `status` | `ScheduleStatus` | no |
+
+`PatchTestScheduleRequest`
+
+| Field | Type | Required |
+|---|---|---|
+| `testId` | UUID | no |
+| `startTime` | datetime | no |
+| `endTime` | datetime | no |
+| `maxCandidates` | integer | no, min 1 if present |
+| `status` | `ScheduleStatus` | no |
+
+`TestScheduleResponse`
+
+| Field | Type |
+|---|---|
+| `id` | UUID |
+| `testId` | UUID |
+| `createdById` | UUID |
+| `startTime` | datetime |
+| `endTime` | datetime |
+| `maxCandidates` | integer |
+| `status` | `ScheduleStatus` |
+
+### Session DTOs
+
+`CreateTestSessionRequest`
+
+| Field | Type | Required |
+|---|---|---|
+| `testId` | UUID | yes |
+| `scheduleId` | UUID | yes |
+| `candidateId` | UUID | yes |
+| `ipAddress` | string | no |
+
+`StartTestSessionRequest`
+
+| Field | Type | Required |
+|---|---|---|
+| `invitationId` | UUID | yes |
+| `ipAddress` | string | no |
+
+`PatchTestSessionRequest`
+
+| Field | Type | Required |
+|---|---|---|
+| `refreshToken` | string | no |
+| `expiresAt` | datetime | no |
+| `startedAt` | datetime | no |
+| `endedAt` | datetime | no |
+| `timerRemainingSecs` | integer | no, min 0 |
+| `status` | `TestSessionStatus` | no |
+| `fullscreenViolations` | integer | no, min 0 |
+
+`TestSessionResponse`
+
+| Field | Type |
+|---|---|
+| `id` | UUID |
+| `testId` | UUID |
+| `scheduleId` | UUID |
+| `candidateId` | UUID |
+| `refreshToken` | string |
+| `expiresAt` | datetime |
+| `ipAddress` | string |
+| `createdAt` | datetime |
+| `startedAt` | datetime |
+| `endedAt` | datetime |
+| `timerRemainingSecs` | integer |
+| `status` | `TestSessionStatus` |
+| `fullscreenViolations` | integer |
+
+`TestSessionPaperResponse`
+
+| Field | Type |
+|---|---|
+| `sessionId` | UUID |
+| `scheduleId` | UUID |
+| `testId` | UUID |
+| `candidateId` | UUID |
+| `status` | `TestSessionStatus` |
+| `startedAt` | datetime |
+| `endedAt` | datetime |
+| `timerRemainingSecs` | integer |
+| `paper` | object |
+
+### Submission DTOs
+
+`SubmissionRequestDTO`
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `sessionId` | UUID | yes | |
+| `questionId` | UUID | yes | Must be attached to session test. |
+| `answerText` | string | no | Use for coding/text. Do not use for MCQ. |
+| `selectedOptionIds` | UUID array | no | Required for MCQ answers. |
+
+`SubmissionResponseDTO`
+
+| Field | Type |
+|---|---|
+| `id` | UUID |
+| `sessionId` | UUID |
+| `questionId` | UUID |
+| `answerText` | string |
+| `submittedAt` | datetime |
+| `questionType` | `QuestionType` |
+| `status` | `SubmissionStatus` |
+
+### Test Result DTOs
+
+`CreateTestResultDTO`
+
+| Field | Type | Required by validation |
+|---|---|---|
+| `sessionId` | UUID | no annotation, but needed |
+| `candidateId` | UUID | no annotation, but candidate must match session candidate if provided |
+
+`TestResultResponse`
+
+| Field | Type |
+|---|---|
+| `id` | UUID |
+| `testSessionId` | UUID |
+| `candidateId` | UUID |
+| `totalScore` | number |
+| `maxScore` | number |
+| `percentage` | number |
+| `passed` | boolean |
+| `evaluatedAt` | datetime |
+| `reportBucketLink` | string |
+
+### Test Case DTOs
+
+`CreateTestCaseRequest`
+
+| Field | Type | Required |
+|---|---|---|
+| `input` | string | no |
+| `expectedOutput` | string | yes |
+| `sample` | boolean | no |
+| `weight` | number | no, min 0 |
+| `codingQuestionId` | UUID | yes |
+| `explanation` | string | no |
+
+`PatchTestCaseRequest`
+
+| Field | Type | Required |
+|---|---|---|
+| `input` | string | no |
+| `expectedOutput` | string | no |
+| `sample` | boolean | no |
+| `weight` | number | no, min 0 |
+| `codingQuestionId` | UUID | no |
+| `explanation` | string | no |
+
+`TestCaseResponse`
+
+| Field | Type |
+|---|---|
+| `id` | UUID |
+| `input` | string |
+| `expectedOutput` | string |
+| `sample` | boolean |
+| `weight` | number |
+| `codingQuestionId` | UUID |
+| `explanation` | string |
+
+### Code Execution DTOs
+
+`CodeRunRequest`
+
+| Field | Type | Required |
+|---|---|---|
+| `sessionId` | UUID | yes |
+| `questionId` | UUID | yes |
+| `language` | string | yes |
+| `sourceCode` | string | yes |
+| `input` | string | no |
+
+`PlaygroundRequest`
+
+| Field | Type | Required |
+|---|---|---|
+| `questionId` | UUID | yes |
+| `language` | string | yes |
+| `sourceCode` | string | yes |
+| `input` | string | no |
+| `runAll` | boolean | no |
+
+`CodeRunResponseDTO`
+
+| Field | Type |
+|---|---|
+| `testCaseId` | UUID |
+| `stdout` | string |
+| `stderr` | string |
+| `compileOutput` | string |
+| `status` | string, maps to `CodeRunStatus` |
+| `execTimeMs` | long |
+| `expectedOutput` | string |
+
+`CodingSubmissionResultDTO`
+
+| Field | Type |
+|---|---|
+| `submissionId` | UUID |
+| `testCasesPassed` | integer |
+| `testCasesTotal` | integer |
+| `scoreAwarded` | number |
+| `maxScore` | number |
+| `execTimeMs` | integer |
+| `status` | string, maps to `CodingSubmissionStatus` or `FAILED` status text |
+
+## 4. Enums
+
+```text
+CheckpointStatus: IN_PROGRESS, COMPLETED, FAILED
+CodeRunStatus: ACCEPTED, WRONG_ANSWER, COMPILE_ERROR, RUNTIME_ERROR, TLE, ERROR
+CodingSubmissionStatus: ACCEPTED, PARTIAL, WRONG_ANSWER, COMPILE_ERROR, TLE, ERROR
+Difficulty: EASY, MEDIUM, HARD
+ExecutionStatus: QUEUED, PROCESSING, ACCEPTED, WRONG_ANSWER, TIME_LIMIT_EXCEEDED, COMPILATION_ERROR, RUNTIME_ERROR, INTERNAL_ERROR
+InvitationStatus: PENDING, ACCEPTED, EXPIRED
+Judge0PendingStatus: SUBMITTED, PROCESSING, COMPLETED, FAILED
+McqType: SINGLE_CORRECT, MULTIPLE_CORRECT, TRUE_FALSE, IMAGE_SINGLE_CORRECT, IMAGE_MULTIPLE_CORRECT, ASSERTION_REASON, FILL_IN_THE_BLANK
+PasswordProvider: LOCAL, GOOGLE
+QuestionType: MCQ, CODING
+QuestionVisibility: PUBLIC, ORG_OWNED
+Role: ADMIN, SUPERADMIN, CANDIDATE, GUEST, TRAINER
+ScheduleStatus: SCHEDULED, LIVE, COMPLETED
+SubmissionStatus: PENDING, GRADED, PENDING_GRADING, FAILED
+TestSessionStatus: ACTIVE, SUBMITTED, FLAGGED, TERMINATED, INACTIVE, EVALUATED
+TestStatus: DRAFT, PUBLISHED, ARCHIVED
+```
+
+## 5. Request Examples
+
+### Login
+
+```http
+POST /auth/login
+Content-Type: application/json
+```
+
+```json
+{
+  "email": "admin@example.com",
+  "password": "password123"
+}
+```
+
+### Create Candidate
+
+```json
+{
+  "name": "Asha Candidate",
+  "email": "asha@example.com",
+  "password": "password123",
+  "phoneNumber": "+919999999999",
+  "organisation_id": "11111111-1111-1111-1111-111111111111",
+  "extraFields": {
+    "college": "ABC College",
+    "course": "BTech",
+    "year": "2026",
+    "skills": "Java, SQL"
   }
-  ```
-- **Authentication**: Stateless JWT-based authentication. Frontend must include the header `Authorization: Bearer <token>` for all secured endpoints.
-- **Execution Engine**: Sandboxed code execution is integrated via RapidAPI Judge0 for coding questions and submissions.
-- **Resilience & Fault Tolerance (Resilience4j)**: Resilience4j Circuit Breaker is active on the Judge0 API calls (instance: `judge0`, window-size: 5, failure-rate: 100%, wait-duration: 10s). If the circuit breaker trips, calls fallback immediately and throws `Judge0UnavailableException`, resulting in a `503 Service Unavailable` response with `errorCode: "JUDGE0_UNAVAILABLE"`.
-- **Performance Optimization**: Java Virtual Threads are enabled (`spring.threads.virtual.enabled=true`) for high-throughput, non-blocking asynchronous grading and code execution operations.
-
-## 2. Platform Enums & Type Definitions
-These values must be matched exactly in frontend dropdowns, status indicators, and payload mapping.
-
-### `CodeRunStatus`
-Allowed values:
-- `ACCEPTED`
-- `WRONG_ANSWER`
-- `COMPILE_ERROR`
-- `RUNTIME_ERROR`
-- `TLE`
-- `ERROR`
-
-### `CodingSubmissionStatus`
-Allowed values:
-- `ACCEPTED`
-- `PARTIAL`
-- `WRONG_ANSWER`
-- `COMPILE_ERROR`
-- `TLE`
-- `ERROR`
-
-### `Difficulty`
-Allowed values:
-- `EASY`
-- `MEDIUM`
-- `HARD`
-
-### `ExecutionStatus`
-Allowed values:
-- `QUEUED`
-- `PROCESSING`
-- `ACCEPTED`
-- `WRONG_ANSWER`
-- `TIME_LIMIT_EXCEEDED`
-- `COMPILATION_ERROR`
-- `RUNTIME_ERROR`
-- `INTERNAL_ERROR`
-
-### `InvitationStatus`
-Allowed values:
-- `PENDING`
-- `ACCEPTED`
-- `EXPIRED`
-
-### `Judge0PendingStatus`
-Allowed values:
-- `SUBMITTED`
-- `PROCESSING`
-- `COMPLETED`
-- `FAILED`
-
-### `McqType`
-Allowed values:
-- `SINGLE_CORRECT`
-- `MULTIPLE_CORRECT`
-- `TRUE_FALSE`
-- `IMAGE_SINGLE_CORRECT`
-- `IMAGE_MULTIPLE_CORRECT`
-- `ASSERTION_REASON`
-- `FILL_IN_THE_BLANK`
-
-### `PasswordProvider`
-Allowed values:
-- `LOCAL`
-- `GOOGLE`
-
-### `QuestionType`
-Allowed values:
-- `MCQ`
-- `CODING`
-
-### `QuestionVisibility`
-Allowed values:
-- `PUBLIC`
-- `ORG_OWNED`
-
-### `Role`
-Allowed values:
-- `ADMIN`
-- `SUPERADMIN`
-- `CANDIDATE`
-- `GUEST`
-- `TRAINER`
-
-### `ScheduleStatus`
-Allowed values:
-- `SCHEDULED`
-- `LIVE`
-- `COMPLETED`
-
-### `SubmissionStatus`
-Allowed values:
-- `PENDING`
-- `GRADED`
-- `PENDING_GRADING`
-- `FAILED`
-
-### `TestSessionStatus`
-Allowed values:
-- `ACTIVE`
-- `SUBMITTED`
-- `FLAGGED`
-- `TERMINATED`
-- `INACTIVE`
-- `EVALUATED`
-
-### `TestStatus`
-Allowed values:
-- `DRAFT`
-- `PUBLISHED`
-- `ARCHIVED`
-
-## 3. REST API Endpoint Catalog
-All endpoints below are relative to the base URL (typically `http://localhost:8081`).
-
-### AdminController
-- **Base Path**: `/admin`
-- **Class-level Security**: `@sec.isAdminOrSuperAdmin()`
-
-#### `[POST] /admin/users`
-- **Authentication / Security Rule**: `@sec.isAdminOrSuperAdmin()`
-- **Method Signature**: `public ResponseEntity<BaseResponse<String>> createUser( @RequestBody @Valid CreateUserRequest request, @RequestParam Role role )`
-
-### AuthController
-- **Base Path**: `/auth`
-
-#### `[POST] /auth/register`
-- **Authentication / Security Rule**: `permitAll()`
-- **Method Signature**: `public ResponseEntity<BaseResponse<AuthResponse>> register(@Valid @RequestBody RegisterRequest request)`
-
-#### `[POST] /auth/login`
-- **Authentication / Security Rule**: `permitAll()`
-- **Method Signature**: `public ResponseEntity<BaseResponse<AuthResponse>> login(@Valid @RequestBody LoginRequest request)`
-
-#### `[PATCH] /auth/reset-password`
-- **Authentication / Security Rule**: `isAuthenticated()`
-- **Method Signature**: `public ResponseEntity<BaseResponse<AuthResponse>> resetPassword(@Valid @RequestBody ResetPasswordRequest request)`
-
-### CandidateController
-- **Base Path**: `/candidates`
-- **Class-level Security**: `@sec.isAdminOrSuperAdmin()`
-
-#### `[POST] /candidates`
-- **Authentication / Security Rule**: `@sec.isAdminOrSuperAdmin()`
-- **Method Signature**: `public ResponseEntity<BaseResponse<String>> createCandidate(@RequestBody @Valid CreateCandidateRequest request)`
-
-#### `[GET] /candidates`
-- **Authentication / Security Rule**: `@sec.isAdminOrSuperAdmin()`
-- **Method Signature**: `public ResponseEntity<BaseResponse<Page<CandidateResponse>>> getCandidates( @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "20") int size)`
-
-#### `[POST] /candidates/bulk-upload`
-- **Authentication / Security Rule**: `@sec.isAdminOrSuperAdmin()`
-- **Method Signature**: `public ResponseEntity<BaseResponse<BulkUploadResult>> bulkUpload(@RequestParam("file") MultipartFile file)`
-
-#### `[PATCH] /candidates/{id}`
-- **Authentication / Security Rule**: `@authorizationService.canAccessCandidate(#id)`
-- **Method Signature**: `public ResponseEntity<BaseResponse<CandidateResponse>> patchCandidate( @PathVariable UUID id, @RequestBody UpdateCandidateRequest request )`
-
-#### `[DELETE] /candidates/{id}`
-- **Authentication / Security Rule**: `@authorizationService.canAccessCandidate(#id)`
-- **Method Signature**: `public ResponseEntity<BaseResponse<String>> deleteCandidate(@PathVariable UUID id)`
-
-### CandidateInvitationController
-- **Base Path**: `/candidate-invitations`
-
-#### `[POST] /candidate-invitations`
-- **Authentication / Security Rule**: `@sec.isAdminOrSuperAdmin()`
-- **Method Signature**: `public ResponseEntity<BaseResponse<CandidateInvitationResponse>> create( @RequestBody @Valid CreateCandidateInvitationRequest request )`
-
-#### `[GET] /candidate-invitations`
-- **Authentication / Security Rule**: `@sec.isAnyRole()`
-- **Method Signature**: `public ResponseEntity<BaseResponse<Page<CandidateInvitationResponse>>> getAll( @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "20") int size )`
-
-#### `[GET] /candidate-invitations/{id}`
-- **Authentication / Security Rule**: `@sec.isAnyRole() and @authorizationService.canAccessInvitation(#id)`
-- **Method Signature**: `public ResponseEntity<BaseResponse<CandidateInvitationResponse>> getById( @PathVariable UUID id )`
-
-#### `[PATCH] /candidate-invitations/{id}`
-- **Authentication / Security Rule**: `@sec.isAdminOrSuperAdmin() and @authorizationService.canAccessInvitation(#id)`
-- **Method Signature**: `public ResponseEntity<BaseResponse<CandidateInvitationResponse>> patch( @PathVariable UUID id, @RequestBody @Valid PatchCandidateInvitationRequest request )`
-
-#### `[DELETE] /candidate-invitations/{id}`
-- **Authentication / Security Rule**: `@sec.isAdminOrSuperAdmin() and @authorizationService.canAccessInvitation(#id)`
-- **Method Signature**: `public ResponseEntity<BaseResponse<String>> delete( @PathVariable UUID id )`
-
-#### `[GET] /candidate-invitations/validate/{token}`
-- **Authentication / Security Rule**: `permitAll()`
-- **Method Signature**: `public ResponseEntity<BaseResponse<CandidateInvitationResponse>> validateToken( @PathVariable String token )`
-
-### CodeExecutionController
-- **Base Path**: `/api/code/execute`
-
-#### `[POST] /api/code/execute/run`
-- **Authentication / Security Rule**: `@sec.isAnyRole()`
-- **Method Signature**: `public ResponseEntity<BaseResponse<List<CodeRunResponseDTO>>> run(@RequestBody @Valid CodeRunRequest request)`
-
-#### `[POST] /api/code/execute/submit`
-- **Authentication / Security Rule**: `@sec.isAnyRole()`
-- **Method Signature**: `public ResponseEntity<BaseResponse<UUID>> submit(@RequestBody @Valid CodeRunRequest request)`
-
-#### `[GET] /api/code/execute/submit/{submissionId}/result`
-- **Authentication / Security Rule**: `@sec.isAnyRole() and @authorizationService.canAccessSubmission(#submissionId)`
-- **Method Signature**: `public ResponseEntity<BaseResponse<CodingSubmissionResultDTO>> getResult(@PathVariable UUID submissionId)`
-
-#### `[POST] /api/code/execute/playground`
-- **Authentication / Security Rule**: `@sec.isAdminOrSuperAdmin()`
-- **Method Signature**: `public ResponseEntity<BaseResponse<List<CodeRunResponseDTO>>> playground(@RequestBody @Valid com.gryphon.rxone.DTO.CodeExecution.PlaygroundRequest request)`
-
-### OrganisationController
-- **Base Path**: `/organisations`
-
-#### `[GET] /organisations`
-- **Authentication / Security Rule**: `@sec.isAdminOrSuperAdmin()`
-- **Method Signature**: `public ResponseEntity<BaseResponse<Page<OrganisationResponse>>> getOrganisations( @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "20") int size )`
-
-#### `[POST] /organisations`
-- **Authentication / Security Rule**: `@sec.isSuperAdmin()`
-- **Method Signature**: `public ResponseEntity<BaseResponse<OrganisationResponse>> createOrganisation(@RequestBody @Valid CreateOrganisationRequest request)`
-
-#### `[GET] /organisations/{id}`
-- **Authentication / Security Rule**: `@sec.isAdminOrSuperAdmin() and @authorizationService.canAccessOrganisation(#id)`
-- **Method Signature**: `public ResponseEntity<BaseResponse<OrganisationResponse>> getOrganisationById(@PathVariable UUID id)`
-
-#### `[PATCH] /organisations/{id}`
-- **Authentication / Security Rule**: `@sec.isAdminOrSuperAdmin() and @authorizationService.canAccessOrganisation(#id)`
-- **Method Signature**: `public ResponseEntity<BaseResponse<OrganisationResponse>> updateOrganisation( @PathVariable UUID id, @RequestBody @Valid UpdateOrganisationRequest request )`
-
-### QuestionController
-- **Base Path**: `/questions`
-
-#### `[POST] /questions`
-- **Authentication / Security Rule**: `@sec.isAdminOrSuperAdmin()`
-- **Method Signature**: `public ResponseEntity<BaseResponse<QuestionResponse>> createQuestion(@RequestBody @Valid CreateQuestionRequest request)`
-
-#### `[GET] /questions/{id}`
-- **Authentication / Security Rule**: `@sec.isAdminOrSuperAdmin() and @authorizationService.canAccessQuestion(#id)`
-- **Method Signature**: `public ResponseEntity<BaseResponse<QuestionResponse>> getQuestionById(@PathVariable UUID id)`
-
-#### `[DELETE] /questions/{id}`
-- **Authentication / Security Rule**: `@sec.isAdminOrSuperAdmin() and @authorizationService.canAccessQuestion(#id)`
-- **Method Signature**: `public ResponseEntity<BaseResponse<String>> deleteQuestion(@PathVariable UUID id)`
-
-#### `[GET] /questions`
-- **Authentication / Security Rule**: `@sec.isAdminOrSuperAdmin()`
-- **Method Signature**: `public ResponseEntity<BaseResponse<Page<QuestionResponse>>> getAllQ( @RequestParam(required = false) UUID subjectId, @RequestParam(required = false) UUID topicId, @RequestParam(required = false) UUID subtopicId, @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "20") int size )`
-
-#### `[PUT] /questions/{id}`
-- **Authentication / Security Rule**: `@sec.isAdminOrSuperAdmin() and @authorizationService.canAccessQuestion(#id)`
-- **Method Signature**: `public ResponseEntity<BaseResponse<QuestionResponse>> updateQuestion( @PathVariable UUID id, @RequestBody @Valid UpdateQuestionRequest request )`
-
-#### `[PATCH] /questions/{id}`
-- **Authentication / Security Rule**: `@sec.isAdminOrSuperAdmin() and @authorizationService.canAccessQuestion(#id)`
-- **Method Signature**: `public ResponseEntity<BaseResponse<QuestionResponse>> patchQuestion( @PathVariable UUID id, @RequestBody @Valid UpdateQuestionRequest request )`
-
-### SubjectController
-- **Base Path**: `/subjects`
-
-#### `[POST] /subjects`
-- **Authentication / Security Rule**: `@sec.isSuperAdmin()`
-- **Method Signature**: `public ResponseEntity<BaseResponse<SubjectResponse>> createSubject(@RequestBody @Valid CreateSubjectRequest request)`
-
-#### `[GET] /subjects`
-- **Authentication / Security Rule**: `@sec.isAdminOrSuperAdmin()`
-- **Method Signature**: `public ResponseEntity<BaseResponse<Page<SubjectResponse>>> getAllSubjects( @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "10") int size)`
-
-#### `[GET] /subjects/{id}`
-- **Authentication / Security Rule**: `@sec.isAdminOrSuperAdmin()`
-- **Method Signature**: `public ResponseEntity<BaseResponse<SubjectResponse>> getSubjectById(@PathVariable UUID id)`
-
-#### `[PUT] /subjects/{id}`
-- **Authentication / Security Rule**: `@sec.isSuperAdmin()`
-- **Method Signature**: `public ResponseEntity<BaseResponse<SubjectResponse>> updateSubject( @PathVariable UUID id, @RequestBody @Valid UpdateSubjectRequest request )`
-
-#### `[PATCH] /subjects/{id}`
-- **Authentication / Security Rule**: `@sec.isSuperAdmin()`
-- **Method Signature**: `public ResponseEntity<BaseResponse<SubjectResponse>> patchSubject( @PathVariable UUID id, @RequestBody @Valid UpdateSubjectRequest request )`
-
-#### `[DELETE] /subjects/{id}`
-- **Authentication / Security Rule**: `@sec.isSuperAdmin()`
-- **Method Signature**: `public ResponseEntity<BaseResponse<String>> deleteSubject(@PathVariable UUID id)`
-
-### SubmissionController
-- **Base Path**: `/submissions`
-
-#### `[POST] /submissions`
-- **Authentication / Security Rule**: `@sec.isAnyRole()`
-- **Method Signature**: `public ResponseEntity<BaseResponse<SubmissionResponseDTO>> submit(@RequestBody @Valid SubmissionRequestDTO dto)`
-
-#### `[GET] /submissions/{id}`
-- **Authentication / Security Rule**: `@sec.isAnyRole() and @authorizationService.canAccessSubmission(#id)`
-- **Method Signature**: `public ResponseEntity<BaseResponse<SubmissionResponseDTO>> getSubmission(@org.springframework.web.bind.annotation.PathVariable UUID id)`
-
-### SubtopicController
-- **Base Path**: `/subtopics`
-
-#### `[POST] /subtopics`
-- **Authentication / Security Rule**: `@sec.isSuperAdmin()`
-- **Method Signature**: `public ResponseEntity<BaseResponse<SubtopicResponse>> createSubtopic(@RequestBody @Valid CreateSubtopicRequest request)`
-
-#### `[GET] /subtopics`
-- **Authentication / Security Rule**: `@sec.isAdminOrSuperAdmin()`
-- **Method Signature**: `public ResponseEntity<BaseResponse<Page<SubtopicResponse>>> getAllSubtopics(`
-
-#### `[GET] /subtopics/{id}`
-- **Authentication / Security Rule**: `@sec.isAdminOrSuperAdmin()`
-- **Method Signature**: `public ResponseEntity<BaseResponse<SubtopicResponse>> getSubtopicById(@PathVariable UUID id)`
-
-#### `[GET] /subtopics/topic/{topicId}`
-- **Authentication / Security Rule**: `@sec.isAdminOrSuperAdmin()`
-- **Method Signature**: `public ResponseEntity<BaseResponse<Page<SubtopicResponse>>> getSubtopicsByTopic( @PathVariable UUID topicId,`
-
-#### `[PUT] /subtopics/{id}`
-- **Authentication / Security Rule**: `@sec.isSuperAdmin()`
-- **Method Signature**: `public ResponseEntity<BaseResponse<SubtopicResponse>> updateSubtopic( @PathVariable UUID id, @RequestBody @Valid UpdateSubtopicRequest request )`
-
-#### `[PATCH] /subtopics/{id}`
-- **Authentication / Security Rule**: `@sec.isSuperAdmin()`
-- **Method Signature**: `public ResponseEntity<BaseResponse<SubtopicResponse>> patchSubtopic( @PathVariable UUID id, @RequestBody @Valid UpdateSubtopicRequest request )`
-
-#### `[DELETE] /subtopics/{id}`
-- **Authentication / Security Rule**: `@sec.isSuperAdmin()`
-- **Method Signature**: `public ResponseEntity<BaseResponse<String>> deleteSubtopic(@PathVariable UUID id)`
-
-### TestCaseController
-- **Base Path**: `/test-cases`
-
-#### `[POST] /test-cases`
-- **Authentication / Security Rule**: `@sec.isAdminOrSuperAdmin()`
-- **Method Signature**: `public ResponseEntity<BaseResponse<TestCaseResponse>> createTestCase(@RequestBody @Valid CreateTestCaseRequest dto)`
-
-#### `[GET] /test-cases`
-- **Authentication / Security Rule**: `Public / PermitAll`
-- **Method Signature**: `public ResponseEntity<BaseResponse<Page<TestCaseResponse>>> getAllTestCases( @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "20") int size )`
-
-#### `[GET] /test-cases/{id}`
-- **Authentication / Security Rule**: `Public / PermitAll`
-- **Method Signature**: `public ResponseEntity<BaseResponse<TestCaseResponse>> getTestCaseById(@PathVariable UUID id)`
-
-#### `[PATCH] /test-cases/update/{id}`
-- **Authentication / Security Rule**: `Public / PermitAll`
-- **Method Signature**: `public ResponseEntity<BaseResponse<TestCaseResponse>> patchTestCase(@PathVariable UUID id, @RequestBody @Valid PatchTestCaseRequest dto)`
-
-#### `[DELETE] /test-cases/delete/{id}`
-- **Authentication / Security Rule**: `Public / PermitAll`
-- **Method Signature**: `public ResponseEntity<BaseResponse<String>> deleteTestCase(@PathVariable UUID id)`
-
-### TestController
-- **Base Path**: `/tests`
-
-#### `[POST] /tests`
-- **Authentication / Security Rule**: `@sec.isAdminOrSuperAdmin()`
-- **Method Signature**: `public ResponseEntity<BaseResponse<TestResponse>> createTest(@RequestBody @Valid CreateTestRequest request)`
-
-#### `[GET] /tests`
-- **Authentication / Security Rule**: `@sec.isAdminOrSuperAdmin()`
-- **Method Signature**: `public ResponseEntity<BaseResponse<Page<TestResponse>>> getAllTests( @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "20") int size )`
-
-#### `[GET] /tests/{id}`
-- **Authentication / Security Rule**: `@sec.isAnyRole() and @authorizationService.canAccessTest(#id)`
-- **Method Signature**: `public ResponseEntity<BaseResponse<TestResponse>> getTestById(@PathVariable UUID id)`
-
-#### `[PUT] /tests/{id}`
-- **Authentication / Security Rule**: `@sec.isAdminOrSuperAdmin() and @authorizationService.canAccessTest(#id)`
-- **Method Signature**: `public ResponseEntity<BaseResponse<TestResponse>> updateTest( @PathVariable UUID id, @RequestBody @Valid UpdateTestRequest request )`
-
-#### `[PATCH] /tests/{id}`
-- **Authentication / Security Rule**: `@sec.isAdminOrSuperAdmin() and @authorizationService.canAccessTest(#id)`
-- **Method Signature**: `public ResponseEntity<BaseResponse<TestResponse>> patchTest( @PathVariable UUID id, @RequestBody @Valid UpdateTestRequest request )`
-
-#### `[PATCH] /tests/{id}/inactive`
-- **Authentication / Security Rule**: `@sec.isAdminOrSuperAdmin() and @authorizationService.canAccessTest(#id)`
-- **Method Signature**: `public ResponseEntity<BaseResponse<String>> inactiveTest(@PathVariable UUID id)`
-
-#### `[GET] /tests/inactive`
-- **Authentication / Security Rule**: `@sec.isAdminOrSuperAdmin()`
-- **Method Signature**: `public ResponseEntity<BaseResponse<List<TestResponse>>> getInactiveTests()`
-
-#### `[PATCH] /tests/{id}/active`
-- **Authentication / Security Rule**: `@sec.isAdminOrSuperAdmin() and @authorizationService.canAccessTest(#id)`
-- **Method Signature**: `public ResponseEntity<BaseResponse<String>> activateTest(@PathVariable UUID id)`
-
-### TestQuestionController
-- **Base Path**: `/test-questions`
-
-#### `[POST] /test-questions`
-- **Authentication / Security Rule**: `@sec.isAdminOrSuperAdmin()`
-- **Method Signature**: `public ResponseEntity<BaseResponse<TestQuestionResponse>> createTestQuestion( @RequestBody @Valid CreateTestQuestionRequest request )`
-
-#### `[POST] /test-questions/bulk`
-- **Authentication / Security Rule**: `@sec.isAdminOrSuperAdmin()`
-- **Method Signature**: `public ResponseEntity<BaseResponse<List<TestQuestionResponse>>> bulkCreateTestQuestions( @RequestBody List<@Valid CreateTestQuestionRequest> requests )`
-
-#### `[GET] /test-questions/{id}`
-- **Authentication / Security Rule**: `@sec.isAdminOrSuperAdmin()`
-- **Method Signature**: `public ResponseEntity<BaseResponse<TestQuestionResponse>> getTestQuestionById(@PathVariable UUID id)`
-
-#### `[GET] /test-questions`
-- **Authentication / Security Rule**: `@sec.isAdminOrSuperAdmin()`
-- **Method Signature**: `public ResponseEntity<BaseResponse<Page<TestQuestionResponse>>> getAllTestQuestions( @RequestParam(required = false) UUID testId, @RequestParam(required = false) UUID questionId, @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "20") int size )`
-
-#### `[GET] /test-questions/test/{testId}`
-- **Authentication / Security Rule**: `@sec.isAdminOrSuperAdmin() and @authorizationService.canAccessTest(#testId)`
-- **Method Signature**: `public ResponseEntity<BaseResponse<List<TestQuestionDetailResponse>>> getTestQuestionsByTestIdDetailed( @PathVariable UUID testId )`
-
-#### `[GET] /test-questions/test/{testId}/grouped`
-- **Authentication / Security Rule**: `@sec.isAdminOrSuperAdmin() and @authorizationService.canAccessTest(#testId)`
-- **Method Signature**: `public ResponseEntity<BaseResponse<Map<String, List<TestQuestionDetailResponse>>>> getGroupedQuestions( @PathVariable UUID testId )`
-
-#### `[PUT] /test-questions/{id}`
-- **Authentication / Security Rule**: `@sec.isAdminOrSuperAdmin()`
-- **Method Signature**: `public ResponseEntity<BaseResponse<TestQuestionResponse>> updateTestQuestion( @PathVariable UUID id, @RequestBody @Valid UpdateTestQuestionRequest request )`
-
-#### `[PATCH] /test-questions/{id}`
-- **Authentication / Security Rule**: `@sec.isAdminOrSuperAdmin()`
-- **Method Signature**: `public ResponseEntity<BaseResponse<TestQuestionResponse>> patchTestQuestion( @PathVariable UUID id, @RequestBody @Valid UpdateTestQuestionRequest request )`
-
-#### `[DELETE] /test-questions/{id}`
-- **Authentication / Security Rule**: `@sec.isAdminOrSuperAdmin()`
-- **Method Signature**: `public ResponseEntity<BaseResponse<String>> deleteTestQuestion(@PathVariable UUID id)`
-
-### TestResultController
-- **Base Path**: `/test-results`
-
-#### `[POST] /test-results`
-- **Authentication / Security Rule**: `@sec.isAdminOrSuperAdmin()`
-- **Method Signature**: `public ResponseEntity<BaseResponse<TestResultResponse>> calculateAndSaveTestResult( @RequestBody @Valid CreateTestResultDTO request )`
-
-#### `[GET] /test-results/{id}`
-- **Authentication / Security Rule**: `@sec.isAnyRole() and @authorizationService.canAccessTestResult(#id)`
-- **Method Signature**: `public ResponseEntity<BaseResponse<TestResultResponse>> getTestResultById(@PathVariable UUID id)`
-
-#### `[GET] /test-results/session/{sessionId}`
-- **Authentication / Security Rule**: `@sec.isAnyRole() and @authorizationService.canAccessSession(#sessionId)`
-- **Method Signature**: `public ResponseEntity<BaseResponse<TestResultResponse>> getTestResultBySessionId(@PathVariable UUID sessionId)`
-
-### TestScheduleController
-- **Base Path**: `/test-schedules`
-
-#### `[POST] /test-schedules`
-- **Authentication / Security Rule**: `@sec.isAdminOrSuperAdmin()`
-- **Method Signature**: `public ResponseEntity<BaseResponse<TestScheduleResponse>> createSchedule( @RequestBody @Valid CreateTestScheduleRequest request )`
-
-#### `[GET] /test-schedules`
-- **Authentication / Security Rule**: `@sec.isAdminOrSuperAdmin()`
-- **Method Signature**: `public ResponseEntity<BaseResponse<Page<TestScheduleResponse>>> getAllSchedules( @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "20") int size )`
-
-#### `[GET] /test-schedules/{id}`
-- **Authentication / Security Rule**: `@sec.isAnyRole() and @authorizationService.canAccessSchedule(#id)`
-- **Method Signature**: `public ResponseEntity<BaseResponse<TestScheduleResponse>> getScheduleById( @PathVariable UUID id )`
-
-#### `[PATCH] /test-schedules/{id}`
-- **Authentication / Security Rule**: `@sec.isAdminOrSuperAdmin() and @authorizationService.canAccessSchedule(#id)`
-- **Method Signature**: `public ResponseEntity<BaseResponse<TestScheduleResponse>> patchSchedule( @PathVariable UUID id, @RequestBody @Valid PatchTestScheduleRequest request )`
-
-#### `[DELETE] /test-schedules/{id}`
-- **Authentication / Security Rule**: `@sec.isAdminOrSuperAdmin() and @authorizationService.canAccessSchedule(#id)`
-- **Method Signature**: `public ResponseEntity<BaseResponse<String>> deleteSchedule(@PathVariable UUID id)`
-
-### TestSessionController
-- **Base Path**: `/test-sessions`
-
-#### `[POST] /test-sessions`
-- **Authentication / Security Rule**: `@sec.isAdminOrSuperAdmin()`
-- **Method Signature**: `public ResponseEntity<BaseResponse<TestSessionResponse>> createSession( @RequestBody @Valid CreateTestSessionRequest request )`
-
-#### `[POST] /test-sessions/start`
-- **Authentication / Security Rule**: `@sec.isCandidate()`
-- **Method Signature**: `public ResponseEntity<BaseResponse<TestSessionResponse>> startSession( @RequestBody @Valid StartTestSessionRequest request )`
-
-#### `[GET] /test-sessions`
-- **Authentication / Security Rule**: `@sec.isAnyRole()`
-- **Method Signature**: `public ResponseEntity<BaseResponse<Page<TestSessionResponse>>> getAllSessions( @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "20") int size )`
-
-#### `[GET] /test-sessions/{id}`
-- **Authentication / Security Rule**: `@sec.isAnyRole() and @authorizationService.canAccessSession(#id)`
-- **Method Signature**: `public ResponseEntity<BaseResponse<TestSessionResponse>> getSessionById(@PathVariable UUID id)`
-
-#### `[GET] /test-sessions/{id}/paper`
-- **Authentication / Security Rule**: `@sec.isAnyRole() and @authorizationService.canAccessSession(#id)`
-- **Method Signature**: `public ResponseEntity<BaseResponse<TestSessionPaperResponse>> getSessionPaper(@PathVariable UUID id)`
-
-#### `[PATCH] /test-sessions/{id}`
-- **Authentication / Security Rule**: `@sec.isAnyRole() and @authorizationService.canAccessSession(#id)`
-- **Method Signature**: `public ResponseEntity<BaseResponse<TestSessionResponse>> patchSession( @PathVariable UUID id, @RequestBody @Valid PatchTestSessionRequest request )`
-
-#### `[POST] /test-sessions/{id}/submit`
-- **Authentication / Security Rule**: `@sec.isAnyRole() and @authorizationService.canAccessSession(#id)`
-- **Method Signature**: `public ResponseEntity<BaseResponse<String>> submitTest(@PathVariable UUID id)`
-
-#### `[DELETE] /test-sessions/{id}`
-- **Authentication / Security Rule**: `@sec.isAdminOrSuperAdmin() and @authorizationService.canAccessSession(#id)`
-- **Method Signature**: `public ResponseEntity<BaseResponse<String>> deleteSession(@PathVariable UUID id)`
-
-### TopicController
-- **Base Path**: `/topics`
-
-#### `[POST] /topics`
-- **Authentication / Security Rule**: `@sec.isSuperAdmin()`
-- **Method Signature**: `public ResponseEntity<BaseResponse<TopicResponse>> createTopic(@RequestBody @Valid CreateTopicRequest request)`
-
-#### `[GET] /topics`
-- **Authentication / Security Rule**: `@sec.isAdminOrSuperAdmin()`
-- **Method Signature**: `public ResponseEntity<BaseResponse<Page<TopicResponse>>> getAllTopics(`
-
-#### `[GET] /topics/{id}`
-- **Authentication / Security Rule**: `@sec.isAdminOrSuperAdmin()`
-- **Method Signature**: `public ResponseEntity<BaseResponse<TopicResponse>> getTopicById(@PathVariable UUID id)`
-
-#### `[GET] /topics/subject/{subjectId}`
-- **Authentication / Security Rule**: `@sec.isAdminOrSuperAdmin()`
-- **Method Signature**: `public ResponseEntity<BaseResponse<Page<TopicResponse>>> getTopicsBySubject( @PathVariable UUID subjectId,`
-
-#### `[PUT] /topics/{id}`
-- **Authentication / Security Rule**: `@sec.isSuperAdmin()`
-- **Method Signature**: `public ResponseEntity<BaseResponse<TopicResponse>> updateTopic( @PathVariable UUID id, @RequestBody @Valid UpdateTopicRequest request )`
-
-#### `[PATCH] /topics/{id}`
-- **Authentication / Security Rule**: `@sec.isSuperAdmin()`
-- **Method Signature**: `public ResponseEntity<BaseResponse<TopicResponse>> patchTopic( @PathVariable UUID id, @RequestBody @Valid UpdateTopicRequest request )`
-
-#### `[DELETE] /topics/{id}`
-- **Authentication / Security Rule**: `@sec.isSuperAdmin()`
-- **Method Signature**: `public ResponseEntity<BaseResponse<String>> deleteTopic(@PathVariable UUID id)`
-
-### UserController
-- **Base Path**: `/users`
-
-#### `[GET] /users`
-- **Authentication / Security Rule**: `@sec.isAdminOrSuperAdmin()`
-- **Method Signature**: `public ResponseEntity<BaseResponse<Page<UserResponse>>> getUsers( @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "20") int size)`
-
-#### `[GET] /users/{id}`
-- **Authentication / Security Rule**: `@sec.isAdminOrSuperAdmin() and @authorizationService.canAccessUser(#id)`
-- **Method Signature**: `public ResponseEntity<BaseResponse<UserResponse>> getUserById(@PathVariable UUID id)`
-
-#### `[PATCH] /users/{id}`
-- **Authentication / Security Rule**: `@sec.isAnyRole() and @authorizationService.canAccessUser(#id)`
-- **Method Signature**: `public ResponseEntity<BaseResponse<UserResponse>> patchUser( @PathVariable UUID id, @RequestBody @Valid UpdateUserRequestPatch request )`
-
-#### `[DELETE] /users/{id}`
-- **Authentication / Security Rule**: `@sec.isAdminOrSuperAdmin() and @authorizationService.canAccessUser(#id)`
-- **Method Signature**: `public ResponseEntity<BaseResponse<String>> deleteUser(@PathVariable UUID id)`
-
-#### `[PUT] /users/{id}`
-- **Authentication / Security Rule**: `Public / PermitAll`
-- **Method Signature**: `// public ResponseEntity<BaseResponse<UserResponse>> putUser( // @PathVariable UUID id, // @RequestBody @Valid UpdateUserRequest request // )`
-
-## 4. Request / Response Data Transfer Objects (DTO)
-This section catalogs all DTO models used in the REST API. Look at the field names and validation tags to understand request payload constraints.
-
-### `AuthResponse` (Folder: `DTO/Auth`)
-| Field Name | Type | Validations / Modifiers | JSON Alias |
-|------------|------|-------------------------|------------|
-| `accessToken` | `String` | None | Same as field name |
-| `tokenType` | `String` | None (Default value exists) | Same as field name |
-| `expiresIn` | `Long` | None | Same as field name |
-| `user` | `UserData` | None | Same as field name |
-
-#### Inner Class: `AuthResponse.UserData`
-| Field Name | Type | Validations / Modifiers |
-|------------|------|-------------------------|
-| `id` | `UUID` | None |
-| `name` | `String` | None |
-| `email` | `String` | None |
-| `role` | `String` | None |
-| `phoneNumber` | `String` | None |
-| `organisationData` | `OrganisationData` | None |
-
-#### Inner Class: `AuthResponse.OrganisationData`
-| Field Name | Type | Validations / Modifiers |
-|------------|------|-------------------------|
-| `id` | `UUID` | None |
-| `name` | `String` | None |
-| `logoUrl` | `String` | None |
-
-### `LoginRequest` (Folder: `DTO/Auth`)
-| Field Name | Type | Validations / Modifiers | JSON Alias |
-|------------|------|-------------------------|------------|
-| `email` | `String` | NotBlank(message = "Email is required"), Email (message = "Invalid email format") | Same as field name |
-| `password` | `String` | NotBlank(message = "Password is required") | Same as field name |
-
-### `RegisterRequest` (Folder: `DTO/Auth`)
-| Field Name | Type | Validations / Modifiers | JSON Alias |
-|------------|------|-------------------------|------------|
-| `name` | `String` | NotBlank(message = "Name is required") | Same as field name |
-| `email` | `String` | NotBlank(message = "Email is required"), Email(message = "Invalid email format") | Same as field name |
-| `password` | `String` | NotBlank(message = "Password is required"), Size(min = 8, message = "Password must be at least 8 characters") | Same as field name |
-| `phoneNumber` | `String` | None | Same as field name |
-| `role` | `Role` | None (Default value exists) | Same as field name |
-| `organisationId` | `UUID` | NotNull(message = "Organisation ID is required") | `organisation_id` |
-
-### `ResetPasswordRequest` (Folder: `DTO/Auth`)
-| Field Name | Type | Validations / Modifiers | JSON Alias |
-|------------|------|-------------------------|------------|
-| `oldPassword` | `String` | NotBlank(message = "Old password is required") | Same as field name |
-| `newPassword` | `String` | NotBlank(message = "New password cannot be empty"), Size(min = 8, message = "New password must be at least 8 characters long") | Same as field name |
-
-### `BulkUploadResult` (Folder: `DTO/Candidate`)
-| Field Name | Type | Validations / Modifiers | JSON Alias |
-|------------|------|-------------------------|------------|
-| `totalRows` | `int` | None | Same as field name |
-| `successCount` | `int` | None | Same as field name |
-| `failCount` | `int` | None | Same as field name |
-| `rows` | `List<BulkUploadRowResult>` | None | Same as field name |
-
-### `BulkUploadRowResult` (Folder: `DTO/Candidate`)
-| Field Name | Type | Validations / Modifiers | JSON Alias |
-|------------|------|-------------------------|------------|
-| `rowNumber` | `int` | None | Same as field name |
-| `email` | `String` | None | Same as field name |
-| `status` | `String` | None | Same as field name |
-| `errorMessage` | `String` | None | Same as field name |
-
-### `CandidateInvitationResponse` (Folder: `DTO/Candidate`)
-| Field Name | Type | Validations / Modifiers | JSON Alias |
-|------------|------|-------------------------|------------|
-| `id` | `UUID` | None | Same as field name |
-| `scheduleId` | `UUID` | None | Same as field name |
-| `candidateId` | `UUID` | None | Same as field name |
-| `token` | `String` | None | Same as field name |
-| `status` | `InvitationStatus` | None | Same as field name |
-| `sentAt` | `LocalDateTime` | None | Same as field name |
-
-### `CandidateResponse` (Folder: `DTO/Candidate`)
-| Field Name | Type | Validations / Modifiers | JSON Alias |
-|------------|------|-------------------------|------------|
-| `id` | `UUID` | None | Same as field name |
-| `userId` | `UUID` | None | Same as field name |
-| `name` | `String` | None | Same as field name |
-| `email` | `String` | None | Same as field name |
-| `phoneNumber` | `String` | None | Same as field name |
-| `organisation` | `OrganisationData` | None | Same as field name |
-| `extraFields` | `Map<String, Object>` | None | Same as field name |
-| `isStale` | `boolean` | None | Same as field name |
-| `lastUpdated` | `LocalDateTime` | None | Same as field name |
-| `createdAt` | `LocalDateTime` | None | Same as field name |
-| `updatedAt` | `LocalDateTime` | None | Same as field name |
-
-#### Inner Class: `CandidateResponse.OrganisationData`
-| Field Name | Type | Validations / Modifiers |
-|------------|------|-------------------------|
-| `id` | `UUID` | None |
-| `name` | `String` | None |
-
-### `CreateCandidateInvitationRequest` (Folder: `DTO/Candidate`)
-| Field Name | Type | Validations / Modifiers | JSON Alias |
-|------------|------|-------------------------|------------|
-| `scheduleId` | `UUID` | NotNull(message = "Schedule id is required") | Same as field name |
-| `candidateId` | `UUID` | NotNull(message = "Candidate id is required") | Same as field name |
-| `candidateEmail` | `String` | None | Same as field name |
-
-### `CreateCandidateRequest` (Folder: `DTO/Candidate`)
-| Field Name | Type | Validations / Modifiers | JSON Alias |
-|------------|------|-------------------------|------------|
-| `name` | `String` | NotBlank(message = "Name is required") | Same as field name |
-| `email` | `String` | NotBlank(message = "Email is required"), Email(message = "Invalid email format") | Same as field name |
-| `password` | `String` | NotBlank(message = "Password is required"), Size(min = 8, message = "Password must be at least 8 characters") | Same as field name |
-| `phoneNumber` | `String` | None | Same as field name |
-| `extraFields` | `Map<String, Object>` | None | Same as field name |
-| `organisationId` | `UUID` | NotNull(message = "Organisation ID is required") | `organisation_id` |
-
-### `PatchCandidateInvitationRequest` (Folder: `DTO/Candidate`)
-| Field Name | Type | Validations / Modifiers | JSON Alias |
-|------------|------|-------------------------|------------|
-| `status` | `InvitationStatus` | NotNull(message = "Invitation status is required") | Same as field name |
-
-### `UpdateCandidateRequest` (Folder: `DTO/Candidate`)
-| Field Name | Type | Validations / Modifiers | JSON Alias |
-|------------|------|-------------------------|------------|
-| `name` | `String` | None | Same as field name |
-| `email` | `String` | None | Same as field name |
-| `phoneNumber` | `String` | None | Same as field name |
-| `extraFields` | `Map<String, Object>` | None | Same as field name |
-
-### `CodeExecutionRequestDTO` (Folder: `DTO/CodeExecution`)
-| Field Name | Type | Validations / Modifiers | JSON Alias |
-|------------|------|-------------------------|------------|
-| `submissionId` | `UUID` | None | Same as field name |
-| `language` | `String` | None | Same as field name |
-| `sourceCode` | `String` | None | Same as field name |
-| `input` | `String` | None | Same as field name |
-| `runAllTestCases` | `boolean` | None | Same as field name |
-
-### `CodeExecutionResponseDTO` (Folder: `DTO/CodeExecution`)
-| Field Name | Type | Validations / Modifiers | JSON Alias |
-|------------|------|-------------------------|------------|
-| `status` | `String` | None | Same as field name |
-| `stdout` | `String` | None | Same as field name |
-| `stderr` | `String` | None | Same as field name |
-| `execTimeMs` | `Long` | None | Same as field name |
-| `judge0Token` | `String` | None | Same as field name |
-| `compileOutput` | `String` | None | Same as field name |
-| `totalTestCases` | `int` | None | Same as field name |
-| `passedTestCases` | `int` | None | Same as field name |
-| `testCaseResults` | `List<TestCaseResultDTO>` | None | Same as field name |
-| `memoryKb` | `Long` | None | Same as field name |
-
-### `CodeRunRequest` (Folder: `DTO/CodeExecution`)
-| Field Name | Type | Validations / Modifiers | JSON Alias |
-|------------|------|-------------------------|------------|
-| `sessionId` | `UUID` | NotNull(message = "Session id is required") | Same as field name |
-| `questionId` | `UUID` | NotNull(message = "Question id is required") | Same as field name |
-| `language` | `String` | NotBlank(message = "Language is required") | Same as field name |
-| `sourceCode` | `String` | NotBlank(message = "Source code is required") | Same as field name |
-| `input` | `String` | None | Same as field name |
-
-### `CodeRunResponseDTO` (Folder: `DTO/CodeExecution`)
-| Field Name | Type | Validations / Modifiers | JSON Alias |
-|------------|------|-------------------------|------------|
-| `testCaseId` | `UUID` | None | Same as field name |
-| `stdout` | `String` | None | Same as field name |
-| `stderr` | `String` | None | Same as field name |
-| `compileOutput` | `String` | None | Same as field name |
-| `status` | `String` | None | Same as field name |
-| `execTimeMs` | `Long` | None | Same as field name |
-| `expectedOutput` | `String` | None | Same as field name |
-
-### `CodingSubmissionResultDTO` (Folder: `DTO/CodeExecution`)
-| Field Name | Type | Validations / Modifiers | JSON Alias |
-|------------|------|-------------------------|------------|
-| `submissionId` | `UUID` | None | Same as field name |
-| `testCasesPassed` | `Integer` | None | Same as field name |
-| `testCasesTotal` | `Integer` | None | Same as field name |
-| `scoreAwarded` | `Double` | None | Same as field name |
-| `maxScore` | `Double` | None | Same as field name |
-| `execTimeMs` | `Integer` | None | Same as field name |
-| `status` | `String` | None | Same as field name |
-
-### `PlaygroundRequest` (Folder: `DTO/CodeExecution`)
-| Field Name | Type | Validations / Modifiers | JSON Alias |
-|------------|------|-------------------------|------------|
-| `language` | `String` | NotNull(message = "Question id is required"), NotBlank(message = "Language is required") | Same as field name |
-| `sourceCode` | `String` | NotBlank(message = "Source code is required") | Same as field name |
-| `input` | `String` | None | Same as field name |
-
-### `TestCaseResultDTO` (Folder: `DTO/CodeExecution`)
-| Field Name | Type | Validations / Modifiers | JSON Alias |
-|------------|------|-------------------------|------------|
-| `status` | `String` | None | Same as field name |
-| `stdout` | `String` | None | Same as field name |
-| `actualOutput` | `String` | None | Same as field name |
-| `stderr` | `String` | None | Same as field name |
-| `compileOutput` | `String` | None | Same as field name |
-| `execTimeMs` | `Long` | None | Same as field name |
-| `memoryKb` | `Integer` | None | Same as field name |
-| `passed` | `boolean` | None | Same as field name |
-| `expectedOutput` | `String` | None | Same as field name |
-| `input` | `String` | None | Same as field name |
-
-### `CreateTestCaseRequest` (Folder: `DTO/`)
-| Field Name | Type | Validations / Modifiers | JSON Alias |
-|------------|------|-------------------------|------------|
-| `input` | `String` | None | Same as field name |
-| `expectedOutput` | `String` | NotBlank(message = "Expected output is required") | Same as field name |
-| `sample` | `Boolean` | None | Same as field name |
-| `weight` | `Float` | Min(value = 0, message = "Weight must be non-negative") | Same as field name |
-| `codingQuestionId` | `UUID` | NotNull(message = "Coding question id is required") | Same as field name |
-| `explanation` | `String` | None | Same as field name |
-
-### `CreateTestDto` (Folder: `DTO/`)
-| Field Name | Type | Validations / Modifiers | JSON Alias |
-|------------|------|-------------------------|------------|
-| `createdById` | `UUID` | None | Same as field name |
-| `title` | `String` | None | Same as field name |
-| `description` | `String` | None | Same as field name |
-| `durationMins` | `int` | None | Same as field name |
-| `difficulty` | `Difficulty` | None | Same as field name |
-| `instructions` | `Map<String, Object>` | None | Same as field name |
-| `status` | `TestStatus` | None | Same as field name |
-| `passMark` | `int` | None | Same as field name |
-
-### `CreateTestQuestionDto` (Folder: `DTO/`)
-| Field Name | Type | Validations / Modifiers | JSON Alias |
-|------------|------|-------------------------|------------|
-| `testId` | `UUID` | None | Same as field name |
-| `questionId` | `UUID` | None | Same as field name |
-| `orderIndex` | `int` | None | Same as field name |
-| `marks` | `int` | None | Same as field name |
-
-### `CreateTestScheduleDto` (Folder: `DTO/`)
-| Field Name | Type | Validations / Modifiers | JSON Alias |
-|------------|------|-------------------------|------------|
-| `id` | `UUID` | None | Same as field name |
-| `testId` | `UUID` | None | Same as field name |
-| `createdById` | `UUID` | None | Same as field name |
-| `startTime` | `LocalDateTime` | None | Same as field name |
-| `endTime` | `LocalDateTime` | None | Same as field name |
-| `status` | `ScheduleStatus` | None | Same as field name |
-
-### `CreateTestScheduleRequest` (Folder: `DTO/`)
-| Field Name | Type | Validations / Modifiers | JSON Alias |
-|------------|------|-------------------------|------------|
-| `testId` | `UUID` | NotNull | Same as field name |
-| `startTime` | `LocalDateTime` | NotNull | Same as field name |
-| `endTime` | `LocalDateTime` | NotNull | Same as field name |
-| `maxCandidates` | `Integer` | None | Same as field name |
-| `status` | `ScheduleStatus` | None | Same as field name |
-
-### `CreateOrganisationRequest` (Folder: `DTO/Organisation`)
-| Field Name | Type | Validations / Modifiers | JSON Alias |
-|------------|------|-------------------------|------------|
-| `name` | `String` | NotBlank(message = "Name is required") | Same as field name |
-| `logoUrl` | `String` | None | Same as field name |
-
-### `OrganisationResponse` (Folder: `DTO/Organisation`)
-| Field Name | Type | Validations / Modifiers | JSON Alias |
-|------------|------|-------------------------|------------|
-| `id` | `UUID` | None | Same as field name |
-| `name` | `String` | None | Same as field name |
-| `logoUrl` | `String` | None | Same as field name |
-| `createdAt` | `LocalDateTime` | None | Same as field name |
-| `updatedAt` | `LocalDateTime` | None | Same as field name |
-
-### `UpdateOrganisationRequest` (Folder: `DTO/Organisation`)
-| Field Name | Type | Validations / Modifiers | JSON Alias |
-|------------|------|-------------------------|------------|
-| `name` | `String` | None | Same as field name |
-| `logoUrl` | `String` | None | Same as field name |
-
-### `PatchTestCaseRequest` (Folder: `DTO/`)
-| Field Name | Type | Validations / Modifiers | JSON Alias |
-|------------|------|-------------------------|------------|
-| `input` | `String` | None | Same as field name |
-| `expectedOutput` | `String` | None | Same as field name |
-| `sample` | `Boolean` | None | Same as field name |
-| `weight` | `Float` | Min(value = 0, message = "Weight must be non-negative") | Same as field name |
-| `codingQuestionId` | `UUID` | None | Same as field name |
-| `explanation` | `String` | None | Same as field name |
-
-### `PatchTestScheduleRequest` (Folder: `DTO/`)
-| Field Name | Type | Validations / Modifiers | JSON Alias |
-|------------|------|-------------------------|------------|
-| `testId` | `UUID` | None | Same as field name |
-| `startTime` | `LocalDateTime` | None | Same as field name |
-| `endTime` | `LocalDateTime` | None | Same as field name |
-| `maxCandidates` | `Integer` | Min(value = 1, message = "Max candidates must be at least 1") | Same as field name |
-| `status` | `ScheduleStatus` | None | Same as field name |
-
-### `CodingQuestionResponse` (Folder: `DTO/Question`)
-| Field Name | Type | Validations / Modifiers | JSON Alias |
-|------------|------|-------------------------|------------|
-| `title` | `String` | None | Same as field name |
-| `difficulty` | `String` | None | Same as field name |
-| `constraints` | `String` | None | Same as field name |
-| `memoryLimitMb` | `Integer` | None | Same as field name |
-| `timeLimitSecs` | `Integer` | None | Same as field name |
-| `sampleExplanation` | `String` | None | Same as field name |
-| `codeTemplate` | `Map<String, Object>` | None | Same as field name |
-| `examples` | `List<Map<String, Object>>` | None | Same as field name |
-| `hints` | `List<String>` | None | Same as field name |
-| `tags` | `List<String>` | None | Same as field name |
-
-### `CreateCodingQuestionRequest` (Folder: `DTO/Question`)
-| Field Name | Type | Validations / Modifiers | JSON Alias |
-|------------|------|-------------------------|------------|
-| `title` | `String` | NotBlank(message = "Title is required") | Same as field name |
-| `difficulty` | `String` | NotBlank(message = "Difficulty is required") | Same as field name |
-| `constraints` | `String` | None | Same as field name |
-| `memoryLimitMb` | `Integer` | Min(value = 1, message = "Memory limit must be at least 1 MB") | Same as field name |
-| `timeLimitSecs` | `Integer` | Min(value = 1, message = "Time limit must be at least 1 second") | Same as field name |
-| `sampleExplanation` | `String` | None | Same as field name |
-| `codeTemplate` | `Map<String, Object>` | NotNull(message = "Code template is required") | Same as field name |
-| `examples` | `List<Map<String, Object>>` | None | Same as field name |
-| `hints` | `List<String>` | None | Same as field name |
-| `tags` | `List<String>` | None | Same as field name |
-
-### `CreateMcqQuestionRequest` (Folder: `DTO/Question`)
-| Field Name | Type | Validations / Modifiers | JSON Alias |
-|------------|------|-------------------------|------------|
-| `mcqType` | `McqType` | NotNull(message = "MCQ type is required") | Same as field name |
-| `multipleCorrect` | `Boolean` | NotNull(message = "multipleCorrect is required") | Same as field name |
-| `shuffleOptions` | `Boolean` | NotNull(message = "shuffleOptions is required") | Same as field name |
-| `mcqOptions` | `List<Map<String, Object>>` | None | Same as field name |
-
-### `CreateQuestionRequest` (Folder: `DTO/Question`)
-| Field Name | Type | Validations / Modifiers | JSON Alias |
-|------------|------|-------------------------|------------|
-| `subjectId` | `UUID` | NotNull(message = "Subject is required") | Same as field name |
-| `topicId` | `UUID` | None | Same as field name |
-| `subtopicId` | `UUID` | None | Same as field name |
-| `questionType` | `QuestionType` | NotNull(message = "Question type is required") | Same as field name |
-| `prompt` | `String` | NotBlank(message = "Prompt is required") | Same as field name |
-| `marks` | `int` | Min(value = 1, message = "Marks must be at least 1") | Same as field name |
-| `visibility` | `QuestionVisibility` | NotNull(message = "Visibility is required") | Same as field name |
-
-### `McqQuestionResponse` (Folder: `DTO/Question`)
-| Field Name | Type | Validations / Modifiers | JSON Alias |
-|------------|------|-------------------------|------------|
-| `mcqType` | `McqType` | None | Same as field name |
-| `multipleCorrect` | `Boolean` | None | Same as field name |
-| `shuffleOptions` | `Boolean` | None | Same as field name |
-| `mcqOptions` | `List<Map<String, Object>>` | None | Same as field name |
-
-### `QuestionResponse` (Folder: `DTO/Question`)
-| Field Name | Type | Validations / Modifiers | JSON Alias |
-|------------|------|-------------------------|------------|
-| `id` | `UUID` | None | Same as field name |
-| `subjectId` | `UUID` | None | Same as field name |
-| `topicId` | `UUID` | None | Same as field name |
-| `subtopicId` | `UUID` | None | Same as field name |
-| `questionType` | `QuestionType` | None | Same as field name |
-| `visibility` | `QuestionVisibility` | None | Same as field name |
-| `organisationId` | `UUID` | None | Same as field name |
-| `prompt` | `String` | None | Same as field name |
-| `marks` | `int` | None | Same as field name |
-| `createdAt` | `LocalDateTime` | None | Same as field name |
-| `updatedAt` | `LocalDateTime` | None | Same as field name |
-
-### `UpdateCodingQuestionRequest` (Folder: `DTO/Question`)
-| Field Name | Type | Validations / Modifiers | JSON Alias |
-|------------|------|-------------------------|------------|
-| `title` | `String` | None | Same as field name |
-| `difficulty` | `String` | None | Same as field name |
-| `constraints` | `String` | None | Same as field name |
-| `memoryLimitMb` | `Integer` | None | Same as field name |
-| `timeLimitSecs` | `Integer` | None | Same as field name |
-| `sampleExplanation` | `String` | None | Same as field name |
-| `codeTemplate` | `Map<String, Object>` | None | Same as field name |
-| `examples` | `List<Map<String, Object>>` | None | Same as field name |
-| `hints` | `List<String>` | None | Same as field name |
-| `tags` | `List<String>` | None | Same as field name |
-
-### `UpdateMcqQuestionRequest` (Folder: `DTO/Question`)
-| Field Name | Type | Validations / Modifiers | JSON Alias |
-|------------|------|-------------------------|------------|
-| `mcqType` | `McqType` | None | Same as field name |
-| `multipleCorrect` | `Boolean` | None | Same as field name |
-| `shuffleOptions` | `Boolean` | None | Same as field name |
-| `mcqOptions` | `List<Map<String, Object>>` | None | Same as field name |
-
-### `UpdateQuestionRequest` (Folder: `DTO/Question`)
-| Field Name | Type | Validations / Modifiers | JSON Alias |
-|------------|------|-------------------------|------------|
-| `subjectId` | `UUID` | None | Same as field name |
-| `topicId` | `UUID` | None | Same as field name |
-| `subtopicId` | `UUID` | None | Same as field name |
-| `prompt` | `String` | None | Same as field name |
-| `questionType` | `QuestionType` | None | Same as field name |
-| `marks` | `Integer` | None | Same as field name |
-| `visibility` | `QuestionVisibility` | None | Same as field name |
-
-### `CreateSubjectRequest` (Folder: `DTO/Subject`)
-| Field Name | Type | Validations / Modifiers | JSON Alias |
-|------------|------|-------------------------|------------|
-| `name` | `String` | NotBlank(message = "Subject name is required") | Same as field name |
-
-### `SubjectResponse` (Folder: `DTO/Subject`)
-| Field Name | Type | Validations / Modifiers | JSON Alias |
-|------------|------|-------------------------|------------|
-| `id` | `UUID` | None | Same as field name |
-| `name` | `String` | None | Same as field name |
-| `createdAt` | `LocalDateTime` | None | Same as field name |
-| `updatedAt` | `LocalDateTime` | None | Same as field name |
-
-### `UpdateSubjectRequest` (Folder: `DTO/Subject`)
-| Field Name | Type | Validations / Modifiers | JSON Alias |
-|------------|------|-------------------------|------------|
-| `name` | `String` | None | Same as field name |
-
-### `SubmissionRequestDTO` (Folder: `DTO/Submission`)
-| Field Name | Type | Validations / Modifiers | JSON Alias |
-|------------|------|-------------------------|------------|
-| `sessionId` | `UUID` | NotNull(message = "Session id is required") | Same as field name |
-| `questionId` | `UUID` | NotNull(message = "Question id is required") | Same as field name |
-| `answerText` | `String` | None | Same as field name |
-| `selectedOptionIds` | `List<UUID>` | None | Same as field name |
-
-### `SubmissionResponseDTO` (Folder: `DTO/Submission`)
-| Field Name | Type | Validations / Modifiers | JSON Alias |
-|------------|------|-------------------------|------------|
-| `id` | `UUID` | None | Same as field name |
-| `sessionId` | `UUID` | None | Same as field name |
-| `questionId` | `UUID` | None | Same as field name |
-| `answerText` | `String` | None | Same as field name |
-| `submittedAt` | `LocalDateTime` | None | Same as field name |
-| `questionType` | `QuestionType` | None | Same as field name |
-| `status` | `SubmissionStatus` | None | Same as field name |
-
-### `TestAnswerSubmissionRequest` (Folder: `DTO/Submission`)
-| Field Name | Type | Validations / Modifiers | JSON Alias |
-|------------|------|-------------------------|------------|
-| `sessionId` | `UUID` | NotNull(message = "Session id is required") | Same as field name |
-| `questionId` | `UUID` | NotNull(message = "Question id is required") | Same as field name |
-| `selectedOptionIds` | `List<UUID>` | None | Same as field name |
-| `answerText` | `String` | None | Same as field name |
-| `sourceCode` | `String` | None | Same as field name |
-| `language` | `String` | None | Same as field name |
-
-### `CreateSubtopicRequest` (Folder: `DTO/Subtopic`)
-| Field Name | Type | Validations / Modifiers | JSON Alias |
-|------------|------|-------------------------|------------|
-| `topicId` | `UUID` | NotNull(message = "Topic is required") | Same as field name |
-| `name` | `String` | NotBlank(message = "Subtopic name is required") | Same as field name |
-
-### `SubtopicResponse` (Folder: `DTO/Subtopic`)
-| Field Name | Type | Validations / Modifiers | JSON Alias |
-|------------|------|-------------------------|------------|
-| `id` | `UUID` | None | Same as field name |
-| `topicId` | `UUID` | None | Same as field name |
-| `name` | `String` | None | Same as field name |
-| `createdAt` | `LocalDateTime` | None | Same as field name |
-| `updatedAt` | `LocalDateTime` | None | Same as field name |
-
-### `UpdateSubtopicRequest` (Folder: `DTO/Subtopic`)
-| Field Name | Type | Validations / Modifiers | JSON Alias |
-|------------|------|-------------------------|------------|
-| `topicId` | `UUID` | None | Same as field name |
-| `name` | `String` | None | Same as field name |
-
-### `TestCaseDto` (Folder: `DTO/`)
-| Field Name | Type | Validations / Modifiers | JSON Alias |
-|------------|------|-------------------------|------------|
-| `input` | `String` | None | Same as field name |
-| `expectedOutput` | `String` | None | Same as field name |
-| `sample` | `Boolean` | None | Same as field name |
-| `weight` | `Float` | None | Same as field name |
-| `codingQuestionId` | `UUID` | None | Same as field name |
-| `explanation` | `String` | None | Same as field name |
-
-### `TestCaseResponse` (Folder: `DTO/`)
-| Field Name | Type | Validations / Modifiers | JSON Alias |
-|------------|------|-------------------------|------------|
-| `id` | `UUID` | None | Same as field name |
-| `input` | `String` | None | Same as field name |
-| `expectedOutput` | `String` | None | Same as field name |
-| `sample` | `boolean` | None | Same as field name |
-| `weight` | `float` | None | Same as field name |
-| `codingQuestionId` | `UUID` | None | Same as field name |
-| `explanation` | `String` | None | Same as field name |
-
-### `BulkAddTestQuestionsRequest` (Folder: `DTO/TestQuestion`)
-| Field Name | Type | Validations / Modifiers | JSON Alias |
-|------------|------|-------------------------|------------|
-| `testId` | `UUID` | NotNull(message = "Test ID is required") | Same as field name |
-| `questionIds` | `List<UUID>` | None | Same as field name |
-| `startOrderIndex` | `Integer` | None | Same as field name |
-| `defaultMarks` | `Integer` | None | Same as field name |
-
-### `CreateTestQuestionRequest` (Folder: `DTO/TestQuestion`)
-| Field Name | Type | Validations / Modifiers | JSON Alias |
-|------------|------|-------------------------|------------|
-| `testId` | `UUID` | NotNull(message = "Test is required") | Same as field name |
-| `questionId` | `UUID` | NotNull(message = "Question is required") | Same as field name |
-| `orderIndex` | `Integer` | NotNull(message = "Order index is required") | Same as field name |
-| `marks` | `Integer` | NotNull(message = "Marks are required") | Same as field name |
-| `sectionName` | `String` | None | Same as field name |
-
-### `UpdateTestQuestionRequest` (Folder: `DTO/TestQuestion`)
-| Field Name | Type | Validations / Modifiers | JSON Alias |
-|------------|------|-------------------------|------------|
-| `testId` | `UUID` | None | Same as field name |
-| `questionId` | `UUID` | None | Same as field name |
-| `orderIndex` | `Integer` | None | Same as field name |
-| `marks` | `Integer` | None | Same as field name |
-| `sectionName` | `String` | None | Same as field name |
-
-### `CreateTestResultDTO` (Folder: `DTO/TestResult`)
-| Field Name | Type | Validations / Modifiers | JSON Alias |
-|------------|------|-------------------------|------------|
-| `sessionId` | `UUID` | None | Same as field name |
-| `candidateId` | `UUID` | None | Same as field name |
-
-### `TestResultResponse` (Folder: `DTO/TestResult`)
-| Field Name | Type | Validations / Modifiers | JSON Alias |
-|------------|------|-------------------------|------------|
-| `id` | `UUID` | None | Same as field name |
-| `testSessionId` | `UUID` | None | Same as field name |
-| `candidateId` | `UUID` | None | Same as field name |
-| `totalScore` | `double` | None | Same as field name |
-| `maxScore` | `double` | None | Same as field name |
-| `percentage` | `double` | None | Same as field name |
-| `passed` | `boolean` | None | Same as field name |
-| `evaluatedAt` | `LocalDateTime` | None | Same as field name |
-| `reportBucketLink` | `String` | None | Same as field name |
-
-### `TestScheduleResponse` (Folder: `DTO/`)
-| Field Name | Type | Validations / Modifiers | JSON Alias |
-|------------|------|-------------------------|------------|
-| `id` | `UUID` | None | Same as field name |
-| `testId` | `UUID` | None | Same as field name |
-| `createdById` | `UUID` | None | Same as field name |
-| `startTime` | `LocalDateTime` | None | Same as field name |
-| `endTime` | `LocalDateTime` | None | Same as field name |
-| `maxCandidates` | `Integer` | None | Same as field name |
-| `status` | `ScheduleStatus` | None | Same as field name |
-
-### `CreateTestSessionRequest` (Folder: `DTO/TestSession`)
-| Field Name | Type | Validations / Modifiers | JSON Alias |
-|------------|------|-------------------------|------------|
-| `testId` | `UUID` | NotNull | Same as field name |
-| `scheduleId` | `UUID` | NotNull | Same as field name |
-| `candidateId` | `UUID` | NotNull | Same as field name |
-| `ipAddress` | `String` | None | Same as field name |
-
-### `PatchTestSessionRequest` (Folder: `DTO/TestSession`)
-| Field Name | Type | Validations / Modifiers | JSON Alias |
-|------------|------|-------------------------|------------|
-| `refreshToken` | `String` | None | Same as field name |
-| `expiresAt` | `LocalDateTime` | None | Same as field name |
-| `startedAt` | `LocalDateTime` | None | Same as field name |
-| `endedAt` | `LocalDateTime` | None | Same as field name |
-| `timerRemainingSecs` | `Integer` | Min(value = 0, message = "Timer remaining seconds must be non-negative") | Same as field name |
-| `status` | `TestSessionStatus` | None | Same as field name |
-| `fullscreenViolations` | `Integer` | Min(value = 0, message = "Fullscreen violations must be non-negative") | Same as field name |
-
-### `StartTestSessionRequest` (Folder: `DTO/TestSession`)
-| Field Name | Type | Validations / Modifiers | JSON Alias |
-|------------|------|-------------------------|------------|
-| `invitationId` | `UUID` | NotNull | Same as field name |
-| `ipAddress` | `String` | None | Same as field name |
-
-### `TestSessionPaperResponse` (Folder: `DTO/TestSession`)
-| Field Name | Type | Validations / Modifiers | JSON Alias |
-|------------|------|-------------------------|------------|
-| `sessionId` | `UUID` | None | Same as field name |
-| `scheduleId` | `UUID` | None | Same as field name |
-| `testId` | `UUID` | None | Same as field name |
-| `candidateId` | `UUID` | None | Same as field name |
-| `status` | `TestSessionStatus` | None | Same as field name |
-| `startedAt` | `LocalDateTime` | None | Same as field name |
-| `endedAt` | `LocalDateTime` | None | Same as field name |
-| `timerRemainingSecs` | `Integer` | None | Same as field name |
-| `paper` | `Object` | None | Same as field name |
-
-### `TestSessionResponse` (Folder: `DTO/TestSession`)
-| Field Name | Type | Validations / Modifiers | JSON Alias |
-|------------|------|-------------------------|------------|
-| `id` | `UUID` | None | Same as field name |
-| `testId` | `UUID` | None | Same as field name |
-| `scheduleId` | `UUID` | None | Same as field name |
-| `candidateId` | `UUID` | None | Same as field name |
-| `refreshToken` | `String` | None | Same as field name |
-| `expiresAt` | `LocalDateTime` | None | Same as field name |
-| `ipAddress` | `String` | None | Same as field name |
-| `createdAt` | `LocalDateTime` | None | Same as field name |
-| `startedAt` | `LocalDateTime` | None | Same as field name |
-| `endedAt` | `LocalDateTime` | None | Same as field name |
-| `timerRemainingSecs` | `Integer` | None | Same as field name |
-| `status` | `TestSessionStatus` | None | Same as field name |
-| `fullscreenViolations` | `Integer` | None | Same as field name |
-
-### `CreateTestRequest` (Folder: `DTO/Test`)
-| Field Name | Type | Validations / Modifiers | JSON Alias |
-|------------|------|-------------------------|------------|
-| `title` | `String` | NotBlank(message = "Title is required") | Same as field name |
-| `description` | `String` | None | Same as field name |
-| `durationMins` | `Integer` | NotNull(message = "Duration is required") | Same as field name |
-| `difficulty` | `Difficulty` | None | Same as field name |
-| `instructions` | `Map<String, Object>` | None | Same as field name |
-| `status` | `TestStatus` | NotNull(message = "Status is required") | Same as field name |
-| `passMark` | `Integer` | NotNull(message = "Pass mark is required") | Same as field name |
-| `questions` | `List<TestQuestionRequest>` | None | Same as field name |
-
-### `TestQuestionDetailResponse` (Folder: `DTO/Test`)
-| Field Name | Type | Validations / Modifiers | JSON Alias |
-|------------|------|-------------------------|------------|
-| `id` | `UUID` | None | Same as field name |
-| `testId` | `UUID` | None | Same as field name |
-| `question` | `QuestionResponse` | None | Same as field name |
-| `orderIndex` | `Integer` | None | Same as field name |
-| `marks` | `Integer` | None | Same as field name |
-| `sectionName` | `String` | None | Same as field name |
-| `createdAt` | `LocalDateTime` | None | Same as field name |
-| `updatedAt` | `LocalDateTime` | None | Same as field name |
-
-### `TestQuestionRequest` (Folder: `DTO/Test`)
-| Field Name | Type | Validations / Modifiers | JSON Alias |
-|------------|------|-------------------------|------------|
-| `questionId` | `UUID` | NotNull(message = "Question is required") | Same as field name |
-| `orderIndex` | `Integer` | NotNull(message = "Order index is required") | Same as field name |
-| `marks` | `Integer` | NotNull(message = "Marks are required") | Same as field name |
-
-### `TestQuestionResponse` (Folder: `DTO/Test`)
-| Field Name | Type | Validations / Modifiers | JSON Alias |
-|------------|------|-------------------------|------------|
-| `id` | `UUID` | None | Same as field name |
-| `testId` | `UUID` | None | Same as field name |
-| `questionId` | `UUID` | None | Same as field name |
-| `orderIndex` | `Integer` | None | Same as field name |
-| `marks` | `Integer` | None | Same as field name |
-| `createdAt` | `LocalDateTime` | None | Same as field name |
-| `updatedAt` | `LocalDateTime` | None | Same as field name |
-
-### `TestResponse` (Folder: `DTO/Test`)
-| Field Name | Type | Validations / Modifiers | JSON Alias |
-|------------|------|-------------------------|------------|
-| `id` | `UUID` | None | Same as field name |
-| `createdById` | `UUID` | None | Same as field name |
-| `title` | `String` | None | Same as field name |
-| `description` | `String` | None | Same as field name |
-| `durationMins` | `Integer` | None | Same as field name |
-| `difficulty` | `Difficulty` | None | Same as field name |
-| `instructions` | `Map<String, Object>` | None | Same as field name |
-| `status` | `TestStatus` | None | Same as field name |
-| `passMark` | `Integer` | None | Same as field name |
-| `questions` | `List<TestQuestionResponse>` | None | Same as field name |
-| `createdAt` | `LocalDateTime` | None | Same as field name |
-| `updatedAt` | `LocalDateTime` | None | Same as field name |
-| `isActive` | `Boolean` | None | Same as field name |
-| `organisationId` | `UUID` | None | Same as field name |
-
-### `UpdateTestRequest` (Folder: `DTO/Test`)
-| Field Name | Type | Validations / Modifiers | JSON Alias |
-|------------|------|-------------------------|------------|
-| `title` | `String` | None | Same as field name |
-| `description` | `String` | None | Same as field name |
-| `durationMins` | `Integer` | None | Same as field name |
-| `difficulty` | `Difficulty` | None | Same as field name |
-| `instructions` | `Map<String, Object>` | None | Same as field name |
-| `status` | `TestStatus` | None | Same as field name |
-| `passMark` | `Integer` | None | Same as field name |
-| `questions` | `List<TestQuestionRequest>` | None | Same as field name |
-
-### `CreateTopicRequest` (Folder: `DTO/Topic`)
-| Field Name | Type | Validations / Modifiers | JSON Alias |
-|------------|------|-------------------------|------------|
-| `subjectId` | `UUID` | NotNull(message = "Subject is required") | Same as field name |
-| `name` | `String` | NotBlank(message = "Topic name is required") | Same as field name |
-
-### `TopicResponse` (Folder: `DTO/Topic`)
-| Field Name | Type | Validations / Modifiers | JSON Alias |
-|------------|------|-------------------------|------------|
-| `id` | `UUID` | None | Same as field name |
-| `subjectId` | `UUID` | None | Same as field name |
-| `name` | `String` | None | Same as field name |
-| `createdAt` | `LocalDateTime` | None | Same as field name |
-| `updatedAt` | `LocalDateTime` | None | Same as field name |
-
-### `UpdateTopicRequest` (Folder: `DTO/Topic`)
-| Field Name | Type | Validations / Modifiers | JSON Alias |
-|------------|------|-------------------------|------------|
-| `subjectId` | `UUID` | None | Same as field name |
-| `name` | `String` | None | Same as field name |
-
-### `UpdateTestDto` (Folder: `DTO/`)
-| Field Name | Type | Validations / Modifiers | JSON Alias |
-|------------|------|-------------------------|------------|
-| `title` | `String` | None | Same as field name |
-| `description` | `String` | None | Same as field name |
-| `durationMins` | `Integer` | None | Same as field name |
-| `difficulty` | `Difficulty` | None | Same as field name |
-| `instructions` | `Map<String, Object>` | None | Same as field name |
-| `status` | `TestStatus` | None | Same as field name |
-| `passMark` | `Integer` | None | Same as field name |
-
-### `CreateUserRequest` (Folder: `DTO/User`)
-| Field Name | Type | Validations / Modifiers | JSON Alias |
-|------------|------|-------------------------|------------|
-| `name` | `String` | NotBlank(message = "Name is required") | Same as field name |
-| `email` | `String` | NotBlank(message = "Email is required"), Email(message = "Invalid email format") | Same as field name |
-| `password` | `String` | NotBlank(message = "Password is required"), Size(min = 8, message = "Password must be at least 8 characters") | Same as field name |
-| `phoneNumber` | `String` | None | Same as field name |
-| `organisationId` | `UUID` | NotNull(message = "Organisation ID is required") | `organisation_id` |
-
-### `UpdateUserRequest` (Folder: `DTO/User`)
-| Field Name | Type | Validations / Modifiers | JSON Alias |
-|------------|------|-------------------------|------------|
-| `name` | `String` | NotBlank(message = "Name is required") | Same as field name |
-| `email` | `String` | NotBlank(message = "Email is required"), Email(message = "Invalid email format") | Same as field name |
-| `password` | `String` | NotBlank(message = "Password is required"), Size(min = 8, message = "Password must be at least 8 characters") | Same as field name |
-| `phoneNumber` | `String` | NotBlank | Same as field name |
-
-### `UpdateUserRequestPatch` (Folder: `DTO/User`)
-| Field Name | Type | Validations / Modifiers | JSON Alias |
-|------------|------|-------------------------|------------|
-| `name` | `String` | None | Same as field name |
-| `email` | `String` | Email(message = "Invalid email format") | Same as field name |
-| `password` | `String` | Size(min = 8, message = "Password must be at least 8 characters") | Same as field name |
-| `phoneNumber` | `String` | None | Same as field name |
-
-### `UserResponse` (Folder: `DTO/User`)
-| Field Name | Type | Validations / Modifiers | JSON Alias |
-|------------|------|-------------------------|------------|
-| `id` | `UUID` | None | Same as field name |
-| `name` | `String` | None | Same as field name |
-| `email` | `String` | None | Same as field name |
-| `phoneNumber` | `String` | None | Same as field name |
-| `role` | `Role` | None | Same as field name |
-| `organisation` | `OrganisationData` | None | Same as field name |
-| `createdAt` | `LocalDateTime` | None | Same as field name |
-| `updatedAt` | `LocalDateTime` | None | Same as field name |
-
-#### Inner Class: `UserResponse.OrganisationData`
-| Field Name | Type | Validations / Modifiers |
-|------------|------|-------------------------|
-| `id` | `UUID` | None |
-| `name` | `String` | None |
-
-## 5. Database Schema & JPA Entity Mapping
-This section contains the database tables, schema structures, primary keys, nullability rules, and cross-table relationships mapped in Hibernate.
-
-### Entity: `BaseEntity` (Table: `baseentity`)
-| Field (Java) | DB Column Name | Data Type | Nullable | Primary Key | Relationship |
-|--------------|----------------|-----------|----------|-------------|--------------|
-| `createdAt` | `createdAt` | `LocalDateTime` | Yes | No | None |
-| `updatedAt` | `updatedAt` | `LocalDateTime` | Yes | No | None |
-
-### Entity: `Candidate` (Table: `candidates`)
-| Field (Java) | DB Column Name | Data Type | Nullable | Primary Key | Relationship |
-|--------------|----------------|-----------|----------|-------------|--------------|
-| `id` | `id` | `UUID` | Yes | **YES** | None |
-| `user` | `user` | `User` | Yes | No | `OneToOne(fetch = FetchType.LAZY, optional = false)` |
-| `organisation` | `organisation` | `Organisation` | Yes | No | `ManyToOne(fetch = FetchType.LAZY, optional = false)` |
-| `extraFields` | `extra_fields` | `Map<String, Object>` | Yes | No | None |
-| `isStale` | `is_stale` | `boolean` | Yes | No | None |
-| `lastUpdated` | `last_updated` | `LocalDateTime` | Yes | No | None |
-
-### Entity: `CandidateInvitation` (Table: `candidate_invitations`)
-| Field (Java) | DB Column Name | Data Type | Nullable | Primary Key | Relationship |
-|--------------|----------------|-----------|----------|-------------|--------------|
-| `id` | `id` | `UUID` | Yes | **YES** | None |
-| `schedule` | `schedule` | `TestSchedule` | Yes | No | `ManyToOne(fetch = FetchType.LAZY, optional = false)` |
-| `candidate` | `candidate` | `Candidate` | Yes | No | `ManyToOne(fetch = FetchType.LAZY, optional = false)` |
-| `token` | `token` | `String` | No | No | None |
-| `status` | `status` | `InvitationStatus` | No | No | None |
-| `sentAt` | `sent_at` | `LocalDateTime` | Yes | No | None |
-
-### Entity: `CodeExecutionRun` (Table: `code_execution_runs`)
-| Field (Java) | DB Column Name | Data Type | Nullable | Primary Key | Relationship |
-|--------------|----------------|-----------|----------|-------------|--------------|
-| `id` | `id` | `UUID` | Yes | **YES** | None |
-| `question` | `question` | `Question` | Yes | No | `ManyToOne(optional = false)` |
-| `session` | `session` | `TestSession` | Yes | No | `ManyToOne(optional = false)` |
-| `testCase` | `testCase` | `TestCases` | Yes | No | `ManyToOne(optional = false)` |
-| `submission` | `submission` | `Submission` | Yes | No | `ManyToOne(optional = false)` |
-| `sourceCode` | `source_code` | `String` | Yes | No | None |
-| `language` | `language` | `String` | Yes | No | None |
-| `judge0Token` | `judge0_token` | `String` | Yes | No | None |
-| `status` | `status` | `CodeRunStatus` | Yes | No | None |
-| `stdout` | `stdout` | `String` | Yes | No | None |
-| `stderr` | `stderr` | `String` | Yes | No | None |
-| `compileOutput` | `compile_output` | `String` | Yes | No | None |
-| `execTimeMs` | `exec_time_ms` | `Long` | Yes | No | None |
-| `createdAt` | `created_at` | `LocalDateTime` | Yes | No | None |
-
-### Entity: `CodingQuestion` (Table: `coding_questions`)
-| Field (Java) | DB Column Name | Data Type | Nullable | Primary Key | Relationship |
-|--------------|----------------|-----------|----------|-------------|--------------|
-| `questionId` | `question_id` | `UUID` | Yes | **YES** | None |
-| `question` | `question` | `Question` | Yes | No | `OneToOne(fetch = FetchType.LAZY, optional = false)` |
-| `title` | `title` | `String` | No | No | None |
-| `difficulty` | `difficulty` | `Difficulty` | Yes | No | None |
-| `codeTemplates` | `code_templates` | `Map<String, Object>` | Yes | No | None |
-| `constraints` | `constraints` | `String` | Yes | No | None |
-| `memoryLimitMB` | `memory_limit_mb` | `Integer` | Yes | No | None |
-| `timeLimitSecs` | `time_limit_secs` | `Integer` | Yes | No | None |
-| `sampleExplanation` | `sample_explanation` | `String` | Yes | No | None |
-| `examples` | `examples` | `Map<String, Object>` | Yes | No | None |
-| `hints` | `hints` | `Map<String, Object>` | Yes | No | None |
-| `tags` | `tags` | `List<String>` | Yes | No | None |
-| `testCases` | `testCases` | `List<TestCases>` | Yes | No | `OneToMany(mappedBy = "codingQuestion", cascade = CascadeType.ALL, orphanRemoval = true)` |
-
-### Entity: `CodingSubmissionResult` (Table: `coding_submission_result`)
-| Field (Java) | DB Column Name | Data Type | Nullable | Primary Key | Relationship |
-|--------------|----------------|-----------|----------|-------------|--------------|
-| `id` | `id` | `UUID` | Yes | **YES** | None |
-| `submission` | `submission` | `Submission` | Yes | No | `OneToOne` |
-| `testCasesPassed` | `test_cases_passed` | `Integer` | Yes | No | None |
-| `testCasesTotal` | `test_cases_total` | `Integer` | Yes | No | None |
-| `scoreAwarded` | `score_awarded` | `Double` | Yes | No | None |
-| `maxScore` | `max_score` | `Double` | Yes | No | None |
-| `execTimeMs` | `exec_time_ms` | `Integer` | Yes | No | None |
-| `status` | `status` | `CodingSubmissionStatus` | Yes | No | None |
-| `judge0Tokens` | `judge0_tokens` | `List<String>` | Yes | No | None |
-| `createdAt` | `created_at` | `LocalDateTime` | Yes | No | None |
-
-### Entity: `DeadLetterQueueRecord` (Table: `dead_letter_queue`)
-| Field (Java) | DB Column Name | Data Type | Nullable | Primary Key | Relationship |
-|--------------|----------------|-----------|----------|-------------|--------------|
-| `id` | `id` | `UUID` | Yes | **YES** | None |
-| `submission` | `submission` | `Submission` | Yes | No | `OneToOne(fetch = FetchType.LAZY, optional = false)` |
-| `failureReason` | `failure_reason` | `String` | Yes | No | None |
-| `errorDetails` | `error_details` | `String` | Yes | No | None |
-| `attemptCount` | `attempt_count` | `int` | No | No | None |
-| `failedAt` | `failed_at` | `LocalDateTime` | No | No | None |
-
-### Entity: `FailedExecutionRecord` (Table: `failed_execution_records`)
-| Field (Java) | DB Column Name | Data Type | Nullable | Primary Key | Relationship |
-|--------------|----------------|-----------|----------|-------------|--------------|
-| `id` | `id` | `UUID` | Yes | **YES** | None |
-| `submission` | `submission` | `Submission` | Yes | No | `OneToOne(fetch = FetchType.LAZY, optional = false)` |
-| `attemptCount` | `attempt_count` | `int` | No | No | None |
-| `lastError` | `last_error` | `String` | Yes | No | None |
-| `lastAttemptedAt` | `last_attempted_at` | `LocalDateTime` | Yes | No | None |
-| `createdAt` | `created_at` | `LocalDateTime` | Yes | No | None |
-
-### Entity: `Judge0Pending` (Table: `judge0_pending`)
-| Field (Java) | DB Column Name | Data Type | Nullable | Primary Key | Relationship |
-|--------------|----------------|-----------|----------|-------------|--------------|
-| `id` | `id` | `UUID` | Yes | **YES** | None |
-| `submission` | `submission` | `Submission` | Yes | No | `ManyToOne(fetch = FetchType.LAZY)` |
-| `token` | `token` | `String` | No | No | None |
-| `status` | `status` | `Judge0PendingStatus` | No | No | None |
-| `retryCount` | `retry_count` | `int` | No | No | None |
-| `maxRetries` | `max_retries` | `int` | No | No | None |
-| `createdAt` | `created_at` | `LocalDateTime` | No | No | None |
-| `nextPollAt` | `next_poll_at` | `LocalDateTime` | No | No | None |
-| `lastError` | `last_error` | `String` | Yes | No | None |
-| `callbackUrl` | `callback_url` | `String` | Yes | No | None |
-
-### Entity: `LogEntity` (Table: `logentity`)
-| Field (Java) | DB Column Name | Data Type | Nullable | Primary Key | Relationship |
-|--------------|----------------|-----------|----------|-------------|--------------|
-| `id` | `id` | `UUID` | Yes | No | None |
-| `level` | `level` | `String` | Yes | No | None |
-| `message` | `message` | `String` | Yes | No | None |
-| `timestamp` | `timestamp` | `LocalDateTime` | Yes | No | None |
-
-### Entity: `McqOption` (Table: `mcqoption`)
-| Field (Java) | DB Column Name | Data Type | Nullable | Primary Key | Relationship |
-|--------------|----------------|-----------|----------|-------------|--------------|
-| `id` | `id` | `UUID` | Yes | No | None |
-| `text` | `text` | `String` | Yes | No | None |
-| `isCorrect` | `isCorrect` | `Boolean` | Yes | No | None |
-| `imageUrl` | `imageUrl` | `String` | Yes | No | None |
-| `displayOrder` | `displayOrder` | `Integer` | Yes | No | None |
-
-### Entity: `McqQuestion` (Table: `mcq_questions`)
-| Field (Java) | DB Column Name | Data Type | Nullable | Primary Key | Relationship |
-|--------------|----------------|-----------|----------|-------------|--------------|
-| `questionId` | `questionId` | `UUID` | Yes | **YES** | None |
-| `question` | `question` | `Question` | Yes | No | `OneToOne(fetch = FetchType.LAZY, optional = false)` |
-| `mcqType` | `mcqType` | `McqType` | No | No | None |
-| `multipleCorrect` | `multipleCorrect` | `Boolean` | No | No | None |
-| `shuffleOptions` | `shuffleOptions` | `Boolean` | No | No | None |
-| `metadata` | `metadata` | `Map<String, Object>` | Yes | No | None |
-| `options` | `options` | `List<McqOption>` | Yes | No | None |
-
-### Entity: `Organisation` (Table: `organisations`)
-| Field (Java) | DB Column Name | Data Type | Nullable | Primary Key | Relationship |
-|--------------|----------------|-----------|----------|-------------|--------------|
-| `id` | `id` | `UUID` | Yes | **YES** | None |
-| `name` | `name` | `String` | No | No | None |
-| `logoUrl` | `logoUrl` | `String` | Yes | No | None |
-
-### Entity: `Question` (Table: `questions`)
-| Field (Java) | DB Column Name | Data Type | Nullable | Primary Key | Relationship |
-|--------------|----------------|-----------|----------|-------------|--------------|
-| `id` | `id` | `UUID` | Yes | **YES** | None |
-| `version` | `version` | `Long` | No | No | None |
-| `type` | `type` | `QuestionType` | No | No | None |
-| `prompt` | `prompt` | `String` | No | No | None |
-| `marks` | `marks` | `Integer` | No | No | None |
-| `visibility` | `visibility` | `QuestionVisibility` | No | No | None |
-| `organisation` | `organisation` | `Organisation` | Yes | No | `ManyToOne(fetch = FetchType.LAZY, optional = false)` |
-| `subject` | `subject` | `Subjects` | Yes | No | `ManyToOne(fetch = FetchType.LAZY, optional = false)` |
-| `topic` | `topic` | `Topics` | Yes | No | `ManyToOne(fetch = FetchType.LAZY)` |
-| `subtopic` | `subtopic` | `Subtopics` | Yes | No | `ManyToOne(fetch = FetchType.LAZY)` |
-| `codingQuestion` | `codingQuestion` | `CodingQuestion` | Yes | No | `OneToOne(mappedBy = "question", cascade = CascadeType.ALL)` |
-| `mcqQuestion` | `mcqQuestion` | `McqQuestion` | Yes | No | `OneToOne(mappedBy = "question", cascade = CascadeType.ALL)` |
-
-### Entity: `QuestionScore` (Table: `question_scores`)
-| Field (Java) | DB Column Name | Data Type | Nullable | Primary Key | Relationship |
-|--------------|----------------|-----------|----------|-------------|--------------|
-| `id` | `id` | `UUID` | Yes | **YES** | None |
-| `submission` | `submission` | `Submission` | Yes | No | `OneToOne(optional = false)` |
-| `scoreAwarded` | `score_awarded` | `Float` | No | No | None |
-| `maxScore` | `max_score` | `Float` | No | No | None |
-| `autoGraded` | `auto_graded` | `Boolean` | No | No | None |
-
-### Entity: `QuestionVersion` (Table: `question_versions`)
-| Field (Java) | DB Column Name | Data Type | Nullable | Primary Key | Relationship |
-|--------------|----------------|-----------|----------|-------------|--------------|
-| `id` | `id` | `UUID` | Yes | **YES** | None |
-| `question` | `question` | `Question` | Yes | No | `ManyToOne(fetch = FetchType.LAZY, optional = false)` |
-| `version` | `version` | `int` | No | No | None |
-| `prompt` | `prompt` | `String` | No | No | None |
-| `marks` | `marks` | `int` | No | No | None |
-| `questionType` | `question_type` | `String` | No | No | None |
-| `payload` | `payload` | `JsonNode` | No | No | None |
-| `createdBy` | `createdBy` | `User` | Yes | No | `ManyToOne(fetch = FetchType.LAZY)` |
-| `createdAt` | `created_at` | `LocalDateTime` | No | No | None |
-
-### Entity: `Subjects` (Table: `subjects`)
-| Field (Java) | DB Column Name | Data Type | Nullable | Primary Key | Relationship |
-|--------------|----------------|-----------|----------|-------------|--------------|
-| `id` | `id` | `UUID` | Yes | **YES** | None |
-| `name` | `name` | `String` | No | No | None |
-| `topics` | `topics` | `List<Topics>` | Yes | No | `OneToMany(mappedBy = "subject", cascade = CascadeType.ALL)` |
-| `questions` | `questions` | `List<Question>` | Yes | No | `OneToMany(mappedBy = "subject", cascade = CascadeType.ALL)` |
-
-### Entity: `Submission` (Table: `submissions`)
-| Field (Java) | DB Column Name | Data Type | Nullable | Primary Key | Relationship |
-|--------------|----------------|-----------|----------|-------------|--------------|
-| `id` | `id` | `UUID` | Yes | **YES** | None |
-| `version` | `version` | `Long` | No | No | None |
-| `session` | `session` | `TestSession` | Yes | No | `ManyToOne(fetch = FetchType.LAZY, optional = false)` |
-| `question` | `question` | `Question` | Yes | No | `ManyToOne(fetch = FetchType.LAZY, optional = false)` |
-| `answerText` | `answerText` | `String` | Yes | No | None |
-| `submittedAt` | `submitted_at` | `LocalDateTime` | No | No | None |
-| `questionType` | `question_type` | `QuestionType` | No | No | None |
-| `status` | `status` | `SubmissionStatus` | No | No | None |
-| `gradingLanguage` | `grading_language` | `String` | Yes | No | None |
-| `gradingAttemptCount` | `grading_attempt_count` | `int` | No | No | None |
-| `questionVersion` | `questionVersion` | `QuestionVersion` | Yes | No | `ManyToOne(fetch = FetchType.LAZY)` |
-
-### Entity: `Subtopics` (Table: `subtopics`)
-| Field (Java) | DB Column Name | Data Type | Nullable | Primary Key | Relationship |
-|--------------|----------------|-----------|----------|-------------|--------------|
-| `id` | `id` | `UUID` | Yes | **YES** | None |
-| `name` | `name` | `String` | No | No | None |
-| `topic` | `topic` | `Topics` | Yes | No | `ManyToOne` |
-
-### Entity: `TestCases` (Table: `test_cases`)
-| Field (Java) | DB Column Name | Data Type | Nullable | Primary Key | Relationship |
-|--------------|----------------|-----------|----------|-------------|--------------|
-| `id` | `id` | `UUID` | Yes | **YES** | None |
-| `input` | `input` | `String` | Yes | No | None |
-| `expectedOutput` | `expected_output` | `String` | No | No | None |
-| `isSample` | `is_sample` | `boolean` | Yes | No | None |
-| `weight` | `weight` | `double` | Yes | No | None |
-| `explanation` | `explanation` | `String` | Yes | No | None |
-| `codingQuestion` | `codingQuestion` | `CodingQuestion` | Yes | No | `ManyToOne(fetch = FetchType.LAZY, optional = false)` |
-
-### Entity: `TestQuestions` (Table: `testquestions`)
-| Field (Java) | DB Column Name | Data Type | Nullable | Primary Key | Relationship |
-|--------------|----------------|-----------|----------|-------------|--------------|
-| `id` | `id` | `UUID` | Yes | **YES** | None |
-| `test` | `test` | `Tests` | Yes | No | `ManyToOne(fetch = FetchType.LAZY, optional = false)` |
-| `question` | `question` | `Question` | Yes | No | `ManyToOne(fetch = FetchType.LAZY, optional = false)` |
-| `orderIndex` | `order_index` | `int` | No | No | None |
-| `marks` | `marks` | `int` | No | No | None |
-| `sectionName` | `section_name` | `String` | Yes | No | None |
-
-### Entity: `TestResult` (Table: `testresult`)
-| Field (Java) | DB Column Name | Data Type | Nullable | Primary Key | Relationship |
-|--------------|----------------|-----------|----------|-------------|--------------|
-| `id` | `id` | `UUID` | Yes | **YES** | None |
-| `version` | `version` | `Long` | No | No | None |
-| `testSession` | `testSession` | `TestSession` | Yes | No | `OneToOne(fetch = FetchType.LAZY, optional = false)` |
-| `candidate` | `candidate` | `Candidate` | Yes | No | `ManyToOne(fetch = FetchType.LAZY, optional = false)` |
-| `totalScore` | `total_score` | `double` | No | No | None |
-| `maxScore` | `max_score` | `double` | No | No | None |
-| `percentage` | `percentage` | `double` | No | No | None |
-| `passed` | `is_passed` | `boolean` | No | No | None |
-| `evaluatedAt` | `evaluated_at` | `LocalDateTime` | No | No | None |
-| `reportBucketLink` | `report_bucket_link` | `String` | Yes | No | None |
-
-### Entity: `TestSchedule` (Table: `test_schedules`)
-| Field (Java) | DB Column Name | Data Type | Nullable | Primary Key | Relationship |
-|--------------|----------------|-----------|----------|-------------|--------------|
-| `id` | `id` | `UUID` | Yes | **YES** | None |
-| `test` | `test` | `Tests` | Yes | No | `ManyToOne(fetch = FetchType.LAZY, optional = false)` |
-| `createdBy` | `createdBy` | `User` | Yes | No | `ManyToOne(fetch = FetchType.LAZY, optional = false)` |
-| `organisation` | `organisation` | `Organisation` | Yes | No | `ManyToOne(fetch = FetchType.LAZY, optional = false)` |
-| `startTime` | `start_time` | `LocalDateTime` | No | No | None |
-| `endTime` | `end_time` | `LocalDateTime` | No | No | None |
-| `maxCandidates` | `max_candidates` | `Integer` | Yes | No | None |
-| `status` | `status` | `ScheduleStatus` | No | No | None |
-
-### Entity: `TestSession` (Table: `test_sessions`)
-| Field (Java) | DB Column Name | Data Type | Nullable | Primary Key | Relationship |
-|--------------|----------------|-----------|----------|-------------|--------------|
-| `id` | `id` | `UUID` | Yes | **YES** | None |
-| `test` | `test` | `Tests` | Yes | No | `ManyToOne(fetch = FetchType.LAZY, optional = false)` |
-| `schedule` | `schedule` | `TestSchedule` | Yes | No | `ManyToOne(fetch = FetchType.LAZY, optional = false)` |
-| `candidate` | `candidate` | `Candidate` | Yes | No | `ManyToOne(fetch = FetchType.LAZY, optional = false)` |
-| `refreshToken` | `refresh_token` | `String` | Yes | No | None |
-| `expiresAt` | `expires_at` | `LocalDateTime` | Yes | No | None |
-| `ipAddress` | `ip_address` | `String` | Yes | No | None |
-| `startedAt` | `started_at` | `LocalDateTime` | Yes | No | None |
-| `endedAt` | `ended_at` | `LocalDateTime` | Yes | No | None |
-| `timerRemainingSecs` | `timer_remaining_secs` | `Integer` | Yes | No | None |
-| `status` | `status` | `TestSessionStatus` | No | No | None |
-| `fullscreenViolations` | `fullscreen_violations` | `Integer` | Yes | No | None |
-| `submissions` | `submissions` | `List<Submission>` | Yes | No | `OneToMany(mappedBy = "session")` |
-
-### Entity: `TestSnapshot` (Table: `testsnapshot`)
-| Field (Java) | DB Column Name | Data Type | Nullable | Primary Key | Relationship |
-|--------------|----------------|-----------|----------|-------------|--------------|
-| `id` | `id` | `UUID` | Yes | **YES** | None |
-| `schedule` | `schedule` | `TestSchedule` | Yes | No | `OneToOne(fetch = FetchType.LAZY, optional = false)` |
-| `test` | `test` | `Tests` | Yes | No | `ManyToOne(fetch = FetchType.LAZY, optional = false)` |
-| `lockedAt` | `locked_at` | `LocalDateTime` | No | No | None |
-| `payload` | `payload` | `JsonNode` | No | No | None |
-
-### Entity: `Tests` (Table: `tests`)
-| Field (Java) | DB Column Name | Data Type | Nullable | Primary Key | Relationship |
-|--------------|----------------|-----------|----------|-------------|--------------|
-| `id` | `id` | `UUID` | Yes | **YES** | None |
-| `createdBy` | `createdBy` | `User` | Yes | No | `ManyToOne(fetch = FetchType.LAZY, optional = false)` |
-| `organisation` | `organisation` | `Organisation` | Yes | No | `ManyToOne(fetch = FetchType.LAZY, optional = false)` |
-| `title` | `title` | `String` | No | No | None |
-| `description` | `description` | `String` | Yes | No | None |
-| `durationMins` | `duration_mins` | `int` | No | No | None |
-| `difficulty` | `difficulty` | `Difficulty` | Yes | No | None |
-| `instructions` | `instructions` | `Map<String, Object>` | Yes | No | None |
-| `status` | `status` | `TestStatus` | No | No | None |
-| `passMark` | `pass_mark` | `int` | No | No | None |
-| `testQuestions` | `testQuestions` | `List<TestQuestions>` | Yes | No | `OneToMany(mappedBy = "test", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)` |
-| `isActive` | `is_active` | `Boolean` | Yes | No | None |
-
-### Entity: `Topics` (Table: `topics`)
-| Field (Java) | DB Column Name | Data Type | Nullable | Primary Key | Relationship |
-|--------------|----------------|-----------|----------|-------------|--------------|
-| `id` | `id` | `UUID` | Yes | **YES** | None |
-| `name` | `name` | `String` | No | No | None |
-| `subject` | `subject` | `Subjects` | Yes | No | `ManyToOne` |
-| `questions` | `questions` | `List<Question>` | Yes | No | `OneToMany(mappedBy = "topic", cascade = CascadeType.ALL)` |
-
-### Entity: `User` (Table: `user`)
-| Field (Java) | DB Column Name | Data Type | Nullable | Primary Key | Relationship |
-|--------------|----------------|-----------|----------|-------------|--------------|
-| `id` | `id` | `UUID` | Yes | **YES** | None |
-| `name` | `name` | `String` | No | No | None |
-| `email` | `email` | `String` | No | No | None |
-| `role` | `role` | `Role` | No | No | None |
-| `phoneNumber` | `phone_number` | `String` | Yes | No | None |
-| `passwordHash` | `password_hash` | `String` | No | No | None |
-| `passwordProvider` | `password_provider` | `PasswordProvider` | No | No | None |
-| `organisation` | `organisation` | `Organisation` | Yes | No | `ManyToOne(fetch = FetchType.LAZY, optional = false)` |
+}
+```
+
+### Validate Invitation
+
+```json
+{
+  "id": "22222222-2222-2222-2222-222222222222",
+  "token": "invitation-token-from-link"
+}
+```
+
+### Start Candidate Session
+
+```json
+{
+  "invitationId": "22222222-2222-2222-2222-222222222222",
+  "ipAddress": "203.0.113.10"
+}
+```
+
+### Create MCQ Question
+
+```json
+{
+  "subject_id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+  "topic_id": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+  "subtopic_id": "cccccccc-cccc-cccc-cccc-cccccccccccc",
+  "questionType": "MCQ",
+  "prompt": "Which values are prime?",
+  "marks": 2,
+  "difficulty": "EASY",
+  "visibility": "ORG_OWNED",
+  "mcqType": "MULTIPLE_CORRECT",
+  "multipleCorrect": true,
+  "shuffleOptions": true,
+  "mcqOptions": [
+    {
+      "text": "2",
+      "isCorrect": true,
+      "displayOrder": 1
+    },
+    {
+      "text": "4",
+      "isCorrect": false,
+      "displayOrder": 2
+    }
+  ]
+}
+```
+
+### Create Coding Question
+
+```json
+{
+  "subject_id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+  "topic_id": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+  "subtopic_id": "cccccccc-cccc-cccc-cccc-cccccccccccc",
+  "questionType": "CODING",
+  "prompt": "Write a function that adds two integers.",
+  "marks": 10,
+  "difficulty": "EASY",
+  "visibility": "ORG_OWNED",
+  "title": "Add Two Numbers",
+  "constraints": "Inputs are integers.",
+  "memoryLimitMb": 128,
+  "timeLimitSecs": 2,
+  "sampleExplanation": "Return the sum.",
+  "codeTemplate": {
+    "java": "class Main { public static void main(String[] args) { } }"
+  },
+  "examples": [
+    {
+      "input": "2 3",
+      "output": "5"
+    }
+  ],
+  "hints": ["Read from stdin"],
+  "tags": ["math", "warmup"]
+}
+```
+
+### Create Test With Inline Questions
+
+```json
+{
+  "title": "Java Basics Assessment",
+  "description": "MCQ plus coding screening test",
+  "durationMins": 60,
+  "difficulty": "MEDIUM",
+  "instructions": {
+    "allowTabSwitch": false,
+    "showTimer": true
+  },
+  "status": "DRAFT",
+  "passMark": 40,
+  "questions": [
+    {
+      "questionId": "dddddddd-dddd-dddd-dddd-dddddddddddd",
+      "orderIndex": 0,
+      "marks": 5
+    }
+  ]
+}
+```
+
+### Schedule Test
+
+```json
+{
+  "testId": "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee",
+  "startTime": "2026-06-10T09:00:00",
+  "endTime": "2026-06-10T11:00:00",
+  "maxCandidates": 100,
+  "status": "SCHEDULED"
+}
+```
+
+### Submit MCQ Answer
+
+```json
+{
+  "sessionId": "ffffffff-ffff-ffff-ffff-ffffffffffff",
+  "questionId": "dddddddd-dddd-dddd-dddd-dddddddddddd",
+  "selectedOptionIds": [
+    "99999999-9999-9999-9999-999999999999"
+  ]
+}
+```
+
+### Run Coding Question
+
+```json
+{
+  "sessionId": "ffffffff-ffff-ffff-ffff-ffffffffffff",
+  "questionId": "88888888-8888-8888-8888-888888888888",
+  "language": "java",
+  "sourceCode": "class Main { public static void main(String[] args) { System.out.println(5); } }",
+  "input": "2 3"
+}
+```
+
+### Submit Coding Question
+
+```http
+POST /api/code/execute/submit
+```
+
+```json
+{
+  "sessionId": "ffffffff-ffff-ffff-ffff-ffffffffffff",
+  "questionId": "88888888-8888-8888-8888-888888888888",
+  "language": "java",
+  "sourceCode": "class Main { public static void main(String[] args) { System.out.println(5); } }"
+}
+```
+
+Response `data` is the submission ID:
+
+```json
+{
+  "success": true,
+  "status": 200,
+  "message": "Request completed successfully",
+  "data": "77777777-7777-7777-7777-777777777777"
+}
+```
+
+Then poll:
+
+```http
+GET /api/code/execute/submit/77777777-7777-7777-7777-777777777777/result
+```
+
+### Calculate Result
+
+```json
+{
+  "sessionId": "ffffffff-ffff-ffff-ffff-ffffffffffff",
+  "candidateId": "66666666-6666-6666-6666-666666666666"
+}
+```
+
+If result is not ready:
+
+```json
+{
+  "success": true,
+  "status": 202,
+  "message": "Test result not yet available. Grading may still be in progress.",
+  "data": null
+}
+```
+
+## 6. Recommended Frontend Flows
+
+### Admin Setup Flow
+
+1. Login as admin/superadmin.
+2. Create taxonomy: subjects, topics, subtopics.
+3. Create questions.
+4. Create tests and link questions.
+5. Create test schedule.
+6. Create/import candidates.
+7. Create candidate invitations.
+
+### Candidate Test Flow
+
+1. Candidate opens invite link containing invitation id and token.
+2. Frontend calls `POST /candidate-invitations/validate`.
+3. Store returned candidate `accessToken`.
+4. Call `POST /test-sessions/start`.
+5. Call `GET /test-sessions/{id}/paper`.
+6. For MCQ answers call `POST /submissions`.
+7. For coding:
+   - call `POST /api/code/execute/run` for quick run,
+   - call `POST /api/code/execute/submit` for final coding submission,
+   - poll `GET /api/code/execute/submit/{submissionId}/result`.
+8. Call `POST /test-sessions/{id}/submit`.
+9. Poll `GET /test-results/session/{sessionId}` until status is `200`.
+10. Optionally open/download `GET /test-results/session/{sessionId}/scorecard`.
+
+### Result Polling Behavior
+
+Treat `202` with `data: null` as "not ready yet":
+
+- `POST /test-results`
+- `GET /test-results/session/{sessionId}`
+- `GET /api/code/execute/submit/{submissionId}/result`
+
+## 7. Frontend Integration Warnings
+
+- Use `organisation_id`, `subject_id`, `topic_id`, and `subtopic_id` where DTOs use `@JsonProperty` or `@JsonAlias`; responses use camelCase.
+- `POST /test-questions/bulk` takes a raw array, not an object wrapper.
+- `GET /test-results/session/{sessionId}/scorecard` is not JSON.
+- Code execution submit returns `202` but the envelope `status` field may still be `200` because `BaseResponse.success(data)` was used.
+- Auth/code rate-limit responses do not follow the `BaseResponse` schema.
+- Do not expose `/api/code/execute/callback` in normal frontend UI.
+- `CreateCandidateInvitationRequest` has a mismatch: DTO requires `candidateId`, service supports `candidateEmail` fallback. Prefer `candidateId`.
+- For MCQ submissions, send `selectedOptionIds`, not `answerText`.
+- For question create/update, `questionType` must match the payload subtype.
+- `PUT /questions/{id}` behaves like a full update and may clear taxonomy IDs when omitted; use `PATCH` for partial updates.
+- Admin/superadmin endpoints are organisation-scoped unless the caller is `SUPERADMIN`.
+
+## 8. Controller Verification Checklist
+
+The endpoint catalog above was verified against these active controller classes:
+
+| Controller | Base path | Endpoint count |
+|---|---|---:|
+| `AuthController` | `/auth` | 3 |
+| `AdminController` | `/admin` | 1 |
+| `UserController` | `/users` | 4 |
+| `OrganisationController` | `/organisations` | 4 |
+| `CandidateController` | `/candidates` | 6 |
+| `CandidateInvitationController` | `/candidate-invitations` | 6 |
+| `SubjectController` | `/subjects` | 6 |
+| `TopicController` | `/topics` | 7 |
+| `SubtopicController` | `/subtopics` | 7 |
+| `QuestionController` | `/questions` | 6 |
+| `TestController` | `/tests` | 8 |
+| `TestQuestionController` | `/test-questions` | 9 |
+| `TestScheduleController` | `/test-schedules` | 5 |
+| `TestSessionController` | `/test-sessions` | 8 |
+| `SubmissionController` | `/submissions` | 2 |
+| `TestResultController` | `/test-results` | 4 |
+| `TestCaseController` | `/test-cases` | 5 |
+| `CodeExecutionController` | `/api/code/execute` | 5 |
+
+Total: 96 active controller endpoints.
+
+## 9. Actuator Note
+
+The project includes `spring-boot-starter-actuator` and a custom `judge0` health indicator. No controller-owned actuator route is defined in `src/main/java/com/gryphon/rxone/controller`. Current `SecurityConfig` permits only `/auth/**`, `POST /candidate-invitations/validate`, and `/api/code/execute/callback`; all other paths require authentication unless actuator security is configured elsewhere in deployment.

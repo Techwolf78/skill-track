@@ -9,6 +9,7 @@ import { useScreenMonitor } from "./hooks/useScreenMonitor";
 import { ObjectDetector } from "./ai/objectDetector";
 import { LLMBehaviorAnalyzer } from "./ai/llmDetector";
 import { toast } from "sonner";
+import { apiClient } from "../lib/api-client";
 
 interface ProctoringContextType extends ProctoringState {
   addViolation: (type: ViolationType, metadata?: Record<string, unknown>) => void;
@@ -111,20 +112,41 @@ export const ProctoringProvider: React.FC<{ children: React.ReactNode; sessionId
   useAudioMonitor(state.isProctoringActive, handleViolation);
   // useScreenMonitor(state.isProctoringActive, handleViolation);
 
-  // Periodic Object Detection
+  // Periodic Object Detection with Dynamic Degradation
   useEffect(() => {
     if (!state.isProctoringActive || !videoRef.current) return;
 
-    const interval = setInterval(async () => {
+    let checkInterval = 5000; // start at 5s
+    let timeoutId: NodeJS.Timeout;
+
+    const runObjectDetection = async () => {
+      if (!state.isProctoringActive) return;
       if (videoRef.current) {
-        const suspicious = await objectDetector.current.detect(videoRef.current);
-        if (suspicious.length > 0) {
-          addViolation("BACKGROUND_OBJECT", { objects: suspicious.map(s => s.class) });
+        try {
+          const t0 = performance.now();
+          const suspicious = await objectDetector.current.detect(videoRef.current);
+          const t1 = performance.now();
+          const duration = t1 - t0;
+          
+          if (duration > 1000) {
+            console.warn(`Object detection took ${duration.toFixed(2)}ms (exceeding 1s). Degrading check interval to 10s.`);
+            checkInterval = 10000;
+          }
+
+          if (suspicious.length > 0) {
+            addViolation("BACKGROUND_OBJECT", { objects: suspicious.map(s => s.class) });
+          }
+        } catch (e) {
+          console.error("Object detection error:", e);
         }
       }
-    }, 5000); // Check every 5 seconds
+      if (state.isProctoringActive) {
+        timeoutId = setTimeout(runObjectDetection, checkInterval);
+      }
+    };
 
-    return () => clearInterval(interval);
+    timeoutId = setTimeout(runObjectDetection, checkInterval);
+    return () => clearTimeout(timeoutId);
   }, [state.isProctoringActive, addViolation, videoRef]);
 
   // Periodic behavior analysis
@@ -197,6 +219,42 @@ export const ProctoringProvider: React.FC<{ children: React.ReactNode; sessionId
     }, 60000); // Capture every 60 seconds
 
     return () => clearInterval(interval);
+  }, [state.isProctoringActive, sessionId]);
+
+  // Batch upload worker for periodic webcam snapshots (every 5 minutes & component unmount)
+  useEffect(() => {
+    if (!state.isProctoringActive || !sessionId) return;
+
+    const syncSnapshots = async () => {
+      const storageKey = `rxone_camera_snapshots_${sessionId}`;
+      const snapshotsRaw = localStorage.getItem(storageKey);
+      if (!snapshotsRaw) return;
+
+      try {
+        const snapshots = JSON.parse(snapshotsRaw);
+        if (snapshots.length === 0) return;
+
+        console.log(`📤 Syncing ${snapshots.length} webcam snapshots in batch...`);
+        await apiClient.post(`/test-sessions/${sessionId}/snapshots/batch`, {
+          snapshots: snapshots.map((s: { timestamp: number; image: string }) => ({
+            timestamp: s.timestamp,
+            image: s.image,
+          }))
+        });
+
+        localStorage.removeItem(storageKey);
+        console.log("✅ Webcam snapshots synced successfully.");
+      } catch (err) {
+        console.error("Failed to batch upload webcam snapshots:", err);
+      }
+    };
+
+    const batchInterval = setInterval(syncSnapshots, 300000); // 5 minutes
+
+    return () => {
+      clearInterval(batchInterval);
+      syncSnapshots(); // flush final snapshots on unmount
+    };
   }, [state.isProctoringActive, sessionId]);
 
   useEffect(() => {

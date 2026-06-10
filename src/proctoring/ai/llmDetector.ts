@@ -1,4 +1,4 @@
-import { pipeline } from "@xenova/transformers";
+import { pipeline, env } from "@xenova/transformers";
 import { ViolationType } from "../../types/proctoring.types";
 
 export class LLMBehaviorAnalyzer {
@@ -9,6 +9,15 @@ export class LLMBehaviorAnalyzer {
     if (this.classifier || this.isInitializing) return;
     this.isInitializing = true;
     try {
+      // Configure env variables for Xenova transformers CDN/cache loading
+      env.allowLocalModels = false;
+      env.useBrowserCache = true;
+      if (import.meta.env.VITE_XENOVA_MODEL_CDN_URL) {
+        env.remoteHost = import.meta.env.VITE_XENOVA_MODEL_CDN_URL;
+      }
+      if (import.meta.env.VITE_XENOVA_MODEL_CDN_PATH) {
+        env.remotePathTemplate = import.meta.env.VITE_XENOVA_MODEL_CDN_PATH;
+      }
       // Using a small model for browser performance
       this.classifier = await pipeline("text-classification", "Xenova/distilbert-base-uncased-finetuned-sst-2-english");
     } catch (err) {

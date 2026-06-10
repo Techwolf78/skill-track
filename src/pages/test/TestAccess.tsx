@@ -38,6 +38,7 @@ export default function TestAccess() {
   const [loading, setLoading] = useState(true);
   const [testData, setTestData] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
+  const [isMobile, setIsMobile] = useState(false);
   
   // Onboarding state
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -55,6 +56,16 @@ export default function TestAccess() {
   const [isLoggingIn, setIsLoggingIn] = useState(false);
 
   useEffect(() => {
+    // Check for mobile or tablet user agents, plus iPad desktop mode detection
+    const isMobileOrTablet = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || 
+      (navigator.maxTouchPoints > 0 && /Macintosh/i.test(navigator.userAgent));
+    
+    if (isMobileOrTablet) {
+      setIsMobile(true);
+      setLoading(false);
+      return;
+    }
+
     if (id && token) {
       validateToken();
     } else if (token && !id) {
@@ -247,6 +258,35 @@ export default function TestAccess() {
       <div className="min-h-screen flex flex-col items-center justify-center bg-background gap-4">
         <Loader2 className="w-12 h-12 animate-spin text-primary" />
         <p className="text-muted-foreground animate-pulse font-medium">Preparing your secure environment...</p>
+      </div>
+    );
+  }
+
+  if (isMobile) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-4 bg-background">
+        <Card className="max-w-md w-full border-destructive/20 shadow-2xl overflow-hidden">
+          <div className="h-2 bg-destructive" />
+          <CardHeader className="text-center">
+            <div className="mx-auto mb-4 w-16 h-16 rounded-full bg-destructive/10 flex items-center justify-center">
+              <Smartphone className="w-8 h-8 text-destructive" />
+            </div>
+            <CardTitle className="text-2xl font-bold">Device Not Supported</CardTitle>
+            <CardDescription className="text-base mt-2">
+              This assessment requires hardware diagnostics, screen sharing capability, and proctoring features that are not supported on mobile or tablet browsers.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="text-center space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Please open the invitation link on a <strong>desktop or laptop computer</strong> with a functional webcam, microphone, and a modern web browser (e.g., Google Chrome, Firefox, Microsoft Edge).
+            </p>
+          </CardContent>
+          <CardFooter>
+            <Button onClick={() => navigate("/")} variant="outline" className="w-full">
+              Return to Homepage
+            </Button>
+          </CardFooter>
+        </Card>
       </div>
     );
   }
