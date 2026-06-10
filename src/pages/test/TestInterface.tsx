@@ -985,6 +985,35 @@ useEffect(() => {
     }
   }, [questions, currentIndex, sessionId, language, code, answers, toast, isOnline]);
 
+  const handleMcqSelect = useCallback(async (questionId: string, value: string) => {
+    const updatedAnswers = { ...answers, [questionId]: value };
+    setAnswers(updatedAnswers);
+
+    const targetSessionId = sessionId || "demo-session";
+    AnswerStore.saveAnswer(targetSessionId, questionId, value);
+
+    if (!sessionId) return;
+
+    if (!isOnline) {
+      AnswerStore.queueOfflineSubmission(sessionId, questionId, "MCQ", value);
+      setUnsyncedCount(AnswerStore.getOfflineQueue(sessionId).length);
+      return;
+    }
+
+    try {
+      await apiClient.post("/submissions", {
+        sessionId: sessionId,
+        questionId: questionId,
+        selectedOptionIds: [value]
+      });
+    } catch (error) {
+      console.error("Auto-save MCQ error:", error);
+      AnswerStore.queueOfflineSubmission(sessionId, questionId, "MCQ", value);
+      setUnsyncedCount(AnswerStore.getOfflineQueue(sessionId).length);
+    }
+  }, [answers, sessionId, isOnline]);
+
+
   const formatTime = (seconds: number) => {
     const hours = Math.floor(seconds / 3600);
     const mins = Math.floor((seconds % 3600) / 60);
@@ -1234,7 +1263,7 @@ useEffect(() => {
                     <div className="space-y-4">
                       <RadioGroup
                         value={(answers[currentQuestion.id] as string) || ""}
-                        onValueChange={(value) => setAnswers({ ...answers, [currentQuestion.id]: value })}
+                        onValueChange={(value) => handleMcqSelect(currentQuestion.id, value)}
                         className="space-y-2 pt-2"
                       >
                         {currentQuestion.options.map((optionItem: unknown, idx: number) => {
@@ -1257,16 +1286,12 @@ useEffect(() => {
                           );
                         })}
                       </RadioGroup>
-                      <div className="flex justify-end">
-                        <Button 
-                          size="sm" 
-                          onClick={handleSubmitQuestion}
-                          disabled={isSubmittingCode}
-                        >
-                          {isSubmittingCode ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
-                          Submit Answer
-                        </Button>
-                      </div>
+                      {answers[currentQuestion.id] && (
+                        <div className="flex justify-end items-center gap-1.5 text-xs text-muted-foreground font-medium pt-1">
+                          <CheckCircle className="w-3.5 h-3.5 text-green-500" />
+                          <span>Selection auto-saved</span>
+                        </div>
+                      )}
                     </div>
                   )}
 
@@ -1546,7 +1571,7 @@ useEffect(() => {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Continue Testing</AlertDialogCancel>
+            <AlertDialogCancel>Go Back to Test</AlertDialogCancel>
             <AlertDialogAction onClick={submitTest} disabled={submitting} className="bg-primary text-white">
               {submitting ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
               Submit Test

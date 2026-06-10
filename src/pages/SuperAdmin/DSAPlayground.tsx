@@ -325,7 +325,6 @@ export default function DSAPlayground() {
     try {
       const backendLanguage = language === "python3" ? "python" : language;
       const requestBody: Record<string, unknown> = {
-        sessionId: "00000000-0000-0000-0000-000000000000",
         questionId: question.id,
         language: backendLanguage,
         sourceCode: code,
@@ -457,13 +456,14 @@ export default function DSAPlayground() {
           variant: "destructive",
         });
       }
+      const errMsg = err.response?.data?.message || "Something went wrong. Please try again.";
       setVerdict({
         type: "error",
         title: isRateLimit ? "Rate Limit Exceeded" : "System Error",
-        message:
-          err.response?.data?.message ||
-          "Something went wrong. Please try again.",
+        message: errMsg,
       });
+      setConsoleOutput((prev) => prev + `\n> Error: ${errMsg}\n`);
+      setSubmissionPhase("result");
     } finally {
       setIsExecuting(false);
     }
@@ -622,14 +622,14 @@ export default function DSAPlayground() {
           variant: "destructive",
         });
       }
+      const errMsg = err.response?.data?.message || err.message || "Failed to process submission.";
       setVerdict({
         type: "error",
         title: isRateLimit ? "Rate Limit Exceeded" : "System Error",
-        message:
-          err.response?.data?.message ||
-          err.message ||
-          "Failed to process submission.",
+        message: errMsg,
       });
+      setConsoleOutput((prev) => prev + `\n> Verification Error: ${errMsg}\n`);
+      setSubmissionPhase("result");
     } finally {
       setIsSubmitting(false);
     }
