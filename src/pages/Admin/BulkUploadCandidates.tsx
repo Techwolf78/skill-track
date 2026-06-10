@@ -14,6 +14,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiClient } from "@/lib/api-client";
 import { Upload, FileSpreadsheet, CheckCircle2, AlertCircle, Loader2, Download, Building2 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
+import type { OrganisationResponse } from "@/lib/organisation-service";
 import {
   Select,
   SelectContent,
@@ -34,7 +35,7 @@ export function BulkUploadCandidates({ open, onOpenChange, onSuccess, isSuperAdm
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
-  const [organisations, setOrganisations] = useState<any[]>([]);
+  const [organisations, setOrganisations] = useState<OrganisationResponse[]>([]);
   const [selectedOrgId, setSelectedOrgId] = useState<string>("");
   const { toast } = useToast();
   const { user } = useAuth();
@@ -51,7 +52,6 @@ export function BulkUploadCandidates({ open, onOpenChange, onSuccess, isSuperAdm
   const getOrganisationId = () => {
     if (isSuperAdmin) return selectedOrgId;
     if (user?.organisationData?.id) return user.organisationData.id;
-    if (user?.organisationId) return user.organisationId;
     return null;
   };
 
@@ -61,7 +61,6 @@ export function BulkUploadCandidates({ open, onOpenChange, onSuccess, isSuperAdm
       return org?.name || "Selected Organisation";
     }
     if (user?.organisationData?.name) return user.organisationData.name;
-    if (user?.organisationName) return user.organisationName;
     return null;
   };
 
@@ -224,11 +223,12 @@ export function BulkUploadCandidates({ open, onOpenChange, onSuccess, isSuperAdm
         setProgress(0);
       }, 1500);
       
-    } catch (error: any) {
+    } catch (error) {
       clearInterval(progressInterval);
       setProgress(0);
       
-      const errorMessage = error.response?.data?.message || error.message || "Failed to upload candidates";
+      const err = error as { response?: { data?: { message?: string } }; message?: string };
+      const errorMessage = err.response?.data?.message || err.message || "Failed to upload candidates";
       setError(errorMessage);
       
       toast({ title: "Upload Failed", description: errorMessage, variant: "destructive" });

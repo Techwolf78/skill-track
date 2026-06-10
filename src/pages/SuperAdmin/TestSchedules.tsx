@@ -118,8 +118,8 @@ export default function TestSchedules() {
         if (Array.isArray(data)) {
           return data;
         }
-        if (data && typeof data === "object" && "content" in data && Array.isArray((data as any).content)) {
-          return (data as any).content;
+        if (data && typeof data === "object" && "content" in data && Array.isArray((data as Record<string, unknown>).content)) {
+          return (data as Record<string, unknown>).content as Record<string, unknown>[];
         }
         return [];
       } catch (e) {

@@ -1,5 +1,5 @@
 // src/pages/SuperAdmin/TestScheduleDetails.tsx
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -41,24 +41,33 @@ export default function TestScheduleDetails() {
   const { toast } = useToast();
 
   const [loading, setLoading] = useState(true);
-  const [schedule, setSchedule] = useState<TestScheduleExtended | null>(null);
+  const [schedule, setSchedule] = useState<(TestScheduleExtended & { organisationId?: string }) | null>(null);
   const [test, setTest] = useState<Test | null>(null);
   const [organisation, setOrganisation] = useState<Organisation | null>(null);
   const [invitations, setInvitations] = useState<Invitation[]>([]);
   const [invitationsLoading, setInvitationsLoading] = useState(false);
 
-  useEffect(() => {
-    if (id) {
-      fetchScheduleDetails();
+  const fetchInvitations = useCallback(async () => {
+    try {
+      setInvitationsLoading(true);
+      // This endpoint might need to be added by backend
+      const response = await apiClient.get(`/candidate-invitations/schedule/${id}?size=1000`);
+      const data = response.data?.data || response.data;
+      setInvitations(data || []);
+    } catch (error) {
+      console.log("No invitations found or endpoint not ready");
+      setInvitations([]);
+    } finally {
+      setInvitationsLoading(false);
     }
   }, [id]);
 
-  const fetchScheduleDetails = async () => {
+  const fetchScheduleDetails = useCallback(async () => {
     try {
       setLoading(true);
       
       // Fetch schedule
-      const scheduleData = await testService.getTestScheduleById(id!);
+      const scheduleData = await testService.getTestScheduleById(id!) as TestScheduleExtended & { organisationId?: string };
       console.log("📋 Schedule Details:", scheduleData);
       setSchedule(scheduleData);
       
@@ -90,22 +99,13 @@ export default function TestScheduleDetails() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [id, fetchInvitations, toast]);
 
-  const fetchInvitations = async () => {
-    try {
-      setInvitationsLoading(true);
-      // This endpoint might need to be added by backend
-      const response = await apiClient.get(`/candidate-invitations/schedule/${id}?size=1000`);
-      const data = response.data?.data || response.data;
-      setInvitations(data || []);
-    } catch (error) {
-      console.log("No invitations found or endpoint not ready");
-      setInvitations([]);
-    } finally {
-      setInvitationsLoading(false);
+  useEffect(() => {
+    if (id) {
+      fetchScheduleDetails();
     }
-  };
+  }, [id, fetchScheduleDetails]);
 
   const getStatusBadge = (status: string) => {
     const styles: Record<string, string> = {

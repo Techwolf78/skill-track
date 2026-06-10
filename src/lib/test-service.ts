@@ -434,16 +434,16 @@ const unwrapArrayResponse = <T>(response: {
     return data;
   }
   if (data && typeof data === "object" && "data" in data) {
-    const nestedData = (data as any).data;
+    const nestedData = (data as unknown as Record<string, unknown>).data;
     if (Array.isArray(nestedData)) {
       return nestedData;
     }
-    if (nestedData && typeof nestedData === "object" && "content" in nestedData && Array.isArray(nestedData.content)) {
-      return nestedData.content;
+    if (nestedData && typeof nestedData === "object" && "content" in nestedData && Array.isArray((nestedData as Record<string, unknown>).content)) {
+      return (nestedData as Record<string, unknown>).content as T[];
     }
   }
-  if (data && typeof data === "object" && "content" in data && Array.isArray((data as any).content)) {
-    return (data as any).content;
+  if (data && typeof data === "object" && "content" in data && Array.isArray((data as unknown as Record<string, unknown>).content)) {
+    return (data as unknown as Record<string, unknown>).content as T[];
   }
   return [];
 };
@@ -628,7 +628,7 @@ export const testService = {
       const url = codingQuestionId
         ? `/test-cases?codingQuestionId=${codingQuestionId}&page=${page}&size=${size}`
         : `/test-cases?page=${page}&size=${size}`;
-      const response = await apiClient.get<any>(url);
+      const response = await apiClient.get<TestCase[]>(url);
       const content = unwrapArrayResponse(response);
       allTestCases = [...allTestCases, ...content];
 
@@ -950,7 +950,7 @@ export const testService = {
     return allSessions.filter((s) => s.testId === testId);
   },
 
-  submitSession: async (id: string, answers?: Record<string, any>): Promise<string> => {
+  submitSession: async (id: string, answers?: Record<string, unknown>): Promise<string> => {
     const response = await apiClient.post<string>(`/test-sessions/${id}/submit`, {
       answers,
       submittedAt: new Date().toISOString(),

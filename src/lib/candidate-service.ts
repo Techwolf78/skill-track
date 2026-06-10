@@ -53,16 +53,16 @@ const unwrapArrayResponse = <T>(response: {
     return data;
   }
   if (data && typeof data === "object" && "data" in data) {
-    const nestedData = (data as Record<string, unknown>)["data"];
+    const nestedData = (data as unknown as Record<string, unknown>)["data"];
     if (Array.isArray(nestedData)) {
       return nestedData as T[];
     }
-    if (nestedData && typeof nestedData === "object" && "content" in nestedData && Array.isArray((nestedData as Record<string, unknown>)["content"])) {
-      return (nestedData as Record<string, unknown>)["content"] as T[];
+    if (nestedData && typeof nestedData === "object" && "content" in nestedData && Array.isArray((nestedData as unknown as Record<string, unknown>)["content"])) {
+      return (nestedData as unknown as Record<string, unknown>)["content"] as T[];
     }
   }
-  if (data && typeof data === "object" && "content" in data && Array.isArray((data as Record<string, unknown>)["content"])) {
-    return (data as Record<string, unknown>)["content"] as T[];
+  if (data && typeof data === "object" && "content" in data && Array.isArray((data as unknown as Record<string, unknown>)["content"])) {
+    return (data as unknown as Record<string, unknown>)["content"] as T[];
   }
   return [];
 };

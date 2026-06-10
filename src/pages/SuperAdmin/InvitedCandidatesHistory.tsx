@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -51,9 +51,9 @@ export default function InvitedCandidatesHistory() {
 
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [fetchData]);
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     try {
       setLoading(true);
       const [schedulesData, candidatesData, invitationsResponse] = await Promise.all([
@@ -79,8 +79,8 @@ export default function InvitedCandidatesHistory() {
       const invData = invitationsResponse.data?.data;
       if (Array.isArray(invData)) {
         setInvitations(invData);
-      } else if (invData && typeof invData === "object" && "content" in invData && Array.isArray((invData as any).content)) {
-        setInvitations((invData as any).content);
+      } else if (invData && typeof invData === "object" && "content" in invData && Array.isArray((invData as Record<string, unknown>).content)) {
+        setInvitations((invData as Record<string, unknown>).content as CandidateInvitation[]);
       } else {
         setInvitations([]);
       }
@@ -94,7 +94,7 @@ export default function InvitedCandidatesHistory() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [toast]);
 
   const copyTestLink = (id: string, token: string) => {
     const testUrl = `${baseUrl}/test/access/${id}/${token}`;

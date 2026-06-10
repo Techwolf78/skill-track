@@ -15,6 +15,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiClient } from "@/lib/api-client";
 import { Loader2, AlertCircle, Building2 } from "lucide-react";
 import type { Candidate } from "@/lib/candidate-service";
+import type { OrganisationResponse } from "@/lib/organisation-service";
 import {
   Select,
   SelectContent,
@@ -33,7 +34,7 @@ interface EditCandidateDialogProps {
 
 export function EditCandidateDialog({ open, onOpenChange, candidate, onSuccess, isSuperAdmin }: EditCandidateDialogProps) {
   const [loading, setLoading] = useState(false);
-  const [organisations, setOrganisations] = useState<any[]>([]);
+  const [organisations, setOrganisations] = useState<OrganisationResponse[]>([]);
   const [formData, setFormData] = useState({
     name: "",
     phoneNumber: "",
@@ -98,7 +99,12 @@ export function EditCandidateDialog({ open, onOpenChange, candidate, onSuccess, 
         extraFields.skills = formData.skills.split(",").map(s => s.trim());
       }
 
-      const payload: any = {
+      const payload: {
+        name: string;
+        phoneNumber?: string;
+        extraFields?: Record<string, unknown>;
+        organisationId?: string;
+      } = {
         name: formData.name,
         phoneNumber: formData.phoneNumber || undefined,
         extraFields: Object.keys(extraFields).length > 0 ? extraFields : undefined,
@@ -113,11 +119,11 @@ export function EditCandidateDialog({ open, onOpenChange, candidate, onSuccess, 
       toast({ title: "Success", description: "Candidate updated successfully" });
       onSuccess();
       onOpenChange(false);
-    } catch (error: any) {
+    } catch (error) {
       console.error("Failed to update candidate:", error);
       toast({
         title: "Error",
-        description: error.response?.data?.message || "Failed to update candidate",
+        description: (error as { response?: { data?: { message?: string } } }).response?.data?.message || "Failed to update candidate",
         variant: "destructive",
       });
     } finally {

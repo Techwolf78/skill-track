@@ -61,8 +61,8 @@ export const organisationService = {
     if (Array.isArray(data)) {
       return data;
     }
-    if (data && typeof data === "object" && "content" in data && Array.isArray((data as any).content)) {
-      return (data as any).content;
+    if (data && typeof data === "object" && "content" in data && Array.isArray((data as unknown as Record<string, unknown>).content)) {
+      return (data as unknown as Record<string, unknown>).content as OrganisationResponse[];
     }
     return [];
   },

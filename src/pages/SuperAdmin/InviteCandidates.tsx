@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -76,9 +76,9 @@ export default function InviteCandidates() {
 
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [fetchData]);
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     try {
       setLoading(true);
       const [schedulesData, candidatesData] = await Promise.all([
@@ -106,8 +106,8 @@ export default function InviteCandidates() {
         const invData = response.data?.data;
         if (Array.isArray(invData)) {
           setInvitations(invData);
-        } else if (invData && typeof invData === "object" && "content" in invData && Array.isArray((invData as any).content)) {
-          setInvitations((invData as any).content);
+        } else if (invData && typeof invData === "object" && "content" in invData && Array.isArray((invData as Record<string, unknown>).content)) {
+          setInvitations((invData as Record<string, unknown>).content as CandidateInvitation[]);
         } else {
           setInvitations([]);
         }
@@ -124,7 +124,7 @@ export default function InviteCandidates() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [toast]);
 
   const handleInvite = async () => {
     if (!selectedSchedule) {
@@ -161,13 +161,13 @@ export default function InviteCandidates() {
       setIsInviteDialogOpen(false);
       setSelectedCandidate(null);
       fetchData(); // Refresh to get the new invitation with token
-    } catch (error: any) {
+    } catch (error) {
       console.error("Failed to send invitation:", error);
       toast({
         title: "Error",
         description:
-          error.response?.data?.message ||
-          error.message ||
+          (error as { response?: { data?: { message?: string } }; message?: string }).response?.data?.message ||
+          (error as { message?: string }).message ||
           "Failed to send invitation",
         variant: "destructive",
       });
@@ -221,7 +221,7 @@ export default function InviteCandidates() {
 
       setSelectedCandidates([]);
       fetchData();
-    } catch (error: any) {
+    } catch (error) {
       console.error("Bulk invitation error:", error);
     } finally {
       setSubmitting(false);
