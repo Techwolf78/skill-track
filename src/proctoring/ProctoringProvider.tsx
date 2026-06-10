@@ -128,9 +128,17 @@ export const ProctoringProvider: React.FC<{ children: React.ReactNode; sessionId
           const t1 = performance.now();
           const duration = t1 - t0;
           
-          if (duration > 1000) {
-            console.warn(`Object detection took ${duration.toFixed(2)}ms (exceeding 1s). Degrading check interval to 10s.`);
-            checkInterval = 10000;
+          if (duration > 3000) {
+            console.warn(`⚠️ Object detection took ${duration.toFixed(2)}ms. Critical delay, degrading check interval to 60s.`);
+            checkInterval = 60000;
+          } else if (duration > 1500) {
+            console.warn(`⚠️ Object detection took ${duration.toFixed(2)}ms. Major delay, degrading check interval to 30s.`);
+            checkInterval = 30000;
+          } else if (duration > 800) {
+            console.warn(`⚠️ Object detection took ${duration.toFixed(2)}ms. Moderate delay, degrading check interval to 15s.`);
+            checkInterval = 15000;
+          } else {
+            checkInterval = 5000; // Normal speed
           }
 
           if (suspicious.length > 0) {

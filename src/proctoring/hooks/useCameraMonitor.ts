@@ -84,9 +84,20 @@ export function useCameraMonitor(
         const t1 = performance.now();
         const duration = t1 - t0;
 
-        if (duration > 1000) {
-          console.warn(`Face detection took ${duration.toFixed(2)}ms (exceeding 1s). Degrading interval to 5s.`);
-          detectionInterval = 5000;
+        if (duration > 3000) {
+          console.warn(`⚠️ Face detection took ${duration.toFixed(2)}ms. Critical delay, degrading interval to 30s.`);
+          detectionInterval = 30000;
+        } else if (duration > 1500) {
+          console.warn(`⚠️ Face detection took ${duration.toFixed(2)}ms. Major delay, degrading interval to 20s.`);
+          detectionInterval = 20000;
+        } else if (duration > 800) {
+          console.warn(`⚠️ Face detection took ${duration.toFixed(2)}ms. Moderate delay, degrading interval to 10s.`);
+          detectionInterval = 10000;
+        } else if (duration > 300) {
+          console.warn(`⚠️ Face detection took ${duration.toFixed(2)}ms. Slight delay, degrading interval to 4s.`);
+          detectionInterval = 4000;
+        } else {
+          detectionInterval = 1500; // Normal speed
         }
 
         const now = Date.now();
