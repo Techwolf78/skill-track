@@ -55,8 +55,8 @@ export default function SeedData() {
   const [seededCandidates, setSeededCandidates] = useState<SeededCandidate[]>([]);
   const [copiedEmail, setCopiedEmail] = useState<string | null>(null);
   const [isSeedingCompleted, setIsSeedingCompleted] = useState(false);
-  const [seedEmail, setSeedEmail] = useState("admin@company.com");
-  const [seedPassword, setSeedPassword] = useState("Admin@123");
+  const [seedEmail, setSeedEmail] = useState("superadmin@gryphonacademy.co.in");
+  const [seedPassword, setSeedPassword] = useState("password123");
 
   const consoleEndRef = useRef<HTMLDivElement>(null);
 
@@ -101,6 +101,8 @@ export default function SeedData() {
     setLogs([]);
     setSeededCandidates([]);
 
+    const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
     addLog("🚀 Starting the Bulk Data Seeder process...", "info");
     
     // Clear out stale JWT session keys to prevent 403 authorization failures on a wiped DB
@@ -121,25 +123,27 @@ export default function SeedData() {
         localStorage.setItem("token", superadminToken);
         localStorage.setItem("user", JSON.stringify(authData.user));
         addLog(`✅ Pre-authentication successful! JWT token acquired.`, "success");
-      } catch (loginErr: any) {
-        addLog(`⚠️ Pre-authentication failed for ${seedEmail}: ${loginErr.response?.data?.message || loginErr.message}.`, "warning");
+      } catch (loginErr: unknown) {
+        const err = loginErr as { response?: { data?: { message?: string } }; message?: string };
+        addLog(`⚠️ Pre-authentication failed for ${seedEmail}: ${err.response?.data?.message || err.message}.`, "warning");
       }
     }
 
     // B: Fallback to the platform's default master bootstrap superadmin
-    if (!superadminToken && seedEmail !== "admin@company.com") {
-      addLog("🔐 Attempting master bootstrap login with default platform credentials (admin@company.com)...", "info");
+    if (!superadminToken && seedEmail !== "superadmin@gryphonacademy.co.in") {
+      addLog("🔐 Attempting master bootstrap login with default platform credentials (superadmin@gryphonacademy.co.in)...", "info");
       try {
         const authData = await authService.login({
-          email: "admin@company.com",
-          password: "Admin@123",
+          email: "superadmin@gryphonacademy.co.in",
+          password: "password123",
         });
         superadminToken = authData.accessToken;
         localStorage.setItem("token", superadminToken);
         localStorage.setItem("user", JSON.stringify(authData.user));
         addLog("✅ Master bootstrap login successful! System administrator authority acquired.", "success");
-      } catch (bootstrapErr: any) {
-        addLog(`⚠️ Master bootstrap login failed: ${bootstrapErr.response?.data?.message || bootstrapErr.message}.`, "warning");
+      } catch (bootstrapErr: unknown) {
+        const err = bootstrapErr as { response?: { data?: { message?: string } }; message?: string };
+        addLog(`⚠️ Master bootstrap login failed: ${err.response?.data?.message || err.message}.`, "warning");
         addLog(`💡 Proceeding anyway. Seeding will run without credentials or register in subsequent steps.`, "info");
       }
     }
@@ -193,8 +197,9 @@ export default function SeedData() {
         const org1 = await organisationService.createOrganisation({ name: "Gryphon Academy" });
         gryphonOrgId = org1.id;
         addLog(`✅ Created Primary Organisation: "Gryphon Academy" [ID: ${gryphonOrgId}]`, "success");
-      } catch (e: any) {
+      } catch (e: unknown) {
         addLog(`⚠️ Gryphon Academy creation failed. Querying existing organisations to recover ID...`, "warning");
+        await delay(200);
         try {
           const existing = await organisationService.getOrganisations();
           const found = existing.find(o => o.name.toLowerCase().includes("gryphon") || o.name.toLowerCase().includes("academy"));
@@ -213,6 +218,7 @@ export default function SeedData() {
           addLog(`⚠️ Organisation fallback query failed. Using default Org UUID.`, "warning");
         }
       }
+      await delay(200);
 
       // Resolve Org 2 (TechWolf Industries)
       try {
@@ -221,6 +227,7 @@ export default function SeedData() {
         addLog(`✅ Created Partner Organisation: "TechWolf Industries" [ID: ${techWolfOrgId}]`, "success");
       } catch (e) {
         addLog(`⚠️ TechWolf creation skipped/failed. Resolving fallback.`, "warning");
+        await delay(200);
         try {
           const existing = await organisationService.getOrganisations();
           techWolfOrgId = existing.find(o => o.name.toLowerCase().includes("techwolf"))?.id || gryphonOrgId;
@@ -229,6 +236,7 @@ export default function SeedData() {
           techWolfOrgId = gryphonOrgId;
         }
       }
+      await delay(200);
 
       // Resolve Org 3 (DoSelect University)
       try {
@@ -237,6 +245,7 @@ export default function SeedData() {
         addLog(`✅ Created Partner Organisation: "DoSelect University" [ID: ${doSelectOrgId}]`, "success");
       } catch (e) {
         addLog(`⚠️ DoSelect creation skipped/failed. Resolving fallback.`, "warning");
+        await delay(200);
         try {
           const existing = await organisationService.getOrganisations();
           doSelectOrgId = existing.find(o => o.name.toLowerCase().includes("doselect"))?.id || gryphonOrgId;
@@ -245,6 +254,7 @@ export default function SeedData() {
           doSelectOrgId = gryphonOrgId;
         }
       }
+      await delay(200);
 
       updateStepStatus("org", "completed");
 
@@ -279,9 +289,11 @@ export default function SeedData() {
           });
         }
         addLog(`✅ Registered Super Admin account: ${targetEmail}`, "success");
-      } catch (e: any) {
-        addLog(`⚠️ Super Admin registration skipped or exists: ${e.response?.data?.message || e.message}.`, "warning");
+      } catch (e: unknown) {
+        const err = e as { response?: { data?: { message?: string } }; message?: string };
+        addLog(`⚠️ Super Admin registration skipped or exists: ${err.response?.data?.message || err.message}.`, "warning");
       }
+      await delay(200);
       updateStepStatus("superadmin", "completed");
 
       // ----------------------------------------------------
@@ -301,9 +313,11 @@ export default function SeedData() {
         localStorage.setItem("token", superadminToken);
         localStorage.setItem("user", JSON.stringify(authData.user));
         addLog(`🔐 Authentication successful! JWT retrieved and saved to LocalStorage.`, "success");
-      } catch (e: any) {
-        addLog(`⚠️ Authentication failed: ${e.response?.data?.message || e.message}. Continuing seeding flow using current session.`, "warning");
+      } catch (e: unknown) {
+        const err = e as { response?: { data?: { message?: string } }; message?: string };
+        addLog(`⚠️ Authentication failed: ${err.response?.data?.message || err.message}. Continuing seeding flow using current session.`, "warning");
       }
+      await delay(200);
       updateStepStatus("login", "completed");
 
       // ----------------------------------------------------
@@ -322,9 +336,10 @@ export default function SeedData() {
           organisation_id: gryphonOrgId,
         }, "ADMIN");
         addLog(`✅ Onboarded Gryphon Academy Admin: admin@gryphonacademy.co.in`, "success");
-      } catch (e: any) {
+      } catch (e: unknown) {
         addLog(`⚠️ Gryphon Admin skipped (already exists or conflict). Automatically moving to next stage.`, "warning");
       }
+      await delay(200);
 
       try {
         await userService.createUser({
@@ -337,6 +352,7 @@ export default function SeedData() {
       } catch (e) {
         addLog(`⚠️ TechWolf Admin skipped (already exists or conflict).`, "warning");
       }
+      await delay(200);
       updateStepStatus("admin", "completed");
 
       // ----------------------------------------------------
@@ -348,14 +364,19 @@ export default function SeedData() {
       addLog("Seeding Subjects, Topics, and Subtopics...", "info");
 
       // Fetch all existing subjects and topics first
-      let dbSubjects: any[] = [];
-      let dbTopics: any[] = [];
-      let dbSubtopics: any[] = [];
+      let dbSubjects: Array<{ id: string; name: string }> = [];
+      let dbTopics: Array<{ id: string; name: string }> = [];
+      let dbSubtopics: Array<{ id: string; name: string }> = [];
       try {
         dbSubjects = await testService.getAllSubjects();
+        await delay(200);
         dbTopics = await testService.getAllTopics();
+        await delay(200);
         dbSubtopics = await testService.getAllSubtopics();
-      } catch (e) {}
+        await delay(200);
+      } catch (e) {
+        addLog("⚠️ Failed to preload taxonomy database. Existing records check will fallback.", "warning");
+      }
 
       // CSE Subject
       try {
@@ -367,6 +388,7 @@ export default function SeedData() {
         subjects.cse = found ? found.id : "cse-fallback-id";
         addLog(`⚠️ "Computer Science & Engineering" already exists. Reusing ID: ${subjects.cse}`, "warning");
       }
+      await delay(200);
 
       // DBMS Topic
       try {
@@ -378,6 +400,7 @@ export default function SeedData() {
         topics.dbms = found ? found.id : "dbms-fallback-id";
         addLog(`  ⚠️ "Database Management Systems" already exists. Reusing ID: ${topics.dbms}`, "warning");
       }
+      await delay(200);
 
       // SQL Indexing Subtopic
       try {
@@ -389,6 +412,7 @@ export default function SeedData() {
         subtopics.indexing = found ? found.id : "indexing-fallback-id";
         addLog(`    ⚠️ "SQL Indexing" already exists. Reusing ID: ${subtopics.indexing}`, "warning");
       }
+      await delay(200);
 
       // OS Topic
       try {
@@ -400,6 +424,7 @@ export default function SeedData() {
         topics.os = found ? found.id : "os-fallback-id";
         addLog(`  ⚠️ "Operating Systems" already exists. Reusing ID: ${topics.os}`, "warning");
       }
+      await delay(200);
 
       // Web Dev Subject
       try {
@@ -411,6 +436,7 @@ export default function SeedData() {
         subjects.web = found ? found.id : "web-fallback-id";
         addLog(`⚠️ "Web Development" already exists. Reusing ID: ${subjects.web}`, "warning");
       }
+      await delay(200);
 
       // React Topic
       try {
@@ -422,6 +448,7 @@ export default function SeedData() {
         topics.react = found ? found.id : "react-fallback-id";
         addLog(`  ⚠️ "React.js Foundations" already exists. Reusing ID: ${topics.react}`, "warning");
       }
+      await delay(200);
 
       // Hooks Subtopic
       try {
@@ -433,6 +460,7 @@ export default function SeedData() {
         subtopics.hooks = found ? found.id : "hooks-fallback-id";
         addLog(`    ⚠️ "React Hooks & State" already exists. Reusing ID: ${subtopics.hooks}`, "warning");
       }
+      await delay(200);
 
       // Node Topic
       try {
@@ -444,6 +472,7 @@ export default function SeedData() {
         topics.node = found ? found.id : "node-fallback-id";
         addLog(`  ⚠️ "Node.js & Express" already exists. Reusing ID: ${topics.node}`, "warning");
       }
+      await delay(200);
 
       // DSA Subject
       try {
@@ -455,6 +484,7 @@ export default function SeedData() {
         subjects.dsa = found ? found.id : "dsa-fallback-id";
         addLog(`⚠️ "Data Structures & Algorithms" already exists. Reusing ID: ${subjects.dsa}`, "warning");
       }
+      await delay(200);
 
       // Arrays Topic
       try {
@@ -466,6 +496,7 @@ export default function SeedData() {
         topics.arrays = found ? found.id : "arrays-fallback-id";
         addLog(`  ⚠️ "Arrays & Strings" already exists. Reusing ID: ${topics.arrays}`, "warning");
       }
+      await delay(200);
 
       // Sliding Window Subtopic
       try {
@@ -477,6 +508,7 @@ export default function SeedData() {
         subtopics.sliding = found ? found.id : "sliding-fallback-id";
         addLog(`    ⚠️ "Sliding Window Pattern" already exists. Reusing ID: ${subtopics.sliding}`, "warning");
       }
+      await delay(200);
 
       // Trees Topic
       try {
@@ -488,6 +520,7 @@ export default function SeedData() {
         topics.trees = found ? found.id : "trees-fallback-id";
         addLog(`  ⚠️ "Trees & Graphs" already exists. Reusing ID: ${topics.trees}`, "warning");
       }
+      await delay(200);
 
       // System Design Subject
       try {
@@ -499,6 +532,7 @@ export default function SeedData() {
         subjects.sd = found ? found.id : "sd-fallback-id";
         addLog(`⚠️ "System Design" already exists. Reusing ID: ${subjects.sd}`, "warning");
       }
+      await delay(200);
 
       // Microservices Topic
       try {
@@ -510,6 +544,7 @@ export default function SeedData() {
         topics.micro = found ? found.id : "micro-fallback-id";
         addLog(`  ⚠️ "Microservices Architecture" already exists. Reusing ID: ${topics.micro}`, "warning");
       }
+      await delay(200);
 
       updateStepStatus("taxonomy", "completed");
 
@@ -532,14 +567,16 @@ export default function SeedData() {
           });
           candidateIds.push(candidateId);
           addLog(`👤 Onboarded Candidate: "${cand.name}" [ID: ${candidateId}]`, "success");
-        } catch (e: any) {
+        } catch (e) {
           addLog(`⚠️ Candidate "${cand.name}" skipped (already registered or error).`, "warning");
         }
+        await delay(200);
       }
 
       // Fallback: If we couldn't create candidates but they already exist, query them
       try {
         const list = await candidateService.getCandidates();
+        await delay(200);
         list.forEach(c => {
           if (!candidateIds.includes(c.id)) {
             candidateIds.push(c.id);
@@ -549,6 +586,7 @@ export default function SeedData() {
       } catch (e) {
         addLog("⚠️ Failed to load existing candidates database fallback.", "warning");
       }
+      await delay(200);
 
       updateStepStatus("candidates", "completed");
 
@@ -570,6 +608,7 @@ export default function SeedData() {
           marks: 5,
           title: "Virtual DOM Purpose",
           difficulty: "EASY",
+          visibility: "PUBLIC",
           mcqType: "SINGLE_CORRECT",
           shuffleOptions: true,
           multipleCorrect: false,
@@ -589,6 +628,7 @@ export default function SeedData() {
           marks: 5,
           title: "Sliding Window Concept",
           difficulty: "MEDIUM",
+          visibility: "PUBLIC",
           mcqType: "SINGLE_CORRECT",
           shuffleOptions: true,
           multipleCorrect: false,
@@ -608,6 +648,7 @@ export default function SeedData() {
           marks: 5,
           title: "DB Indexing Tradeoff",
           difficulty: "MEDIUM",
+          visibility: "PUBLIC",
           mcqType: "SINGLE_CORRECT",
           shuffleOptions: true,
           multipleCorrect: false,
@@ -626,6 +667,7 @@ export default function SeedData() {
           marks: 5,
           title: "React Hooks Memoization",
           difficulty: "MEDIUM",
+          visibility: "PUBLIC",
           mcqType: "MULTIPLE_CORRECT",
           shuffleOptions: true,
           multipleCorrect: true,
@@ -644,6 +686,7 @@ export default function SeedData() {
           marks: 5,
           title: "BST Search Complexity",
           difficulty: "EASY",
+          visibility: "PUBLIC",
           mcqType: "SINGLE_CORRECT",
           shuffleOptions: true,
           multipleCorrect: false,
@@ -662,6 +705,7 @@ export default function SeedData() {
           marks: 10,
           title: "DB Isolation Levels",
           difficulty: "HARD",
+          visibility: "PUBLIC",
           mcqType: "SINGLE_CORRECT",
           shuffleOptions: true,
           multipleCorrect: false,
@@ -680,6 +724,7 @@ export default function SeedData() {
           marks: 5,
           title: "Microservices Scalability",
           difficulty: "EASY",
+          visibility: "PUBLIC",
           mcqType: "SINGLE_CORRECT",
           shuffleOptions: true,
           multipleCorrect: false,
@@ -698,6 +743,7 @@ export default function SeedData() {
           marks: 5,
           title: "OS Semaphores",
           difficulty: "MEDIUM",
+          visibility: "PUBLIC",
           mcqType: "MULTIPLE_CORRECT",
           shuffleOptions: true,
           multipleCorrect: true,
@@ -716,6 +762,7 @@ export default function SeedData() {
           marks: 5,
           title: "HTTP Conflict Code",
           difficulty: "EASY",
+          visibility: "PUBLIC",
           mcqType: "SINGLE_CORRECT",
           shuffleOptions: false,
           multipleCorrect: false,
@@ -734,6 +781,7 @@ export default function SeedData() {
           marks: 5,
           title: "Caching Refresh Strategy",
           difficulty: "MEDIUM",
+          visibility: "PUBLIC",
           mcqType: "SINGLE_CORRECT",
           shuffleOptions: true,
           multipleCorrect: false,
@@ -746,7 +794,7 @@ export default function SeedData() {
         }
       ];
 
-      const codingQuestions = [
+      const codingQuestions: CreateQuestionRequest[] = [
         {
           questionType: "CODING" as const,
           prompt: "Given an array of integers `nums` and an integer `target`, return indices of the two numbers such that they add up to `target`. Print the indices separated by a single space. You can assume exactly one solution exists.",
@@ -756,6 +804,7 @@ export default function SeedData() {
           marks: 20,
           title: "Two Sum Problem",
           difficulty: "EASY" as const,
+          visibility: "PUBLIC",
           constraints: "2 <= nums.length <= 10^4\n-10^9 <= nums[i] <= 10^9",
           memoryLimitMb: 256,
           timeLimitSecs: 2,
@@ -796,6 +845,7 @@ export default function SeedData() {
           marks: 15,
           title: "Reverse String Challenge",
           difficulty: "EASY" as const,
+          visibility: "PUBLIC",
           constraints: "String length < 100",
           memoryLimitMb: 256,
           timeLimitSecs: 2,
@@ -826,6 +876,7 @@ export default function SeedData() {
           marks: 15,
           title: "Verify Prime Integers",
           difficulty: "EASY" as const,
+          visibility: "PUBLIC",
           constraints: "2 <= n <= 2 * 10^9",
           memoryLimitMb: 256,
           timeLimitSecs: 2,
@@ -851,6 +902,7 @@ export default function SeedData() {
           marks: 20,
           title: "Valid Parentheses Checker",
           difficulty: "MEDIUM" as const,
+          visibility: "PUBLIC",
           constraints: "1 <= s.length <= 10^4",
           memoryLimitMb: 256,
           timeLimitSecs: 2,
@@ -876,6 +928,7 @@ export default function SeedData() {
           marks: 20,
           title: "Climbing Stairs Path Count",
           difficulty: "MEDIUM" as const,
+          visibility: "PUBLIC",
           constraints: "1 <= n <= 45",
           memoryLimitMb: 256,
           timeLimitSecs: 2,
@@ -896,10 +949,13 @@ export default function SeedData() {
       ];
 
       // Query existing questions in case they exist
-      let dbQuestions: any[] = [];
+      let dbQuestions: Array<{ id: string; title: string }> = [];
       try {
         dbQuestions = await testService.getAllQuestions();
-      } catch (e) {}
+      } catch (e) {
+        addLog("⚠️ Failed to load existing question database.", "warning");
+      }
+      await delay(200);
 
       // Create MCQs
       for (const mcq of mcqQuestions) {
@@ -907,7 +963,7 @@ export default function SeedData() {
           const created = await testService.createQuestion(mcq);
           questionIds.push(created.id);
           addLog(`✅ Seeded MCQ Question: "${mcq.title}" [ID: ${created.id}]`, "success");
-        } catch (e: any) {
+        } catch (e) {
           const found = dbQuestions.find(q => q.title === mcq.title);
           if (found) {
             questionIds.push(found.id);
@@ -916,6 +972,7 @@ export default function SeedData() {
             addLog(`⚠️ Skipping MCQ creation error for "${mcq.title}". Automatically moving to next stage.`, "warning");
           }
         }
+        await delay(200);
       }
 
       // Create Coding Questions
@@ -926,7 +983,7 @@ export default function SeedData() {
           questionIds.push(created.id);
           codingCreatedIds.push(created.id);
           addLog(`✅ Seeded Coding Question: "${cq.title}" [ID: ${created.id}]`, "success");
-        } catch (e: any) {
+        } catch (e) {
           const found = dbQuestions.find(q => q.title === cq.title);
           if (found) {
             questionIds.push(found.id);
@@ -936,6 +993,7 @@ export default function SeedData() {
             addLog(`⚠️ Skipping Coding creation error for "${cq.title}". Automatically moving to next stage.`, "warning");
           }
         }
+        await delay(200);
       }
 
       updateStepStatus("questions", "completed");
@@ -993,6 +1051,7 @@ export default function SeedData() {
           } catch (tcError) {
             addLog(`  ⚠️ Test case skipped (already exists or mapping mismatch).`, "warning");
           }
+          await delay(200);
         }
       }
 
@@ -1036,10 +1095,13 @@ export default function SeedData() {
         }
       ];
 
-      let dbTests: any[] = [];
+      let dbTests: Array<{ id: string; title: string }> = [];
       try {
         dbTests = await testService.getAllTests();
-      } catch (e) {}
+      } catch (e) {
+        addLog("⚠️ Failed to load existing assessments database.", "warning");
+      }
+      await delay(200);
 
       for (const ta of testAssessments) {
         try {
@@ -1054,6 +1116,7 @@ export default function SeedData() {
             questions: [],
             isActive: true
           });
+          await delay(200);
 
           testIds.push(createdTest.id);
           addLog(`🏆 Assessment Created: "${ta.title}" [ID: ${createdTest.id}]`, "success");
@@ -1075,9 +1138,10 @@ export default function SeedData() {
               } catch (linkErr) {
                 // Link already exists
               }
+              await delay(200);
             }
           }
-        } catch (e: any) {
+        } catch (e) {
           const found = dbTests.find(t => t.title === ta.title);
           if (found) {
             testIds.push(found.id);
@@ -1086,6 +1150,7 @@ export default function SeedData() {
             addLog(`⚠️ Skipping assessment error for "${ta.title}". Automatically moving to next stage.`, "warning");
           }
         }
+        await delay(200);
       }
 
       updateStepStatus("tests", "completed");
@@ -1101,10 +1166,13 @@ export default function SeedData() {
       const startTime = new Date().toISOString();
       const endTime = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
 
-      let dbSchedules: any[] = [];
+      let dbSchedules: Array<{ id: string; testId: string }> = [];
       try {
         dbSchedules = await testService.getAllTestSchedules();
-      } catch (e) {}
+      } catch (e) {
+        addLog("⚠️ Failed to load existing test schedules.", "warning");
+      }
+      await delay(200);
 
       for (const tId of testIds) {
         try {
@@ -1116,8 +1184,8 @@ export default function SeedData() {
           });
           scheduleIds.push(schedule.id);
           addLog(`📅 Schedule Activated: [ID: ${schedule.id}] for Test: ${tId}`, "success");
-        } catch (e: any) {
-          const found = dbSchedules.find((s: any) => s.testId === tId);
+        } catch (e) {
+          const found = dbSchedules.find(s => s.testId === tId);
           if (found) {
             scheduleIds.push(found.id);
             addLog(`⚠️ Schedule for Test ID ${tId} already active. Reused ID: ${found.id}`, "warning");
@@ -1125,6 +1193,7 @@ export default function SeedData() {
             addLog(`⚠️ Skipping Schedule error for Test ID ${tId}. Automatically moving to next stage.`, "warning");
           }
         }
+        await delay(200);
       }
 
       updateStepStatus("schedules", "completed");
@@ -1167,23 +1236,27 @@ export default function SeedData() {
           } catch (invError) {
             addLog(`⚠️ Invitation skipped/already exists for candidate: "${cName}"`, "warning");
           }
+          await delay(200);
         }
       }
 
       // Fetch all candidate-invitations to extract tokens
       addLog("Retrieving token hashes to generate direct test access links...", "info");
-      let listInv: any[] = [];
+      let listInv: Array<{ id: string; candidateId: string; scheduleId: string; token: string }> = [];
       try {
         const invResponse = await apiClient.get("/candidate-invitations?size=100");
-        const invData = invResponse.data?.data;
+        await delay(200);
+        const invData = invResponse.data?.data as { content?: Array<{ id: string; candidateId: string; scheduleId: string; token: string }> } | Array<{ id: string; candidateId: string; scheduleId: string; token: string }> | undefined;
         if (Array.isArray(invData)) {
           listInv = invData;
-        } else if (invData && typeof invData === "object" && "content" in invData && Array.isArray((invData as any).content)) {
-          listInv = (invData as any).content;
+        } else if (invData && typeof invData === "object" && "content" in invData && Array.isArray(invData.content)) {
+          listInv = invData.content;
         } else {
           listInv = [];
         }
-      } catch (invGetError) {}
+      } catch (invGetError) {
+        addLog("⚠️ Failed to query invitation lists.", "warning");
+      }
 
       candidatesList.forEach((cand, idx) => {
         const cId = candidateIds[idx];
@@ -1194,7 +1267,7 @@ export default function SeedData() {
         const schedId = scheduleIds[scheduleIdx];
         const tTitle = testNames[scheduleIdx];
 
-        const matchInv = listInv.find((inv: any) => inv.candidateId === cId && inv.scheduleId === schedId);
+        const matchInv = listInv.find(inv => inv.candidateId === cId && inv.scheduleId === schedId);
         if (matchInv && matchInv.token) {
           const testLink = `${window.location.origin}/test/access/${matchInv.id}/${matchInv.token}`;
           newSeededCandidates.push({
@@ -1250,9 +1323,10 @@ export default function SeedData() {
         description: "Standard data successfully populated in bulk.",
       });
 
-    } catch (error: any) {
-      console.error(error);
-      addLog(`❌ CRITICAL SEEDING FAULT: ${error.response?.data?.message || error.message}`, "error");
+    } catch (error: unknown) {
+      const err = error as { response?: { data?: { message?: string } }; message?: string };
+      console.error(err);
+      addLog(`❌ CRITICAL SEEDING FAULT: ${err.response?.data?.message || err.message}`, "error");
       
       const currentStepId = steps[currentStepIndex]?.id;
       if (currentStepId) {
