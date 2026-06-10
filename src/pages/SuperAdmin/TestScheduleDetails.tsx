@@ -71,7 +71,7 @@ export default function TestScheduleDetails() {
       
       // Fetch organisation details
       if (scheduleData.organisationId) {
-        const orgsData = await apiClient.get("/organisations");
+        const orgsData = await apiClient.get("/organisations?size=1000");
         const orgs = orgsData.data?.data || [];
         const org = orgs.find((o: Organisation) => o.id === scheduleData.organisationId);
         setOrganisation(org || null);
@@ -96,7 +96,7 @@ export default function TestScheduleDetails() {
     try {
       setInvitationsLoading(true);
       // This endpoint might need to be added by backend
-      const response = await apiClient.get(`/candidate-invitations/schedule/${id}`);
+      const response = await apiClient.get(`/candidate-invitations/schedule/${id}?size=1000`);
       const data = response.data?.data || response.data;
       setInvitations(data || []);
     } catch (error) {

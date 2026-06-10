@@ -69,7 +69,7 @@ const unwrapArrayResponse = <T>(response: {
 
 export const candidateService = {
   getCandidates: async (): Promise<Candidate[]> => {
-    const response = await apiClient.get<Candidate[]>("/candidates");
+    const response = await apiClient.get<Candidate[]>("/candidates?size=1000");
     const rawList = unwrapArrayResponse(response);
     return rawList.map((c: Candidate & Record<string, unknown>) => {
       if (c.user) return c;

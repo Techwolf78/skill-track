@@ -49,7 +49,7 @@ export function EditCandidateDialog({ open, onOpenChange, candidate, onSuccess, 
   // Fetch organisations if SuperAdmin
   useEffect(() => {
     if (isSuperAdmin && open) {
-      apiClient.get("/organisations")
+      apiClient.get("/organisations?size=1000")
         .then(res => setOrganisations(res.data.data || []))
         .catch(err => console.error("Failed to fetch organisations", err));
     }

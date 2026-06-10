@@ -54,7 +54,7 @@ export const organisationService = {
   getOrganisations: async (): Promise<OrganisationResponse[]> => {
     const response =
       await apiClient.get<BaseResponse<OrganisationResponse[]>>(
-        "/organisations",
+        "/organisations?size=1000",
       );
 
     const data = response.data?.data;

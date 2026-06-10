@@ -682,7 +682,7 @@ export const testService = {
 
   // ==================== Test APIs ====================
   getAllTests: async (): Promise<Test[]> => {
-    const response = await apiClient.get<Test[]>("/tests");
+    const response = await apiClient.get<Test[]>("/tests?size=1000");
     return unwrapArrayResponse(response);
   },
 
@@ -894,7 +894,7 @@ export const testService = {
   },
 
   getAllTestSchedules: async (): Promise<TestScheduleExtended[]> => {
-    const response = await apiClient.get<TestScheduleExtended[]>("/test-schedules");
+    const response = await apiClient.get<TestScheduleExtended[]>("/test-schedules?size=1000");
     return unwrapArrayResponse(response);
   },
 
@@ -941,7 +941,7 @@ export const testService = {
   },
 
   getAllSessions: async (): Promise<TestSession[]> => {
-    const response = await apiClient.get<TestSession[]>("/test-sessions");
+    const response = await apiClient.get<TestSession[]>("/test-sessions?size=1000");
     return unwrapArrayResponse(response);
   },
 

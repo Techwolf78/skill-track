@@ -113,7 +113,7 @@ export default function TestSchedules() {
     queryKey: ["candidate-invitations"],
     queryFn: async () => {
       try {
-        const res = await apiClient.get("/candidate-invitations");
+        const res = await apiClient.get("/candidate-invitations?size=1000");
         const data = res.data?.data;
         if (Array.isArray(data)) {
           return data;

@@ -59,7 +59,7 @@ export default function InvitedCandidatesHistory() {
       const [schedulesData, candidatesData, invitationsResponse] = await Promise.all([
         testService.getAllTestSchedules(),
         candidateService.getCandidates(),
-        apiClient.get("/candidate-invitations").catch(() => ({ data: { data: [] } })),
+        apiClient.get("/candidate-invitations?size=1000").catch(() => ({ data: { data: [] } })),
       ]);
       
       // Fetch test details for each schedule

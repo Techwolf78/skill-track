@@ -102,7 +102,7 @@ export default function InviteCandidates() {
       setCandidates(candidatesData);
 
       try {
-        const response = await apiClient.get("/candidate-invitations");
+        const response = await apiClient.get("/candidate-invitations?size=1000");
         const invData = response.data?.data;
         if (Array.isArray(invData)) {
           setInvitations(invData);
