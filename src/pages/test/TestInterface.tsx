@@ -152,7 +152,12 @@ export default function TestInterface() {
   const { testId, sessionId } = useParams();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const [checked, setChecked] = useState(false);
+  const [checked, setChecked] = useState(() => {
+    if (sessionId) {
+      return sessionStorage.getItem(`env_checked_${sessionId}`) === "true";
+    }
+    return false;
+  });
 
   return (
     <ProctoringProvider sessionId={sessionId || "demo-session"}>
