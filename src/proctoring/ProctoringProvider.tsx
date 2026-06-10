@@ -30,6 +30,7 @@ export const ProctoringProvider: React.FC<{ children: React.ReactNode; sessionId
     trustScore: 100,
     isProctoringActive: false,
     cameraActive: false,
+    screenActive: false,
     micActive: false,
   });
 
