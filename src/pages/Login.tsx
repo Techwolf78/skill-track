@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import axios from "axios";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
@@ -31,6 +31,19 @@ export default function Login() {
   const { toast } = useToast();
   const { login: loginToContext } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
+  const [showColdStartMessage, setShowColdStartMessage] = useState(false);
+
+  useEffect(() => {
+    let timer: any;
+    if (isLoading) {
+      timer = setTimeout(() => {
+        setShowColdStartMessage(true);
+      }, 4000);
+    } else {
+      setShowColdStartMessage(false);
+    }
+    return () => clearTimeout(timer);
+  }, [isLoading]);
   const [adminEmail, setAdminEmail] = useState("superadmin@gryphonacademy.co.in");
   const [adminPassword, setAdminPassword] = useState("");
   const [studentEmail, setStudentEmail] = useState("");
@@ -313,6 +326,11 @@ export default function Login() {
                 >
                   {isLoading ? "Signing in..." : "Sign in as Admin"}
                 </Button>
+                {showColdStartMessage && (
+                  <p className="text-center text-xs text-amber-500 animate-pulse mt-2">
+                    ⏳ Backend is waking up... Cold start on Render free tier can take up to 50 seconds. Please wait.
+                  </p>
+                )}
 
               </form>
             </TabsContent>
@@ -377,6 +395,11 @@ export default function Login() {
                 >
                   {isLoading ? "Signing in..." : "Sign in as Candidate"}
                 </Button>
+                {showColdStartMessage && (
+                  <p className="text-center text-xs text-amber-500 animate-pulse mt-2">
+                    ⏳ Backend is waking up... Cold start on Render free tier can take up to 50 seconds. Please wait.
+                  </p>
+                )}
                 <p className="text-center text-sm text-muted-foreground">
                   Use the credentials shared by your assessment administrator
                 </p>
