@@ -133,10 +133,15 @@ function ManualResultFetcher() {
   const handleViewScorecard = async (sid: string) => {
     try {
       setPdfLoadingSessionId(sid);
-      const blob = await testService.downloadScorecard(sid);
+      const { data: blob, filename } = await testService.downloadScorecard(sid);
       const url = URL.createObjectURL(blob);
-      window.open(url, "_blank", "noopener,noreferrer");
-      setTimeout(() => URL.revokeObjectURL(url), 60000);
+      const link = document.createElement("a");
+      link.href = url;
+      link.setAttribute("download", filename);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
     } catch (error: any) {
       window.alert(error.message || "Scorecard PDF is not available yet.");
     } finally {
