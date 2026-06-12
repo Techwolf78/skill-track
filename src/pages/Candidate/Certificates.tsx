@@ -76,11 +76,16 @@ export default function Certificates() {
   const handleDownload = async (sessionId: string, title: string) => {
     try {
       setPdfLoadingId(sessionId);
-      const blob = await testService.downloadScorecard(sessionId);
+      const { data: blob, filename } = await testService.downloadScorecard(sessionId);
       const url = URL.createObjectURL(blob);
-      window.open(url, "_blank", "noopener,noreferrer");
-      setTimeout(() => URL.revokeObjectURL(url), 60000);
-      toast.success(`Scorecard PDF for '${title}' opened.`);
+      const link = document.createElement("a");
+      link.href = url;
+      link.setAttribute("download", filename);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+      toast.success(`Scorecard PDF for '${title}' downloaded.`);
     } catch (err: unknown) {
       toast.error((err as Error).message || "Scorecard PDF not available yet.");
     } finally {

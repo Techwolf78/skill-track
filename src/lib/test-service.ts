@@ -990,10 +990,23 @@ export const testService = {
     return response.data;
   },
 
-  downloadScorecard: async (sessionId: string): Promise<Blob> => {
+  downloadScorecard: async (sessionId: string): Promise<{ data: Blob; filename: string }> => {
     const response = await apiClient.get<Blob>(`/test-results/session/${sessionId}/scorecard`, {
       responseType: "blob",
     });
-    return response.data;
+    
+    let filename = `scorecard-${sessionId}.pdf`;
+    const disposition = response.headers?.["content-disposition"] || response.headers?.["Content-Disposition"];
+    if (disposition && disposition.includes("filename=")) {
+      const match = disposition.match(/filename=["']?([^"';]+)["']?/);
+      if (match && match[1]) {
+        filename = match[1];
+      }
+    }
+    
+    return {
+      data: response.data,
+      filename,
+    };
   },
 };
