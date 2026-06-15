@@ -209,7 +209,7 @@ Raw rate-limit response:
 
 ## 2. Endpoint Catalog
 
-There are 96 active controller endpoints.
+There are 99 active controller endpoints.
 
 ### Auth
 
@@ -230,6 +230,8 @@ Important:
 | Method | Path | Access | Request | Query | Response |
 |---|---|---|---|---|---|
 | `POST` | `/admin/users` | `ADMIN`, `SUPERADMIN` | `CreateUserRequest` | `role: Role` required | `200 BaseResponse<String>` |
+| `GET` | `/admin/audit-logs` | `ADMIN`, `SUPERADMIN` | none | `actor`, `start`, `end`, `page`, `size` | `200 BaseResponse<Page<AuditLog>>` |
+
 
 Important:
 
@@ -275,6 +277,9 @@ Scope:
 | `POST` | `/candidates/bulk-upload` | `ADMIN`, `SUPERADMIN` | multipart `file` | none | `200 BaseResponse<BulkUploadResult>` |
 | `PATCH` | `/candidates/{id}` | Scoped candidate access | `UpdateCandidateRequest` | none | `200 BaseResponse<CandidateResponse>` |
 | `DELETE` | `/candidates/{id}` | Scoped candidate access | none | none | `200 BaseResponse<String>` |
+| `GET` | `/candidates/me/insights` | `CANDIDATE` | none | none | `200 BaseResponse<CandidateInsightResponse>` |
+| `GET` | `/candidates/{id}/insights` | `ADMIN`, `SUPERADMIN`, scoped | none | none | `200 BaseResponse<CandidateInsightResponse>` |
+
 
 Bulk upload:
 
@@ -689,6 +694,25 @@ Types:
 | `email` | string |
 | `status` | `SUCCESS` or `FAILED` |
 | `errorMessage` | string/null |
+
+`CandidateInsightResponse`
+
+| Field | Type |
+|---|---|
+| `id` | UUID |
+| `candidateId` | UUID |
+| `totalEvals` | integer |
+| `totalTests` | integer |
+| `overallPercentile` | double |
+| `trends` | array of doubles |
+| `monthlyTrend` | object (key: yyyy-MM, value: double) |
+| `topicBreakdown` | object (key: topic, value: double) |
+| `strongTopics` | array of strings |
+| `weakTopics` | array of strings |
+| `commPercentile` | double |
+| `commTrend` | object (key: topic, value: double) |
+| `improvementAreas` | array of strings |
+| `lastComputed` | datetime |
 
 ### Candidate Invitation DTOs
 
@@ -1542,9 +1566,10 @@ The endpoint catalog above was verified against these active controller classes:
 |---|---|---:|
 | `AuthController` | `/auth` | 3 |
 | `AdminController` | `/admin` | 1 |
+| `AuditLogController` | `/admin/audit-logs` | 1 |
 | `UserController` | `/users` | 4 |
 | `OrganisationController` | `/organisations` | 4 |
-| `CandidateController` | `/candidates` | 6 |
+| `CandidateController` | `/candidates` | 8 |
 | `CandidateInvitationController` | `/candidate-invitations` | 6 |
 | `SubjectController` | `/subjects` | 6 |
 | `TopicController` | `/topics` | 7 |
@@ -1559,7 +1584,7 @@ The endpoint catalog above was verified against these active controller classes:
 | `TestCaseController` | `/test-cases` | 5 |
 | `CodeExecutionController` | `/api/code/execute` | 5 |
 
-Total: 96 active controller endpoints.
+Total: 99 active controller endpoints.
 
 ## 9. Actuator Note
 

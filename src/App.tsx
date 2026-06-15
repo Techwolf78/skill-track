@@ -29,6 +29,7 @@ import Settings from "./pages/SuperAdmin/Settings";
 import DSAPlayground from "./pages/SuperAdmin/DSAPlayground";
 import Reports from "./pages/SuperAdmin/Reports";
 import TestSchedules from "./pages/SuperAdmin/TestSchedules";
+import AuditLogs from "./pages/SuperAdmin/AuditLogs";
 import SeedData from "./pages/SeedData";
 import { AuthProvider } from "./lib/auth-context";
 import ErrorBoundary from "./components/ErrorBoundary";
@@ -126,6 +127,7 @@ const App = () => (
                 <Route path="questions/create" element={<AddQuestion />} />
                 <Route path="questions/edit/:id" element={<EditQuestion />} />
                 <Route path="reports" element={<Reports />} />
+                <Route path="audit-logs" element={<AuditLogs />} />
                 <Route path="settings" element={<Settings />} />
                 <Route path="subjects/manage" element={<ManageSubjects />} />
               </Route>
