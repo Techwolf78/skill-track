@@ -53,86 +53,9 @@ import {
   SlidersHorizontal,
   ChevronRight,
   GraduationCap,
-  Sparkles,
 } from "lucide-react";
 
-// Mock data fallbacks if no real candidate sessions are graded yet
-const mockTopPerformers = [
-  {
-    rank: 1,
-    name: "Sneha Gupta",
-    college: "Tech College",
-    batch: "CSE 2025",
-    score: 95,
-  },
-  {
-    rank: 2,
-    name: "Priya Patel",
-    college: "ABC Engineering",
-    batch: "CSE 2024",
-    score: 92,
-  },
-  {
-    rank: 3,
-    name: "Rahul Sharma",
-    college: "ABC Engineering",
-    batch: "CSE 2024",
-    score: 88,
-  },
-  {
-    rank: 4,
-    name: "Amit Kumar",
-    college: "XYZ Institute",
-    batch: "IT 2024",
-    score: 85,
-  },
-  {
-    rank: 5,
-    name: "Vikram Singh",
-    college: "ABC Engineering",
-    batch: "MCA 2024",
-    score: 82,
-  },
-];
-
-const mockBatchPerformance = [
-  {
-    batch: "CSE 2024",
-    college: "ABC Engineering",
-    students: 45,
-    avgScore: 78,
-    passRate: 89,
-  },
-  {
-    batch: "IT 2024",
-    college: "XYZ Institute",
-    students: 32,
-    avgScore: 72,
-    passRate: 84,
-  },
-  {
-    batch: "CSE 2025",
-    college: "Tech College",
-    students: 60,
-    avgScore: 81,
-    passRate: 92,
-  },
-  {
-    batch: "MCA 2024",
-    college: "ABC Engineering",
-    students: 28,
-    avgScore: 68,
-    passRate: 75,
-  },
-];
-
-const mockTopicWise = [
-  { topic: "Data Structures", avgScore: 75, difficulty: "Medium" },
-  { topic: "Algorithms", avgScore: 68, difficulty: "Hard" },
-  { topic: "Python", avgScore: 82, difficulty: "Easy" },
-  { topic: "Java", avgScore: 71, difficulty: "Medium" },
-  { topic: "SQL", avgScore: 79, difficulty: "Medium" },
-];
+// Mock data fallbacks removed for production
 
 const RESULT_POLL_INTERVAL_MS = 3000;
 const MAX_RESULT_POLL_ATTEMPTS = 40;
@@ -561,21 +484,21 @@ export default function Reports() {
 
   // Real Average Score
   const averageScore = useMemo(() => {
-    if (!isUsingRealData) return 78; // Fallback to mock
+    if (!isUsingRealData) return 0;
     const sum = realResults.reduce((acc, curr) => acc + curr.percentage, 0);
     return Math.round(sum / realResults.length);
   }, [realResults, isUsingRealData]);
 
   // Real Pass Rate
   const passRate = useMemo(() => {
-    if (!isUsingRealData) return 84; // Fallback to mock
+    if (!isUsingRealData) return 0;
     const passedCount = realResults.filter((r) => r.passed).length;
     return Math.round((passedCount / realResults.length) * 100);
   }, [realResults, isUsingRealData]);
 
   // Real Top Performers
   const computedTopPerformers = useMemo(() => {
-    if (!isUsingRealData) return mockTopPerformers;
+    if (!isUsingRealData) return [];
 
     // Sort descending by percentage
     const sortedResults = [...realResults].sort(
@@ -603,7 +526,7 @@ export default function Reports() {
 
   // Real Batch / Institution Performance
   const computedBatchPerformance = useMemo(() => {
-    if (!isUsingRealData) return mockBatchPerformance;
+    if (!isUsingRealData) return [];
 
     const orgGroups: Record<
       string,
@@ -636,7 +559,7 @@ export default function Reports() {
 
   // Real Test-Wise Performance
   const computedTopicWise = useMemo(() => {
-    if (!isUsingRealData) return mockTopicWise;
+    if (!isUsingRealData) return [];
 
     const testGroups: Record<
       string,
@@ -726,23 +649,6 @@ export default function Reports() {
 
         {/* ==================== TAB 1: OVERVIEW ANALYTICS ==================== */}
         <TabsContent value="overview" className="space-y-6 outline-none">
-          {/* Data Source Indicator */}
-          <div className="flex items-center justify-between p-3 px-4 rounded-xl border border-primary/20 bg-primary/5 text-xs font-semibold text-primary">
-            <div className="flex items-center gap-2">
-              <Sparkles className="h-4 w-4 text-primary animate-pulse" />
-              <span>
-                {isUsingRealData
-                  ? "Showing Live Production Data compiled from candidate evaluations."
-                  : "No completed candidate test results found. Showing demo preview simulation."}
-              </span>
-            </div>
-            <Badge
-              variant="outline"
-              className="text-[10px] uppercase font-extrabold border-primary/30 text-primary"
-            >
-              {isUsingRealData ? "Live" : "Preview Mode"}
-            </Badge>
-          </div>
 
           {/* Stats Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -775,21 +681,23 @@ export default function Reports() {
                   Average Score
                 </CardDescription>
                 <CardTitle className="text-3xl font-bold font-heading">
-                  {averageScore}%
+                  {isUsingRealData ? `${averageScore}%` : "No data available"}
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-2">
                 <div className="flex items-center text-xs text-muted-foreground font-semibold justify-between">
                   <span>Target Benchmark: 70%</span>
-                  <span
-                    className={
-                      averageScore >= 70 ? "text-green-500" : "text-yellow-500"
-                    }
-                  >
-                    {averageScore >= 70 ? "On Track" : "Below Target"}
-                  </span>
+                  {isUsingRealData && (
+                    <span
+                      className={
+                        averageScore >= 70 ? "text-green-500" : "text-yellow-500"
+                      }
+                    >
+                      {averageScore >= 70 ? "On Track" : "Below Target"}
+                    </span>
+                  )}
                 </div>
-                <Progress value={averageScore} className="h-1.5 bg-muted" />
+                <Progress value={isUsingRealData ? averageScore : 0} className="h-1.5 bg-muted" />
               </CardContent>
             </Card>
 
@@ -802,14 +710,14 @@ export default function Reports() {
                   Pass Rate
                 </CardDescription>
                 <CardTitle className="text-3xl font-bold font-heading">
-                  {passRate}%
+                  {isUsingRealData ? `${passRate}%` : "No data available"}
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-2">
                 <div className="flex items-center text-xs text-muted-foreground font-semibold justify-between">
                   <span>Target Pass Rate: 75%</span>
                 </div>
-                <Progress value={passRate} className="h-1.5 bg-muted" />
+                <Progress value={isUsingRealData ? passRate : 0} className="h-1.5 bg-muted" />
               </CardContent>
             </Card>
 
@@ -861,29 +769,37 @@ export default function Reports() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {computedTopPerformers.map((perf) => (
-                        <TableRow
-                          key={perf.rank}
-                          className="hover:bg-muted/10 transition-colors"
-                        >
-                          <TableCell className="text-center font-bold text-muted-foreground">
-                            {perf.rank}
-                          </TableCell>
-                          <TableCell>
-                            <div>
-                              <p className="font-semibold text-sm">
-                                {perf.name}
-                              </p>
-                              <p className="text-[10px] text-muted-foreground">
-                                {perf.college} • {perf.batch}
-                              </p>
-                            </div>
-                          </TableCell>
-                          <TableCell className="text-right font-bold text-primary">
-                            {perf.score}%
+                      {computedTopPerformers.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={3} className="text-center py-8 text-muted-foreground text-sm">
+                            No data available
                           </TableCell>
                         </TableRow>
-                      ))}
+                      ) : (
+                        computedTopPerformers.map((perf) => (
+                          <TableRow
+                            key={perf.rank}
+                            className="hover:bg-muted/10 transition-colors"
+                          >
+                            <TableCell className="text-center font-bold text-muted-foreground">
+                              {perf.rank}
+                            </TableCell>
+                            <TableCell>
+                              <div>
+                                <p className="font-semibold text-sm">
+                                  {perf.name}
+                                </p>
+                                <p className="text-[10px] text-muted-foreground">
+                                  {perf.college} • {perf.batch}
+                                </p>
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-right font-bold text-primary">
+                              {perf.score}%
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      )}
                     </TableBody>
                   </Table>
                 </div>
@@ -915,34 +831,42 @@ export default function Reports() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {computedBatchPerformance.map((batch, index) => (
-                        <TableRow
-                          key={index}
-                          className="hover:bg-muted/10 transition-colors"
-                        >
-                          <TableCell>
-                            <div>
-                              <p className="font-semibold text-sm">
-                                {batch.batch}
-                              </p>
-                              <p className="text-[10px] text-muted-foreground">
-                                {batch.college}
-                              </p>
-                            </div>
-                          </TableCell>
-                          <TableCell className="text-center text-sm font-semibold">
-                            {batch.students}
-                          </TableCell>
-                          <TableCell className="text-center text-sm font-bold text-foreground">
-                            {batch.avgScore}%
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <Badge className="bg-green-500/10 text-green-500 border-green-500/20 font-bold">
-                              {batch.passRate}% Pass
-                            </Badge>
+                      {computedBatchPerformance.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={4} className="text-center py-8 text-muted-foreground text-sm">
+                            No data available
                           </TableCell>
                         </TableRow>
-                      ))}
+                      ) : (
+                        computedBatchPerformance.map((batch, index) => (
+                          <TableRow
+                            key={index}
+                            className="hover:bg-muted/10 transition-colors"
+                          >
+                            <TableCell>
+                              <div>
+                                <p className="font-semibold text-sm">
+                                  {batch.batch}
+                                </p>
+                                <p className="text-[10px] text-muted-foreground">
+                                  {batch.college}
+                                </p>
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-center text-sm font-semibold">
+                              {batch.students}
+                            </TableCell>
+                            <TableCell className="text-center text-sm font-bold text-foreground">
+                              {batch.avgScore}%
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <Badge className="bg-green-500/10 text-green-500 border-green-500/20 font-bold">
+                                {batch.passRate}% Pass
+                              </Badge>
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      )}
                     </TableBody>
                   </Table>
                 </div>
@@ -962,33 +886,39 @@ export default function Reports() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
-                {computedTopicWise.map((topic, index) => (
-                  <div
-                    key={index}
-                    className="space-y-2 p-4 border rounded-xl bg-background/50 hover:bg-background/80 transition-all shadow-sm"
-                  >
-                    <div className="flex justify-between items-center text-sm">
-                      <span className="font-semibold text-foreground">
-                        {topic.topic}
-                      </span>
-                      <Badge
-                        variant="outline"
-                        className="text-xs uppercase font-bold tracking-wider px-2 py-0.5"
-                      >
-                        {topic.difficulty}
-                      </Badge>
+              {computedTopicWise.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground text-sm">
+                  No data available
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
+                  {computedTopicWise.map((topic, index) => (
+                    <div
+                      key={index}
+                      className="space-y-2 p-4 border rounded-xl bg-background/50 hover:bg-background/80 transition-all shadow-sm"
+                    >
+                      <div className="flex justify-between items-center text-sm">
+                        <span className="font-semibold text-foreground">
+                          {topic.topic}
+                        </span>
+                        <Badge
+                          variant="outline"
+                          className="text-xs uppercase font-bold tracking-wider px-2 py-0.5"
+                        >
+                          {topic.difficulty}
+                        </Badge>
+                      </div>
+                      <div className="flex justify-between items-center text-xs text-muted-foreground">
+                        <span>Average Score:</span>
+                        <span className="font-bold text-primary">
+                          {topic.avgScore}%
+                        </span>
+                      </div>
+                      <Progress value={topic.avgScore} className="h-2 bg-muted" />
                     </div>
-                    <div className="flex justify-between items-center text-xs text-muted-foreground">
-                      <span>Average Score:</span>
-                      <span className="font-bold text-primary">
-                        {topic.avgScore}%
-                      </span>
-                    </div>
-                    <Progress value={topic.avgScore} className="h-2 bg-muted" />
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
