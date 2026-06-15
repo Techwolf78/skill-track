@@ -33,6 +33,7 @@ export const EnvironmentCheck: React.FC<{ onComplete: () => void }> = ({ onCompl
   });
   const [isVerifying, setIsVerifying] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [screenErrorMsg, setScreenErrorMsg] = useState<string | null>(null);
 
   useEffect(() => {
     const handleFullscreenChange = () => {
@@ -50,6 +51,7 @@ export const EnvironmentCheck: React.FC<{ onComplete: () => void }> = ({ onCompl
 
   const verifyEnvironment = async () => {
     setIsVerifying(true);
+    setScreenErrorMsg(null);
     
     // 1. Browser Check
     const isModern = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
@@ -73,9 +75,40 @@ export const EnvironmentCheck: React.FC<{ onComplete: () => void }> = ({ onCompl
       setChecks(prev => ({ ...prev, mic: "error" }));
     }
 
-    // 4. Screen Support Check (Don't prompt yet to avoid double-popup)
-    const hasScreenShareSupport = !!(navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia);
-    setChecks(prev => ({ ...prev, screen: hasScreenShareSupport ? "success" : "error" }));
+    // 4. Screen Sharing & Multiple Displays Check
+    try {
+      if (navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia) {
+        const screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
+        
+        const track = screenStream.getVideoTracks()[0];
+        const settings = track ? track.getSettings() : {};
+        const displaySurface = settings.displaySurface;
+        const isEntireScreen = displaySurface !== 'window' && displaySurface !== 'browser';
+
+        // Check for multiple monitors
+        const isExtended = 'isExtended' in window.screen ? (window.screen as unknown as { isExtended?: boolean }).isExtended : false;
+        
+        // Stop screen tracks immediately
+        screenStream.getTracks().forEach(t => t.stop());
+
+        if (!isEntireScreen) {
+          setChecks(prev => ({ ...prev, screen: "error" }));
+          setScreenErrorMsg("Please share your ENTIRE screen (not a window or tab) and close all other apps (VS Code, Teams, Brave, etc.) to proceed.");
+        } else if (isExtended) {
+          setChecks(prev => ({ ...prev, screen: "error" }));
+          setScreenErrorMsg("Multiple displays detected. Please disconnect extra monitors to proceed.");
+        } else {
+          setChecks(prev => ({ ...prev, screen: "success" }));
+        }
+      } else {
+        setChecks(prev => ({ ...prev, screen: "error" }));
+        setScreenErrorMsg("Your browser does not support screen sharing.");
+      }
+    } catch (e) {
+      console.error("Screen sharing check failed:", e);
+      setChecks(prev => ({ ...prev, screen: "error" }));
+      setScreenErrorMsg("Screen sharing permission is required. Please close other applications and try again.");
+    }
 
     setIsVerifying(false);
   };
@@ -134,6 +167,12 @@ export const EnvironmentCheck: React.FC<{ onComplete: () => void }> = ({ onCompl
             label="Microphone Access" 
             status={checks.mic} 
             description="Required for audio monitoring"
+          />
+          <CheckItem 
+            icon={<Monitor className="w-5 h-5" />} 
+            label="Screen Share & Display Check" 
+            status={checks.screen} 
+            description={screenErrorMsg || "Ensure only one monitor is connected"}
           />
           <CheckItem 
             icon={<ShieldCheck className="w-5 h-5" />} 

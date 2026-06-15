@@ -137,7 +137,12 @@ interface BentoCardProps {
   children: React.ReactNode;
 }
 
-function BentoCard({ className = "", index, borderRadiusClass, children }: BentoCardProps) {
+function BentoCard({
+  className = "",
+  index,
+  borderRadiusClass,
+  children,
+}: BentoCardProps) {
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
     const rect = e.currentTarget.getBoundingClientRect();
     const x = e.clientX - rect.left;
@@ -156,25 +161,30 @@ function BentoCard({ className = "", index, borderRadiusClass, children }: Bento
       className={`group relative overflow-hidden border border-border/60 bg-white/85 backdrop-blur-md p-8 transition-all duration-500 hover:-translate-y-2 hover:shadow-2xl hover:shadow-primary/5 hover:border-transparent ${borderRadiusClass} ${className}`}
     >
       {/* Background spotlight gradient */}
-      <div 
+      <div
         className="pointer-events-none absolute -inset-px opacity-0 transition-opacity duration-500 group-hover:opacity-100"
         style={{
           borderRadius: "inherit",
-          background: "radial-gradient(400px circle at var(--mouse-x) var(--mouse-y), rgba(255, 87, 51, 0.08), rgba(255, 122, 0, 0.03), transparent 80%)"
+          background:
+            "radial-gradient(400px circle at var(--mouse-x) var(--mouse-y), rgba(255, 87, 51, 0.08), rgba(255, 122, 0, 0.03), transparent 80%)",
         }}
       />
-      
+
       {/* Dynamic Border Spotlight */}
-      <div 
+      <div
         className="pointer-events-none absolute -inset-px opacity-0 transition-opacity duration-500 group-hover:opacity-100"
-        style={{
-          borderRadius: "inherit",
-          padding: "1px",
-          background: "radial-gradient(300px circle at var(--mouse-x) var(--mouse-y), rgba(255, 87, 51, 0.4), rgba(255, 122, 0, 0.2), transparent 60%)",
-          WebkitMask: "linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)",
-          WebkitMaskComposite: "xor",
-          maskComposite: "exclude"
-        } as React.CSSProperties}
+        style={
+          {
+            borderRadius: "inherit",
+            padding: "1px",
+            background:
+              "radial-gradient(300px circle at var(--mouse-x) var(--mouse-y), rgba(255, 87, 51, 0.4), rgba(255, 122, 0, 0.2), transparent 60%)",
+            WebkitMask:
+              "linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)",
+            WebkitMaskComposite: "xor",
+            maskComposite: "exclude",
+          } as React.CSSProperties
+        }
       />
 
       <div className="relative z-10 flex flex-col h-full justify-between">
@@ -232,14 +242,15 @@ function assessCandidate(skills) {
 
       {/* Main Glassmorphic Panel */}
       <div className="relative rounded-2xl border border-white/20 bg-slate-950/95 shadow-2xl backdrop-blur-xl overflow-hidden text-slate-300 font-mono text-[11px] flex flex-col h-[400px]">
-        
         {/* Header Bar */}
         <div className="flex items-center justify-between px-4 py-2.5 bg-slate-900/60 border-b border-white/5">
           <div className="flex items-center gap-1.5">
             <span className="w-2.5 h-2.5 rounded-full bg-rose-500/80" />
             <span className="w-2.5 h-2.5 rounded-full bg-amber-500/80" />
             <span className="w-2.5 h-2.5 rounded-full bg-emerald-500/80" />
-            <span className="text-[9px] text-slate-500 font-sans ml-2">RxOne Candidate Hub v2.1</span>
+            <span className="text-[9px] text-slate-500 font-sans ml-2">
+              RxOne Candidate Hub v2.1
+            </span>
           </div>
           <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-slate-800 text-[9px] text-slate-400 font-sans">
             <span className="w-1 h-1 rounded-full bg-emerald-500 animate-pulse" />
@@ -249,24 +260,26 @@ function assessCandidate(skills) {
 
         {/* Inner Content Grid */}
         <div className="flex-1 grid grid-cols-3 divide-x divide-white/5 overflow-hidden">
-          
           {/* Left panel: Proctor Monitor */}
           <div className="col-span-1 p-2.5 flex flex-col justify-between bg-slate-950/50">
             <div>
-              <span className="text-[8px] text-slate-500 font-sans uppercase font-bold tracking-wider block mb-1.5">AI Proctoring Feed</span>
-              
+              <span className="text-[8px] text-slate-500 font-sans uppercase font-bold tracking-wider block mb-1.5">
+                AI Proctoring Feed
+              </span>
+
               {/* Webcam View Mock */}
               <div className="relative h-[115px] w-full bg-slate-900 rounded-lg overflow-hidden border border-white/5 flex items-center justify-center">
-                
                 {/* Scanning overlay effect */}
                 <div className="absolute inset-0 bg-gradient-to-b from-primary/0 via-accent/5 to-primary/0 animate-pulse" />
-                
+
                 {stage >= 1 ? (
                   <div className="flex flex-col items-center justify-center text-center p-1">
                     {stage === 1 ? (
                       <>
                         <Loader2 className="w-5 h-5 text-accent animate-spin mb-0.5" />
-                        <span className="text-[7px] text-accent animate-pulse font-sans">Verifying Face...</span>
+                        <span className="text-[7px] text-accent animate-pulse font-sans">
+                          Verifying Face...
+                        </span>
                       </>
                     ) : (
                       <>
@@ -278,7 +291,9 @@ function assessCandidate(skills) {
                             <Check className="w-1.5 h-1.5 text-white" />
                           </span>
                         </div>
-                        <span className="text-[7px] text-emerald-400 font-sans font-bold mt-1 uppercase tracking-wide">Verified</span>
+                        <span className="text-[7px] text-emerald-400 font-sans font-bold mt-1 uppercase tracking-wide">
+                          Verified
+                        </span>
                       </>
                     )}
                   </div>
@@ -295,15 +310,39 @@ function assessCandidate(skills) {
             <div className="flex flex-col gap-1 font-sans mt-2">
               <div className="flex items-center justify-between text-[8px] text-slate-400">
                 <span>Eye Tracking:</span>
-                <span className={stage >= 2 ? "text-emerald-400 font-semibold" : "text-slate-500"}>{stage >= 2 ? "Locked" : "Standby"}</span>
+                <span
+                  className={
+                    stage >= 2
+                      ? "text-emerald-400 font-semibold"
+                      : "text-slate-500"
+                  }
+                >
+                  {stage >= 2 ? "Locked" : "Standby"}
+                </span>
               </div>
               <div className="flex items-center justify-between text-[8px] text-slate-400">
                 <span>Audio Feed:</span>
-                <span className={stage >= 2 ? "text-emerald-400 font-semibold" : "text-slate-500"}>{stage >= 2 ? "Safe (0dB)" : "Standby"}</span>
+                <span
+                  className={
+                    stage >= 2
+                      ? "text-emerald-400 font-semibold"
+                      : "text-slate-500"
+                  }
+                >
+                  {stage >= 2 ? "Safe (0dB)" : "Standby"}
+                </span>
               </div>
               <div className="flex items-center justify-between text-[8px] text-slate-400">
                 <span>Device Lock:</span>
-                <span className={stage >= 1 ? "text-emerald-400 font-semibold" : "text-slate-500"}>{stage >= 1 ? "Active" : "Standby"}</span>
+                <span
+                  className={
+                    stage >= 1
+                      ? "text-emerald-400 font-semibold"
+                      : "text-slate-500"
+                  }
+                >
+                  {stage >= 1 ? "Active" : "Standby"}
+                </span>
               </div>
             </div>
           </div>
@@ -312,13 +351,23 @@ function assessCandidate(skills) {
           <div className="col-span-2 p-2.5 flex flex-col justify-between overflow-hidden bg-slate-900/20">
             <div className="flex-1 overflow-y-auto pr-1">
               <div className="flex items-center justify-between mb-1.5">
-                <span className="text-[8px] text-slate-500 font-sans uppercase font-bold tracking-wider">Candidate Workspace</span>
-                <span className="text-[8px] text-accent/80">JavaScript (ES6)</span>
+                <span className="text-[8px] text-slate-500 font-sans uppercase font-bold tracking-wider">
+                  Candidate Workspace
+                </span>
+                <span className="text-[8px] text-accent/80">
+                  JavaScript (ES6)
+                </span>
               </div>
-              
+
               <pre className="text-[9px] text-slate-350 leading-tight font-mono select-none whitespace-pre-wrap">
-                {codeText || <span className="text-slate-600 animate-pulse">// Waiting for candidate initialization...</span>}
-                {stage === 2 && <span className="w-1.5 h-3 bg-primary inline-block ml-0.5 animate-pulse" />}
+                {codeText || (
+                  <span className="text-slate-600 animate-pulse">
+                    // Waiting for candidate initialization...
+                  </span>
+                )}
+                {stage === 2 && (
+                  <span className="w-1.5 h-3 bg-primary inline-block ml-0.5 animate-pulse" />
+                )}
               </pre>
             </div>
 
@@ -332,38 +381,67 @@ function assessCandidate(skills) {
                   </span>
                 )}
               </div>
-              
+
               <div className="bg-slate-950 p-1.5 rounded border border-white/5 font-mono text-[8px] h-[95px] overflow-y-auto flex flex-col justify-between">
-                {stage === 0 && <span className="text-slate-550">System idle. Ready to initialize exam context.</span>}
-                {stage === 1 && <span className="text-accent animate-pulse">Running hardware validation, browser check, lock verification...</span>}
-                {stage === 2 && <span className="text-slate-400">Coding challenge: write assessCandidate helper to output classification.</span>}
-                {stage === 3 && <span className="text-slate-400">Loading tests... Executing Test Suite [1..3]...</span>}
+                {stage === 0 && (
+                  <span className="text-slate-550">
+                    System idle. Ready to initialize exam context.
+                  </span>
+                )}
+                {stage === 1 && (
+                  <span className="text-accent animate-pulse">
+                    Running hardware validation, browser check, lock
+                    verification...
+                  </span>
+                )}
+                {stage === 2 && (
+                  <span className="text-slate-400">
+                    Coding challenge: write assessCandidate helper to output
+                    classification.
+                  </span>
+                )}
+                {stage === 3 && (
+                  <span className="text-slate-400">
+                    Loading tests... Executing Test Suite [1..3]...
+                  </span>
+                )}
                 {stage === 4 && (
                   <div className="flex flex-col gap-0.5">
-                    <span className="text-emerald-400 font-bold">✓ Test 1: Standard classification check passed.</span>
-                    <span className="text-emerald-400 font-bold">✓ Test 2: Edge-case boundary array check passed.</span>
-                    <span className="text-emerald-405 font-bold">✓ Test 3: Weight rating computation passed.</span>
-                    <span className="text-primary font-bold mt-0.5">Evaluation Score: 100/100 (Recommended Candidate)</span>
+                    <span className="text-emerald-400 font-bold">
+                      ✓ Test 1: Standard classification check passed.
+                    </span>
+                    <span className="text-emerald-400 font-bold">
+                      ✓ Test 2: Edge-case boundary array check passed.
+                    </span>
+                    <span className="text-emerald-405 font-bold">
+                      ✓ Test 3: Weight rating computation passed.
+                    </span>
+                    <span className="text-primary font-bold mt-0.5">
+                      Evaluation Score: 100/100 (Recommended Candidate)
+                    </span>
                   </div>
                 )}
               </div>
             </div>
-
           </div>
-
         </div>
-
       </div>
 
       {/* Floating Sparkly Score Badge */}
       <motion.div
-        animate={stage === 4 ? { opacity: 1, scale: 1, y: 0 } : { opacity: 0, scale: 0.8, y: 10 }}
+        animate={
+          stage === 4
+            ? { opacity: 1, scale: 1, y: 0 }
+            : { opacity: 0, scale: 0.8, y: 10 }
+        }
         transition={{ type: "spring", stiffness: 200, damping: 15 }}
         className="absolute -top-6 -right-6 bg-gradient-primary text-white font-sans font-bold px-4 py-2 rounded-xl shadow-xl flex items-center gap-1.5 border border-white/20 z-20 pointer-events-none"
       >
         <Sparkles className="w-4 h-4 fill-current" />
         <div className="flex flex-col">
-          <span className="text-[8px] uppercase tracking-wider text-white/80">Automated Grade</span>
+          <span className="text-[8px] uppercase tracking-wider text-white/80">
+            Automated Grade
+          </span>
           <span className="text-xs leading-none">98% Accuracy Score</span>
         </div>
       </motion.div>
@@ -376,7 +454,9 @@ export default function NationalLandingPage() {
   const [isScrolled, setIsScrolled] = useState(false);
   const [scrollProgress, setScrollProgress] = useState(0);
   const [isNavTransitioning, setIsNavTransitioning] = useState(false);
-  const [activeLayout, setActiveLayout] = useState<"horizontal" | "vertical">("horizontal");
+  const [activeLayout, setActiveLayout] = useState<"horizontal" | "vertical">(
+    "horizontal",
+  );
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -393,8 +473,10 @@ export default function NationalLandingPage() {
         setIsScrolled(false);
       }
 
-      const totalHeight = document.documentElement.scrollHeight - window.innerHeight;
-      const progress = totalHeight > 0 ? (window.scrollY / totalHeight) * 100 : 0;
+      const totalHeight =
+        document.documentElement.scrollHeight - window.innerHeight;
+      const progress =
+        totalHeight > 0 ? (window.scrollY / totalHeight) * 100 : 0;
       setScrollProgress(progress);
     };
     window.addEventListener("scroll", handleScroll);
@@ -439,7 +521,11 @@ export default function NationalLandingPage() {
       <div className="fixed inset-0 pointer-events-none z-50">
         <motion.nav
           layout
-          transition={{ type: "tween", ease: [0.76, 0, 0.24, 1], duration: 0.85 }}
+          transition={{
+            type: "tween",
+            ease: [0.76, 0, 0.24, 1],
+            duration: 0.85,
+          }}
           className={`fixed pointer-events-auto flex items-center justify-between border text-white backdrop-blur-xl bg-slate-950 shadow-2xl rounded-full ${
             isScrolled
               ? "flex-col py-6 px-2 border-white/15 shadow-[0_20px_50px_rgba(0,0,0,0.5)]"
@@ -477,14 +563,16 @@ export default function NationalLandingPage() {
             transition={{ duration: 0.2, ease: "easeInOut" }}
           >
             {/* Brand Logo / Icon */}
-            <div 
+            <div
               className={`flex items-center cursor-pointer ${
                 activeLayout === "vertical" ? "flex-col gap-1.5" : "gap-2.5"
-              }`} 
+              }`}
               onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
             >
               <div className="w-8 h-8 rounded-lg bg-gradient-primary flex items-center justify-center shadow-lg shadow-primary flex-shrink-0">
-                <span className="text-sm font-black text-white font-sans">R</span>
+                <span className="text-sm font-black text-white font-sans">
+                  R
+                </span>
               </div>
               {activeLayout !== "vertical" && (
                 <span className="font-heading font-extrabold text-lg tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-white to-slate-300">
@@ -509,12 +597,14 @@ export default function NationalLandingPage() {
                       href={`#${item.id}`}
                       onClick={(e) => {
                         e.preventDefault();
-                        document.getElementById(item.id)?.scrollIntoView({ behavior: "smooth" });
+                        document
+                          .getElementById(item.id)
+                          ?.scrollIntoView({ behavior: "smooth" });
                       }}
                       className="w-10 h-10 rounded-full flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-900 border border-transparent hover:border-white/10 transition-all duration-300 relative group"
                     >
                       <Icon className="w-4 h-4" />
-                      
+
                       {/* Floating Tooltip Label */}
                       <div className="absolute left-14 opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-all duration-300 transform translate-x-2 group-hover:translate-x-0 bg-slate-950 border border-white/15 px-3 py-1.5 rounded-lg text-[9px] font-bold text-white uppercase tracking-wider shadow-2xl whitespace-nowrap z-50">
                         {item.label}
@@ -536,7 +626,9 @@ export default function NationalLandingPage() {
                     href={`#${item.id}`}
                     onClick={(e) => {
                       e.preventDefault();
-                      document.getElementById(item.id)?.scrollIntoView({ behavior: "smooth" });
+                      document
+                        .getElementById(item.id)
+                        ?.scrollIntoView({ behavior: "smooth" });
                     }}
                     className="hover:text-white transition-colors py-1 relative group"
                   >
@@ -548,7 +640,9 @@ export default function NationalLandingPage() {
             )}
 
             {/* Right CTA / Action Buttons */}
-            <div className={`flex items-center ${activeLayout === "vertical" ? "flex-col" : "gap-3"}`}>
+            <div
+              className={`flex items-center ${activeLayout === "vertical" ? "flex-col" : "gap-3"}`}
+            >
               {activeLayout !== "vertical" && (
                 <Button
                   variant="ghost"
@@ -559,7 +653,7 @@ export default function NationalLandingPage() {
                   Login
                 </Button>
               )}
-              
+
               {activeLayout === "vertical" ? (
                 <button
                   onClick={() =>
@@ -592,7 +686,6 @@ export default function NationalLandingPage() {
 
       {/* Hero Section */}
       <section className="relative overflow-hidden bg-background pt-28 md:pt-32 pb-16 border-b border-slate-100">
-        
         {/* Modern radial visual gradients and particles backdrop */}
         <div className="absolute top-0 left-1/3 w-[600px] h-[600px] bg-gradient-to-br from-primary/10 via-transparent to-primary/5 rounded-full blur-[140px] pointer-events-none -z-10" />
         <div className="absolute bottom-10 right-1/4 w-[400px] h-[400px] bg-primary/2 rounded-full blur-[100px] pointer-events-none -z-10" />
@@ -603,7 +696,6 @@ export default function NationalLandingPage() {
 
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
-            
             {/* Left Column: Context Content */}
             <div className="lg:col-span-7 text-left flex flex-col justify-center">
               <motion.div
@@ -617,18 +709,26 @@ export default function NationalLandingPage() {
                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                     <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
                   </span>
-                  <Globe className="w-3.5 h-3.5 text-accent mr-1 animate-spin" style={{ animationDuration: '20s' }} />
+                  <Globe
+                    className="w-3.5 h-3.5 text-accent mr-1 animate-spin"
+                    style={{ animationDuration: "20s" }}
+                  />
                   <span>Trusted by 500+ Institutions Nationwide</span>
                 </div>
 
                 <h1 className="text-3xl sm:text-4xl md:text-5xl font-heading font-extrabold text-slate-900 leading-[1.15] mb-4 tracking-tight">
                   The Intelligent Way to <br />
-                  <span className="text-gradient-primary">Assess, Evaluate & Hire</span> <br />
+                  <span className="text-gradient-primary">
+                    Assess, Evaluate & Hire
+                  </span>{" "}
+                  <br />
                   at Scale
                 </h1>
 
                 <p className="text-base md:text-lg text-muted-foreground leading-relaxed mb-6 max-w-2xl">
-                  Empower your institution with next-gen secure, scalable assessment solutions. Automatically proctor tests, evaluate tech and non-tech skills, and drive academic excellence.
+                  Empower your institution with next-gen secure, scalable
+                  assessment solutions. Automatically proctor tests, evaluate
+                  tech and non-tech skills, and drive academic excellence.
                 </p>
 
                 {/* Direct Action buttons */}
@@ -664,13 +764,16 @@ export default function NationalLandingPage() {
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                     {stats.map((stat, index) => (
                       <div key={index} className="flex flex-col">
-                        <span className="text-xl md:text-2xl font-extrabold text-slate-900 tracking-tight">{stat.number}</span>
-                        <span className="text-[10px] text-muted-foreground mt-0.5 font-medium">{stat.label}</span>
+                        <span className="text-xl md:text-2xl font-extrabold text-slate-900 tracking-tight">
+                          {stat.number}
+                        </span>
+                        <span className="text-[10px] text-muted-foreground mt-0.5 font-medium">
+                          {stat.label}
+                        </span>
                       </div>
                     ))}
                   </div>
                 </div>
-
               </motion.div>
             </div>
 
@@ -685,17 +788,19 @@ export default function NationalLandingPage() {
                 <HeroMockConsole />
               </motion.div>
             </div>
-
           </div>
         </div>
       </section>
 
       {/* Features Section */}
-      <section id="features" className="relative py-32 bg-background overflow-hidden">
+      <section
+        id="features"
+        className="relative py-32 bg-background overflow-hidden"
+      >
         {/* Subtle decorative background glows */}
         <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[800px] h-[350px] bg-gradient-to-tr from-primary/5 to-primary/2 rounded-full blur-[120px] pointer-events-none -z-10" />
         <div className="absolute bottom-1/4 right-10 w-[300px] h-[300px] bg-primary/2 rounded-full blur-[80px] pointer-events-none -z-10" />
-        
+
         {/* Fine grid background for a tech feel */}
         <div className="absolute inset-0 bg-[linear-gradient(to_right,rgba(0,0,0,0.015)_1px,transparent_1px),linear-gradient(to_bottom,rgba(0,0,0,0.015)_1px,transparent_1px)] bg-[size:32px_32px] pointer-events-none [mask-image:radial-gradient(ellipse_60%_50%_at_50%_50%,#000_70%,transparent_100%)] -z-20" />
 
@@ -707,11 +812,17 @@ export default function NationalLandingPage() {
               viewport={{ once: true }}
               transition={{ duration: 0.5 }}
             >
-              <Badge variant="secondary" className="mb-4 bg-primary/10 text-primary border-primary/20 px-3 py-1 font-medium tracking-wide">
+              <Badge
+                variant="secondary"
+                className="mb-4 bg-primary/10 text-primary border-primary/20 px-3 py-1 font-medium tracking-wide"
+              >
                 Key Features
               </Badge>
               <h2 className="text-4xl md:text-5xl font-heading font-extrabold mb-6 tracking-tight text-slate-900 leading-[1.15]">
-                Comprehensive <span className="text-gradient-primary">Assessment Solutions</span>
+                Comprehensive{" "}
+                <span className="text-gradient-primary">
+                  Assessment Solutions
+                </span>
               </h2>
               <p className="text-lg md:text-xl text-muted-foreground leading-relaxed">
                 Everything you need to conduct secure, efficient, and insightful
@@ -738,7 +849,9 @@ export default function NationalLandingPage() {
                       Advanced Anti-Cheating
                     </h3>
                     <p className="text-muted-foreground leading-relaxed text-sm group-hover:text-slate-600 transition-colors">
-                      AI-powered proctoring with real-time monitoring and automated violation detection. Maintain the highest exam integrity.
+                      AI-powered proctoring with real-time monitoring and
+                      automated violation detection. Maintain the highest exam
+                      integrity.
                     </p>
                   </div>
                   <div className="mt-6 flex items-center gap-2 text-xs font-semibold text-primary">
@@ -749,8 +862,11 @@ export default function NationalLandingPage() {
                 {/* Visual Mock */}
                 <div className="relative border border-border/50 bg-slate-900 rounded-2xl p-4 overflow-hidden shadow-inner h-48 flex flex-col justify-between">
                   {/* Scan line effect */}
-                  <div className="absolute top-0 left-0 w-full h-[2px] bg-primary/40 animate-pulse" style={{ animationDuration: '2s' }} />
-                  
+                  <div
+                    className="absolute top-0 left-0 w-full h-[2px] bg-primary/40 animate-pulse"
+                    style={{ animationDuration: "2s" }}
+                  />
+
                   {/* Face silhouette placeholder */}
                   <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-20">
                     <div className="w-24 h-24 rounded-full border-2 border-dashed border-accent/40 flex items-center justify-center">
@@ -767,7 +883,7 @@ export default function NationalLandingPage() {
                       Cam-01
                     </span>
                   </div>
-                  
+
                   <div className="relative z-10 flex flex-col gap-1 w-full bg-slate-850/80 backdrop-blur-md p-3 rounded-lg border border-white/5 font-mono text-[10px] text-slate-300">
                     <div className="flex justify-between">
                       <span>Gaze Focus:</span>
@@ -802,7 +918,9 @@ export default function NationalLandingPage() {
                     Comprehensive Analytics
                   </h3>
                   <p className="text-muted-foreground leading-relaxed text-sm group-hover:text-slate-600 transition-colors">
-                    Detailed performance insights with customizable reports and data-driven insights. Generate custom exports with detailed psychometric graphs.
+                    Detailed performance insights with customizable reports and
+                    data-driven insights. Generate custom exports with detailed
+                    psychometric graphs.
                   </p>
                 </div>
                 {/* Visual Mock */}
@@ -823,7 +941,9 @@ export default function NationalLandingPage() {
                       <span className="w-2 h-2 rounded-full bg-accent" />
                       <span>Speed</span>
                     </div>
-                    <span className="text-foreground font-semibold">98% Acc.</span>
+                    <span className="text-foreground font-semibold">
+                      98% Acc.
+                    </span>
                   </div>
                 </div>
               </div>
@@ -845,14 +965,19 @@ export default function NationalLandingPage() {
                     Real-time Assessment
                   </h3>
                   <p className="text-muted-foreground leading-relaxed text-sm group-hover:text-slate-600 transition-colors">
-                    Instant evaluation with automated grading and immediate feedback systems.
+                    Instant evaluation with automated grading and immediate
+                    feedback systems.
                   </p>
                 </div>
                 {/* Visual Mock */}
                 <div className="mt-6 border border-border/50 bg-slate-50/50 rounded-2xl p-4 flex items-center justify-between shadow-inner">
                   <div className="flex flex-col">
-                    <span className="text-[10px] text-muted-foreground uppercase font-semibold">Remaining</span>
-                    <span className="text-lg font-mono font-bold text-slate-800 tracking-wider">00:42:15</span>
+                    <span className="text-[10px] text-muted-foreground uppercase font-semibold">
+                      Remaining
+                    </span>
+                    <span className="text-lg font-mono font-bold text-slate-800 tracking-wider">
+                      00:42:15
+                    </span>
                   </div>
                   <div className="px-3 py-1.5 rounded-full bg-emerald-50 text-emerald-600 font-semibold text-xs border border-emerald-100 flex items-center gap-1">
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
@@ -878,14 +1003,21 @@ export default function NationalLandingPage() {
                     Custom Test Builder
                   </h3>
                   <p className="text-muted-foreground leading-relaxed text-sm group-hover:text-slate-600 transition-colors">
-                    Create assessments with multiple question types, coding challenges, and adaptive difficulty.
+                    Create assessments with multiple question types, coding
+                    challenges, and adaptive difficulty.
                   </p>
                 </div>
                 {/* Visual Mock */}
                 <div className="mt-6 flex flex-wrap gap-2">
-                  <span className="px-2.5 py-1 rounded-full bg-purple-50 text-purple-600 text-xs font-semibold border border-purple-100">Coding Qs</span>
-                  <span className="px-2.5 py-1 rounded-full bg-blue-50 text-blue-600 text-xs font-semibold border border-blue-100">MCQs</span>
-                  <span className="px-2.5 py-1 rounded-full bg-amber-50 text-amber-600 text-xs font-semibold border border-amber-100">Adaptive</span>
+                  <span className="px-2.5 py-1 rounded-full bg-purple-50 text-purple-600 text-xs font-semibold border border-purple-100">
+                    Coding Qs
+                  </span>
+                  <span className="px-2.5 py-1 rounded-full bg-blue-50 text-blue-600 text-xs font-semibold border border-blue-100">
+                    MCQs
+                  </span>
+                  <span className="px-2.5 py-1 rounded-full bg-amber-50 text-amber-600 text-xs font-semibold border border-amber-100">
+                    Adaptive
+                  </span>
                 </div>
               </div>
             </BentoCard>
@@ -906,17 +1038,26 @@ export default function NationalLandingPage() {
                     Multi-user Management
                   </h3>
                   <p className="text-muted-foreground leading-relaxed text-sm group-hover:text-slate-600 transition-colors">
-                    Role-based access control for administrators, trainers, and students with bulk operations.
+                    Role-based access control for administrators, trainers, and
+                    students with bulk operations.
                   </p>
                 </div>
                 {/* Visual Mock */}
                 <div className="mt-6 flex items-center gap-1.5">
                   <div className="flex -space-x-2 overflow-hidden">
-                    <div className="h-7 w-7 rounded-full ring-2 ring-white bg-primary flex items-center justify-center text-[9px] font-bold text-white">AD</div>
-                    <div className="h-7 w-7 rounded-full ring-2 ring-white bg-accent flex items-center justify-center text-[9px] font-bold text-accent-foreground">TR</div>
-                    <div className="h-7 w-7 rounded-full ring-2 ring-white bg-slate-300 flex items-center justify-center text-[9px] font-bold text-slate-700">ST</div>
+                    <div className="h-7 w-7 rounded-full ring-2 ring-white bg-primary flex items-center justify-center text-[9px] font-bold text-white">
+                      AD
+                    </div>
+                    <div className="h-7 w-7 rounded-full ring-2 ring-white bg-accent flex items-center justify-center text-[9px] font-bold text-accent-foreground">
+                      TR
+                    </div>
+                    <div className="h-7 w-7 rounded-full ring-2 ring-white bg-slate-300 flex items-center justify-center text-[9px] font-bold text-slate-700">
+                      ST
+                    </div>
                   </div>
-                  <span className="text-[10px] text-muted-foreground font-mono ml-2">Role-based Access</span>
+                  <span className="text-[10px] text-muted-foreground font-mono ml-2">
+                    Role-based Access
+                  </span>
                 </div>
               </div>
             </BentoCard>
@@ -938,7 +1079,10 @@ export default function NationalLandingPage() {
                       Certification Ready
                     </h3>
                     <p className="text-muted-foreground leading-relaxed text-sm group-hover:text-slate-600 transition-colors">
-                      Generate professional certificates and shareable digital badges instantly. Enable candidates to showcase verified credentials directly on LinkedIn, resume profiles, or portfolios.
+                      Generate professional certificates and shareable digital
+                      badges instantly. Enable candidates to showcase verified
+                      credentials directly on LinkedIn, resume profiles, or
+                      portfolios.
                     </p>
                   </div>
                   <div className="mt-6 flex items-center gap-2 text-xs font-semibold text-primary">
@@ -949,11 +1093,15 @@ export default function NationalLandingPage() {
                 {/* Visual Mock */}
                 <div className="relative border border-border/50 bg-slate-950 rounded-2xl p-4 flex flex-col justify-between shadow-inner h-48 overflow-hidden text-white">
                   <div className="absolute top-0 right-0 w-24 h-24 bg-accent/10 rounded-full blur-xl pointer-events-none" />
-                  
+
                   <div className="flex justify-between items-start">
                     <div>
-                      <h4 className="text-[10px] text-accent tracking-wider uppercase font-semibold">RxOne Certification</h4>
-                      <p className="text-[8px] text-slate-400 font-mono mt-0.5">Verified Credential</p>
+                      <h4 className="text-[10px] text-accent tracking-wider uppercase font-semibold">
+                        RxOne Certification
+                      </h4>
+                      <p className="text-[8px] text-slate-400 font-mono mt-0.5">
+                        Verified Credential
+                      </p>
                     </div>
                     <div className="w-6 h-6 rounded-full bg-gradient-primary flex items-center justify-center shadow-md">
                       <Award className="w-3 h-3 text-white" />
@@ -961,8 +1109,12 @@ export default function NationalLandingPage() {
                   </div>
 
                   <div className="my-2">
-                    <div className="text-[8px] text-slate-400">Candidate Name</div>
-                    <div className="text-xs font-bold text-slate-200">Aditya Verma</div>
+                    <div className="text-[8px] text-slate-400">
+                      Candidate Name
+                    </div>
+                    <div className="text-xs font-bold text-slate-200">
+                      Aditya Verma
+                    </div>
                     <div className="text-[7px] text-emerald-400 mt-1 font-mono flex items-center gap-1">
                       <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
                       Score: 96% (Elite tier)
@@ -984,7 +1136,6 @@ export default function NationalLandingPage() {
       <section className="py-24 relative bg-white overflow-hidden border-b border-slate-100">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-16 items-center">
-            
             {/* Left Column: Interactive Candidate Grid (4 Cards) */}
             <div className="lg:col-span-6">
               <div className="w-full">
@@ -1007,18 +1158,19 @@ export default function NationalLandingPage() {
               >
                 <h2 className="text-3xl md:text-4xl font-heading font-extrabold text-slate-900 leading-[1.1] tracking-tight">
                   Find the best <br className="hidden sm:inline" />
-                  candidate. <span className="text-[#FF5733]">No</span> <span className="text-[#0EA5E9]">fuss.</span>
+                  candidate. <span className="text-[#FF5733]">No</span>{" "}
+                  <span className="text-[#0EA5E9]">fuss.</span>
                 </h2>
 
                 <p className="text-base md:text-lg text-slate-600 leading-relaxed">
-                  Evalart’s online evaluations can pre-filter candidates to identify the best applicants and significantly reduce the number of candidates who require an interview.
+                  Evalart’s online evaluations can pre-filter candidates to
+                  identify the best applicants and significantly reduce the
+                  number of candidates who require an interview.
                 </p>
 
                 <p className="text-base md:text-lg text-slate-900 leading-relaxed">
                   Online assessments allow you to filter out up to{" "}
-                  <span className="font-bold">
-                    80% of applicants.
-                  </span>
+                  <span className="font-bold">80% of applicants.</span>
                 </p>
 
                 <div className="flex items-center gap-4 pt-2">
@@ -1047,14 +1199,15 @@ export default function NationalLandingPage() {
                 </div>
               </motion.div>
             </div>
-
           </div>
         </div>
       </section>
 
       {/* Use Cases / Industries Section */}
-      <section id="industries" className="py-24 bg-slate-50/50 relative overflow-hidden border-t border-b border-slate-100">
-        
+      <section
+        id="industries"
+        className="py-24 bg-slate-50/50 relative overflow-hidden border-t border-b border-slate-100"
+      >
         {/* Subtle decorative background glows */}
         <div className="absolute top-1/3 right-1/4 w-[500px] h-[300px] bg-gradient-to-tr from-primary/2 to-primary/5 rounded-full blur-[100px] pointer-events-none -z-10" />
         <div className="absolute bottom-1/3 left-1/4 w-[400px] h-[400px] bg-primary/3 rounded-full blur-[120px] pointer-events-none -z-10" />
@@ -1071,13 +1224,14 @@ export default function NationalLandingPage() {
                 Perfect for Every Industry
               </h2>
               <p className="text-lg md:text-xl text-muted-foreground max-w-3xl mx-auto leading-relaxed">
-                Trusted by educational institutions, corporate enterprises, and government agencies nationwide to deliver reliable, secure assessments.
+                Trusted by educational institutions, corporate enterprises, and
+                government agencies nationwide to deliver reliable, secure
+                assessments.
               </p>
             </motion.div>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-            
             {/* Card 1: Educational Institutions */}
             <BentoCard
               index={0}
@@ -1095,7 +1249,9 @@ export default function NationalLandingPage() {
                       Educational Institutions
                     </h3>
                     <p className="text-muted-foreground leading-relaxed text-xs group-hover:text-slate-650 transition-colors">
-                      Conduct secure online examinations, entrance tests, and skill assessments for universities. Scaled to handle thousands of concurrent takers.
+                      Conduct secure online examinations, entrance tests, and
+                      skill assessments for universities. Scaled to handle
+                      thousands of concurrent takers.
                     </p>
                   </div>
                   <div className="mt-4 flex items-center gap-1.5 text-xs font-semibold text-primary">
@@ -1103,15 +1259,19 @@ export default function NationalLandingPage() {
                     <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
                   </div>
                 </div>
-                
+
                 {/* Visual Mock */}
                 <div className="relative border border-border/50 bg-slate-950 rounded-2xl p-4 flex flex-col justify-between shadow-inner h-44 overflow-hidden text-white font-mono text-[9px]">
                   <div className="absolute top-0 right-0 w-24 h-24 bg-primary/10 rounded-full blur-xl pointer-events-none" />
-                  
+
                   <div className="flex justify-between items-center border-b border-white/10 pb-1.5">
                     <div>
-                      <h4 className="text-[9px] text-primary tracking-wider uppercase font-semibold">CS Finals: Data Structures</h4>
-                      <p className="text-[7px] text-slate-400 mt-0.5">Session: LIVE ACTIVE</p>
+                      <h4 className="text-[9px] text-primary tracking-wider uppercase font-semibold">
+                        CS Finals: Data Structures
+                      </h4>
+                      <p className="text-[7px] text-slate-400 mt-0.5">
+                        Session: LIVE ACTIVE
+                      </p>
                     </div>
                     <span className="flex h-1.5 w-1.5 relative">
                       <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
@@ -1121,22 +1281,36 @@ export default function NationalLandingPage() {
 
                   <div className="my-2.5 flex justify-between items-center gap-2">
                     <div className="flex flex-col">
-                      <span className="text-[7px] text-slate-500 uppercase">Registered</span>
-                      <span className="text-sm font-extrabold text-slate-200">4,280</span>
+                      <span className="text-[7px] text-slate-500 uppercase">
+                        Registered
+                      </span>
+                      <span className="text-sm font-extrabold text-slate-200">
+                        4,280
+                      </span>
                     </div>
                     <div className="flex flex-col">
-                      <span className="text-[7px] text-slate-500 uppercase">Online</span>
-                      <span className="text-sm font-extrabold text-accent">3,892</span>
+                      <span className="text-[7px] text-slate-500 uppercase">
+                        Online
+                      </span>
+                      <span className="text-sm font-extrabold text-accent">
+                        3,892
+                      </span>
                     </div>
                     <div className="flex flex-col text-right">
-                      <span className="text-[7px] text-slate-500 uppercase">Avg. Proctor</span>
-                      <span className="text-sm font-extrabold text-emerald-400">99.8%</span>
+                      <span className="text-[7px] text-slate-500 uppercase">
+                        Avg. Proctor
+                      </span>
+                      <span className="text-sm font-extrabold text-emerald-400">
+                        99.8%
+                      </span>
                     </div>
                   </div>
 
                   <div className="bg-slate-900/80 p-2 rounded border border-white/5 text-[7px] text-slate-450 flex items-center justify-between">
                     <span>Auto Grading Engine: Active</span>
-                    <span className="text-emerald-400 font-semibold">✓ Synced</span>
+                    <span className="text-emerald-400 font-semibold">
+                      ✓ Synced
+                    </span>
                   </div>
                 </div>
               </div>
@@ -1158,15 +1332,20 @@ export default function NationalLandingPage() {
                     Corporate Training
                   </h3>
                   <p className="text-muted-foreground leading-relaxed text-xs group-hover:text-slate-650 transition-colors">
-                    Evaluate employee skills, run certifications, and benchmark technical proficiencies across your organization.
+                    Evaluate employee skills, run certifications, and benchmark
+                    technical proficiencies across your organization.
                   </p>
                 </div>
-                
+
                 {/* Visual Mock */}
                 <div className="mt-4 border border-border/50 bg-slate-950 rounded-2xl p-4 flex flex-col gap-2.5 shadow-inner text-white h-[140px] overflow-hidden">
                   <div className="flex justify-between items-center text-[9px] border-b border-white/10 pb-1.5 font-sans">
-                    <span className="font-semibold text-accent">Tech Stack Benchmarks</span>
-                    <span className="text-slate-400 font-mono text-[7px]">Updates Hourly</span>
+                    <span className="font-semibold text-accent">
+                      Tech Stack Benchmarks
+                    </span>
+                    <span className="text-slate-400 font-mono text-[7px]">
+                      Updates Hourly
+                    </span>
                   </div>
                   <div className="space-y-1.5">
                     <div className="space-y-0.5">
@@ -1175,7 +1354,10 @@ export default function NationalLandingPage() {
                         <span>92% Proficient</span>
                       </div>
                       <div className="h-1.5 w-full bg-slate-900 rounded-full overflow-hidden">
-                        <div className="h-full bg-gradient-to-r from-primary to-accent rounded-full" style={{ width: '92%' }} />
+                        <div
+                          className="h-full bg-gradient-to-r from-primary to-accent rounded-full"
+                          style={{ width: "92%" }}
+                        />
                       </div>
                     </div>
                     <div className="space-y-0.5">
@@ -1184,7 +1366,10 @@ export default function NationalLandingPage() {
                         <span>84% Proficient</span>
                       </div>
                       <div className="h-1.5 w-full bg-slate-900 rounded-full overflow-hidden">
-                        <div className="h-full bg-gradient-to-r from-primary to-accent rounded-full" style={{ width: '84%' }} />
+                        <div
+                          className="h-full bg-gradient-to-r from-primary to-accent rounded-full"
+                          style={{ width: "84%" }}
+                        />
                       </div>
                     </div>
                     <div className="space-y-0.5">
@@ -1193,7 +1378,10 @@ export default function NationalLandingPage() {
                         <span>71% Proficient</span>
                       </div>
                       <div className="h-1.5 w-full bg-slate-900 rounded-full overflow-hidden">
-                        <div className="h-full bg-gradient-to-r from-primary to-accent rounded-full" style={{ width: '71%' }} />
+                        <div
+                          className="h-full bg-gradient-to-r from-primary to-accent rounded-full"
+                          style={{ width: "71%" }}
+                        />
                       </div>
                     </div>
                   </div>
@@ -1217,38 +1405,60 @@ export default function NationalLandingPage() {
                     Placement Agencies
                   </h3>
                   <p className="text-muted-foreground leading-relaxed text-xs group-hover:text-slate-650 transition-colors">
-                    Streamline candidate vetting with standardized tests and automated grading. Make data-driven placement decisions instantly.
+                    Streamline candidate vetting with standardized tests and
+                    automated grading. Make data-driven placement decisions
+                    instantly.
                   </p>
                 </div>
-                
+
                 {/* Visual Mock */}
                 <div className="mt-4 border border-border/50 bg-slate-950 rounded-2xl p-3.5 flex flex-col justify-between shadow-inner text-white h-[140px] overflow-hidden">
                   <div className="flex justify-between items-center text-[9px] border-b border-white/10 pb-1.5 font-sans">
-                    <span className="font-semibold text-accent">Shortlist Pipeline</span>
-                    <span className="text-slate-400 font-mono text-[7px]">Candidates: 240</span>
+                    <span className="font-semibold text-accent">
+                      Shortlist Pipeline
+                    </span>
+                    <span className="text-slate-400 font-mono text-[7px]">
+                      Candidates: 240
+                    </span>
                   </div>
 
                   <div className="space-y-2 font-sans my-1.5">
                     <div className="flex items-center justify-between text-[8px] bg-slate-900/60 p-1 rounded border border-white/5">
                       <div className="flex items-center gap-1.5">
-                        <div className="w-4 h-4 rounded-full bg-primary flex items-center justify-center text-[6px] font-bold text-white">AV</div>
+                        <div className="w-4 h-4 rounded-full bg-primary flex items-center justify-center text-[6px] font-bold text-white">
+                          AV
+                        </div>
                         <div className="flex flex-col">
-                          <span className="font-bold text-slate-200">Aditya Verma</span>
-                          <span className="text-[6px] text-slate-400">Node.js Dev</span>
+                          <span className="font-bold text-slate-200">
+                            Aditya Verma
+                          </span>
+                          <span className="text-[6px] text-slate-400">
+                            Node.js Dev
+                          </span>
                         </div>
                       </div>
-                      <span className="px-1 py-0.5 rounded bg-emerald-500/20 text-emerald-400 font-mono text-[7px]">96% Match</span>
+                      <span className="px-1 py-0.5 rounded bg-emerald-500/20 text-emerald-400 font-mono text-[7px]">
+                        96% Match
+                      </span>
                     </div>
 
                     <div className="flex items-center justify-between text-[8px] bg-slate-900/60 p-1 rounded border border-white/5">
                       <div className="flex items-center gap-1.5">
-                        <div className="w-4 h-4 rounded-full bg-accent flex items-center justify-center text-[6px] font-bold text-slate-900">NS</div>
+                        <div className="w-4 h-4 rounded-full bg-accent flex items-center justify-center text-[6px] font-bold text-slate-900">
+                          NS
+                        </div>
                         <div className="flex flex-col">
-                          <span className="font-bold text-slate-200">Neha Singh</span>
-                          <span className="text-[6px] text-slate-400">React Specialist</span>
+                          <span className="font-bold text-slate-200">
+                            Neha Singh
+                          </span>
+                          <span className="text-[6px] text-slate-400">
+                            React Specialist
+                          </span>
                         </div>
                       </div>
-                      <span className="px-1 py-0.5 rounded bg-emerald-500/20 text-emerald-400 font-mono text-[7px]">91% Match</span>
+                      <span className="px-1 py-0.5 rounded bg-emerald-500/20 text-emerald-400 font-mono text-[7px]">
+                        91% Match
+                      </span>
                     </div>
                   </div>
 
@@ -1276,7 +1486,10 @@ export default function NationalLandingPage() {
                       Government Programs
                     </h3>
                     <p className="text-muted-foreground leading-relaxed text-xs group-hover:text-slate-650 transition-colors">
-                      Execute large-scale, high-concurrency national skill programs. Robust offline support and distributed syncing algorithms keep assessments robust across varying network conditions.
+                      Execute large-scale, high-concurrency national skill
+                      programs. Robust offline support and distributed syncing
+                      algorithms keep assessments robust across varying network
+                      conditions.
                     </p>
                   </div>
                   <div className="mt-4 flex items-center gap-1.5 text-xs font-semibold text-primary">
@@ -1284,31 +1497,43 @@ export default function NationalLandingPage() {
                     <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
                   </div>
                 </div>
-                
+
                 {/* Visual Mock */}
                 <div className="relative border border-border/50 bg-slate-950 rounded-2xl p-4 flex flex-col justify-between shadow-inner h-44 overflow-hidden text-white font-mono text-[9px]">
                   <div className="absolute top-0 right-0 w-24 h-24 bg-primary/10 rounded-full blur-xl pointer-events-none" />
-                  
+
                   <div className="flex justify-between items-center border-b border-white/10 pb-1.5">
                     <div>
-                      <h4 className="text-[9px] text-primary tracking-wider uppercase font-semibold">National Skill Index</h4>
-                      <p className="text-[7px] text-slate-400 mt-0.5">Distributed Scale Mode</p>
+                      <h4 className="text-[9px] text-primary tracking-wider uppercase font-semibold">
+                        National Skill Index
+                      </h4>
+                      <p className="text-[7px] text-slate-400 mt-0.5">
+                        Distributed Scale Mode
+                      </p>
                     </div>
-                    <span className="px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 font-semibold text-[7px]">SYSTEM OK</span>
+                    <span className="px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 font-semibold text-[7px]">
+                      SYSTEM OK
+                    </span>
                   </div>
 
                   <div className="my-2 space-y-1 text-[8px] text-slate-400">
                     <div className="flex justify-between">
                       <span>Total Assessed:</span>
-                      <span className="text-slate-100 font-bold">1,248,500</span>
+                      <span className="text-slate-100 font-bold">
+                        1,248,500
+                      </span>
                     </div>
                     <div className="flex justify-between">
                       <span>Active Regions:</span>
-                      <span className="text-slate-100 font-bold">28 States & UTs</span>
+                      <span className="text-slate-100 font-bold">
+                        28 States & UTs
+                      </span>
                     </div>
                     <div className="flex justify-between">
                       <span>Live Server Nodes:</span>
-                      <span className="text-emerald-400 font-bold">120/120 Online</span>
+                      <span className="text-emerald-400 font-bold">
+                        120/120 Online
+                      </span>
                     </div>
                   </div>
 
@@ -1319,14 +1544,15 @@ export default function NationalLandingPage() {
                 </div>
               </div>
             </BentoCard>
-
           </div>
         </div>
       </section>
 
       {/* Testimonials */}
-      <section id="testimonials" className="py-24 relative overflow-hidden bg-background">
-        
+      <section
+        id="testimonials"
+        className="py-24 relative overflow-hidden bg-background"
+      >
         {/* Decorative background glows */}
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[700px] h-[300px] bg-gradient-to-tr from-primary/5 via-transparent to-primary/2 rounded-full blur-[120px] pointer-events-none -z-10" />
 
@@ -1342,7 +1568,8 @@ export default function NationalLandingPage() {
                 What Our Partners Say
               </h2>
               <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed">
-                Join hundreds of institutions already driving academic and hiring excellence with RxOne.
+                Join hundreds of institutions already driving academic and
+                hiring excellence with RxOne.
               </p>
             </motion.div>
           </div>
@@ -1369,7 +1596,6 @@ export default function NationalLandingPage() {
                   <div className="absolute -inset-0.5 bg-gradient-primary rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-550 blur-sm -z-10" />
 
                   <div className="relative h-full rounded-2xl border border-slate-100 bg-white p-8 shadow-sm transition-all duration-300 group-hover:-translate-y-1.5 group-hover:shadow-md flex flex-col justify-between overflow-hidden">
-                    
                     {/* Decorative quote mark */}
                     <span className="absolute right-6 top-2 text-slate-100/80 text-8xl font-serif select-none pointer-events-none group-hover:text-primary/10 transition-colors duration-300">
                       “
@@ -1406,7 +1632,6 @@ export default function NationalLandingPage() {
                         </span>
                       </div>
                     </div>
-
                   </div>
                 </motion.div>
               );
@@ -1437,9 +1662,11 @@ export default function NationalLandingPage() {
                 Ready to Transform Your Assessment Process?
               </h2>
               <p className="text-base md:text-lg text-slate-300 max-w-2xl mx-auto mb-10 leading-relaxed">
-                Join India's leading institutions in adopting next-generation assessment technology. Start your free trial today and experience the difference.
+                Join India's leading institutions in adopting next-generation
+                assessment technology. Start your free trial today and
+                experience the difference.
               </p>
-              
+
               <div className="flex flex-col sm:flex-row gap-4 justify-center">
                 <Button
                   size="lg"
@@ -1472,8 +1699,10 @@ export default function NationalLandingPage() {
       </section>
 
       {/* Contact Form */}
-      <section id="contact" className="py-24 relative overflow-hidden bg-slate-50/50">
-        
+      <section
+        id="contact"
+        className="py-24 relative overflow-hidden bg-slate-50/50"
+      >
         {/* Ambient background glows */}
         <div className="absolute top-1/4 left-1/4 w-[600px] h-[400px] bg-gradient-to-tr from-primary/5 via-transparent to-primary/2 rounded-full blur-[140px] pointer-events-none -z-10" />
         <div className="absolute bottom-10 right-10 w-[300px] h-[300px] bg-primary/5 rounded-full blur-[100px] pointer-events-none -z-10" />
@@ -1490,16 +1719,15 @@ export default function NationalLandingPage() {
                 Get in Touch
               </h2>
               <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed">
-                Ready to get started? Contact our sales team for a personalized demonstration.
+                Ready to get started? Contact our sales team for a personalized
+                demonstration.
               </p>
             </motion.div>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-start">
-            
             {/* Left Column: Why Choose & Info */}
             <div className="lg:col-span-5 space-y-8">
-              
               <motion.div
                 initial={{ opacity: 0, x: -20 }}
                 whileInView={{ opacity: 1, x: 0 }}
@@ -1512,23 +1740,37 @@ export default function NationalLandingPage() {
                     Contact Information
                   </h3>
                   <div className="space-y-4">
-                    <a href="mailto:sales@rxone.com" className="flex items-center gap-3.5 p-4 rounded-xl border border-slate-105 bg-white hover:border-primary/30 hover:shadow-sm transition-all duration-300 group">
+                    <a
+                      href="mailto:sales@rxone.com"
+                      className="flex items-center gap-3.5 p-4 rounded-xl border border-slate-105 bg-white hover:border-primary/30 hover:shadow-sm transition-all duration-300 group"
+                    >
                       <div className="w-10 h-10 rounded-lg bg-primary/10 text-primary flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
                         <Mail className="w-5 h-5" />
                       </div>
                       <div className="flex flex-col">
-                        <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">Email Us</span>
-                        <span className="text-sm font-semibold text-slate-800">sales@rxone.com</span>
+                        <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">
+                          Email Us
+                        </span>
+                        <span className="text-sm font-semibold text-slate-800">
+                          sales@rxone.com
+                        </span>
                       </div>
                     </a>
 
-                    <a href="tel:+911800XXXXXX" className="flex items-center gap-3.5 p-4 rounded-xl border border-slate-105 bg-white hover:border-primary/30 hover:shadow-sm transition-all duration-300 group">
+                    <a
+                      href="tel:+911800XXXXXX"
+                      className="flex items-center gap-3.5 p-4 rounded-xl border border-slate-105 bg-white hover:border-primary/30 hover:shadow-sm transition-all duration-300 group"
+                    >
                       <div className="w-10 h-10 rounded-lg bg-primary/10 text-primary flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
                         <Phone className="w-5 h-5" />
                       </div>
                       <div className="flex flex-col">
-                        <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">Call Toll Free</span>
-                        <span className="text-sm font-semibold text-slate-800">+91 1800-XXX-XXXX</span>
+                        <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">
+                          Call Toll Free
+                        </span>
+                        <span className="text-sm font-semibold text-slate-800">
+                          +91 1800-XXX-XXXX
+                        </span>
                       </div>
                     </a>
 
@@ -1537,8 +1779,12 @@ export default function NationalLandingPage() {
                         <MapPin className="w-5 h-5" />
                       </div>
                       <div className="flex flex-col">
-                        <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">Our Headquarters</span>
-                        <span className="text-sm font-semibold text-slate-800">Mumbai, Maharashtra</span>
+                        <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">
+                          Our Headquarters
+                        </span>
+                        <span className="text-sm font-semibold text-slate-800">
+                          Mumbai, Maharashtra
+                        </span>
                       </div>
                     </div>
                   </div>
@@ -1560,12 +1806,13 @@ export default function NationalLandingPage() {
                         <div className="mt-0.5 rounded-full p-0.5 bg-emerald-50 text-emerald-600 border border-emerald-100 flex-shrink-0">
                           <Check className="w-3 h-3" />
                         </div>
-                        <span className="text-xs text-slate-650 leading-normal font-medium">{item}</span>
+                        <span className="text-xs text-slate-650 leading-normal font-medium">
+                          {item}
+                        </span>
                       </div>
                     ))}
                   </div>
                 </div>
-
               </motion.div>
             </div>
 
@@ -1587,14 +1834,17 @@ export default function NationalLandingPage() {
                       Request a Demo
                     </h3>
                     <p className="text-sm text-muted-foreground mt-1">
-                      Fill out the form below and our sales engineering team will reach out with a custom preview.
+                      Fill out the form below and our sales engineering team
+                      will reach out with a custom preview.
                     </p>
                   </div>
 
                   <form onSubmit={handleSubmit} className="space-y-4">
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div className="space-y-1.5">
-                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">Full Name</label>
+                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">
+                          Full Name
+                        </label>
                         <Input
                           name="name"
                           placeholder="Aditya Sen"
@@ -1605,7 +1855,9 @@ export default function NationalLandingPage() {
                         />
                       </div>
                       <div className="space-y-1.5">
-                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">Email Address</label>
+                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">
+                          Email Address
+                        </label>
                         <Input
                           name="email"
                           type="email"
@@ -1620,7 +1872,9 @@ export default function NationalLandingPage() {
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div className="space-y-1.5">
-                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">Organization/Institution</label>
+                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">
+                          Organization/Institution
+                        </label>
                         <Input
                           name="organization"
                           placeholder="IIT Bombay"
@@ -1631,7 +1885,9 @@ export default function NationalLandingPage() {
                         />
                       </div>
                       <div className="space-y-1.5">
-                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">Phone Number</label>
+                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">
+                          Phone Number
+                        </label>
                         <Input
                           name="phone"
                           type="tel"
@@ -1645,7 +1901,9 @@ export default function NationalLandingPage() {
                     </div>
 
                     <div className="space-y-1.5">
-                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">Assessment Needs</label>
+                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">
+                        Assessment Needs
+                      </label>
                       <Textarea
                         name="message"
                         placeholder="Describe the scale, requirements, or timeline for your assessments..."
@@ -1656,7 +1914,10 @@ export default function NationalLandingPage() {
                       />
                     </div>
 
-                    <Button type="submit" className="w-full py-5 rounded-xl text-base font-semibold shadow-lg shadow-primary/20 bg-gradient-primary hover:opacity-95 hover:shadow-primary/35 transition-all duration-300 hover:scale-[1.01] active:scale-[0.99] group mt-2 text-white">
+                    <Button
+                      type="submit"
+                      className="w-full py-5 rounded-xl text-base font-semibold shadow-lg shadow-primary/20 bg-gradient-primary hover:opacity-95 hover:shadow-primary/35 transition-all duration-300 hover:scale-[1.01] active:scale-[0.99] group mt-2 text-white"
+                    >
                       Send Request
                       <ArrowRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />
                     </Button>
@@ -1664,7 +1925,6 @@ export default function NationalLandingPage() {
                 </div>
               </motion.div>
             </div>
-
           </div>
         </div>
       </section>
@@ -1676,28 +1936,27 @@ export default function NationalLandingPage() {
           className="absolute top-0 left-0 right-0 h-[2.5px] bg-gradient-to-r from-[#FF7A00] via-[#FF5733] to-[#C82A00]"
           style={{
             backgroundSize: "200% auto",
-            animation: "gradientFlow 5s linear infinite"
+            animation: "gradientFlow 5s linear infinite",
           }}
         />
 
         {/* Floating Glowing Gradient Orb */}
-        <motion.div 
+        <motion.div
           className="absolute -bottom-20 -right-20 w-[450px] h-[450px] bg-gradient-to-br from-primary/15 to-transparent rounded-full blur-[120px] pointer-events-none"
           animate={{
             scale: [1, 1.15, 0.95, 1],
             x: [0, 20, -10, 0],
-            y: [0, -20, 15, 0]
+            y: [0, -20, 15, 0],
           }}
           transition={{
             repeat: Infinity,
             duration: 10,
-            ease: "easeInOut"
+            ease: "easeInOut",
           }}
         />
-        
+
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-10 lg:gap-12">
-            
             {/* Brand column */}
             <div className="lg:col-span-2 space-y-5">
               <div className="flex items-center gap-3">
@@ -1706,86 +1965,166 @@ export default function NationalLandingPage() {
                     R
                   </span>
                 </div>
-                <span className="font-heading font-extrabold text-xl text-white tracking-tight">RxOne</span>
+                <span className="font-heading font-extrabold text-xl text-white tracking-tight">
+                  RxOne
+                </span>
               </div>
               <p className="text-sm text-slate-400 leading-relaxed max-w-sm">
-                India's premier skill assessment platform, trusted by colleges, universities, and leading corporate enterprises nationwide to deliver bulletproof evaluation at scale.
+                India's premier skill assessment platform, trusted by colleges,
+                universities, and leading corporate enterprises nationwide to
+                deliver bulletproof evaluation at scale.
               </p>
               {/* Optional Badges or Social row */}
               <div className="flex gap-3 text-xs text-slate-500 font-mono">
-                <span className="px-2.5 py-1 rounded bg-slate-900 border border-slate-800 text-[10px] uppercase font-bold text-slate-400 tracking-wider">Secure Assessment</span>
-                <span className="px-2.5 py-1 rounded bg-slate-900 border border-slate-800 text-[10px] uppercase font-bold text-slate-400 tracking-wider">ISO 27001</span>
+                <span className="px-2.5 py-1 rounded bg-slate-900 border border-slate-800 text-[10px] uppercase font-bold text-slate-400 tracking-wider">
+                  Secure Assessment
+                </span>
+                <span className="px-2.5 py-1 rounded bg-slate-900 border border-slate-800 text-[10px] uppercase font-bold text-slate-400 tracking-wider">
+                  ISO 27001
+                </span>
               </div>
             </div>
 
             {/* Link column 1 */}
             <div>
-              <h4 className="font-heading font-bold text-sm text-white mb-4 uppercase tracking-wider text-[10px]">Product</h4>
+              <h4 className="font-heading font-bold text-sm text-white mb-4 uppercase tracking-wider text-[10px]">
+                Product
+              </h4>
               <ul className="space-y-3 text-sm">
                 <li>
-                  <a href="#features" className="hover:text-primary transition-colors duration-200">Features</a>
+                  <a
+                    href="#features"
+                    className="hover:text-primary transition-colors duration-200"
+                  >
+                    Features
+                  </a>
                 </li>
                 <li>
-                  <a href="#" className="hover:text-primary transition-colors duration-200">Pricing</a>
+                  <a
+                    href="#"
+                    className="hover:text-primary transition-colors duration-200"
+                  >
+                    Pricing
+                  </a>
                 </li>
                 <li>
-                  <a href="#" className="hover:text-primary transition-colors duration-200">Security</a>
+                  <a
+                    href="#"
+                    className="hover:text-primary transition-colors duration-200"
+                  >
+                    Security
+                  </a>
                 </li>
                 <li>
-                  <a href="#" className="hover:text-primary transition-colors duration-200">Integrations</a>
+                  <a
+                    href="#"
+                    className="hover:text-primary transition-colors duration-200"
+                  >
+                    Integrations
+                  </a>
                 </li>
               </ul>
             </div>
 
             {/* Link column 2 */}
             <div>
-              <h4 className="font-heading font-bold text-sm text-white mb-4 uppercase tracking-wider text-[10px]">Company</h4>
+              <h4 className="font-heading font-bold text-sm text-white mb-4 uppercase tracking-wider text-[10px]">
+                Company
+              </h4>
               <ul className="space-y-3 text-sm">
                 <li>
-                  <a href="#" className="hover:text-primary transition-colors duration-200">About Us</a>
+                  <a
+                    href="#"
+                    className="hover:text-primary transition-colors duration-200"
+                  >
+                    About Us
+                  </a>
                 </li>
                 <li>
-                  <a href="#" className="hover:text-primary transition-colors duration-200">Careers</a>
+                  <a
+                    href="#"
+                    className="hover:text-primary transition-colors duration-200"
+                  >
+                    Careers
+                  </a>
                 </li>
                 <li>
-                  <a href="#" className="hover:text-primary transition-colors duration-200">Press Kit</a>
+                  <a
+                    href="#"
+                    className="hover:text-primary transition-colors duration-200"
+                  >
+                    Press Kit
+                  </a>
                 </li>
                 <li>
-                  <a href="#contact" className="hover:text-primary transition-colors duration-200">Contact Sales</a>
+                  <a
+                    href="#contact"
+                    className="hover:text-primary transition-colors duration-200"
+                  >
+                    Contact Sales
+                  </a>
                 </li>
               </ul>
             </div>
 
             {/* Link column 3 */}
             <div>
-              <h4 className="font-heading font-bold text-sm text-white mb-4 uppercase tracking-wider text-[10px]">Support</h4>
+              <h4 className="font-heading font-bold text-sm text-white mb-4 uppercase tracking-wider text-[10px]">
+                Support
+              </h4>
               <ul className="space-y-3 text-sm">
                 <li>
-                  <a href="#" className="hover:text-primary transition-colors duration-200">Help Center</a>
+                  <a
+                    href="#"
+                    className="hover:text-primary transition-colors duration-200"
+                  >
+                    Help Center
+                  </a>
                 </li>
                 <li>
-                  <a href="#" className="hover:text-primary transition-colors duration-200">Documentation</a>
+                  <a
+                    href="#"
+                    className="hover:text-primary transition-colors duration-200"
+                  >
+                    Documentation
+                  </a>
                 </li>
                 <li>
-                  <a href="#" className="hover:text-primary transition-colors duration-200">Community</a>
+                  <a
+                    href="#"
+                    className="hover:text-primary transition-colors duration-200"
+                  >
+                    Community
+                  </a>
                 </li>
                 <li>
-                  <a href="#" className="hover:text-primary transition-colors duration-200">Platform Status</a>
+                  <a
+                    href="#"
+                    className="hover:text-primary transition-colors duration-200"
+                  >
+                    Platform Status
+                  </a>
                 </li>
               </ul>
             </div>
-
           </div>
 
           {/* Bottom Copyright Bar */}
           <div className="border-t border-slate-900 mt-12 pt-8 flex flex-col md:flex-row items-center justify-between gap-4 text-xs text-slate-500">
             <p className="order-2 md:order-1">
-              &copy; 2024 RxOne. All rights reserved. Made with ❤️ for India's education sector.
+              &copy; 2024 RxOne. All rights reserved. Made with ❤️ for India's
+              education sector.
             </p>
             <div className="flex gap-6 order-1 md:order-2">
-              <a href="#" className="hover:text-slate-400 transition-colors">Privacy Policy</a>
-              <a href="#" className="hover:text-slate-400 transition-colors">Terms of Service</a>
-              <a href="#" className="hover:text-slate-450 transition-colors">SLA Agreement</a>
+              <a href="#" className="hover:text-slate-400 transition-colors">
+                Privacy Policy
+              </a>
+              <a href="#" className="hover:text-slate-400 transition-colors">
+                Terms of Service
+              </a>
+              <a href="#" className="hover:text-slate-450 transition-colors">
+                SLA Agreement
+              </a>
             </div>
           </div>
         </div>

@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import axios from "axios";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
@@ -205,6 +205,7 @@ export default function TestInterface() {
 
 function TestInterfaceContent({ testId, sessionId, navigate, toast }: { testId?: string; sessionId?: string; navigate: (path: string) => void; toast: (props: { title?: string; description?: string; variant?: "default" | "destructive" }) => void }) {
   const { violations, trustScore, isProctoringActive, startProctoring, syncViolations } = useProctoring();
+  const lastWarnedCountRef = useRef(0);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -715,7 +716,8 @@ useEffect(() => {
     const tabSwitches = violations.filter(v => v.type === "TAB_SWITCH" || v.type === "EXTENDED_TAB_SWITCH");
     const count = tabSwitches.length;
 
-    if (count > 0) {
+    if (count > lastWarnedCountRef.current) {
+      lastWarnedCountRef.current = count;
       if (count >= 3) {
         toast({
           title: "Test Auto-Submitted",

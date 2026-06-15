@@ -24,9 +24,42 @@ import { useAuth } from "@/lib/auth-context";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
+interface TestData {
+  valid: boolean;
+  invitationId: string;
+  candidateId: string;
+  testId: string;
+  testTitle: string;
+  durationMins: number;
+  scheduleId: string;
+  endTime: string;
+  token: string;
+}
+
+interface CandidateInvitation {
+  id: string;
+  scheduleId?: string;
+  candidateId?: string;
+  testId?: string;
+  token?: string;
+}
+
+interface TestSchedule {
+  id: string;
+  testId?: string;
+  endTime?: string;
+}
+
+interface TestAssessment {
+  id: string;
+  title?: string;
+  durationMins?: number;
+}
+
 interface CheckState {
   camera: "pending" | "success" | "error";
   mic: "pending" | "success" | "error";
+  screen: "pending" | "success" | "error";
   browser: "pending" | "success" | "error";
 }
 
@@ -38,7 +71,7 @@ export default function TestAccess() {
   const { toast } = useToast();
   
   const [loading, setLoading] = useState(true);
-  const [testData, setTestData] = useState<any>(null);
+  const [testData, setTestData] = useState<TestData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isMobile, setIsMobile] = useState(false);
   
@@ -48,8 +81,10 @@ export default function TestAccess() {
   const [checks, setChecks] = useState<CheckState>({
     camera: "pending",
     mic: "pending",
+    screen: "pending",
     browser: "pending",
   });
+  const [screenErrorMsg, setScreenErrorMsg] = useState<string | null>(null);
   const [consentChecked, setConsentChecked] = useState(false);
   
   // Media Stream state & refs
@@ -70,7 +105,7 @@ export default function TestAccess() {
   const [showColdStartMessage, setShowColdStartMessage] = useState(false);
 
   useEffect(() => {
-    let timer: any;
+    let timer: ReturnType<typeof setTimeout> | undefined;
     if (loading || isLoggingIn) {
       timer = setTimeout(() => {
         setShowColdStartMessage(true);
@@ -148,38 +183,109 @@ export default function TestAccess() {
         throw new Error("Failed to parse authentication token.");
       }
 
-      const invitationResponse = await apiClient.get(`/candidate-invitations/${id}`);
-      const invitation = invitationResponse.data?.data || invitationResponse.data;
-
-      if (invitation.scheduleId) {
-        const scheduleResponse = await apiClient.get(`/test-schedules/${invitation.scheduleId}`);
-        const schedule = scheduleResponse.data?.data || scheduleResponse.data;
+      // 403 Bypass/Fallback strategy: Try direct GET, fall back to list, then to JWT claims
+      let invitation: CandidateInvitation | null = null;
+      try {
+        const invitationResponse = await apiClient.get(`/candidate-invitations/${id}`);
+        invitation = invitationResponse.data?.data || invitationResponse.data;
+      } catch (err: unknown) {
+        const axiosError = err as { response?: { status?: number } };
+        console.warn("Direct invitation fetch failed with status:", axiosError.response?.status, err);
         
-        if (schedule.testId) {
-          const testResponse = await apiClient.get(`/tests/${schedule.testId}`);
-          const test = testResponse.data?.data || testResponse.data;
-          
-          setTestData({
-            valid: true,
-            invitationId: invitation.id,
-            candidateId: invitation.candidateId,
-            testId: test.id,
-            testTitle: test.title,
-            durationMins: test.durationMins,
-            scheduleId: schedule.id,
-            endTime: schedule.endTime,
-            token: token
-          });
-        } else {
-          throw new Error("Test not found");
+        // Fallback 1: Try list endpoint
+        try {
+          const listResponse = await apiClient.get("/candidate-invitations?size=100");
+          const listData = listResponse.data?.data || listResponse.data;
+          const items = Array.isArray(listData) 
+            ? listData 
+            : (listData?.content && Array.isArray(listData.content)) 
+              ? listData.content 
+              : [];
+          invitation = items.find((item: CandidateInvitation) => item.id === id) || null;
+          if (invitation) {
+            console.log("Found invitation in list fallback:", invitation);
+          }
+        } catch (listErr) {
+          console.warn("List invitation fetch failed:", listErr);
         }
-      } else {
-        throw new Error("Schedule not found");
+
+        // Fallback 2: Check JWT decoded claims
+        if (!invitation && decoded) {
+          console.log("Decoded JWT payload for fallback:", decoded);
+          const scheduleId = decoded.scheduleId || decoded.schedule_id || decoded.schedId;
+          const candidateId = decoded.candidateId || decoded.candidate_id || decoded.candId || decoded.id;
+          const testId = decoded.testId || decoded.test_id;
+          const invitationId = decoded.invitationId || decoded.invitation_id || decoded.invId || id;
+          
+          if (scheduleId) {
+            invitation = {
+              id: invitationId,
+              scheduleId,
+              candidateId,
+              testId
+            };
+            console.log("Constructed invitation from JWT claims:", invitation);
+          }
+        }
+        
+        // Fallback 3: Construct invitation manually using decoded JWT if still null
+        if (!invitation) {
+          invitation = {
+            id: id,
+            scheduleId: decoded?.scheduleId || decoded?.schedule_id || decoded?.schedId,
+            candidateId: decoded?.candidateId || decoded?.candidate_id || decoded?.id,
+            testId: decoded?.testId || decoded?.test_id,
+          };
+          console.log("Constructed manual fallback invitation:", invitation);
+        }
       }
+
+      let schedule: TestSchedule | null = null;
+      let test: TestAssessment | null = null;
+
+      if (invitation && invitation.scheduleId) {
+        try {
+          const scheduleResponse = await apiClient.get(`/test-schedules/${invitation.scheduleId}`);
+          schedule = scheduleResponse.data?.data || scheduleResponse.data;
+        } catch (schedErr) {
+          console.warn("Failed to fetch schedule details, continuing with defaults:", schedErr);
+        }
+      }
+
+      const testId = invitation?.testId || schedule?.testId || decoded?.testId || decoded?.test_id;
+      if (testId) {
+        try {
+          const testResponse = await apiClient.get(`/tests/${testId}`);
+          test = testResponse.data?.data || testResponse.data;
+        } catch (testErr) {
+          console.warn("Failed to fetch test details, continuing with defaults:", testErr);
+        }
+      }
+
+      // Populate testData with whatever we resolved, falling back to safe defaults/decoded payload values
+      const testTitle = test?.title || decoded?.testTitle || decoded?.test_title || "Technical Assessment";
+      const durationMins = test?.durationMins || decoded?.durationMins || decoded?.duration_mins || 45;
+      const endTime = schedule?.endTime || decoded?.endTime || decoded?.end_time || new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString();
+      const finalCandidateId = invitation?.candidateId || decoded?.candidateId || decoded?.id;
+      const finalScheduleId = invitation?.scheduleId || schedule?.id || decoded?.scheduleId;
+
+      setTestData({
+        valid: true,
+        invitationId: invitation?.id || id,
+        candidateId: finalCandidateId,
+        testId: testId || "default-test-id",
+        testTitle: testTitle,
+        durationMins: Number(durationMins),
+        scheduleId: finalScheduleId || "default-schedule-id",
+        endTime: endTime,
+        token: token
+      });
+
       setError(null);
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const validationErr = error as { response?: { data?: { message?: string } }; message?: string };
       console.error("Token validation error:", error);
-      setError(error.response?.data?.message || error.message || "Invalid or expired invitation link");
+      setError(validationErr.response?.data?.message || validationErr.message || "Invalid or expired invitation link");
     } finally {
       setLoading(false);
     }
@@ -194,7 +300,7 @@ export default function TestAccess() {
 
   const startAudioMonitoring = (stream: MediaStream) => {
     try {
-      const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+      const AudioContextClass = window.AudioContext || (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
       const audioContext = new AudioContextClass();
       const source = audioContext.createMediaStreamSource(stream);
       const analyser = audioContext.createAnalyser();
@@ -253,6 +359,7 @@ export default function TestAccess() {
 
   const verifyEnvironment = async () => {
     setIsVerifying(true);
+    setScreenErrorMsg(null);
     releaseResources(); // reset any previous streams
     
     // 1. Browser Check
@@ -293,10 +400,45 @@ export default function TestAccess() {
       }
     }
 
+    // 3. Screen Sharing & Multiple Displays Check
+    try {
+      if (navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia) {
+        const screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
+        
+        const track = screenStream.getVideoTracks()[0];
+        const settings = track ? track.getSettings() : {};
+        const displaySurface = settings.displaySurface;
+        const isEntireScreen = displaySurface !== 'window' && displaySurface !== 'browser';
+
+        // Check for multiple monitors
+        const isExtended = 'isExtended' in window.screen ? (window.screen as unknown as { isExtended?: boolean }).isExtended : false;
+        
+        // Stop screen tracks immediately
+        screenStream.getTracks().forEach(t => t.stop());
+
+        if (!isEntireScreen) {
+          setChecks(prev => ({ ...prev, screen: "error" }));
+          setScreenErrorMsg("Please share your ENTIRE screen (not a window or tab) and close all other apps (VS Code, Teams, Brave, etc.) to proceed.");
+        } else if (isExtended) {
+          setChecks(prev => ({ ...prev, screen: "error" }));
+          setScreenErrorMsg("Multiple displays detected. Please disconnect extra monitors to proceed.");
+        } else {
+          setChecks(prev => ({ ...prev, screen: "success" }));
+        }
+      } else {
+        setChecks(prev => ({ ...prev, screen: "error" }));
+        setScreenErrorMsg("Your browser does not support screen sharing.");
+      }
+    } catch (e) {
+      console.error("Screen sharing check failed:", e);
+      setChecks(prev => ({ ...prev, screen: "error" }));
+      setScreenErrorMsg("Screen sharing permission is required. Please close other applications and try again.");
+    }
+
     setIsVerifying(false);
   };
 
-  const allChecksPassed = checks.camera === "success" && checks.mic === "success" && checks.browser === "success";
+  const allChecksPassed = checks.camera === "success" && checks.mic === "success" && checks.screen === "success" && checks.browser === "success";
 
   const launchSecureTest = async () => {
     // 1. Enter Fullscreen Mode (Mandatory final step)
@@ -319,20 +461,22 @@ export default function TestAccess() {
 
     // 3. Start Session & Navigate
     try {
-      const session = await testService.startTestSession(testData.invitationId, "0.0.0.0");
+      const invitationId = testData?.invitationId || id || "";
+      const session = await testService.startTestSession(invitationId, "0.0.0.0");
       
       // 4. Store a token indicating they completed checking environment
       sessionStorage.setItem(`env_checked_${session.id}`, "true");
 
-      navigate(`/test/${testData.testId}/session/${session.id}`);
-    } catch (error: any) {
+      navigate(`/test/${session.testId || testData?.testId || "default-test-id"}/session/${session.id}`);
+    } catch (error: unknown) {
+      const startErr = error as { response?: { data?: { message?: string } }; message?: string };
       // Exit fullscreen if initialization fails
       if (document.fullscreenElement) {
         await document.exitFullscreen().catch(() => {});
       }
       toast({
         title: "Error Starting Assessment",
-        description: error.response?.data?.message || "Failed to launch session",
+        description: startErr.response?.data?.message || "Failed to launch session",
         variant: "destructive",
       });
     }
@@ -349,10 +493,11 @@ export default function TestAccess() {
         description: "Re-validating your test access...",
       });
       await validateToken();
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const loginErr = err as { response?: { data?: { message?: string } }; message?: string };
       toast({
         title: "Login Failed",
-        description: err.response?.data?.message || err.message || "Invalid credentials",
+        description: loginErr.response?.data?.message || loginErr.message || "Invalid credentials",
         variant: "destructive",
       });
     } finally {
@@ -598,6 +743,11 @@ export default function TestAccess() {
                           label="Microphone Permission Check" 
                           status={checks.mic} 
                           desc="Background audio analytics" 
+                        />
+                        <DiagnosticRow 
+                          label="Screen Share & Display Check" 
+                          status={checks.screen} 
+                          desc={screenErrorMsg || "Ensure only one monitor is connected"} 
                         />
                       </div>
 

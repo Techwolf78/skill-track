@@ -9,6 +9,16 @@ export function useTabMonitor(
 
     const startTime = Date.now();
     let hiddenStartTime: number | null = null;
+    let lastTabSwitchTime = 0;
+
+    const reportTabSwitch = (metadata: Record<string, unknown>) => {
+      const now = Date.now();
+      // Enforce a 2.5-second cooldown to deduplicate concurrent blur, visibility, and fullscreen events
+      if (now - lastTabSwitchTime >= 2500) {
+        lastTabSwitchTime = now;
+        onViolation("TAB_SWITCH", metadata);
+      }
+    };
     
     const handleVisibilityChange = () => {
       // Ignore if within 5s grace period (screen share popup, etc)
@@ -16,7 +26,7 @@ export function useTabMonitor(
       
       if (document.hidden) {
         hiddenStartTime = Date.now();
-        onViolation("TAB_SWITCH", { timestamp: hiddenStartTime });
+        reportTabSwitch({ type: "visibility-hidden", timestamp: hiddenStartTime });
       } else {
         if (hiddenStartTime) {
           const duration = Date.now() - hiddenStartTime;
@@ -35,7 +45,7 @@ export function useTabMonitor(
       // Debounce blur to avoid false positives from browser UI interactions (like "Hide" button)
       setTimeout(() => {
         if (!document.hasFocus() && isActive) {
-          onViolation("TAB_SWITCH", { type: "window-blur" });
+          reportTabSwitch({ type: "window-blur" });
         }
       }, 300);
     };
@@ -45,7 +55,7 @@ export function useTabMonitor(
       if (Date.now() - startTime < 5000) return;
       
       if (!document.fullscreenElement && isActive) {
-        onViolation("TAB_SWITCH", { detail: "Exited fullscreen mode" });
+        reportTabSwitch({ detail: "Exited fullscreen mode" });
       }
     };
     

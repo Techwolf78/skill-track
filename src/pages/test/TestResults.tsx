@@ -1,11 +1,8 @@
 import { motion } from "framer-motion";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { CheckCircle, ArrowLeft } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { CheckCircle } from "lucide-react";
 
 export default function TestResults() {
-  const navigate = useNavigate();
 
   return (
     <div className="min-h-screen bg-background p-6 flex items-center justify-center">
@@ -29,14 +26,11 @@ export default function TestResults() {
               <h1 className="text-3xl font-heading font-bold mb-4">Test Submitted Successfully</h1>
               
               <p className="text-muted-foreground mb-8 text-lg">
-                Your responses have been recorded. You can safely close this window or return to the login screen.
+                Your responses have been recorded.
               </p>
 
-              <div className="flex justify-center">
-                <Button onClick={() => navigate("/login")} variant="default" className="w-full sm:w-auto">
-                  <ArrowLeft className="w-4 h-4 mr-2" />
-                  Back to Login
-                </Button>
+              <div className="p-4 rounded-xl bg-muted/50 border border-dashed text-sm font-semibold text-muted-foreground">
+                You can close this tab now
               </div>
             </CardContent>
           </Card>
