@@ -21,9 +21,27 @@ interface ProctoringContextType extends ProctoringState {
 
 const ProctoringContext = createContext<ProctoringContextType | undefined>(undefined);
 
-export const ProctoringProvider: React.FC<{ children: React.ReactNode; sessionId: string }> = ({ 
+export interface ProctoringConfigDto {
+  camera: boolean;
+  audio: boolean;
+  tabSwitch: boolean;
+  devtools: boolean;
+  screenShare: boolean;
+  objectDetection: boolean;
+  llmDetector: boolean;
+  maxTabSwitches: number;
+  snapshotIntervalSecs: number;
+  violationThresholds: Record<string, number>;
+}
+
+export const ProctoringProvider: React.FC<{ 
+  children: React.ReactNode; 
+  sessionId: string;
+  config: ProctoringConfigDto;
+}> = ({ 
   children, 
-  sessionId 
+  sessionId,
+  config
 }) => {
   const [state, setState] = useState<ProctoringState>({
     violations: [],
@@ -107,21 +125,21 @@ export const ProctoringProvider: React.FC<{ children: React.ReactNode; sessionId
     addViolation(type, meta || {});
   }, [addViolation]);
 
-  const { videoRef } = useCameraMonitor(state.isProctoringActive, handleViolation);
-  useTabMonitor(state.isProctoringActive, handleViolation);
-  useDevToolsDetector(state.isProctoringActive, () => addViolation("DEVTOOLS_OPEN"));
-  useAudioMonitor(state.isProctoringActive, handleViolation);
-  // useScreenMonitor(state.isProctoringActive, handleViolation);
+  const { videoRef } = useCameraMonitor(state.isProctoringActive && config.camera, handleViolation);
+  useTabMonitor(state.isProctoringActive && config.tabSwitch, handleViolation);
+  useDevToolsDetector(state.isProctoringActive && config.devtools, () => addViolation("DEVTOOLS_OPEN"));
+  useAudioMonitor(state.isProctoringActive && config.audio, handleViolation);
+  // useScreenMonitor(state.isProctoringActive && config.screenShare, handleViolation);
 
   // Periodic Object Detection with Dynamic Degradation
   useEffect(() => {
-    if (!state.isProctoringActive || !videoRef.current) return;
+    if (!state.isProctoringActive || !config.objectDetection || !videoRef.current) return;
 
     let checkInterval = 5000; // start at 5s
     let timeoutId: NodeJS.Timeout;
 
     const runObjectDetection = async () => {
-      if (!state.isProctoringActive) return;
+      if (!state.isProctoringActive || !config.objectDetection) return;
       if (videoRef.current) {
         try {
           const t0 = performance.now();
@@ -149,18 +167,18 @@ export const ProctoringProvider: React.FC<{ children: React.ReactNode; sessionId
           console.error("Object detection error:", e);
         }
       }
-      if (state.isProctoringActive) {
+      if (state.isProctoringActive && config.objectDetection) {
         timeoutId = setTimeout(runObjectDetection, checkInterval);
       }
     };
 
     timeoutId = setTimeout(runObjectDetection, checkInterval);
     return () => clearTimeout(timeoutId);
-  }, [state.isProctoringActive, addViolation, videoRef]);
+  }, [state.isProctoringActive, config.objectDetection, addViolation, videoRef]);
 
   // Periodic behavior analysis
   useEffect(() => {
-    if (!state.isProctoringActive) return;
+    if (!state.isProctoringActive || !config.llmDetector) return;
 
     const interval = setInterval(async () => {
       const recentViolations = state.violations.slice(-5);
@@ -175,11 +193,11 @@ export const ProctoringProvider: React.FC<{ children: React.ReactNode; sessionId
     }, 30000);
 
     return () => clearInterval(interval);
-  }, [state.isProctoringActive, state.violations, addViolation]);
+  }, [state.isProctoringActive, config.llmDetector, state.violations, addViolation]);
 
   // Periodic Camera Snapshot capturing/auditing
   useEffect(() => {
-    if (!state.isProctoringActive) return;
+    if (!state.isProctoringActive || !config.camera) return;
 
     const interval = setInterval(() => {
       const video = document.querySelector("video");
@@ -225,10 +243,10 @@ export const ProctoringProvider: React.FC<{ children: React.ReactNode; sessionId
           console.error("Failed to capture periodic camera snapshot:", e);
         }
       }
-    }, 60000); // Capture every 60 seconds
+    }, (config.snapshotIntervalSecs || 60) * 1000);
 
     return () => clearInterval(interval);
-  }, [state.isProctoringActive, sessionId]);
+  }, [state.isProctoringActive, config.camera, config.snapshotIntervalSecs, sessionId]);
 
   // Batch upload worker for periodic webcam snapshots (every 5 minutes & component unmount)
   useEffect(() => {

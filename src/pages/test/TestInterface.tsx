@@ -35,7 +35,7 @@ import { isTerminalStatus, mapTestCaseResults, buildSubmitOutputMessage, buildRu
 import { isDevToolsKey, isClipboardShortcut, isPrintScreen } from "@/lib/proctoring/keyboardSecurity";
 import { countTabSwitches, shouldAutoSubmitOnTabSwitch } from "@/lib/proctoring/violationLogic";
 import { computeFullscreenPolicy, tickFullscreenTimer, resetFullscreenTimer, FULLSCREEN_GRACE_PERIOD } from "@/lib/proctoring/fullscreenLogic";
-import { ProctoringProvider, useProctoring } from "@/proctoring/ProctoringProvider";
+import { ProctoringProvider, useProctoring, ProctoringConfigDto } from "@/proctoring/ProctoringProvider";
 import { CameraPreview } from "@/proctoring/components/CameraPreview";
 import { ViolationToast } from "@/proctoring/components/ViolationToast";
 import { EnvironmentCheck } from "@/proctoring/components/EnvironmentCheck";
@@ -158,9 +158,42 @@ export default function TestInterface() {
     }
     return false;
   });
+  const [config, setConfig] = useState<ProctoringConfigDto | null>(null);
+
+  useEffect(() => {
+    if (!sessionId) return;
+    apiClient.get(`/test-sessions/${sessionId}/proctoring-config`)
+      .then(res => {
+        const data = res.data?.data || res.data;
+        setConfig(data);
+      })
+      .catch(err => {
+        console.error("Failed to load proctoring config, using safe defaults", err);
+        setConfig({
+          camera: false,
+          audio: false,
+          tabSwitch: true,
+          devtools: false,
+          screenShare: false,
+          objectDetection: false,
+          llmDetector: false,
+          maxTabSwitches: 2,
+          snapshotIntervalSecs: 60,
+          violationThresholds: { look_away: 3, multi_face: 2 }
+        });
+      });
+  }, [sessionId]);
+
+  if (!config) {
+    return (
+      <div className="flex h-screen items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
-    <ProctoringProvider sessionId={sessionId || "demo-session"}>
+    <ProctoringProvider sessionId={sessionId || "demo-session"} config={config}>
       {!checked ? (
         <EnvironmentCheck onComplete={() => setChecked(true)} />
       ) : (
