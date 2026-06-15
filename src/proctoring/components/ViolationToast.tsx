@@ -33,7 +33,7 @@ export const ViolationToast: React.FC = () => {
   if (activeViolations.length === 0) return null;
 
   return (
-    <div className="fixed bottom-24 right-4 z-50 flex flex-col gap-2 w-72 pointer-events-none">
+    <div className="fixed bottom-24 right-4 z-50 flex flex-col gap-1.5 w-60 pointer-events-none">
       <AnimatePresence mode="popLayout">
         {activeViolations.map((violation) => (
           <motion.div
@@ -60,25 +60,25 @@ const ViolationItem: React.FC<{ violation: Violation }> = ({ violation }) => {
   };
 
   const severityIcons = {
-    LOW: <Info className="h-4 w-4" />,
-    MEDIUM: <AlertTriangle className="h-4 w-4" />,
-    HIGH: <AlertTriangle className="h-4 w-4" />,
-    CRITICAL: <AlertCircle className="h-4 w-4" />,
+    LOW: <Info className="h-3.5 w-3.5" />,
+    MEDIUM: <AlertTriangle className="h-3.5 w-3.5" />,
+    HIGH: <AlertTriangle className="h-3.5 w-3.5" />,
+    CRITICAL: <AlertCircle className="h-3.5 w-3.5" />,
   };
 
   return (
     <div className={cn(
-      "flex items-start gap-3 p-3 rounded-lg border shadow-lg",
+      "flex items-start gap-2 p-2.5 rounded-md border shadow-md",
       severityColors[violation.severity]
     )}>
       <div className="mt-0.5">
         {severityIcons[violation.severity]}
       </div>
       <div className="flex-1">
-        <h4 className="text-xs font-bold leading-none mb-1">
+        <h4 className="text-[10px] font-bold leading-none mb-1">
           {violation.type.replace("_", " ")}
         </h4>
-        <p className="text-[10px] opacity-80 leading-tight">
+        <p className="text-[8px] opacity-80 leading-tight">
           {new Date(violation.timestamp).toLocaleTimeString()} - {violation.severity} severity
         </p>
       </div>

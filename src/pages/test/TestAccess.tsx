@@ -59,6 +59,7 @@ interface TestAssessment {
 interface CheckState {
   camera: "pending" | "success" | "error";
   mic: "pending" | "success" | "error";
+  screen: "pending" | "success" | "error";
   browser: "pending" | "success" | "error";
 }
 
@@ -80,8 +81,10 @@ export default function TestAccess() {
   const [checks, setChecks] = useState<CheckState>({
     camera: "pending",
     mic: "pending",
+    screen: "pending",
     browser: "pending",
   });
+  const [screenErrorMsg, setScreenErrorMsg] = useState<string | null>(null);
   const [consentChecked, setConsentChecked] = useState(false);
   
   // Media Stream state & refs
@@ -356,6 +359,7 @@ export default function TestAccess() {
 
   const verifyEnvironment = async () => {
     setIsVerifying(true);
+    setScreenErrorMsg(null);
     releaseResources(); // reset any previous streams
     
     // 1. Browser Check
@@ -396,10 +400,45 @@ export default function TestAccess() {
       }
     }
 
+    // 3. Screen Sharing & Multiple Displays Check
+    try {
+      if (navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia) {
+        const screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
+        
+        const track = screenStream.getVideoTracks()[0];
+        const settings = track ? track.getSettings() : {};
+        const displaySurface = settings.displaySurface;
+        const isEntireScreen = displaySurface !== 'window' && displaySurface !== 'browser';
+
+        // Check for multiple monitors
+        const isExtended = 'isExtended' in window.screen ? (window.screen as unknown as { isExtended?: boolean }).isExtended : false;
+        
+        // Stop screen tracks immediately
+        screenStream.getTracks().forEach(t => t.stop());
+
+        if (!isEntireScreen) {
+          setChecks(prev => ({ ...prev, screen: "error" }));
+          setScreenErrorMsg("Please share your ENTIRE screen (not a window or tab) and close all other apps (VS Code, Teams, Brave, etc.) to proceed.");
+        } else if (isExtended) {
+          setChecks(prev => ({ ...prev, screen: "error" }));
+          setScreenErrorMsg("Multiple displays detected. Please disconnect extra monitors to proceed.");
+        } else {
+          setChecks(prev => ({ ...prev, screen: "success" }));
+        }
+      } else {
+        setChecks(prev => ({ ...prev, screen: "error" }));
+        setScreenErrorMsg("Your browser does not support screen sharing.");
+      }
+    } catch (e) {
+      console.error("Screen sharing check failed:", e);
+      setChecks(prev => ({ ...prev, screen: "error" }));
+      setScreenErrorMsg("Screen sharing permission is required. Please close other applications and try again.");
+    }
+
     setIsVerifying(false);
   };
 
-  const allChecksPassed = checks.camera === "success" && checks.mic === "success" && checks.browser === "success";
+  const allChecksPassed = checks.camera === "success" && checks.mic === "success" && checks.screen === "success" && checks.browser === "success";
 
   const launchSecureTest = async () => {
     // 1. Enter Fullscreen Mode (Mandatory final step)
@@ -704,6 +743,11 @@ export default function TestAccess() {
                           label="Microphone Permission Check" 
                           status={checks.mic} 
                           desc="Background audio analytics" 
+                        />
+                        <DiagnosticRow 
+                          label="Screen Share & Display Check" 
+                          status={checks.screen} 
+                          desc={screenErrorMsg || "Ensure only one monitor is connected"} 
                         />
                       </div>
 
