@@ -35,6 +35,7 @@ import { AuthProvider } from "./lib/auth-context";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { ROLES } from "./lib/roles";
+import ProctoringDashboard from "@/pages/Admin/ProctoringDashboard";
  
 // Admin pages
 import AdminDashboardAdmin from "./pages/Admin/Dashboard";
@@ -126,7 +127,9 @@ const App = () => (
                 <Route path="questions/add" element={<AddQuestion />} />
                 <Route path="questions/create" element={<AddQuestion />} />
                 <Route path="questions/edit/:id" element={<EditQuestion />} />
-                <Route path="reports" element={<Reports />} />
+                 <Route path="reports" element={<Reports />} />
+                <Route path="proctoring" element={<ProctoringDashboard />} />
+                <Route path="proctoring/:sessionId" element={<ProctoringDashboard />} />
                 <Route path="audit-logs" element={<AuditLogs />} />
                 <Route path="settings" element={<Settings />} />
                 <Route path="subjects/manage" element={<ManageSubjects />} />
@@ -163,6 +166,8 @@ const App = () => (
                 <Route path="tests/:id" element={<AdminTestDetails />} />
                 <Route path="tests/:id/questions" element={<TestQuestions />} />
                 <Route path="schedules/:id" element={<TestScheduleDetails />} />
+                <Route path="proctoring" element={<ProctoringDashboard />} />
+                <Route path="proctoring/:sessionId" element={<ProctoringDashboard />} />
                 <Route
                   path="invitations-history"
                   element={<InvitedCandidatesHistory />}

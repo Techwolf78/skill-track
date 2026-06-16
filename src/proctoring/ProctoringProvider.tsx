@@ -16,7 +16,7 @@ interface ProctoringContextType extends ProctoringState {
   startProctoring: () => void;
   stopProctoring: () => void;
   videoRef: React.RefObject<HTMLVideoElement | null>;
-  syncViolations: () => Promise<boolean>;
+  syncViolations: () => Promise<number | null>;
 }
 
 const ProctoringContext = createContext<ProctoringContextType | undefined>(undefined);
@@ -115,7 +115,11 @@ export const ProctoringProvider: React.FC<{
 
     // Non-blocking real-time alert sync for critical/high violations
     if (severity === "CRITICAL" || severity === "HIGH") {
-      store.current.syncSingleViolation(newViolation).catch(err => {
+      store.current.syncSingleViolation(newViolation).then(score => {
+        if (score !== null) {
+          setState(prev => ({ ...prev, trustScore: score }));
+        }
+      }).catch(err => {
         console.error("Failed to sync critical violation immediately:", err);
       });
     }
@@ -301,7 +305,11 @@ export const ProctoringProvider: React.FC<{
   useEffect(() => {
     const handleOnline = () => {
       console.log("🌐 Connection restored. Syncing unsynced violations to backend...");
-      store.current.syncUnsynced().catch(err => {
+      store.current.syncUnsynced().then(score => {
+        if (score !== null) {
+          setState(prev => ({ ...prev, trustScore: score }));
+        }
+      }).catch(err => {
         console.error("Failed to sync offline queue:", err);
       });
     };
@@ -314,7 +322,11 @@ export const ProctoringProvider: React.FC<{
   const stopProctoring = () => setState(prev => ({ ...prev, isProctoringActive: false }));
 
   const syncViolations = useCallback(async () => {
-    return await store.current.syncToBackend();
+    const score = await store.current.syncToBackend();
+    if (score !== null) {
+      setState(prev => ({ ...prev, trustScore: score }));
+    }
+    return score;
   }, []);
 
   return (

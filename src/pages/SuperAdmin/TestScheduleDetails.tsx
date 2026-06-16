@@ -20,6 +20,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { testService, TestScheduleExtended, Test } from "@/lib/test-service";
 import { apiClient } from "@/lib/api-client";
+import { useAuth } from "@/lib/auth-context";
 
 interface Organisation {
   id: string;
@@ -39,6 +40,7 @@ export default function TestScheduleDetails() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { user } = useAuth();
 
   const [loading, setLoading] = useState(true);
   const [schedule, setSchedule] = useState<(TestScheduleExtended & { organisationId?: string }) | null>(null);
@@ -149,7 +151,7 @@ export default function TestScheduleDetails() {
         <Card>
           <CardContent className="pt-6">
             <p className="text-center text-muted-foreground">Schedule not found</p>
-            <Button onClick={() => navigate("/superadmin/test-schedules")} className="mt-4 w-full">
+            <Button onClick={() => navigate(user?.role === "ADMIN" ? "/admin/schedules" : "/superadmin/test-schedules")} className="mt-4 w-full">
               Back to Schedules
             </Button>
           </CardContent>
@@ -165,7 +167,7 @@ export default function TestScheduleDetails() {
         <Button
           variant="ghost"
           size="icon"
-          onClick={() => navigate("/superadmin/test-schedules")}
+          onClick={() => navigate(user?.role === "ADMIN" ? "/admin/schedules" : "/superadmin/test-schedules")}
         >
           <ArrowLeft className="w-5 h-5" />
         </Button>
@@ -328,11 +330,11 @@ export default function TestScheduleDetails() {
 
       {/* Action Buttons */}
       <div className="flex justify-end gap-3">
-        <Button variant="outline" onClick={() => navigate("/superadmin/invitations")}>
+        <Button variant="outline" onClick={() => navigate(user?.role === "ADMIN" ? "/admin/invitations" : "/superadmin/invitations")}>
           <Mail className="w-4 h-4 mr-2" />
           Invite More Candidates
         </Button>
-        <Button onClick={() => navigate("/superadmin/test-schedules")}>
+        <Button onClick={() => navigate(user?.role === "ADMIN" ? "/admin/schedules" : "/superadmin/test-schedules")}>
           Back to Schedules
         </Button>
       </div>

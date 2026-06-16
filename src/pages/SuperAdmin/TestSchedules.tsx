@@ -552,7 +552,7 @@ export default function TestSchedules() {
                           <DropdownMenuItem
                             onClick={() =>
                               navigate(
-                                `/${user?.role === "ADMIN" ? "admin" : "superadmin"}/test-schedules/${schedule.id}`,
+                                `/${user?.role === "ADMIN" ? "admin/schedules" : "superadmin/test-schedules"}/${schedule.id}`,
                               )
                             }
                           >

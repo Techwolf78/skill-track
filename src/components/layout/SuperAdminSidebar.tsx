@@ -13,6 +13,7 @@ import {
   ChevronRight,
   UserRound,
   ScrollText,
+  ShieldAlert,
 } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -29,6 +30,7 @@ const navItems = [
     path: "/superadmin/tests",
     matchPaths: ["/superadmin/tests", "/superadmin/test-schedules", "/superadmin/invitations"]
   },
+  { icon: ShieldAlert, label: "Proctoring", path: "/superadmin/proctoring" },
   { icon: BarChart3, label: "Reports", path: "/superadmin/reports" },
   { icon: ScrollText, label: "Audit Logs", path: "/superadmin/audit-logs" },
   { icon: Settings, label: "Settings", path: "/superadmin/settings" },

@@ -1,8 +1,18 @@
 # RxOne Backend API Specification
 
-Updated from the current Spring Boot controllers and DTOs in this repository.
+Last verified: 2026-06-15.
+
+Updated from the current Spring Boot controllers, DTOs, security configuration, and validation rules in this repository.
 
 This document is intended for frontend integration. It lists every active controller endpoint, request and response shapes, auth requirements, status behavior, rate limits, pagination, enums, and key workflow rules.
+
+Verification scope:
+
+- Controllers: `src/main/java/com/gryphon/rxone/controller`
+- DTOs: `src/main/java/com/gryphon/rxone/DTO`
+- Security/public route rules: `src/main/java/com/gryphon/rxone/config/SecurityConfig.java`
+- Role helper rules: `src/main/java/com/gryphon/rxone/security/SecurityExpressions.java`
+- Actuator/health note: checked for controller-owned mappings outside the controller package.
 
 ## 1. Base Contract
 
@@ -209,7 +219,7 @@ Raw rate-limit response:
 
 ## 2. Endpoint Catalog
 
-There are 99 active controller endpoints.
+There are 104 active controller endpoints as of the 2026-06-15 source scan. No extra controller-owned routes were found outside `src/main/java/com/gryphon/rxone/controller`.
 
 ### Auth
 
@@ -431,6 +441,7 @@ Important:
 
 - Schedule organisation is derived from the linked test.
 - Patching `testId` must keep the same organisation.
+- The schedule entity now also stores `proctoringProfile` and `proctoringConfigOverride` internally, but current schedule create/patch DTOs do not expose those fields.
 
 ### Test Sessions
 
@@ -449,10 +460,12 @@ Candidate flow:
 
 1. `POST /candidate-invitations/validate` to get candidate JWT.
 2. `POST /test-sessions/start` with `invitationId`.
-3. `GET /test-sessions/{id}/paper`.
-4. Submit answers through `/submissions` and coding code through `/api/code/execute/*`.
-5. `POST /test-sessions/{id}/submit`.
-6. Poll `GET /test-results/session/{sessionId}`.
+3. `GET /test-sessions/{id}/proctoring-config` to initialize monitoring rules when proctoring is enabled.
+4. `GET /test-sessions/{id}/paper`.
+5. During the session, send proctoring telemetry through `/test-sessions/{id}/violations`, `/violations/batch`, and `/snapshots/batch` as needed.
+6. Submit answers through `/submissions` and coding code through `/api/code/execute/*`.
+7. `POST /test-sessions/{id}/submit`.
+8. Poll `GET /test-results/session/{sessionId}`.
 
 Important:
 
@@ -460,6 +473,36 @@ Important:
 - A candidate cannot start another `ACTIVE`, `INACTIVE`, or `SUBMITTED` session for the same schedule.
 - When submitting a test, unanswered MCQs are auto-created with zero score.
 - For coding questions, latest accepted code run may be promoted into a grading submission.
+
+### Proctoring
+
+| Method | Path | Access | Request | Query | Response |
+|---|---|---|---|---|---|
+| `GET` | `/test-sessions/{sessionId}/proctoring-config` | `CANDIDATE`, session scoped | none | none | `200 BaseResponse<ProctoringConfigDto>` |
+| `POST` | `/test-sessions/{sessionId}/violations` | `CANDIDATE`, session scoped | `ViolationRequest` | none | `200 BaseResponse<String>` |
+| `POST` | `/test-sessions/{sessionId}/violations/batch` | `CANDIDATE`, session scoped | `ViolationBatchRequest` | none | `200 BaseResponse<String>` |
+| `POST` | `/test-sessions/{sessionId}/snapshots/batch` | `CANDIDATE`, session scoped | `SnapshotBatchRequest` | none | `200 BaseResponse<String>` |
+| `GET` | `/admin/sessions/{sessionId}/proctoring-summary` | `ADMIN`, `SUPERADMIN`, session scoped | none | `page`, `size` default `20` | `200 BaseResponse<ProctoringSummaryResponse>` |
+
+Important:
+
+- `GET /test-sessions/{sessionId}/proctoring-config` resolves the effective config by merging the linked schedule's profile config and per-schedule override config.
+- Default effective config is:
+  - `camera: false`
+  - `audio: false`
+  - `tabSwitch: true`
+  - `devtools: false`
+  - `screenShare: false`
+  - `objectDetection: false`
+  - `llmDetector: false`
+  - `maxTabSwitches: 2`
+  - `snapshotIntervalSecs: 60`
+  - `violationThresholds: { "look_away": 3, "multi_face": 2 }`
+- Config merging accepts both snake_case and camelCase keys for several fields, including `tab_switch` or `tabSwitch`, `screen_share` or `screenShare`, and `snapshot_interval_secs` or `snapshotIntervalSecs`.
+- Violation ingestion is idempotent by `clientEventId` per session. Duplicate event IDs are silently ignored and still return success.
+- `ViolationRequest.type` and `ViolationRequest.severity` are converted with `Enum.valueOf(...)` after uppercasing. Unsupported values return `400 BAD_REQUEST`.
+- If `ViolationRequest.evidence` is present and non-blank, the backend stores it as a `VIOLATION` snapshot linked to the created event.
+- Snapshot batch ingestion stores `AUDIT` snapshots only. There is currently no per-item bean validation on `SnapshotEntry`.
 
 ### Submissions
 
@@ -1072,6 +1115,89 @@ MCQ option object:
 | `maxCandidates` | integer |
 | `status` | `ScheduleStatus` |
 
+Note:
+
+- Although the underlying entity now has `proctoringProfile` and `proctoringConfigOverride`, those fields are not currently returned by `TestScheduleResponse`.
+
+### Proctoring DTOs
+
+`ProctoringConfigDto`
+
+| Field | Type |
+|---|---|
+| `camera` | boolean |
+| `audio` | boolean |
+| `tabSwitch` | boolean |
+| `devtools` | boolean |
+| `screenShare` | boolean |
+| `objectDetection` | boolean |
+| `llmDetector` | boolean |
+| `maxTabSwitches` | integer |
+| `snapshotIntervalSecs` | integer |
+| `violationThresholds` | `Record<string, integer>` |
+
+`ViolationRequest`
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `clientEventId` | UUID | yes | Also accepts JSON key `id` via `@JsonAlias`. |
+| `type` | string | yes | Expected enum values map to `ProctoringEventType`. |
+| `timestamp` | long | effectively yes | Epoch milliseconds. No `@NotNull`, so omitted values deserialize to `0`. |
+| `severity` | string | yes | Expected enum values map to `ProctoringEventSeverity`. |
+| `evidence` | string | no | Usually base64 image data or similar evidence payload. |
+| `metadata` | object | no | Arbitrary JSON object. |
+
+`ViolationBatchRequest`
+
+| Field | Type | Required |
+|---|---|---|
+| `violations` | `ViolationRequest[]` | yes |
+
+`SnapshotBatchRequest`
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `snapshots` | `SnapshotEntry[]` | yes | List itself is required. |
+
+`SnapshotEntry`
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `timestamp` | long | no bean validation | Epoch milliseconds. Missing values deserialize to `0`. |
+| `image` | string | no bean validation | Stored as snapshot image data. |
+
+`ProctoringSummaryResponse`
+
+| Field | Type |
+|---|---|
+| `trustScore` | `TrustScoreDto` |
+| `events` | `Page<ProctoringEventDto>` |
+
+`TrustScoreDto`
+
+| Field | Type |
+|---|---|
+| `id` | UUID/null |
+| `score` | number |
+| `flagsCount` | integer |
+| `isMalpractice` | boolean |
+| `reviewedBy` | UUID/null |
+| `reviewedAt` | datetime/null |
+| `updatedAt` | datetime/null |
+
+If a trust score record does not exist yet, the summary returns defaults of `score: 100.0`, `flagsCount: 0`, and `isMalpractice: false`.
+
+`ProctoringEventDto`
+
+| Field | Type |
+|---|---|
+| `id` | UUID |
+| `eventType` | string |
+| `severity` | string/null |
+| `occurredAt` | datetime |
+| `metadata` | object/null |
+| `syncedAt` | datetime |
+
 ### Session DTOs
 
 `CreateTestSessionRequest`
@@ -1274,10 +1400,13 @@ InvitationStatus: PENDING, ACCEPTED, EXPIRED
 Judge0PendingStatus: SUBMITTED, PROCESSING, COMPLETED, FAILED
 McqType: SINGLE_CORRECT, MULTIPLE_CORRECT, TRUE_FALSE, IMAGE_SINGLE_CORRECT, IMAGE_MULTIPLE_CORRECT, ASSERTION_REASON, FILL_IN_THE_BLANK
 PasswordProvider: LOCAL, GOOGLE
+ProctoringEventSeverity: LOW, MEDIUM, HIGH, CRITICAL
+ProctoringEventType: TAB_SWITCH, LOOK_AWAY, MULTI_FACE, DEVTOOLS, SCREEN_RECORD, SUSPICIOUS_AUDIO, OBJECT_DETECTED
 QuestionType: MCQ, CODING
 QuestionVisibility: PUBLIC, ORG_OWNED
 Role: ADMIN, SUPERADMIN, CANDIDATE, GUEST, TRAINER
 ScheduleStatus: SCHEDULED, LIVE, COMPLETED
+SnapshotType: VIOLATION, AUDIT
 SubmissionStatus: PENDING, GRADED, PENDING_GRADING, FAILED
 TestSessionStatus: ACTIVE, SUBMITTED, FLAGGED, TERMINATED, INACTIVE, EVALUATED
 TestStatus: DRAFT, PUBLISHED, ARCHIVED
@@ -1332,6 +1461,62 @@ Content-Type: application/json
 {
   "invitationId": "22222222-2222-2222-2222-222222222222",
   "ipAddress": "203.0.113.10"
+}
+```
+
+### Get Effective Proctoring Config
+
+```http
+GET /test-sessions/ffffffff-ffff-ffff-ffff-ffffffffffff/proctoring-config
+Authorization: Bearer <candidateAccessToken>
+```
+
+Example `data`:
+
+```json
+{
+  "camera": true,
+  "audio": false,
+  "tabSwitch": true,
+  "devtools": true,
+  "screenShare": false,
+  "objectDetection": true,
+  "llmDetector": false,
+  "maxTabSwitches": 2,
+  "snapshotIntervalSecs": 60,
+  "violationThresholds": {
+    "look_away": 3,
+    "multi_face": 2
+  }
+}
+```
+
+### Ingest Proctoring Violation
+
+```json
+{
+  "clientEventId": "12121212-3434-5656-7878-909090909090",
+  "type": "LOOK_AWAY",
+  "timestamp": 1781517600000,
+  "severity": "MEDIUM",
+  "evidence": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQ...",
+  "metadata": {
+    "durationMs": 3200,
+    "tabHiddenCount": 1
+  }
+}
+```
+
+### Ingest Snapshot Batch
+
+```json
+{
+  "snapshots": [
+    {
+      "timestamp": 1781517600000,
+      "image": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQ..."
+    }
+  ]
 }
 ```
 
@@ -1526,15 +1711,17 @@ If result is not ready:
 2. Frontend calls `POST /candidate-invitations/validate`.
 3. Store returned candidate `accessToken`.
 4. Call `POST /test-sessions/start`.
-5. Call `GET /test-sessions/{id}/paper`.
-6. For MCQ answers call `POST /submissions`.
-7. For coding:
+5. Call `GET /test-sessions/{id}/proctoring-config` if the frontend needs to initialize candidate-side monitoring rules.
+6. Call `GET /test-sessions/{id}/paper`.
+7. During the active test, send proctoring telemetry through `/test-sessions/{id}/violations`, `/violations/batch`, and `/snapshots/batch` as needed.
+8. For MCQ answers call `POST /submissions`.
+9. For coding:
    - call `POST /api/code/execute/run` for quick run,
    - call `POST /api/code/execute/submit` for final coding submission,
    - poll `GET /api/code/execute/submit/{submissionId}/result`.
-8. Call `POST /test-sessions/{id}/submit`.
-9. Poll `GET /test-results/session/{sessionId}` until status is `200`.
-10. Optionally open/download `GET /test-results/session/{sessionId}/scorecard`.
+10. Call `POST /test-sessions/{id}/submit`.
+11. Poll `GET /test-results/session/{sessionId}` until status is `200`.
+12. Optionally open/download `GET /test-results/session/{sessionId}/scorecard`.
 
 ### Result Polling Behavior
 
@@ -1557,10 +1744,12 @@ Treat `202` with `data: null` as "not ready yet":
 - For question create/update, `questionType` must match the payload subtype.
 - `PUT /questions/{id}` behaves like a full update and may clear taxonomy IDs when omitted; use `PATCH` for partial updates.
 - Admin/superadmin endpoints are organisation-scoped unless the caller is `SUPERADMIN`.
+- Proctoring config is readable through `/test-sessions/{sessionId}/proctoring-config`, but schedule CRUD APIs do not currently expose or mutate the underlying `proctoringProfile` or `proctoringConfigOverride` fields.
+- Proctoring violation ingestion deduplicates by `clientEventId` per session and still returns success for duplicates, so the frontend should not assume every success created a new event.
 
 ## 8. Controller Verification Checklist
 
-The endpoint catalog above was verified against these active controller classes:
+The endpoint catalog above was verified against these active controller classes on 2026-06-15:
 
 | Controller | Base path | Endpoint count |
 |---|---|---:|
@@ -1579,13 +1768,14 @@ The endpoint catalog above was verified against these active controller classes:
 | `TestQuestionController` | `/test-questions` | 9 |
 | `TestScheduleController` | `/test-schedules` | 5 |
 | `TestSessionController` | `/test-sessions` | 8 |
+| `ProctoringController` | none | 5 |
 | `SubmissionController` | `/submissions` | 2 |
 | `TestResultController` | `/test-results` | 4 |
 | `TestCaseController` | `/test-cases` | 5 |
 | `CodeExecutionController` | `/api/code/execute` | 5 |
 
-Total: 99 active controller endpoints.
+Total: 104 active controller endpoints.
 
 ## 9. Actuator Note
 
-The project includes `spring-boot-starter-actuator` and a custom `judge0` health indicator. No controller-owned actuator route is defined in `src/main/java/com/gryphon/rxone/controller`. Current `SecurityConfig` permits only `/auth/**`, `POST /candidate-invitations/validate`, and `/api/code/execute/callback`; all other paths require authentication unless actuator security is configured elsewhere in deployment.
+The project includes `spring-boot-starter-actuator` and a custom `judge0` health indicator. No controller-owned actuator route is defined in `src/main/java/com/gryphon/rxone/controller`, and the source scan did not find another application controller package with additional routes. Current `SecurityConfig` permits only `/auth/**`, `POST /candidate-invitations/validate`, and `/api/code/execute/callback`; all other paths require authentication unless actuator security is configured elsewhere in deployment.

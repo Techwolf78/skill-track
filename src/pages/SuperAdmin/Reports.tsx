@@ -36,6 +36,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useNavigate } from "react-router-dom";
 import {
   Download,
   TrendingUp,
@@ -53,6 +54,7 @@ import {
   SlidersHorizontal,
   ChevronRight,
   GraduationCap,
+  ShieldAlert,
 } from "lucide-react";
 
 // Mock data fallbacks removed for production
@@ -61,6 +63,7 @@ const RESULT_POLL_INTERVAL_MS = 3000;
 const MAX_RESULT_POLL_ATTEMPTS = 40;
 
 export default function Reports() {
+  const navigate = useNavigate();
   const [schedules, setSchedules] = useState<TestScheduleExtended[]>([]);
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [sessions, setSessions] = useState<TestSession[]>([]);
@@ -1204,6 +1207,17 @@ export default function Reports() {
                                           PDF
                                         </Button>
                                       )}
+                                     <Button
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={() =>
+                                        navigate(`/superadmin/proctoring/${session.id}`)
+                                      }
+                                      className="h-8 text-xs border-orange-500/20 text-orange-600 hover:bg-orange-50 dark:hover:bg-orange-950/10"
+                                    >
+                                      <ShieldAlert className="h-3.5 w-3.5 mr-1" />
+                                      Proctoring
+                                    </Button>
                                     <Button
                                       size="sm"
                                       variant="ghost"

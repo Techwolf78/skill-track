@@ -8,6 +8,7 @@ import {
   LogOut,
   ChevronLeft,
   ChevronRight,
+  ShieldAlert,
 } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -23,6 +24,7 @@ const navItems = [
     path: "/admin/tests",
     matchPaths: ["/admin/tests", "/admin/schedules", "/admin/invitations"]
   },
+  { icon: ShieldAlert, label: "Proctoring", path: "/admin/proctoring" },
 ];
 
 export function AdminSidebar() {
