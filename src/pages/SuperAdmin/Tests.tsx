@@ -253,6 +253,21 @@ export default function Tests() {
     return status.charAt(0).toUpperCase() + status.slice(1).toLowerCase();
   };
 
+  const getProctoringModeBadge = (mode?: string) => {
+    switch (mode) {
+      case "LOW":
+        return <Badge className="bg-blue-500/10 text-blue-600 border-blue-200">Low</Badge>;
+      case "MEDIUM":
+        return <Badge className="bg-amber-500/10 text-amber-600 border-amber-200">Medium</Badge>;
+      case "HIGH":
+        return <Badge className="bg-red-500/10 text-red-600 border-red-200">High</Badge>;
+      case "CUSTOM":
+        return <Badge className="bg-purple-500/10 text-purple-600 border-purple-200">Custom</Badge>;
+      default:
+        return <Badge variant="outline" className="text-slate-500 border-slate-200">None</Badge>;
+    }
+  };
+
   const filteredTests = tests.filter((test) =>
     test.name.toLowerCase().includes(searchTerm.toLowerCase()),
   );
@@ -318,6 +333,7 @@ export default function Tests() {
               <TableHead>Test Name</TableHead>
               <TableHead>Type</TableHead>
               <TableHead>Status</TableHead>
+              <TableHead>Proctoring</TableHead>
               <TableHead>Difficulty</TableHead>
               <TableHead>Duration</TableHead>
               <TableHead>Questions</TableHead>
@@ -354,6 +370,9 @@ export default function Tests() {
                   >
                     {formatStatus(test.status)}
                   </Badge>
+                </TableCell>
+                <TableCell>
+                  {getProctoringModeBadge(test.proctoringMode)}
                 </TableCell>
                 <TableCell>
                   <Badge

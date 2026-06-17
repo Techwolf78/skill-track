@@ -11,6 +11,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select,
   SelectContent,
@@ -27,9 +28,85 @@ import {
   Loader2,
   AlertCircle,
 } from "lucide-react";
-import { testService, CreateTestRequest } from "@/lib/test-service";
+import { testService, CreateTestRequest, ProctoringMode } from "@/lib/test-service";
 import { useToast } from "@/hooks/use-toast";
 
+const getProctoringPreset = (mode: ProctoringMode) => {
+  const defaults = {
+    enableTabSwitchTracking: false,
+    blockCopyPaste: false,
+    blockRightClick: false,
+    warnOnFullscreenExit: false,
+    maxWarnings: 0,
+    requireWebcam: false,
+    detectFaceNotVisible: false,
+    detectMultipleFaces: false,
+    detectSuspiciousAudio: false,
+    detectObjects: false,
+    periodicSnapshots: false,
+    evidenceCapture: false,
+    requireMicrophone: false,
+    requireScreenShare: false,
+    detectDevTools: false,
+    detectScreenShareStop: false,
+    enableLiveProctoring: false,
+    autoSubmitOnCriticalViolations: false,
+    maxCriticalViolations: 0,
+  };
+
+  if (mode === "LOW") {
+    return {
+      ...defaults,
+      enableTabSwitchTracking: true,
+      blockCopyPaste: true,
+      blockRightClick: true,
+      warnOnFullscreenExit: true,
+      maxWarnings: 5,
+    };
+  }
+  if (mode === "MEDIUM") {
+    return {
+      ...defaults,
+      enableTabSwitchTracking: true,
+      blockCopyPaste: true,
+      blockRightClick: true,
+      warnOnFullscreenExit: true,
+      maxWarnings: 3,
+      requireWebcam: true,
+      detectFaceNotVisible: true,
+      detectMultipleFaces: true,
+      detectSuspiciousAudio: true,
+      detectObjects: true,
+      periodicSnapshots: true,
+      evidenceCapture: true,
+    };
+  }
+  if (mode === "HIGH") {
+    return {
+      ...defaults,
+      enableTabSwitchTracking: true,
+      blockCopyPaste: true,
+      blockRightClick: true,
+      warnOnFullscreenExit: true,
+      maxWarnings: 3,
+      requireWebcam: true,
+      detectFaceNotVisible: true,
+      detectMultipleFaces: true,
+      detectSuspiciousAudio: true,
+      detectObjects: true,
+      periodicSnapshots: true,
+      evidenceCapture: true,
+      requireMicrophone: true,
+      requireScreenShare: true,
+      detectDevTools: true,
+      detectScreenShareStop: true,
+      enableLiveProctoring: true,
+      autoSubmitOnCriticalViolations: true,
+      maxCriticalViolations: 1,
+    };
+  }
+  return defaults;
+};
 
 export default function TestCreate() {
   const navigate = useNavigate();
@@ -47,6 +124,26 @@ export default function TestCreate() {
     status: "DRAFT",
     instructions: {},
     questions: [],
+    proctoringMode: "NONE",
+    enableTabSwitchTracking: false,
+    blockCopyPaste: false,
+    blockRightClick: false,
+    warnOnFullscreenExit: false,
+    maxWarnings: 0,
+    requireWebcam: false,
+    detectFaceNotVisible: false,
+    detectMultipleFaces: false,
+    detectSuspiciousAudio: false,
+    detectObjects: false,
+    periodicSnapshots: false,
+    evidenceCapture: false,
+    requireMicrophone: false,
+    requireScreenShare: false,
+    detectDevTools: false,
+    detectScreenShareStop: false,
+    enableLiveProctoring: false,
+    autoSubmitOnCriticalViolations: false,
+    maxCriticalViolations: 0,
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -110,6 +207,23 @@ export default function TestCreate() {
     }));
   };
 
+  const handleCheckboxChange = (name: string, checked: boolean) => {
+    setFormData((prev) => ({
+      ...prev,
+      [name]: checked,
+    }));
+  };
+
+  const handleProctoringModeChange = (value: string) => {
+    const mode = value as ProctoringMode;
+    const presets = getProctoringPreset(mode);
+    setFormData((prev) => ({
+      ...prev,
+      proctoringMode: mode,
+      ...presets,
+    }));
+  };
+
   const createTestAndContinue = async (status: "DRAFT" | "PUBLISHED") => {
     if (status === "PUBLISHED" && !validateForm()) {
       toast({
@@ -152,6 +266,26 @@ export default function TestCreate() {
         instructions: formData.instructions || {},
         questions: [],
         isActive: true,
+        proctoringMode: formData.proctoringMode || "NONE",
+        enableTabSwitchTracking: formData.enableTabSwitchTracking || false,
+        blockCopyPaste: formData.blockCopyPaste || false,
+        blockRightClick: formData.blockRightClick || false,
+        warnOnFullscreenExit: formData.warnOnFullscreenExit || false,
+        maxWarnings: formData.maxWarnings || 0,
+        requireWebcam: formData.requireWebcam || false,
+        detectFaceNotVisible: formData.detectFaceNotVisible || false,
+        detectMultipleFaces: formData.detectMultipleFaces || false,
+        detectSuspiciousAudio: formData.detectSuspiciousAudio || false,
+        detectObjects: formData.detectObjects || false,
+        periodicSnapshots: formData.periodicSnapshots || false,
+        evidenceCapture: formData.evidenceCapture || false,
+        requireMicrophone: formData.requireMicrophone || false,
+        requireScreenShare: formData.requireScreenShare || false,
+        detectDevTools: formData.detectDevTools || false,
+        detectScreenShareStop: formData.detectScreenShareStop || false,
+        enableLiveProctoring: formData.enableLiveProctoring || false,
+        autoSubmitOnCriticalViolations: formData.autoSubmitOnCriticalViolations || false,
+        maxCriticalViolations: formData.maxCriticalViolations || 0,
       };
 
       console.log("Creating test with data:", createData);
@@ -362,6 +496,399 @@ export default function TestCreate() {
                   </SelectContent>
                 </Select>
               </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Proctoring Settings</CardTitle>
+              <CardDescription>
+                Configure anti-cheating and monitoring rules for this assessment
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="space-y-2">
+                <Label htmlFor="proctoringMode">Proctoring Mode</Label>
+                <Select
+                  value={formData.proctoringMode}
+                  onValueChange={handleProctoringModeChange}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select proctoring mode" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="NONE">No Proctoring</SelectItem>
+                    <SelectItem value="LOW">Low Proctoring</SelectItem>
+                    <SelectItem value="MEDIUM">Medium Proctoring</SelectItem>
+                    <SelectItem value="HIGH">High Proctoring</SelectItem>
+                    <SelectItem value="CUSTOM">Custom</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {formData.proctoringMode === "NONE" ? (
+                <p className="text-sm text-muted-foreground italic">
+                  This assessment will run without proctoring.
+                </p>
+              ) : (
+                <div className="space-y-6 pt-2">
+                  {/* Category 1: Browser Controls */}
+                  <div className="space-y-4">
+                    <h4 className="text-sm font-semibold text-slate-900 dark:text-slate-100 uppercase tracking-wider">
+                      Browser & Shell Control
+                    </h4>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="flex items-center space-x-2">
+                        <Checkbox
+                          id="enableTabSwitchTracking"
+                          checked={formData.enableTabSwitchTracking}
+                          onCheckedChange={(checked) =>
+                            handleCheckboxChange("enableTabSwitchTracking", !!checked)
+                          }
+                          disabled={formData.proctoringMode !== "CUSTOM"}
+                        />
+                        <Label
+                          htmlFor="enableTabSwitchTracking"
+                          className="text-sm font-normal cursor-pointer"
+                        >
+                          Enable tab switch tracking
+                        </Label>
+                      </div>
+
+                      <div className="flex items-center space-x-2">
+                        <Checkbox
+                          id="blockCopyPaste"
+                          checked={formData.blockCopyPaste}
+                          onCheckedChange={(checked) =>
+                            handleCheckboxChange("blockCopyPaste", !!checked)
+                          }
+                          disabled={formData.proctoringMode !== "CUSTOM"}
+                        />
+                        <Label
+                          htmlFor="blockCopyPaste"
+                          className="text-sm font-normal cursor-pointer"
+                        >
+                          Block copy/paste
+                        </Label>
+                      </div>
+
+                      <div className="flex items-center space-x-2">
+                        <Checkbox
+                          id="blockRightClick"
+                          checked={formData.blockRightClick}
+                          onCheckedChange={(checked) =>
+                            handleCheckboxChange("blockRightClick", !!checked)
+                          }
+                          disabled={formData.proctoringMode !== "CUSTOM"}
+                        />
+                        <Label
+                          htmlFor="blockRightClick"
+                          className="text-sm font-normal cursor-pointer"
+                        >
+                          Block right click
+                        </Label>
+                      </div>
+
+                      <div className="flex items-center space-x-2">
+                        <Checkbox
+                          id="warnOnFullscreenExit"
+                          checked={formData.warnOnFullscreenExit}
+                          onCheckedChange={(checked) =>
+                            handleCheckboxChange("warnOnFullscreenExit", !!checked)
+                          }
+                          disabled={formData.proctoringMode !== "CUSTOM"}
+                        />
+                        <Label
+                          htmlFor="warnOnFullscreenExit"
+                          className="text-sm font-normal cursor-pointer"
+                        >
+                          Warn on fullscreen exit
+                        </Label>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2 max-w-xs">
+                      <Label htmlFor="maxWarnings">Max warnings allowed</Label>
+                      <Input
+                        id="maxWarnings"
+                        type="number"
+                        value={formData.maxWarnings}
+                        onChange={(e) =>
+                          handleNumberChange("maxWarnings", e.target.value)
+                        }
+                        disabled={formData.proctoringMode !== "CUSTOM"}
+                        min="0"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Category 2: Webcam & Audio Monitoring */}
+                  {(formData.proctoringMode === "MEDIUM" ||
+                    formData.proctoringMode === "HIGH" ||
+                    formData.proctoringMode === "CUSTOM") && (
+                    <div className="space-y-4 pt-4 border-t">
+                      <h4 className="text-sm font-semibold text-slate-900 dark:text-slate-100 uppercase tracking-wider">
+                        Webcam & Audio Monitoring
+                      </h4>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="flex items-center space-x-2">
+                          <Checkbox
+                            id="requireWebcam"
+                            checked={formData.requireWebcam}
+                            onCheckedChange={(checked) =>
+                              handleCheckboxChange("requireWebcam", !!checked)
+                            }
+                            disabled={formData.proctoringMode !== "CUSTOM"}
+                          />
+                          <Label
+                            htmlFor="requireWebcam"
+                            className="text-sm font-normal cursor-pointer"
+                          >
+                            Require webcam
+                          </Label>
+                        </div>
+
+                        <div className="flex items-center space-x-2">
+                          <Checkbox
+                            id="detectFaceNotVisible"
+                            checked={formData.detectFaceNotVisible}
+                            onCheckedChange={(checked) =>
+                              handleCheckboxChange("detectFaceNotVisible", !!checked)
+                            }
+                            disabled={formData.proctoringMode !== "CUSTOM"}
+                          />
+                          <Label
+                            htmlFor="detectFaceNotVisible"
+                            className="text-sm font-normal cursor-pointer"
+                          >
+                            Detect face not visible
+                          </Label>
+                        </div>
+
+                        <div className="flex items-center space-x-2">
+                          <Checkbox
+                            id="detectMultipleFaces"
+                            checked={formData.detectMultipleFaces}
+                            onCheckedChange={(checked) =>
+                              handleCheckboxChange("detectMultipleFaces", !!checked)
+                            }
+                            disabled={formData.proctoringMode !== "CUSTOM"}
+                          />
+                          <Label
+                            htmlFor="detectMultipleFaces"
+                            className="text-sm font-normal cursor-pointer"
+                          >
+                            Detect multiple faces
+                          </Label>
+                        </div>
+
+                        <div className="flex items-center space-x-2">
+                          <Checkbox
+                            id="detectSuspiciousAudio"
+                            checked={formData.detectSuspiciousAudio}
+                            onCheckedChange={(checked) =>
+                              handleCheckboxChange("detectSuspiciousAudio", !!checked)
+                            }
+                            disabled={formData.proctoringMode !== "CUSTOM"}
+                          />
+                          <Label
+                            htmlFor="detectSuspiciousAudio"
+                            className="text-sm font-normal cursor-pointer"
+                          >
+                            Detect suspicious audio
+                          </Label>
+                        </div>
+
+                        <div className="flex items-center space-x-2">
+                          <Checkbox
+                            id="detectObjects"
+                            checked={formData.detectObjects}
+                            onCheckedChange={(checked) =>
+                              handleCheckboxChange("detectObjects", !!checked)
+                            }
+                            disabled={formData.proctoringMode !== "CUSTOM"}
+                          />
+                          <Label
+                            htmlFor="detectObjects"
+                            className="text-sm font-normal cursor-pointer"
+                          >
+                            Detect objects (phone/book/etc.)
+                          </Label>
+                        </div>
+
+                        <div className="flex items-center space-x-2">
+                          <Checkbox
+                            id="periodicSnapshots"
+                            checked={formData.periodicSnapshots}
+                            onCheckedChange={(checked) =>
+                              handleCheckboxChange("periodicSnapshots", !!checked)
+                            }
+                            disabled={formData.proctoringMode !== "CUSTOM"}
+                          />
+                          <Label
+                            htmlFor="periodicSnapshots"
+                            className="text-sm font-normal cursor-pointer"
+                          >
+                            Periodic snapshots
+                          </Label>
+                        </div>
+
+                        <div className="flex items-center space-x-2">
+                          <Checkbox
+                            id="evidenceCapture"
+                            checked={formData.evidenceCapture}
+                            onCheckedChange={(checked) =>
+                              handleCheckboxChange("evidenceCapture", !!checked)
+                            }
+                            disabled={formData.proctoringMode !== "CUSTOM"}
+                          />
+                          <Label
+                            htmlFor="evidenceCapture"
+                            className="text-sm font-normal cursor-pointer"
+                          >
+                            Evidence capture
+                          </Label>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Category 3: Advanced Security & Hardware */}
+                  {(formData.proctoringMode === "HIGH" ||
+                    formData.proctoringMode === "CUSTOM") && (
+                    <div className="space-y-4 pt-4 border-t">
+                      <h4 className="text-sm font-semibold text-slate-900 dark:text-slate-100 uppercase tracking-wider">
+                        Advanced Security & Hardware
+                      </h4>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="flex items-center space-x-2">
+                          <Checkbox
+                            id="requireMicrophone"
+                            checked={formData.requireMicrophone}
+                            onCheckedChange={(checked) =>
+                              handleCheckboxChange("requireMicrophone", !!checked)
+                            }
+                            disabled={formData.proctoringMode !== "CUSTOM"}
+                          />
+                          <Label
+                            htmlFor="requireMicrophone"
+                            className="text-sm font-normal cursor-pointer"
+                          >
+                            Require microphone
+                          </Label>
+                        </div>
+
+                        <div className="flex items-center space-x-2">
+                          <Checkbox
+                            id="requireScreenShare"
+                            checked={formData.requireScreenShare}
+                            onCheckedChange={(checked) =>
+                              handleCheckboxChange("requireScreenShare", !!checked)
+                            }
+                            disabled={formData.proctoringMode !== "CUSTOM"}
+                          />
+                          <Label
+                            htmlFor="requireScreenShare"
+                            className="text-sm font-normal cursor-pointer"
+                          >
+                            Require screen share
+                          </Label>
+                        </div>
+
+                        <div className="flex items-center space-x-2">
+                          <Checkbox
+                            id="detectDevTools"
+                            checked={formData.detectDevTools}
+                            onCheckedChange={(checked) =>
+                              handleCheckboxChange("detectDevTools", !!checked)
+                            }
+                            disabled={formData.proctoringMode !== "CUSTOM"}
+                          />
+                          <Label
+                            htmlFor="detectDevTools"
+                            className="text-sm font-normal cursor-pointer"
+                          >
+                            Detect DevTools
+                          </Label>
+                        </div>
+
+                        <div className="flex items-center space-x-2">
+                          <Checkbox
+                            id="detectScreenShareStop"
+                            checked={formData.detectScreenShareStop}
+                            onCheckedChange={(checked) =>
+                              handleCheckboxChange("detectScreenShareStop", !!checked)
+                            }
+                            disabled={formData.proctoringMode !== "CUSTOM"}
+                          />
+                          <Label
+                            htmlFor="detectScreenShareStop"
+                            className="text-sm font-normal cursor-pointer"
+                          >
+                            Detect screen-share stop
+                          </Label>
+                        </div>
+
+                        <div className="flex items-center space-x-2">
+                          <Checkbox
+                            id="enableLiveProctoring"
+                            checked={formData.enableLiveProctoring}
+                            onCheckedChange={(checked) =>
+                              handleCheckboxChange("enableLiveProctoring", !!checked)
+                            }
+                            disabled={formData.proctoringMode !== "CUSTOM"}
+                          />
+                          <Label
+                            htmlFor="enableLiveProctoring"
+                            className="text-sm font-normal cursor-pointer"
+                          >
+                            Enable live proctoring
+                          </Label>
+                        </div>
+
+                        <div className="flex items-center space-x-2">
+                          <Checkbox
+                            id="autoSubmitOnCriticalViolations"
+                            checked={formData.autoSubmitOnCriticalViolations}
+                            onCheckedChange={(checked) =>
+                              handleCheckboxChange(
+                                "autoSubmitOnCriticalViolations",
+                                !!checked
+                              )
+                            }
+                            disabled={formData.proctoringMode !== "CUSTOM"}
+                          />
+                          <Label
+                            htmlFor="autoSubmitOnCriticalViolations"
+                            className="text-sm font-normal cursor-pointer"
+                          >
+                            Auto-submit after critical violations
+                          </Label>
+                        </div>
+                      </div>
+
+                      <div className="space-y-2 max-w-xs">
+                        <Label htmlFor="maxCriticalViolations">
+                          Max critical violations allowed
+                        </Label>
+                        <Input
+                          id="maxCriticalViolations"
+                          type="number"
+                          value={formData.maxCriticalViolations}
+                          onChange={(e) =>
+                            handleNumberChange(
+                              "maxCriticalViolations",
+                              e.target.value
+                            )
+                          }
+                          disabled={formData.proctoringMode !== "CUSTOM"}
+                          min="0"
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
             </CardContent>
           </Card>
 

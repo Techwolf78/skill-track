@@ -1,6 +1,8 @@
 import { apiClient } from "./api-client";
 import { BaseResponse } from "./auth-service";
 
+export type ProctoringMode = "NONE" | "LOW" | "MEDIUM" | "HIGH" | "CUSTOM";
+
 // ==================== Request DTOs ====================
 export interface CreateTestRequest {
   title: string;
@@ -17,6 +19,27 @@ export interface CreateTestRequest {
     marks: number;
     timeLimitSecs: number;
   }>;
+  // Proctoring Settings
+  proctoringMode?: ProctoringMode;
+  enableTabSwitchTracking?: boolean;
+  blockCopyPaste?: boolean;
+  blockRightClick?: boolean;
+  warnOnFullscreenExit?: boolean;
+  maxWarnings?: number;
+  requireWebcam?: boolean;
+  detectFaceNotVisible?: boolean;
+  detectMultipleFaces?: boolean;
+  detectSuspiciousAudio?: boolean;
+  detectObjects?: boolean;
+  periodicSnapshots?: boolean;
+  evidenceCapture?: boolean;
+  requireMicrophone?: boolean;
+  requireScreenShare?: boolean;
+  detectDevTools?: boolean;
+  detectScreenShareStop?: boolean;
+  enableLiveProctoring?: boolean;
+  autoSubmitOnCriticalViolations?: boolean;
+  maxCriticalViolations?: number;
 }
 
 export interface CreateTestQuestionRequest {
@@ -333,6 +356,27 @@ export interface Test {
   testQuestions?: TestQuestion[];
   isActive?: boolean;
   organisationId?: string;
+  // Proctoring Settings
+  proctoringMode?: ProctoringMode;
+  enableTabSwitchTracking?: boolean;
+  blockCopyPaste?: boolean;
+  blockRightClick?: boolean;
+  warnOnFullscreenExit?: boolean;
+  maxWarnings?: number;
+  requireWebcam?: boolean;
+  detectFaceNotVisible?: boolean;
+  detectMultipleFaces?: boolean;
+  detectSuspiciousAudio?: boolean;
+  detectObjects?: boolean;
+  periodicSnapshots?: boolean;
+  evidenceCapture?: boolean;
+  requireMicrophone?: boolean;
+  requireScreenShare?: boolean;
+  detectDevTools?: boolean;
+  detectScreenShareStop?: boolean;
+  enableLiveProctoring?: boolean;
+  autoSubmitOnCriticalViolations?: boolean;
+  maxCriticalViolations?: number;
 }
 
 export interface TestViewModel {
@@ -349,6 +393,7 @@ export interface TestViewModel {
   difficulty: string;
   passMark: number;
   isActive?: boolean;
+  proctoringMode?: ProctoringMode;
 }
 
 export interface TestSchedule {
@@ -852,6 +897,7 @@ export const testService = {
       difficulty,
       passMark,
       isActive: test.isActive,
+      proctoringMode: test.proctoringMode,
     };
   },
 

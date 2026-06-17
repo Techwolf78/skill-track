@@ -593,6 +593,159 @@ export default function TestDetails() {
               )}
             </CardContent>
           </Card>
+
+          <Card className="mt-6">
+            <CardHeader>
+              <CardTitle className="text-base flex items-center justify-between">
+                <span>Proctoring Configuration</span>
+                <Badge className={
+                  test.proctoringMode === "LOW" ? "bg-blue-500/10 text-blue-600 border-blue-200" :
+                  test.proctoringMode === "MEDIUM" ? "bg-amber-500/10 text-amber-600 border-amber-200" :
+                  test.proctoringMode === "HIGH" ? "bg-red-500/10 text-red-600 border-red-200" :
+                  test.proctoringMode === "CUSTOM" ? "bg-purple-500/10 text-purple-600 border-purple-200" :
+                  "bg-slate-500/10 text-slate-500 border-slate-200"
+                }>
+                  {test.proctoringMode || "NONE"} Mode
+                </Badge>
+              </CardTitle>
+              <CardDescription>Anti-cheating controls and security settings</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {test.proctoringMode === "NONE" || !test.proctoringMode ? (
+                <p className="text-sm text-muted-foreground italic">Proctoring is disabled for this assessment.</p>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-2">
+                  <div className="space-y-1">
+                    <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Browser Control</h4>
+                    <div className="flex items-center justify-between py-2 border-b border-slate-100 dark:border-slate-800 text-sm">
+                      <span className="text-muted-foreground">Tab Switch Tracking</span>
+                      <Badge variant={test.enableTabSwitchTracking ? "default" : "outline"} className={test.enableTabSwitchTracking ? "bg-emerald-500/10 text-emerald-600 border-emerald-200" : "text-slate-400 border-slate-200"}>
+                        {test.enableTabSwitchTracking ? "Enabled" : "Disabled"}
+                      </Badge>
+                    </div>
+                    <div className="flex items-center justify-between py-2 border-b border-slate-100 dark:border-slate-800 text-sm">
+                      <span className="text-muted-foreground">Block Copy/Paste</span>
+                      <Badge variant={test.blockCopyPaste ? "default" : "outline"} className={test.blockCopyPaste ? "bg-emerald-500/10 text-emerald-600 border-emerald-200" : "text-slate-400 border-slate-200"}>
+                        {test.blockCopyPaste ? "Enabled" : "Disabled"}
+                      </Badge>
+                    </div>
+                    <div className="flex items-center justify-between py-2 border-b border-slate-100 dark:border-slate-800 text-sm">
+                      <span className="text-muted-foreground">Block Right Click</span>
+                      <Badge variant={test.blockRightClick ? "default" : "outline"} className={test.blockRightClick ? "bg-emerald-500/10 text-emerald-600 border-emerald-200" : "text-slate-400 border-slate-200"}>
+                        {test.blockRightClick ? "Enabled" : "Disabled"}
+                      </Badge>
+                    </div>
+                    <div className="flex items-center justify-between py-2 border-b border-slate-100 dark:border-slate-800 text-sm">
+                      <span className="text-muted-foreground">Warn on Fullscreen Exit</span>
+                      <Badge variant={test.warnOnFullscreenExit ? "default" : "outline"} className={test.warnOnFullscreenExit ? "bg-emerald-500/10 text-emerald-600 border-emerald-200" : "text-slate-400 border-slate-200"}>
+                        {test.warnOnFullscreenExit ? "Enabled" : "Disabled"}
+                      </Badge>
+                    </div>
+                    <div className="flex items-center justify-between py-2 border-b border-slate-100 dark:border-slate-800 text-sm">
+                      <span className="text-muted-foreground">Max Warnings</span>
+                      <span className="font-semibold">{test.maxWarnings ?? 0}</span>
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-1">
+                    <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Webcam & Audio</h4>
+                    <div className="flex items-center justify-between py-2 border-b border-slate-100 dark:border-slate-800 text-sm">
+                      <span className="text-muted-foreground">Require Webcam</span>
+                      <Badge variant={test.requireWebcam ? "default" : "outline"} className={test.requireWebcam ? "bg-emerald-500/10 text-emerald-600 border-emerald-200" : "text-slate-400 border-slate-200"}>
+                        {test.requireWebcam ? "Enabled" : "Disabled"}
+                      </Badge>
+                    </div>
+                    <div className="flex items-center justify-between py-2 border-b border-slate-100 dark:border-slate-800 text-sm">
+                      <span className="text-muted-foreground">Detect Face Visible</span>
+                      <Badge variant={test.detectFaceNotVisible ? "default" : "outline"} className={test.detectFaceNotVisible ? "bg-emerald-500/10 text-emerald-600 border-emerald-200" : "text-slate-400 border-slate-200"}>
+                        {test.detectFaceNotVisible ? "Enabled" : "Disabled"}
+                      </Badge>
+                    </div>
+                    <div className="flex items-center justify-between py-2 border-b border-slate-100 dark:border-slate-800 text-sm">
+                      <span className="text-muted-foreground">Detect Multiple Faces</span>
+                      <Badge variant={test.detectMultipleFaces ? "default" : "outline"} className={test.detectMultipleFaces ? "bg-emerald-500/10 text-emerald-600 border-emerald-200" : "text-slate-400 border-slate-200"}>
+                        {test.detectMultipleFaces ? "Enabled" : "Disabled"}
+                      </Badge>
+                    </div>
+                    <div className="flex items-center justify-between py-2 border-b border-slate-100 dark:border-slate-800 text-sm">
+                      <span className="text-muted-foreground">Detect Suspicious Audio</span>
+                      <Badge variant={test.detectSuspiciousAudio ? "default" : "outline"} className={test.detectSuspiciousAudio ? "bg-emerald-500/10 text-emerald-600 border-emerald-200" : "text-slate-400 border-slate-200"}>
+                        {test.detectSuspiciousAudio ? "Enabled" : "Disabled"}
+                      </Badge>
+                    </div>
+                    <div className="flex items-center justify-between py-2 border-b border-slate-100 dark:border-slate-800 text-sm">
+                      <span className="text-muted-foreground">Detect Objects</span>
+                      <Badge variant={test.detectObjects ? "default" : "outline"} className={test.detectObjects ? "bg-emerald-500/10 text-emerald-600 border-emerald-200" : "text-slate-400 border-slate-200"}>
+                        {test.detectObjects ? "Enabled" : "Disabled"}
+                      </Badge>
+                    </div>
+                    <div className="flex items-center justify-between py-2 border-b border-slate-100 dark:border-slate-800 text-sm">
+                      <span className="text-muted-foreground">Periodic Snapshots</span>
+                      <Badge variant={test.periodicSnapshots ? "default" : "outline"} className={test.periodicSnapshots ? "bg-emerald-500/10 text-emerald-600 border-emerald-200" : "text-slate-400 border-slate-200"}>
+                        {test.periodicSnapshots ? "Enabled" : "Disabled"}
+                      </Badge>
+                    </div>
+                    <div className="flex items-center justify-between py-2 border-b border-slate-100 dark:border-slate-800 text-sm">
+                      <span className="text-muted-foreground">Evidence Capture</span>
+                      <Badge variant={test.evidenceCapture ? "default" : "outline"} className={test.evidenceCapture ? "bg-emerald-500/10 text-emerald-600 border-emerald-200" : "text-slate-400 border-slate-200"}>
+                        {test.evidenceCapture ? "Enabled" : "Disabled"}
+                      </Badge>
+                    </div>
+                  </div>
+
+                  <div className="space-y-1 md:col-span-2 mt-4 pt-4 border-t border-slate-100 dark:border-slate-800">
+                    <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Advanced & Hardware</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8">
+                      <div>
+                        <div className="flex items-center justify-between py-2 border-b border-slate-100 dark:border-slate-800 text-sm">
+                          <span className="text-muted-foreground">Require Microphone</span>
+                          <Badge variant={test.requireMicrophone ? "default" : "outline"} className={test.requireMicrophone ? "bg-emerald-500/10 text-emerald-600 border-emerald-200" : "text-slate-400 border-slate-200"}>
+                            {test.requireMicrophone ? "Enabled" : "Disabled"}
+                          </Badge>
+                        </div>
+                        <div className="flex items-center justify-between py-2 border-b border-slate-100 dark:border-slate-800 text-sm">
+                          <span className="text-muted-foreground">Require Screen Share</span>
+                          <Badge variant={test.requireScreenShare ? "default" : "outline"} className={test.requireScreenShare ? "bg-emerald-500/10 text-emerald-600 border-emerald-200" : "text-slate-400 border-slate-200"}>
+                            {test.requireScreenShare ? "Enabled" : "Disabled"}
+                          </Badge>
+                        </div>
+                        <div className="flex items-center justify-between py-2 border-b border-slate-100 dark:border-slate-800 text-sm">
+                          <span className="text-muted-foreground">Detect DevTools</span>
+                          <Badge variant={test.detectDevTools ? "default" : "outline"} className={test.detectDevTools ? "bg-emerald-500/10 text-emerald-600 border-emerald-200" : "text-slate-400 border-slate-200"}>
+                            {test.detectDevTools ? "Enabled" : "Disabled"}
+                          </Badge>
+                        </div>
+                      </div>
+                      <div>
+                        <div className="flex items-center justify-between py-2 border-b border-slate-100 dark:border-slate-800 text-sm">
+                          <span className="text-muted-foreground">Detect Screen Share Stop</span>
+                          <Badge variant={test.detectScreenShareStop ? "default" : "outline"} className={test.detectScreenShareStop ? "bg-emerald-500/10 text-emerald-600 border-emerald-200" : "text-slate-400 border-slate-200"}>
+                            {test.detectScreenShareStop ? "Enabled" : "Disabled"}
+                          </Badge>
+                        </div>
+                        <div className="flex items-center justify-between py-2 border-b border-slate-100 dark:border-slate-800 text-sm">
+                          <span className="text-muted-foreground">Enable Live Proctoring</span>
+                          <Badge variant={test.enableLiveProctoring ? "default" : "outline"} className={test.enableLiveProctoring ? "bg-emerald-500/10 text-emerald-600 border-emerald-200" : "text-slate-400 border-slate-200"}>
+                            {test.enableLiveProctoring ? "Enabled" : "Disabled"}
+                          </Badge>
+                        </div>
+                        <div className="flex items-center justify-between py-2 border-b border-slate-100 dark:border-slate-800 text-sm">
+                          <span className="text-muted-foreground">Auto Submit on Critical Violations</span>
+                          <Badge variant={test.autoSubmitOnCriticalViolations ? "default" : "outline"} className={test.autoSubmitOnCriticalViolations ? "bg-emerald-500/10 text-emerald-600 border-emerald-200" : "text-slate-400 border-slate-200"}>
+                            {test.autoSubmitOnCriticalViolations ? "Enabled" : "Disabled"}
+                          </Badge>
+                        </div>
+                        <div className="flex items-center justify-between py-2 text-sm">
+                          <span className="text-muted-foreground">Max Critical Violations</span>
+                          <span className="font-semibold">{test.maxCriticalViolations ?? 0}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </TabsContent>
       </Tabs>
     </div>

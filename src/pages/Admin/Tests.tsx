@@ -191,6 +191,21 @@ export default function AdminTests() {
     }
   };
 
+  const getProctoringModeBadge = (mode?: string) => {
+    switch (mode) {
+      case "LOW":
+        return <Badge className="bg-blue-500/10 text-blue-600 border-blue-200">Low</Badge>;
+      case "MEDIUM":
+        return <Badge className="bg-amber-500/10 text-amber-600 border-amber-200">Medium</Badge>;
+      case "HIGH":
+        return <Badge className="bg-red-500/10 text-red-600 border-red-200">High</Badge>;
+      case "CUSTOM":
+        return <Badge className="bg-purple-500/10 text-purple-600 border-purple-200">Custom</Badge>;
+      default:
+        return <Badge variant="outline" className="text-slate-500 border-slate-200">None</Badge>;
+    }
+  };
+
   // Calculate stats
   const totalTests = tests.length;
   const publishedTests = tests.filter((t) => t.status === "PUBLISHED").length;
@@ -360,6 +375,9 @@ export default function AdminTests() {
                     Status
                   </TableHead>
                   <TableHead className="font-semibold text-slate-700 text-center">
+                    Proctoring
+                  </TableHead>
+                  <TableHead className="font-semibold text-slate-700 text-center">
                     Questions
                   </TableHead>
                   <TableHead className="font-semibold text-slate-700 text-center">
@@ -379,7 +397,7 @@ export default function AdminTests() {
               <TableBody>
                 {loading ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center py-16">
+                    <TableCell colSpan={8} className="text-center py-16">
                       <div className="flex flex-col items-center gap-3">
                         <Loader2 className="w-8 h-8 animate-spin text-primary" />
                         <p className="text-sm text-muted-foreground">
@@ -390,7 +408,7 @@ export default function AdminTests() {
                   </TableRow>
                 ) : filteredTests.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center py-16">
+                    <TableCell colSpan={8} className="text-center py-16">
                       <div className="flex flex-col items-center gap-3">
                         <FileQuestion className="w-12 h-12 text-muted-foreground/50" />
                         <div>
@@ -441,6 +459,9 @@ export default function AdminTests() {
                         >
                           {getStatusBadge(test.status)}
                         </Badge>
+                      </TableCell>
+                      <TableCell className="text-center">
+                        {getProctoringModeBadge(test.proctoringMode)}
                       </TableCell>
                       <TableCell className="text-center">
                         <div className="flex items-center justify-center gap-1.5">

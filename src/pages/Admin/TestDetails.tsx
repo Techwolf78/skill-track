@@ -1,8 +1,15 @@
-import { useNavigate, useParams } from "react-router-dom";
+import { useState, useEffect, useCallback } from "react";
+import { useParams, useNavigate, Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowLeft, Edit, Clock, FileQuestion, Users, TrendingUp } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Table,
   TableBody,
@@ -11,222 +18,650 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-
-const sampleSubmissions = [
-  {
-    id: "1",
-    candidateName: "John Doe",
-    score: 85,
-    submittedAt: "2024-04-15 10:30 AM",
-    status: "Completed",
-  },
-  {
-    id: "2",
-    candidateName: "Jane Smith",
-    score: 92,
-    submittedAt: "2024-04-15 11:15 AM",
-    status: "Completed",
-  },
-  {
-    id: "3",
-    candidateName: "Mike Johnson",
-    score: 78,
-    submittedAt: "2024-04-15 2:45 PM",
-    status: "Completed",
-  },
-];
+import {
+  ArrowLeft,
+  Edit,
+  Clock,
+  Target,
+  FileQuestion,
+  Users,
+  Calendar,
+  User,
+  Loader2,
+  AlertCircle,
+  Code,
+  FileText,
+  Copy,
+} from "lucide-react";
+import { testService, Test, Question } from "@/lib/test-service";
+import { useToast } from "@/hooks/use-toast";
 
 export default function AdminTestDetails() {
+  const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { id } = useParams();
+  const { toast } = useToast();
+
+  const formatDuration = (secs: number) => {
+    if (secs <= 0) return "N/A";
+    if (secs % 60 === 0) {
+      const mins = secs / 60;
+      return `${mins} min${mins > 1 ? "s" : ""}`;
+    }
+    const mins = Math.floor(secs / 60);
+    const remainingSecs = secs % 60;
+    if (mins === 0) return `${remainingSecs} sec`;
+    return `${mins} min ${remainingSecs} sec`;
+  };
+
+  const [loading, setLoading] = useState(true);
+  const [test, setTest] = useState<Test | null>(null);
+  const [questions, setQuestions] = useState<
+    (Question & { marks: number; timeLimitSecs: number; orderIndex: number })[]
+  >([]);
+
+  const fetchTestDetails = useCallback(async () => {
+    try {
+      setLoading(true);
+      const testData = await testService.getTestById(id!);
+      setTest(testData);
+
+      // Fetch full question details
+      if (testData.questions && testData.questions.length > 0) {
+        const allQuestions = await testService.getAllQuestions();
+        const enrichedQuestions = testData.questions
+          .map((tq) => {
+            const question = allQuestions.find((q) => q.id === tq.questionId);
+            return {
+              ...question,
+              marks: tq.marks,
+              timeLimitSecs: tq.timeLimitSecs,
+              orderIndex: tq.orderIndex,
+            } as Question & {
+              marks: number;
+              timeLimitSecs: number;
+              orderIndex: number;
+            };
+          })
+          .filter((q) => q.id) // Filter out any undefined questions
+          .sort((a, b) => a.orderIndex - b.orderIndex);
+
+        setQuestions(enrichedQuestions);
+      }
+    } catch (error: unknown) {
+      console.error("Failed to fetch test details:", error);
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to load test details",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  }, [id, toast]);
+
+  useEffect(() => {
+    if (id) {
+      fetchTestDetails();
+    }
+  }, [id, fetchTestDetails]);
+
+  const handleEdit = () => {
+    navigate(`/admin/tests/edit/${id}`);
+  };
+
+  const handleManageQuestions = () => {
+    navigate(`/admin/tests/${id}/questions`);
+  };
+
+  const handleDuplicate = async () => {
+    try {
+      await testService.createTest({
+        title: `${test!.title} (Copy)`,
+        description: test!.description,
+        durationMins: test!.durationMins,
+        difficulty: test!.difficulty,
+        instructions: test!.instructions,
+        status: "DRAFT",
+        passMark: test!.passMark,
+      });
+
+      toast({
+        title: "Success",
+        description: "Test duplicated successfully.",
+      });
+      navigate("/admin/tests");
+    } catch (error: unknown) {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to duplicate test",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const getDifficultyColor = (difficulty: string) => {
+    switch (difficulty.toLowerCase()) {
+      case "easy":
+        return "bg-green-500/10 text-green-500";
+      case "medium":
+        return "bg-yellow-500/10 text-yellow-500";
+      case "hard":
+        return "bg-red-500/10 text-red-500";
+      default:
+        return "bg-gray-500/10 text-gray-500";
+    }
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status.toLowerCase()) {
+      case "published":
+        return "bg-green-500/10 text-green-500";
+      case "draft":
+        return "bg-gray-500/10 text-gray-500";
+      case "archived":
+        return "bg-red-500/10 text-red-500";
+      default:
+        return "bg-gray-500/10 text-gray-500";
+    }
+  };
+
+  const getQuestionTypeIcon = (type: string) => {
+    switch (type?.toLowerCase()) {
+      case "mcq":
+        return <FileText className="w-4 h-4" />;
+      case "coding":
+        return <Code className="w-4 h-4" />;
+      default:
+        return <FileQuestion className="w-4 h-4" />;
+    }
+  };
+
+  const totalMarks = questions.reduce((sum, q) => sum + (q.marks || 0), 0);
+  const totalTimeMinutes = Math.ceil(
+    questions.reduce((sum, q) => sum + (q.timeLimitSecs || 0), 0) / 60,
+  );
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (!test) {
+    return (
+      <div className="flex flex-col items-center justify-center h-96 text-center">
+        <AlertCircle className="w-12 h-12 text-destructive mb-4" />
+        <h2 className="text-xl font-semibold mb-2">Test Not Found</h2>
+        <p className="text-muted-foreground mb-4">
+          The test you're looking for doesn't exist or has been deleted.
+        </p>
+        <Link to="/admin/tests">
+          <Button>
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Back to Tests
+          </Button>
+        </Link>
+      </div>
+    );
+  }
 
   return (
     <div className="p-8 space-y-6 animate-fade-in">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-4">
         <div className="flex items-center gap-4">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => navigate("/admin/tests")}
-          >
-            <ArrowLeft className="w-5 h-5" />
-          </Button>
+          <Link to="/admin/tests">
+            <Button variant="ghost" size="icon">
+              <ArrowLeft className="w-5 h-5" />
+            </Button>
+          </Link>
           <div>
-            <h1 className="text-3xl font-heading font-bold">JavaScript Fundamentals</h1>
-            <p className="text-muted-foreground mt-1">
-              Test ID: {id}
-            </p>
+            <h1 className="text-3xl font-heading font-bold">{test.title}</h1>
+            {test.description && (
+              <p className="text-muted-foreground mt-1">{test.description}</p>
+            )}
           </div>
         </div>
-        <Button
-          variant="hero"
-          onClick={() => navigate(`/admin/tests/edit/${id}`)}
-        >
-          <Edit className="w-4 h-4 mr-2" />
-          Edit Test
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={handleEdit}>
+            <Edit className="w-4 h-4 mr-2" />
+            Edit
+          </Button>
+          <Button variant="outline" onClick={handleDuplicate}>
+            <Copy className="w-4 h-4 mr-2" />
+            Duplicate
+          </Button>
+        </div>
       </div>
 
-      {/* Quick Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Questions</p>
-                <p className="text-2xl font-bold">20</p>
-              </div>
-              <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                <FileQuestion className="w-5 h-5 text-primary" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">Duration</p>
-                <p className="text-2xl font-bold">60m</p>
+                <p className="text-2xl font-bold">{test.durationMins} min</p>
               </div>
-              <div className="w-10 h-10 rounded-lg bg-accent/10 flex items-center justify-center">
-                <Clock className="w-5 h-5 text-accent" />
-              </div>
+              <Clock className="w-8 h-8 text-muted-foreground" />
             </div>
           </CardContent>
         </Card>
-
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Submissions</p>
-                <p className="text-2xl font-bold">18</p>
+                <p className="text-sm text-muted-foreground">Passing Mark</p>
+                <p className="text-2xl font-bold">{test.passMark}%</p>
               </div>
-              <div className="w-10 h-10 rounded-lg bg-success/10 flex items-center justify-center">
-                <Users className="w-5 h-5 text-success" />
-              </div>
+              <Target className="w-8 h-8 text-muted-foreground" />
             </div>
           </CardContent>
         </Card>
-
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Avg Score</p>
-                <p className="text-2xl font-bold">85%</p>
+                <p className="text-sm text-muted-foreground">Questions</p>
+                <p className="text-2xl font-bold">{questions.length}</p>
               </div>
-              <div className="w-10 h-10 rounded-lg bg-warning/10 flex items-center justify-center">
-                <TrendingUp className="w-5 h-5 text-warning" />
+              <FileQuestion className="w-8 h-8 text-muted-foreground" />
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">Total Marks</p>
+                <p className="text-2xl font-bold">{totalMarks}</p>
               </div>
+              <Users className="w-8 h-8 text-muted-foreground" />
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Test Details */}
-      <div className="grid grid-cols-3 gap-6">
-        <div className="col-span-2">
+      {/* Main Content Tabs */}
+      <Tabs defaultValue="overview" className="w-full">
+        <TabsList>
+          <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="questions">
+            Questions ({questions.length})
+          </TabsTrigger>
+          <TabsTrigger value="settings">Settings</TabsTrigger>
+        </TabsList>
+
+        {/* Overview Tab */}
+        <TabsContent value="overview" className="mt-6 space-y-6">
           <Card>
             <CardHeader>
               <CardTitle>Test Information</CardTitle>
+              <CardDescription>
+                Detailed information about this test
+              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div>
-                <p className="text-sm text-muted-foreground">Description</p>
-                <p>Basic JavaScript concepts and syntax</p>
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Status</p>
-                <Badge className="bg-success/10 text-success">Published</Badge>
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Created</p>
-                <p>2024-04-10</p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-sm font-medium text-muted-foreground">
+                    Status
+                  </label>
+                  <div className="mt-1">
+                    <Badge className={getStatusColor(test.status)}>
+                      {test.status}
+                    </Badge>
+                  </div>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-muted-foreground">
+                    Difficulty
+                  </label>
+                  <div className="mt-1">
+                    <Badge className={getDifficultyColor(test.difficulty)}>
+                      {test.difficulty}
+                    </Badge>
+                  </div>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-muted-foreground">
+                    Created By
+                  </label>
+                  <div className="mt-1 flex items-center gap-2">
+                    <User className="w-4 h-4 text-muted-foreground" />
+                    <span>
+                      {test.createdById || "Unknown"}
+                    </span>
+                  </div>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-muted-foreground">
+                    Created At
+                  </label>
+                  <div className="mt-1 flex items-center gap-2">
+                    <Calendar className="w-4 h-4 text-muted-foreground" />
+                    <span>
+                      {test.createdAt
+                        ? new Date(test.createdAt).toLocaleString()
+                        : "N/A"}
+                    </span>
+                  </div>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-muted-foreground">
+                    Last Updated
+                  </label>
+                  <div className="mt-1 flex items-center gap-2">
+                    <Calendar className="w-4 h-4 text-muted-foreground" />
+                    <span>
+                      {test.updatedAt
+                        ? new Date(test.updatedAt).toLocaleString()
+                        : "N/A"}
+                    </span>
+                  </div>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-muted-foreground">
+                    Total Time (Estimated)
+                  </label>
+                  <div className="mt-1 flex items-center gap-2">
+                    <Clock className="w-4 h-4 text-muted-foreground" />
+                    <span>{totalTimeMinutes} minutes</span>
+                  </div>
+                </div>
               </div>
             </CardContent>
           </Card>
-        </div>
 
-        <div>
+          {test.instructions && Object.keys(test.instructions).length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Instructions</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <pre className="whitespace-pre-wrap font-sans text-sm">
+                  {JSON.stringify(test.instructions, null, 2)}
+                </pre>
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
+
+        {/* Questions Tab */}
+        <TabsContent value="questions" className="mt-6">
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">Performance</CardTitle>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle>Test Questions</CardTitle>
+                  <CardDescription>
+                    Questions included in this test
+                  </CardDescription>
+                </div>
+                <Button onClick={handleManageQuestions}>
+                  <FileQuestion className="w-4 h-4 mr-2" />
+                  Manage Questions
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {questions.length === 0 ? (
+                <div className="text-center py-12 text-muted-foreground">
+                  <FileQuestion className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                  <p>No questions added yet.</p>
+                  <Button onClick={handleManageQuestions} className="mt-4">
+                    Add Questions
+                  </Button>
+                </div>
+              ) : (
+                <div className="border rounded-lg">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-[50px]">#</TableHead>
+                        <TableHead>Question</TableHead>
+                        <TableHead>Type</TableHead>
+                        <TableHead>Marks</TableHead>
+                        <TableHead>Time Limit</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {questions.map((question, index) => (
+                        <TableRow key={question.id}>
+                          <TableCell className="font-medium">
+                            {index + 1}
+                          </TableCell>
+                          <TableCell>
+                            <div>
+                              <p>{question.prompt}</p>
+                              {question.mcqOptions &&
+                                question.mcqOptions.length > 0 && (
+                                  <div className="text-xs text-muted-foreground mt-1">
+                                    {question.mcqOptions.length} options
+                                  </div>
+                                )}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <Badge
+                              variant="outline"
+                              className="flex items-center gap-1 w-fit"
+                            >
+                              {getQuestionTypeIcon(
+                                question.questionType || "MCQ",
+                              )}
+                              {question.questionType || "MCQ"}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>{question.marks}</TableCell>
+                          <TableCell>{formatDuration(question.timeLimitSecs)}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Settings Tab */}
+        <TabsContent value="settings" className="mt-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Test Settings</CardTitle>
+              <CardDescription>
+                Advanced configuration and metadata
+              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div>
-                <div className="flex justify-between text-sm mb-1">
-                  <span className="text-muted-foreground">Completion</span>
-                  <span className="font-semibold">90%</span>
-                </div>
-                <div className="h-2 bg-muted rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-success rounded-full"
-                    style={{ width: "90%" }}
-                  />
-                </div>
+                <label className="text-sm font-medium text-muted-foreground">
+                  Test ID
+                </label>
+                <p className="font-mono text-sm mt-1">{test.id}</p>
               </div>
               <div>
-                <div className="flex justify-between text-sm mb-1">
-                  <span className="text-muted-foreground">Pass Rate</span>
-                  <span className="font-semibold">72%</span>
-                </div>
-                <div className="h-2 bg-muted rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-primary rounded-full"
-                    style={{ width: "72%" }}
-                  />
-                </div>
+                <label className="text-sm font-medium text-muted-foreground">
+                  Duration
+                </label>
+                <p className="mt-1">{test.durationMins} minutes</p>
               </div>
+              <div>
+                <label className="text-sm font-medium text-muted-foreground">
+                  Passing Mark
+                </label>
+                <p className="mt-1">{test.passMark}%</p>
+              </div>
+              {test.instructions && (
+                <div>
+                  <label className="text-sm font-medium text-muted-foreground">
+                    Instructions (JSON)
+                  </label>
+                  <pre className="mt-2 p-4 bg-muted rounded-lg text-xs overflow-auto">
+                    {JSON.stringify(test.instructions, null, 2)}
+                  </pre>
+                </div>
+              )}
             </CardContent>
           </Card>
-        </div>
-      </div>
 
-      {/* Submissions Table */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Recent Submissions</CardTitle>
-          <CardDescription>
-            Latest test submissions from candidates
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow className="bg-muted/50">
-                <TableHead className="font-semibold">Candidate</TableHead>
-                <TableHead className="font-semibold">Score</TableHead>
-                <TableHead className="font-semibold">Submitted</TableHead>
-                <TableHead className="font-semibold">Status</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {sampleSubmissions.map((submission) => (
-                <TableRow key={submission.id}>
-                  <TableCell className="font-medium">
-                    {submission.candidateName}
-                  </TableCell>
-                  <TableCell>
-                    <span className="font-semibold">{submission.score}%</span>
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {submission.submittedAt}
-                  </TableCell>
-                  <TableCell>
-                    <Badge className="bg-success/10 text-success">
-                      {submission.status}
-                    </Badge>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+          <Card className="mt-6">
+            <CardHeader>
+              <CardTitle className="text-base flex items-center justify-between">
+                <span>Proctoring Configuration</span>
+                <Badge className={
+                  test.proctoringMode === "LOW" ? "bg-blue-500/10 text-blue-600 border-blue-200" :
+                  test.proctoringMode === "MEDIUM" ? "bg-amber-500/10 text-amber-600 border-amber-200" :
+                  test.proctoringMode === "HIGH" ? "bg-red-500/10 text-red-600 border-red-200" :
+                  test.proctoringMode === "CUSTOM" ? "bg-purple-500/10 text-purple-600 border-purple-200" :
+                  "bg-slate-500/10 text-slate-500 border-slate-200"
+                }>
+                  {test.proctoringMode || "NONE"} Mode
+                </Badge>
+              </CardTitle>
+              <CardDescription>Anti-cheating controls and security settings</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {test.proctoringMode === "NONE" || !test.proctoringMode ? (
+                <p className="text-sm text-muted-foreground italic">Proctoring is disabled for this assessment.</p>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-2">
+                  <div className="space-y-1">
+                    <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Browser Control</h4>
+                    <div className="flex items-center justify-between py-2 border-b border-slate-100 dark:border-slate-800 text-sm">
+                      <span className="text-muted-foreground">Tab Switch Tracking</span>
+                      <Badge variant={test.enableTabSwitchTracking ? "default" : "outline"} className={test.enableTabSwitchTracking ? "bg-emerald-500/10 text-emerald-600 border-emerald-200" : "text-slate-400 border-slate-200"}>
+                        {test.enableTabSwitchTracking ? "Enabled" : "Disabled"}
+                      </Badge>
+                    </div>
+                    <div className="flex items-center justify-between py-2 border-b border-slate-100 dark:border-slate-800 text-sm">
+                      <span className="text-muted-foreground">Block Copy/Paste</span>
+                      <Badge variant={test.blockCopyPaste ? "default" : "outline"} className={test.blockCopyPaste ? "bg-emerald-500/10 text-emerald-600 border-emerald-200" : "text-slate-400 border-slate-200"}>
+                        {test.blockCopyPaste ? "Enabled" : "Disabled"}
+                      </Badge>
+                    </div>
+                    <div className="flex items-center justify-between py-2 border-b border-slate-100 dark:border-slate-800 text-sm">
+                      <span className="text-muted-foreground">Block Right Click</span>
+                      <Badge variant={test.blockRightClick ? "default" : "outline"} className={test.blockRightClick ? "bg-emerald-500/10 text-emerald-600 border-emerald-200" : "text-slate-400 border-slate-200"}>
+                        {test.blockRightClick ? "Enabled" : "Disabled"}
+                      </Badge>
+                    </div>
+                    <div className="flex items-center justify-between py-2 border-b border-slate-100 dark:border-slate-800 text-sm">
+                      <span className="text-muted-foreground">Warn on Fullscreen Exit</span>
+                      <Badge variant={test.warnOnFullscreenExit ? "default" : "outline"} className={test.warnOnFullscreenExit ? "bg-emerald-500/10 text-emerald-600 border-emerald-200" : "text-slate-400 border-slate-200"}>
+                        {test.warnOnFullscreenExit ? "Enabled" : "Disabled"}
+                      </Badge>
+                    </div>
+                    <div className="flex items-center justify-between py-2 border-b border-slate-100 dark:border-slate-800 text-sm">
+                      <span className="text-muted-foreground">Max Warnings</span>
+                      <span className="font-semibold">{test.maxWarnings ?? 0}</span>
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-1">
+                    <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Webcam & Audio</h4>
+                    <div className="flex items-center justify-between py-2 border-b border-slate-100 dark:border-slate-800 text-sm">
+                      <span className="text-muted-foreground">Require Webcam</span>
+                      <Badge variant={test.requireWebcam ? "default" : "outline"} className={test.requireWebcam ? "bg-emerald-500/10 text-emerald-600 border-emerald-200" : "text-slate-400 border-slate-200"}>
+                        {test.requireWebcam ? "Enabled" : "Disabled"}
+                      </Badge>
+                    </div>
+                    <div className="flex items-center justify-between py-2 border-b border-slate-100 dark:border-slate-800 text-sm">
+                      <span className="text-muted-foreground">Detect Face Visible</span>
+                      <Badge variant={test.detectFaceNotVisible ? "default" : "outline"} className={test.detectFaceNotVisible ? "bg-emerald-500/10 text-emerald-600 border-emerald-200" : "text-slate-400 border-slate-200"}>
+                        {test.detectFaceNotVisible ? "Enabled" : "Disabled"}
+                      </Badge>
+                    </div>
+                    <div className="flex items-center justify-between py-2 border-b border-slate-100 dark:border-slate-800 text-sm">
+                      <span className="text-muted-foreground">Detect Multiple Faces</span>
+                      <Badge variant={test.detectMultipleFaces ? "default" : "outline"} className={test.detectMultipleFaces ? "bg-emerald-500/10 text-emerald-600 border-emerald-200" : "text-slate-400 border-slate-200"}>
+                        {test.detectMultipleFaces ? "Enabled" : "Disabled"}
+                      </Badge>
+                    </div>
+                    <div className="flex items-center justify-between py-2 border-b border-slate-100 dark:border-slate-800 text-sm">
+                      <span className="text-muted-foreground">Detect Suspicious Audio</span>
+                      <Badge variant={test.detectSuspiciousAudio ? "default" : "outline"} className={test.detectSuspiciousAudio ? "bg-emerald-500/10 text-emerald-600 border-emerald-200" : "text-slate-400 border-slate-200"}>
+                        {test.detectSuspiciousAudio ? "Enabled" : "Disabled"}
+                      </Badge>
+                    </div>
+                    <div className="flex items-center justify-between py-2 border-b border-slate-100 dark:border-slate-800 text-sm">
+                      <span className="text-muted-foreground">Detect Objects</span>
+                      <Badge variant={test.detectObjects ? "default" : "outline"} className={test.detectObjects ? "bg-emerald-500/10 text-emerald-600 border-emerald-200" : "text-slate-400 border-slate-200"}>
+                        {test.detectObjects ? "Enabled" : "Disabled"}
+                      </Badge>
+                    </div>
+                    <div className="flex items-center justify-between py-2 border-b border-slate-100 dark:border-slate-800 text-sm">
+                      <span className="text-muted-foreground">Periodic Snapshots</span>
+                      <Badge variant={test.periodicSnapshots ? "default" : "outline"} className={test.periodicSnapshots ? "bg-emerald-500/10 text-emerald-600 border-emerald-200" : "text-slate-400 border-slate-200"}>
+                        {test.periodicSnapshots ? "Enabled" : "Disabled"}
+                      </Badge>
+                    </div>
+                    <div className="flex items-center justify-between py-2 border-b border-slate-100 dark:border-slate-800 text-sm">
+                      <span className="text-muted-foreground">Evidence Capture</span>
+                      <Badge variant={test.evidenceCapture ? "default" : "outline"} className={test.evidenceCapture ? "bg-emerald-500/10 text-emerald-600 border-emerald-200" : "text-slate-400 border-slate-200"}>
+                        {test.evidenceCapture ? "Enabled" : "Disabled"}
+                      </Badge>
+                    </div>
+                  </div>
+
+                  <div className="space-y-1 md:col-span-2 mt-4 pt-4 border-t border-slate-100 dark:border-slate-800">
+                    <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Advanced & Hardware</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8">
+                      <div>
+                        <div className="flex items-center justify-between py-2 border-b border-slate-100 dark:border-slate-800 text-sm">
+                          <span className="text-muted-foreground">Require Microphone</span>
+                          <Badge variant={test.requireMicrophone ? "default" : "outline"} className={test.requireMicrophone ? "bg-emerald-500/10 text-emerald-600 border-emerald-200" : "text-slate-400 border-slate-200"}>
+                            {test.requireMicrophone ? "Enabled" : "Disabled"}
+                          </Badge>
+                        </div>
+                        <div className="flex items-center justify-between py-2 border-b border-slate-100 dark:border-slate-800 text-sm">
+                          <span className="text-muted-foreground">Require Screen Share</span>
+                          <Badge variant={test.requireScreenShare ? "default" : "outline"} className={test.requireScreenShare ? "bg-emerald-500/10 text-emerald-600 border-emerald-200" : "text-slate-400 border-slate-200"}>
+                            {test.requireScreenShare ? "Enabled" : "Disabled"}
+                          </Badge>
+                        </div>
+                        <div className="flex items-center justify-between py-2 border-b border-slate-100 dark:border-slate-800 text-sm">
+                          <span className="text-muted-foreground">Detect DevTools</span>
+                          <Badge variant={test.detectDevTools ? "default" : "outline"} className={test.detectDevTools ? "bg-emerald-500/10 text-emerald-600 border-emerald-200" : "text-slate-400 border-slate-200"}>
+                            {test.detectDevTools ? "Enabled" : "Disabled"}
+                          </Badge>
+                        </div>
+                      </div>
+                      <div>
+                        <div className="flex items-center justify-between py-2 border-b border-slate-100 dark:border-slate-800 text-sm">
+                          <span className="text-muted-foreground">Detect Screen Share Stop</span>
+                          <Badge variant={test.detectScreenShareStop ? "default" : "outline"} className={test.detectScreenShareStop ? "bg-emerald-500/10 text-emerald-600 border-emerald-200" : "text-slate-400 border-slate-200"}>
+                            {test.detectScreenShareStop ? "Enabled" : "Disabled"}
+                          </Badge>
+                        </div>
+                        <div className="flex items-center justify-between py-2 border-b border-slate-100 dark:border-slate-800 text-sm">
+                          <span className="text-muted-foreground">Enable Live Proctoring</span>
+                          <Badge variant={test.enableLiveProctoring ? "default" : "outline"} className={test.enableLiveProctoring ? "bg-emerald-500/10 text-emerald-600 border-emerald-200" : "text-slate-400 border-slate-200"}>
+                            {test.enableLiveProctoring ? "Enabled" : "Disabled"}
+                          </Badge>
+                        </div>
+                        <div className="flex items-center justify-between py-2 border-b border-slate-100 dark:border-slate-800 text-sm">
+                          <span className="text-muted-foreground">Auto Submit on Critical Violations</span>
+                          <Badge variant={test.autoSubmitOnCriticalViolations ? "default" : "outline"} className={test.autoSubmitOnCriticalViolations ? "bg-emerald-500/10 text-emerald-600 border-emerald-200" : "text-slate-400 border-slate-200"}>
+                            {test.autoSubmitOnCriticalViolations ? "Enabled" : "Disabled"}
+                          </Badge>
+                        </div>
+                        <div className="flex items-center justify-between py-2 text-sm">
+                          <span className="text-muted-foreground">Max Critical Violations</span>
+                          <span className="font-semibold">{test.maxCriticalViolations ?? 0}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
