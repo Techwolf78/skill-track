@@ -24,6 +24,30 @@ import { useAuth } from "@/lib/auth-context";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
+type ProctoringMode = "NONE" | "LOW" | "MEDIUM" | "HIGH" | "CUSTOM";
+
+interface ProctoringFlags {
+  proctoringMode: ProctoringMode;
+  tabSwitchTrackingEnabled: boolean;
+  copyPasteBlocked: boolean;
+  rightClickBlocked: boolean;
+  fullscreenExitTrackingEnabled: boolean;
+  webcamRequired: boolean;
+  microphoneRequired: boolean;
+  screenShareRequired: boolean;
+  faceNotVisibleDetectionEnabled: boolean;
+  multipleFaceDetectionEnabled: boolean;
+  suspiciousAudioDetectionEnabled: boolean;
+  objectDetectionEnabled: boolean;
+  devtoolsDetectionEnabled: boolean;
+  periodicSnapshotsEnabled: boolean;
+  evidenceCaptureEnabled: boolean;
+  liveProctoringEnabled: boolean;
+  autoSubmitOnCriticalViolation: boolean;
+  maxWarningsAllowed: number;
+  maxCriticalViolationsAllowed: number;
+}
+
 interface TestData {
   valid: boolean;
   invitationId: string;
@@ -34,6 +58,7 @@ interface TestData {
   scheduleId: string;
   endTime: string;
   token: string;
+  proctoring: ProctoringFlags;
 }
 
 interface CandidateInvitation {
@@ -54,6 +79,25 @@ interface TestAssessment {
   id: string;
   title?: string;
   durationMins?: number;
+  proctoringMode?: ProctoringMode;
+  tabSwitchTrackingEnabled?: boolean;
+  copyPasteBlocked?: boolean;
+  rightClickBlocked?: boolean;
+  fullscreenExitTrackingEnabled?: boolean;
+  webcamRequired?: boolean;
+  microphoneRequired?: boolean;
+  screenShareRequired?: boolean;
+  faceNotVisibleDetectionEnabled?: boolean;
+  multipleFaceDetectionEnabled?: boolean;
+  suspiciousAudioDetectionEnabled?: boolean;
+  objectDetectionEnabled?: boolean;
+  devtoolsDetectionEnabled?: boolean;
+  periodicSnapshotsEnabled?: boolean;
+  evidenceCaptureEnabled?: boolean;
+  liveProctoringEnabled?: boolean;
+  autoSubmitOnCriticalViolation?: boolean;
+  maxWarningsAllowed?: number;
+  maxCriticalViolationsAllowed?: number;
 }
 
 interface CheckState {
@@ -268,6 +312,7 @@ export default function TestAccess() {
       const endTime = schedule?.endTime || decoded?.endTime || decoded?.end_time || new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString();
       const finalCandidateId = invitation?.candidateId || decoded?.candidateId || decoded?.id;
       const finalScheduleId = invitation?.scheduleId || schedule?.id || decoded?.scheduleId;
+      const mode: ProctoringMode = test?.proctoringMode || "HIGH";
 
       setTestData({
         valid: true,
@@ -278,7 +323,28 @@ export default function TestAccess() {
         durationMins: Number(durationMins),
         scheduleId: finalScheduleId || "default-schedule-id",
         endTime: endTime,
-        token: token
+        token: token,
+        proctoring: {
+          proctoringMode: mode,
+          tabSwitchTrackingEnabled: test?.tabSwitchTrackingEnabled ?? true,
+          copyPasteBlocked: test?.copyPasteBlocked ?? true,
+          rightClickBlocked: test?.rightClickBlocked ?? false,
+          fullscreenExitTrackingEnabled: test?.fullscreenExitTrackingEnabled ?? true,
+          webcamRequired: test?.webcamRequired ?? (mode !== "NONE" && mode !== "LOW"),
+          microphoneRequired: test?.microphoneRequired ?? (mode === "HIGH" || mode === "CUSTOM"),
+          screenShareRequired: test?.screenShareRequired ?? (mode === "HIGH" || mode === "CUSTOM"),
+          faceNotVisibleDetectionEnabled: test?.faceNotVisibleDetectionEnabled ?? (mode !== "NONE" && mode !== "LOW"),
+          multipleFaceDetectionEnabled: test?.multipleFaceDetectionEnabled ?? (mode !== "NONE" && mode !== "LOW"),
+          suspiciousAudioDetectionEnabled: test?.suspiciousAudioDetectionEnabled ?? (mode !== "NONE"),
+          objectDetectionEnabled: test?.objectDetectionEnabled ?? (mode !== "NONE" && mode !== "LOW"),
+          devtoolsDetectionEnabled: test?.devtoolsDetectionEnabled ?? (mode === "HIGH" || mode === "CUSTOM"),
+          periodicSnapshotsEnabled: test?.periodicSnapshotsEnabled ?? (mode !== "NONE"),
+          evidenceCaptureEnabled: test?.evidenceCaptureEnabled ?? (mode !== "NONE"),
+          liveProctoringEnabled: test?.liveProctoringEnabled ?? (mode !== "NONE"),
+          autoSubmitOnCriticalViolation: test?.autoSubmitOnCriticalViolation ?? true,
+          maxWarningsAllowed: test?.maxWarningsAllowed ?? 3,
+          maxCriticalViolationsAllowed: test?.maxCriticalViolationsAllowed ?? 2,
+        },
       });
 
       setError(null);
@@ -358,87 +424,93 @@ export default function TestAccess() {
   }, [cameraStream]);
 
   const verifyEnvironment = async () => {
+    if (!testData) return;
+    const p = testData.proctoring;
     setIsVerifying(true);
     setScreenErrorMsg(null);
-    releaseResources(); // reset any previous streams
-    
-    // 1. Browser Check
+    releaseResources();
+
+    // 1. Browser check — always
     const isModern = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
     setChecks(prev => ({ ...prev, browser: isModern ? "success" : "error" }));
 
-    // 2. Camera & Mic request (Combined)
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-      setCameraStream(stream);
-      setChecks(prev => ({ 
-        ...prev, 
-        camera: "success", 
-        mic: "success" 
-      }));
-      startAudioMonitoring(stream);
-    } catch (e) {
-      console.warn("Combined hardware check failed. Retrying separately...", e);
-      
-      // Try camera individually
+    // 2. Camera + Mic — only if required by proctoring mode
+    if (p.webcamRequired || p.microphoneRequired) {
       try {
-        const camStream = await navigator.mediaDevices.getUserMedia({ video: true });
-        setCameraStream(camStream);
-        setChecks(prev => ({ ...prev, camera: "success" }));
-      } catch (camErr) {
-        setChecks(prev => ({ ...prev, camera: "error" }));
-      }
-
-      // Try mic individually
-      try {
-        const micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        if (!cameraStream) {
-          startAudioMonitoring(micStream);
+        const constraints = {
+          video: p.webcamRequired,
+          audio: p.microphoneRequired,
+        };
+        const stream = await navigator.mediaDevices.getUserMedia(constraints);
+        setCameraStream(stream);
+        if (p.webcamRequired) setChecks(prev => ({ ...prev, camera: "success" }));
+        if (p.microphoneRequired) {
+          setChecks(prev => ({ ...prev, mic: "success" }));
+          startAudioMonitoring(stream);
         }
-        setChecks(prev => ({ ...prev, mic: "success" }));
-      } catch (micErr) {
-        setChecks(prev => ({ ...prev, mic: "error" }));
+      } catch (e) {
+        console.warn("Combined hardware check failed. Retrying separately...", e);
+        if (p.webcamRequired) {
+          try {
+            const camStream = await navigator.mediaDevices.getUserMedia({ video: true });
+            setCameraStream(camStream);
+            setChecks(prev => ({ ...prev, camera: "success" }));
+          } catch { setChecks(prev => ({ ...prev, camera: "error" })); }
+        }
+        if (p.microphoneRequired) {
+          try {
+            const micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            startAudioMonitoring(micStream);
+            setChecks(prev => ({ ...prev, mic: "success" }));
+          } catch { setChecks(prev => ({ ...prev, mic: "error" })); }
+        }
       }
+    } else {
+      // Not required — auto-pass
+      setChecks(prev => ({ ...prev, camera: "success", mic: "success" }));
     }
 
-    // 3. Screen Sharing & Multiple Displays Check
-    try {
-      if (navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia) {
-        const screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
-        
-        const track = screenStream.getVideoTracks()[0];
-        const settings = track ? track.getSettings() : {};
-        const displaySurface = settings.displaySurface;
-        const isEntireScreen = displaySurface !== 'window' && displaySurface !== 'browser';
-
-        // Check for multiple monitors
-        const isExtended = 'isExtended' in window.screen ? (window.screen as unknown as { isExtended?: boolean }).isExtended : false;
-        
-        // Stop screen tracks immediately
-        screenStream.getTracks().forEach(t => t.stop());
-
-        if (!isEntireScreen) {
-          setChecks(prev => ({ ...prev, screen: "error" }));
-          setScreenErrorMsg("Please share your ENTIRE screen (not a window or tab) and close all other apps (VS Code, Teams, Brave, etc.) to proceed.");
-        } else if (isExtended) {
-          setChecks(prev => ({ ...prev, screen: "error" }));
-          setScreenErrorMsg("Multiple displays detected. Please disconnect extra monitors to proceed.");
+    // 3. Screen share — only if required
+    if (p.screenShareRequired) {
+      try {
+        if (navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia) {
+          const screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
+          const track = screenStream.getVideoTracks()[0];
+          const settings = track ? track.getSettings() : {};
+          const displaySurface = settings.displaySurface;
+          const isEntireScreen = displaySurface !== 'window' && displaySurface !== 'browser';
+          const isExtended = 'isExtended' in window.screen ? (window.screen as unknown as { isExtended?: boolean }).isExtended : false;
+          screenStream.getTracks().forEach(t => t.stop());
+          if (!isEntireScreen) {
+            setChecks(prev => ({ ...prev, screen: "error" }));
+            setScreenErrorMsg("Please share your ENTIRE screen (not a window or tab).");
+          } else if (isExtended) {
+            setChecks(prev => ({ ...prev, screen: "error" }));
+            setScreenErrorMsg("Multiple displays detected. Please disconnect extra monitors.");
+          } else {
+            setChecks(prev => ({ ...prev, screen: "success" }));
+          }
         } else {
-          setChecks(prev => ({ ...prev, screen: "success" }));
+          setChecks(prev => ({ ...prev, screen: "error" }));
+          setScreenErrorMsg("Your browser does not support screen sharing.");
         }
-      } else {
+      } catch (e) {
+        console.error("Screen sharing check failed:", e);
         setChecks(prev => ({ ...prev, screen: "error" }));
-        setScreenErrorMsg("Your browser does not support screen sharing.");
+        setScreenErrorMsg("Screen sharing permission is required. Please try again.");
       }
-    } catch (e) {
-      console.error("Screen sharing check failed:", e);
-      setChecks(prev => ({ ...prev, screen: "error" }));
-      setScreenErrorMsg("Screen sharing permission is required. Please close other applications and try again.");
+    } else {
+      setChecks(prev => ({ ...prev, screen: "success" }));
     }
 
     setIsVerifying(false);
   };
 
-  const allChecksPassed = checks.camera === "success" && checks.mic === "success" && checks.screen === "success" && checks.browser === "success";
+  const allChecksPassed =
+    checks.browser === "success" &&
+    checks.camera === "success" &&
+    checks.mic === "success" &&
+    checks.screen === "success";
 
   const launchSecureTest = async () => {
     // 1. Enter Fullscreen Mode (Mandatory final step)
@@ -665,27 +737,35 @@ export default function TestAccess() {
             {/* Wizard Panels */}
             <div className="flex-1 py-4 animate-in fade-in duration-300">
               
-              {/* Step 1: Welcome & Overview */}
               {currentStep === "welcome" && (
                 <div className="space-y-4">
-                  <h3 className="text-xl font-bold">Assessment Guidelines Overview</h3>
+                  <div className="flex items-center gap-3">
+                    <h3 className="text-xl font-bold">Assessment Guidelines Overview</h3>
+                    <ProctoringBadge mode={testData.proctoring.proctoringMode} />
+                  </div>
                   <p className="text-sm text-muted-foreground leading-relaxed">
-                    You have been invited to take the <strong>{testData.testTitle}</strong>. 
-                    This test is conducted in a secure browser environment using automated monitoring utilities. 
+                    You have been invited to take the <strong>{testData.testTitle}</strong>.
+                    This test is conducted in a secure browser environment using automated monitoring utilities.
                     Please ensure you are in a quiet, private space with a stable internet connection.
                   </p>
-                  
+
                   <div className="bg-muted/30 border rounded-xl p-4 space-y-3">
                     <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">What to expect during onboarding:</h4>
                     <ul className="text-xs space-y-2 text-muted-foreground list-disc list-inside">
-                      <li>We will request webcam and microphone access (handled safely in windowed mode).</li>
-                      <li>You will see a live video feed to verify your framing and lighting.</li>
-                      <li>A volume indicator will verify that your microphone captures audio correctly.</li>
-                      <li>Once checked, you will declare consent and launch the test directly in fullscreen.</li>
+                      {testData.proctoring.proctoringMode === "NONE" ? (
+                        <li>This assessment runs without proctoring. No hardware permissions will be requested.</li>
+                      ) : (
+                        <>
+                          {testData.proctoring.webcamRequired && <li>We will request webcam access for identity verification.</li>}
+                          {testData.proctoring.microphoneRequired && <li>Microphone access is required for audio monitoring.</li>}
+                          {testData.proctoring.screenShareRequired && <li>You must share your entire screen for the duration of the test.</li>}
+                          <li>Once checked, you will declare consent and launch the test in fullscreen.</li>
+                        </>
+                      )}
                     </ul>
                   </div>
 
-                  <Button 
+                  <Button
                     className="w-full sm:w-auto px-6 h-12 text-sm font-bold gap-2"
                     onClick={() => setCurrentStep("diagnostics")}
                   >
@@ -698,57 +778,69 @@ export default function TestAccess() {
               {currentStep === "diagnostics" && (
                 <div className="space-y-6">
                   <div className="flex flex-col sm:flex-row gap-6">
-                    {/* Live Video Preview Panel */}
-                    <div className="w-full sm:w-72 aspect-video sm:h-52 rounded-xl bg-slate-950 border border-slate-800 flex flex-col items-center justify-center relative overflow-hidden shadow-inner">
-                      {cameraStream ? (
-                        <>
-                          <video 
-                            ref={videoRef} 
-                            autoPlay 
-                            playsInline 
-                            muted 
-                            className="w-full h-full object-cover scale-x-[-1]"
-                          />
-                          <div className="absolute bottom-2 left-2 right-2 bg-black/60 backdrop-blur-md rounded px-2.5 py-1 flex items-center justify-between text-[10px] text-white">
-                            <span className="flex items-center gap-1.5 font-bold">
-                              <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-                              Webcam Stream Active
-                            </span>
+                    {/* Live Video Preview Panel — only show if webcam required */}
+                    {testData.proctoring.webcamRequired && (
+                      <div className="w-full sm:w-72 aspect-video sm:h-52 rounded-xl bg-slate-950 border border-slate-800 flex flex-col items-center justify-center relative overflow-hidden shadow-inner">
+                        {cameraStream ? (
+                          <>
+                            <video
+                              ref={videoRef}
+                              autoPlay
+                              playsInline
+                              muted
+                              className="w-full h-full object-cover scale-x-[-1]"
+                            />
+                            <div className="absolute bottom-2 left-2 right-2 bg-black/60 backdrop-blur-md rounded px-2.5 py-1 flex items-center justify-between text-[10px] text-white">
+                              <span className="flex items-center gap-1.5 font-bold">
+                                <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+                                Webcam Stream Active
+                              </span>
+                            </div>
+                          </>
+                        ) : (
+                          <div className="text-center p-4 text-xs text-slate-500 space-y-2">
+                            <Camera className="w-8 h-8 mx-auto text-slate-600 animate-pulse" />
+                            <p>Webcam preview is currently inactive</p>
                           </div>
-                        </>
-                      ) : (
-                        <div className="text-center p-4 text-xs text-slate-500 space-y-2">
-                          <Camera className="w-8 h-8 mx-auto text-slate-600 animate-pulse" />
-                          <p>Webcam preview is currently inactive</p>
-                        </div>
-                      )}
-                    </div>
+                        )}
+                      </div>
+                    )}
 
                     {/* Checklists */}
                     <div className="flex-1 space-y-3">
                       <h4 className="text-sm font-bold text-foreground">Hardware Diagnostics</h4>
-                      
                       <div className="space-y-2">
-                        <DiagnosticRow 
-                          label="Browser Capability Check" 
-                          status={checks.browser} 
-                          desc="Ensures your browser supports modern secure features" 
+                        <DiagnosticRow
+                          label="Browser Capability Check"
+                          status={checks.browser}
+                          desc="Ensures your browser supports modern secure features"
                         />
-                        <DiagnosticRow 
-                          label="Webcam Permission Check" 
-                          status={checks.camera} 
-                          desc="Continuous visual identity verification" 
-                        />
-                        <DiagnosticRow 
-                          label="Microphone Permission Check" 
-                          status={checks.mic} 
-                          desc="Background audio analytics" 
-                        />
-                        <DiagnosticRow 
-                          label="Screen Share & Display Check" 
-                          status={checks.screen} 
-                          desc={screenErrorMsg || "Ensure only one monitor is connected"} 
-                        />
+                        {testData.proctoring.webcamRequired && (
+                          <DiagnosticRow
+                            label="Webcam Permission Check"
+                            status={checks.camera}
+                            desc="Continuous visual identity verification"
+                          />
+                        )}
+                        {testData.proctoring.microphoneRequired && (
+                          <DiagnosticRow
+                            label="Microphone Permission Check"
+                            status={checks.mic}
+                            desc="Background audio analytics"
+                          />
+                        )}
+                        {testData.proctoring.screenShareRequired && (
+                          <DiagnosticRow
+                            label="Screen Share & Display Check"
+                            status={checks.screen}
+                            desc={screenErrorMsg || "Ensure only one monitor is connected"}
+                          />
+                        )}
+                        {testData.proctoring.proctoringMode === "NONE" && (
+                          <div className="text-xs text-muted-foreground p-3 bg-muted/30 rounded-xl border">
+                            This assessment has no proctoring requirements. Click Continue to proceed.
+                          </div>
+                        )}
                       </div>
 
                       {/* Microphone Level Meter */}
@@ -939,13 +1031,25 @@ export default function TestAccess() {
                 </div>
 
                 <div className="space-y-2">
-                  <span className="text-[10px] uppercase font-extrabold text-muted-foreground tracking-wider block">Security Rule Checklist:</span>
-                  <div className="space-y-1.5">
-                    <RuleBadge icon={<Monitor className="w-3.5 h-3.5" />} text="Strict Fullscreen Lock" />
-                    <RuleBadge icon={<Ban className="w-3.5 h-3.5" />} text="Blocked Clipboard & Copy/Paste" />
-                    <RuleBadge icon={<Search className="w-3.5 h-3.5" />} text="AI Face & object track" />
-                    <RuleBadge icon={<Volume2 className="w-3.5 h-3.5" />} text="Ambient audio log check" />
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] uppercase font-extrabold text-muted-foreground tracking-wider block">Active Monitoring:</span>
+                    <ProctoringBadge mode={testData.proctoring.proctoringMode} />
                   </div>
+                  <div className="space-y-1.5">
+                    <RuleBadge icon={<Monitor className="w-3.5 h-3.5" />} text="Fullscreen Lock" active />
+                    {testData.proctoring.tabSwitchTrackingEnabled && <RuleBadge icon={<Ban className="w-3.5 h-3.5" />} text="Tab Switch Tracking" active />}
+                    {testData.proctoring.copyPasteBlocked && <RuleBadge icon={<Ban className="w-3.5 h-3.5" />} text="Copy/Paste Blocked" active />}
+                    {testData.proctoring.webcamRequired && <RuleBadge icon={<Camera className="w-3.5 h-3.5" />} text="Webcam Identity Check" active />}
+                    {testData.proctoring.microphoneRequired && <RuleBadge icon={<Mic className="w-3.5 h-3.5" />} text="Microphone Monitoring" active />}
+                    {testData.proctoring.screenShareRequired && <RuleBadge icon={<Monitor className="w-3.5 h-3.5" />} text="Screen Share Required" active />}
+                    {testData.proctoring.multipleFaceDetectionEnabled && <RuleBadge icon={<UserCheck className="w-3.5 h-3.5" />} text="Multiple Face Detection" active />}
+                    {testData.proctoring.objectDetectionEnabled && <RuleBadge icon={<Search className="w-3.5 h-3.5" />} text="Object Detection (AI)" active />}
+                    {testData.proctoring.devtoolsDetectionEnabled && <RuleBadge icon={<Shield className="w-3.5 h-3.5" />} text="DevTools Detection" active />}
+                    {testData.proctoring.proctoringMode === "NONE" && (
+                      <p className="text-[10px] text-muted-foreground italic">No monitoring active for this assessment.</p>
+                    )}
+                  </div>
+                  <p className="text-[10px] text-muted-foreground pt-1">Max warnings: <strong>{testData.proctoring.maxWarningsAllowed}</strong></p>
                 </div>
               </CardContent>
               <CardFooter className="bg-muted/20 border-t py-4 text-center">
@@ -1008,11 +1112,28 @@ function DiagnosticRow({ label, status, desc }: { label: string; status: "pendin
   );
 }
 
-function RuleBadge({ icon, text }: { icon: React.ReactNode; text: string }) {
+function RuleBadge({ icon, text, active = true }: { icon: React.ReactNode; text: string; active?: boolean }) {
   return (
-    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+    <div className={cn("flex items-center gap-2 text-xs", active ? "text-foreground" : "text-muted-foreground line-through")}>
       <div className="text-primary">{icon}</div>
       <span>{text}</span>
     </div>
+  );
+}
+
+function ProctoringBadge({ mode }: { mode: ProctoringMode }) {
+  const config: Record<ProctoringMode, { label: string; className: string }> = {
+    NONE: { label: "No Proctoring", className: "bg-slate-100 text-slate-600 border-slate-200" },
+    LOW: { label: "Low Proctoring", className: "bg-blue-50 text-blue-700 border-blue-200" },
+    MEDIUM: { label: "Medium Proctoring", className: "bg-amber-50 text-amber-700 border-amber-200" },
+    HIGH: { label: "High Proctoring", className: "bg-red-50 text-red-700 border-red-200" },
+    CUSTOM: { label: "Custom", className: "bg-purple-50 text-purple-700 border-purple-200" },
+  };
+  const { label, className } = config[mode] ?? config["NONE"];
+  return (
+    <span className={cn("inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-[10px] font-bold", className)}>
+      <Shield className="w-3 h-3" />
+      {label}
+    </span>
   );
 }
