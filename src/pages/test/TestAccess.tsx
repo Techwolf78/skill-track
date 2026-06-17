@@ -312,7 +312,13 @@ export default function TestAccess() {
       const endTime = schedule?.endTime || decoded?.endTime || decoded?.end_time || new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString();
       const finalCandidateId = invitation?.candidateId || decoded?.candidateId || decoded?.id;
       const finalScheduleId = invitation?.scheduleId || schedule?.id || decoded?.scheduleId;
-      const mode: ProctoringMode = test?.proctoringMode || "HIGH";
+      const mode: ProctoringMode = test?.proctoringMode ?? "NONE";
+
+      // For each flag: use the actual backend value if it came back (non-null), otherwise
+      // derive a safe default from the resolved mode so NONE = everything off.
+      const isLow     = mode === "LOW" || mode === "MEDIUM" || mode === "HIGH" || mode === "CUSTOM";
+      const isMedHigh = mode === "MEDIUM" || mode === "HIGH" || mode === "CUSTOM";
+      const isHigh    = mode === "HIGH" || mode === "CUSTOM";
 
       setTestData({
         valid: true,
@@ -326,24 +332,24 @@ export default function TestAccess() {
         token: token,
         proctoring: {
           proctoringMode: mode,
-          tabSwitchTrackingEnabled: test?.tabSwitchTrackingEnabled ?? true,
-          copyPasteBlocked: test?.copyPasteBlocked ?? true,
-          rightClickBlocked: test?.rightClickBlocked ?? false,
-          fullscreenExitTrackingEnabled: test?.fullscreenExitTrackingEnabled ?? true,
-          webcamRequired: test?.webcamRequired ?? (mode !== "NONE" && mode !== "LOW"),
-          microphoneRequired: test?.microphoneRequired ?? (mode === "HIGH" || mode === "CUSTOM"),
-          screenShareRequired: test?.screenShareRequired ?? (mode === "HIGH" || mode === "CUSTOM"),
-          faceNotVisibleDetectionEnabled: test?.faceNotVisibleDetectionEnabled ?? (mode !== "NONE" && mode !== "LOW"),
-          multipleFaceDetectionEnabled: test?.multipleFaceDetectionEnabled ?? (mode !== "NONE" && mode !== "LOW"),
-          suspiciousAudioDetectionEnabled: test?.suspiciousAudioDetectionEnabled ?? (mode !== "NONE"),
-          objectDetectionEnabled: test?.objectDetectionEnabled ?? (mode !== "NONE" && mode !== "LOW"),
-          devtoolsDetectionEnabled: test?.devtoolsDetectionEnabled ?? (mode === "HIGH" || mode === "CUSTOM"),
-          periodicSnapshotsEnabled: test?.periodicSnapshotsEnabled ?? (mode !== "NONE"),
-          evidenceCaptureEnabled: test?.evidenceCaptureEnabled ?? (mode !== "NONE"),
-          liveProctoringEnabled: test?.liveProctoringEnabled ?? (mode !== "NONE"),
-          autoSubmitOnCriticalViolation: test?.autoSubmitOnCriticalViolation ?? true,
-          maxWarningsAllowed: test?.maxWarningsAllowed ?? 3,
-          maxCriticalViolationsAllowed: test?.maxCriticalViolationsAllowed ?? 2,
+          tabSwitchTrackingEnabled:         test?.tabSwitchTrackingEnabled         ?? isLow,
+          copyPasteBlocked:                 test?.copyPasteBlocked                 ?? isLow,
+          rightClickBlocked:                test?.rightClickBlocked                ?? false,
+          fullscreenExitTrackingEnabled:    test?.fullscreenExitTrackingEnabled    ?? isLow,
+          webcamRequired:                   test?.webcamRequired                   ?? isMedHigh,
+          microphoneRequired:               test?.microphoneRequired               ?? isHigh,
+          screenShareRequired:              test?.screenShareRequired              ?? isHigh,
+          faceNotVisibleDetectionEnabled:   test?.faceNotVisibleDetectionEnabled   ?? isMedHigh,
+          multipleFaceDetectionEnabled:     test?.multipleFaceDetectionEnabled     ?? isMedHigh,
+          suspiciousAudioDetectionEnabled:  test?.suspiciousAudioDetectionEnabled  ?? isLow,
+          objectDetectionEnabled:           test?.objectDetectionEnabled           ?? isMedHigh,
+          devtoolsDetectionEnabled:         test?.devtoolsDetectionEnabled         ?? isHigh,
+          periodicSnapshotsEnabled:         test?.periodicSnapshotsEnabled         ?? isMedHigh,
+          evidenceCaptureEnabled:           test?.evidenceCaptureEnabled           ?? isMedHigh,
+          liveProctoringEnabled:            test?.liveProctoringEnabled            ?? isMedHigh,
+          autoSubmitOnCriticalViolation:    test?.autoSubmitOnCriticalViolation    ?? isLow,
+          maxWarningsAllowed:               test?.maxWarningsAllowed               ?? (mode === "NONE" ? 0 : 3),
+          maxCriticalViolationsAllowed:     test?.maxCriticalViolationsAllowed     ?? (isHigh ? 1 : 2),
         },
       });
 
