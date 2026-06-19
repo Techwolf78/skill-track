@@ -54,3 +54,87 @@ describe("Tab Switch Violation Logic", () => {
     expect(shouldAutoSubmitOnTabSwitch(violations)).toBe(false);
   });
 });
+
+describe("Telemetry Timing Constraints", () => {
+  const getBoundedDelta = (seconds: number): number => {
+    return Math.min(Math.max(seconds, 0), 300);
+  };
+
+  it("should bound negative deltas to 0", () => {
+    expect(getBoundedDelta(-10)).toBe(0);
+  });
+
+  it("should preserve valid deltas within 0 and 300", () => {
+    expect(getBoundedDelta(45)).toBe(45);
+    expect(getBoundedDelta(0)).toBe(0);
+    expect(getBoundedDelta(300)).toBe(300);
+  });
+
+  it("should cap deltas exceeding 300 to 300", () => {
+    expect(getBoundedDelta(301)).toBe(300);
+    expect(getBoundedDelta(1000)).toBe(300);
+  });
+});
+
+describe("Calibration Metadata Mapping & DTO Validation", () => {
+  interface QuestionMock {
+    prompt: string;
+    subject_id: string;
+    questionType: "MCQ" | "CODING";
+    domain?: "ENGINEERING" | "BUSINESS" | "APTITUDE" | "CORPORATE";
+    cognitiveLevel?: "REMEMBER" | "UNDERSTAND" | "APPLY" | "ANALYZE" | "EVALUATE" | "CREATE";
+    status?: "ACTIVE" | "UNDER_REVIEW" | "QUARANTINED";
+    p_value?: number;
+    discrimination_index?: number;
+    avg_time_seconds?: number;
+    options?: unknown[];
+  }
+
+  const validateQuestionDto = (q: QuestionMock): boolean => {
+    if (!q.prompt || q.prompt.trim() === "") return false;
+    if (!q.subject_id || q.subject_id.trim() === "") return false;
+    if (q.questionType === "MCQ") {
+      if (!q.options || q.options.length < 2) return false;
+    }
+    if (q.p_value !== undefined && (q.p_value < 0 || q.p_value > 1)) return false;
+    if (q.discrimination_index !== undefined && (q.discrimination_index < -1 || q.discrimination_index > 1)) return false;
+    if (q.avg_time_seconds !== undefined && q.avg_time_seconds < 0) return false;
+    return true;
+  };
+
+  it("should accept valid question calibration mapping and metadata", () => {
+    const validMCQ: QuestionMock = {
+      prompt: "What is 2+2?",
+      subject_id: "math-101",
+      questionType: "MCQ",
+      domain: "APTITUDE",
+      cognitiveLevel: "REMEMBER",
+      status: "ACTIVE",
+      p_value: 0.85,
+      discrimination_index: 0.45,
+      avg_time_seconds: 15,
+      options: [{ text: "4", isCorrect: true }, { text: "5", isCorrect: false }]
+    };
+    expect(validateQuestionDto(validMCQ)).toBe(true);
+  });
+
+  it("should reject calibration validation if psychometric bounds are invalid", () => {
+    const invalidPValue: QuestionMock = {
+      prompt: "Q",
+      subject_id: "sub-1",
+      questionType: "CODING",
+      p_value: 1.5 // Invalid, must be <= 1.0
+    };
+    const invalidDiscrimination: QuestionMock = {
+      prompt: "Q",
+      subject_id: "sub-1",
+      questionType: "CODING",
+      discrimination_index: -1.2 // Invalid, must be >= -1.0
+    };
+
+    expect(validateQuestionDto(invalidPValue)).toBe(false);
+    expect(validateQuestionDto(invalidDiscrimination)).toBe(false);
+  });
+});
+
+

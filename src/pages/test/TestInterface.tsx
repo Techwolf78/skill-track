@@ -209,6 +209,25 @@ function TestInterfaceContent({ testId, sessionId, navigate, toast }: { testId?:
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  const activeQuestionStartTimeRef = useRef(Date.now());
+
+  const flushQuestionTiming = useCallback(async (qId: string) => {
+    if (!sessionId || !qId) return;
+    const elapsedMs = Date.now() - activeQuestionStartTimeRef.current;
+    const activeSecondsDelta = Math.round(elapsedMs / 1000);
+    activeQuestionStartTimeRef.current = Date.now(); // Reset immediately to avoid double counting
+
+    if (activeSecondsDelta > 0) {
+      const boundedDelta = Math.min(Math.max(activeSecondsDelta, 0), 300);
+      try {
+        await testService.submitQuestionTiming(sessionId, qId, boundedDelta);
+      } catch (err) {
+        console.error("Telemetry timing update failed:", err);
+      }
+    }
+  }, [sessionId]);
+
   const [test, setTest] = useState<TestDetails | null>(null);
   const [session, setSession] = useState<TestSession | null>(null);
   const [questions, setQuestions] = useState<Question[]>([]);
@@ -218,6 +237,37 @@ function TestInterfaceContent({ testId, sessionId, navigate, toast }: { testId?:
   const [timeLeft, setTimeLeft] = useState(0);
   const [showSubmitDialog, setShowSubmitDialog] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+
+  const prevIndexRef = useRef(currentIndex);
+
+  useEffect(() => {
+    if (prevIndexRef.current !== currentIndex) {
+      const prevQuestion = questions[prevIndexRef.current];
+      if (prevQuestion) {
+        flushQuestionTiming(prevQuestion.id);
+      }
+      prevIndexRef.current = currentIndex;
+    }
+  }, [currentIndex, questions, flushQuestionTiming]);
+
+  useEffect(() => {
+    const handleBlur = () => {
+      const currentQ = questions[currentIndex];
+      if (currentQ) {
+        flushQuestionTiming(currentQ.id);
+      }
+    };
+    const handleFocus = () => {
+      activeQuestionStartTimeRef.current = Date.now();
+    };
+    window.addEventListener("blur", handleBlur);
+    window.addEventListener("focus", handleFocus);
+    return () => {
+      window.removeEventListener("blur", handleBlur);
+      window.removeEventListener("focus", handleFocus);
+    };
+  }, [currentIndex, questions, flushQuestionTiming]);
+
   
   // Code editor state
   const [code, setCode] = useState("");
@@ -472,6 +522,12 @@ useEffect(() => {
       navigate(`/test/${testId}/results`);
       return;
     }
+
+    // Flush current question timing before submit
+    const currentQ = questions[currentIndex];
+    if (currentQ) {
+      await flushQuestionTiming(currentQ.id);
+    }
     
     setSubmitting(true);
 
@@ -543,7 +599,7 @@ useEffect(() => {
       setSubmitting(false);
       setShowSubmitDialog(false);
     }
-  }, [sessionId, answers, testId, navigate, toast, syncViolations]);
+  }, [sessionId, answers, testId, navigate, toast, syncViolations, questions, currentIndex, flushQuestionTiming]);
 
   const handleAutoSubmit = useCallback(async () => {
     toast({
@@ -818,6 +874,9 @@ useEffect(() => {
     const currentQ = questions[currentIndex];
     if (!currentQ) return;
     
+    // Flush current timing as this is a submit/autosave event
+    flushQuestionTiming(currentQ.id);
+
     if (currentQ.type === "CODING") {
       if (!sessionId) {
         toast({ title: "Error", description: "No active session found", variant: "destructive" });
@@ -1018,7 +1077,7 @@ useEffect(() => {
     } finally {
       setIsSubmittingCode(false);
     }
-  }, [questions, currentIndex, sessionId, language, code, answers, toast, isOnline]);
+  }, [questions, currentIndex, sessionId, language, code, answers, toast, isOnline, flushQuestionTiming]);
 
   const handleMcqSelect = useCallback(async (questionId: string, value: string) => {
     const updatedAnswers = { ...answers, [questionId]: value };
@@ -1028,6 +1087,9 @@ useEffect(() => {
     AnswerStore.saveAnswer(targetSessionId, questionId, value);
 
     if (!sessionId) return;
+
+    // Flush current timing as this is an autosave event
+    flushQuestionTiming(questionId);
 
     if (!isOnline) {
       AnswerStore.queueOfflineSubmission(sessionId, questionId, "MCQ", value);
@@ -1046,7 +1108,7 @@ useEffect(() => {
       AnswerStore.queueOfflineSubmission(sessionId, questionId, "MCQ", value);
       setUnsyncedCount(AnswerStore.getOfflineQueue(sessionId).length);
     }
-  }, [answers, sessionId, isOnline]);
+  }, [answers, sessionId, isOnline, flushQuestionTiming]);
 
 
   const formatTime = (seconds: number) => {

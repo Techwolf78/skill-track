@@ -140,6 +140,13 @@ export interface CreateQuestionRequest {
   codeTemplate?: Record<string, CodeTemplateEntry>;
   examples?: Array<{ input: string; output: string; explanation?: string }>;
   visibility?: "PUBLIC" | "ORG_OWNED";
+  // Extended Enterprise Metadata
+  domain?: "ENGINEERING" | "BUSINESS" | "APTITUDE" | "CORPORATE";
+  cognitiveLevel?: "REMEMBER" | "UNDERSTAND" | "APPLY" | "ANALYZE" | "EVALUATE" | "CREATE";
+  p_value?: number;
+  discrimination_index?: number;
+  avg_time_seconds?: number;
+  status?: "ACTIVE" | "UNDER_REVIEW" | "QUARANTINED";
 }
 
 // Updated UpdateQuestionRequest to match backend API
@@ -172,6 +179,13 @@ export interface UpdateQuestionRequest {
   codeTemplate?: Record<string, CodeTemplateEntry>;
   examples?: Array<{ input: string; output: string; explanation?: string }>;
   visibility?: "PUBLIC" | "ORG_OWNED";
+  // Extended Enterprise Metadata
+  domain?: "ENGINEERING" | "BUSINESS" | "APTITUDE" | "CORPORATE";
+  cognitiveLevel?: "REMEMBER" | "UNDERSTAND" | "APPLY" | "ANALYZE" | "EVALUATE" | "CREATE";
+  p_value?: number;
+  discrimination_index?: number;
+  avg_time_seconds?: number;
+  status?: "ACTIVE" | "UNDER_REVIEW" | "QUARANTINED";
 }
 
 // Updated TestCase DTOs to match backend
@@ -313,6 +327,13 @@ export interface Question {
   codeTemplate?: Record<string, CodeTemplateEntry>;
   visibility?: "PUBLIC" | "ORG_OWNED";
   organisationId?: string;
+  // Extended Enterprise Metadata
+  domain?: "ENGINEERING" | "BUSINESS" | "APTITUDE" | "CORPORATE";
+  cognitiveLevel?: "REMEMBER" | "UNDERSTAND" | "APPLY" | "ANALYZE" | "EVALUATE" | "CREATE";
+  p_value?: number;
+  discrimination_index?: number;
+  avg_time_seconds?: number;
+  status?: "ACTIVE" | "UNDER_REVIEW" | "QUARANTINED";
 }
 
 export interface TestQuestion {
@@ -658,6 +679,18 @@ export const testService = {
   deleteQuestion: async (id: string): Promise<void> => {
     await apiClient.delete(`/questions/${id}`);
   },
+
+  submitQuestionTiming: async (
+    sessionId: string,
+    questionId: string,
+    activeSecondsDelta: number,
+  ): Promise<void> => {
+    await apiClient.post(`/test-sessions/${sessionId}/question-timings`, {
+      questionId,
+      activeSecondsDelta,
+    });
+  },
+
 
   getAllTestCases: async (codingQuestionId?: string): Promise<TestCase[]> => {
     let allTestCases: TestCase[] = [];

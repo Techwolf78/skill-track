@@ -270,6 +270,14 @@ export default function EditQuestion() {
   // Test cases state for coding questions
   const [testCases, setTestCases] = useState<TestCaseForm[]>([]);
 
+  // Extended Enterprise Metadata States
+  const [domain, setDomain] = useState<"ENGINEERING" | "BUSINESS" | "APTITUDE" | "CORPORATE" | "">("");
+  const [cognitiveLevel, setCognitiveLevel] = useState<"REMEMBER" | "UNDERSTAND" | "APPLY" | "ANALYZE" | "EVALUATE" | "CREATE" | "">("");
+  const [status, setStatus] = useState<"ACTIVE" | "UNDER_REVIEW" | "QUARANTINED">("ACTIVE");
+  const [pValue, setPValue] = useState<string>("");
+  const [discriminationIndex, setDiscriminationIndex] = useState<string>("");
+  const [avgTimeSeconds, setAvgTimeSeconds] = useState<string>("");
+
   const fetchData = useCallback(async () => {
     try {
       setLoading(true);
@@ -306,6 +314,14 @@ export default function EditQuestion() {
       if (questionData.visibility) {
         setVisibility(questionData.visibility as "PUBLIC" | "ORG_OWNED");
       }
+      
+      // Populate Enterprise Taxonomy & Calibration
+      setDomain(questionData.domain || "");
+      setCognitiveLevel(questionData.cognitiveLevel || "");
+      setStatus(questionData.status || "ACTIVE");
+      setPValue(questionData.p_value !== undefined && questionData.p_value !== null ? questionData.p_value.toString() : "");
+      setDiscriminationIndex(questionData.discrimination_index !== undefined && questionData.discrimination_index !== null ? questionData.discrimination_index.toString() : "");
+      setAvgTimeSeconds(questionData.avg_time_seconds !== undefined && questionData.avg_time_seconds !== null ? questionData.avg_time_seconds.toString() : "");
 
       const currentUser = authService.getCurrentUser();
       const userIsSuperAdmin = currentUser?.role === "SUPERADMIN";
@@ -482,7 +498,7 @@ export default function EditQuestion() {
     } finally {
       setLoading(false);
     }
-  }, [id, navigate, toast]);
+  }, [id, navigate, toast, backRoute]);
 
   useEffect(() => {
     fetchData();
@@ -894,6 +910,13 @@ export default function EditQuestion() {
             output: tc.expectedOutput,
             explanation: tc.explanation || "",
           })),
+        // Extended Enterprise Metadata
+        domain: domain || undefined,
+        cognitiveLevel: cognitiveLevel || undefined,
+        status: status,
+        p_value: pValue ? parseFloat(pValue) : undefined,
+        discrimination_index: discriminationIndex ? parseFloat(discriminationIndex) : undefined,
+        avg_time_seconds: avgTimeSeconds ? parseInt(avgTimeSeconds, 10) : undefined,
       };
 
       if (questionType === "MCQ") {
@@ -1672,6 +1695,109 @@ export default function EditQuestion() {
                   </div>
                 </>
               )}
+            </CardContent>
+          </Card>
+
+          {/* Enterprise Taxonomy & Calibration */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Enterprise Taxonomy & Calibration</CardTitle>
+              <CardDescription>
+                Configure enterprise domain categorization, cognitive levels, and psychometric metrics.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <Label>Domain (Stream)</Label>
+                  <Select value={domain || "none"} onValueChange={(val) => setDomain(val === "none" ? "" : (val as "ENGINEERING" | "BUSINESS" | "APTITUDE" | "CORPORATE" | ""))}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select domain" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">None / Engineering Default</SelectItem>
+                      <SelectItem value="ENGINEERING">Engineering (CS/IT)</SelectItem>
+                      <SelectItem value="BUSINESS">MBA / BBA (Business)</SelectItem>
+                      <SelectItem value="APTITUDE">Aptitude & Core</SelectItem>
+                      <SelectItem value="CORPORATE">Corporate SJT</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Cognitive Level (Bloom's)</Label>
+                  <Select value={cognitiveLevel || "none"} onValueChange={(val) => setCognitiveLevel(val === "none" ? "" : (val as "REMEMBER" | "UNDERSTAND" | "APPLY" | "ANALYZE" | "EVALUATE" | "CREATE" | ""))}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select cognitive level" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">None / Apply Default</SelectItem>
+                      <SelectItem value="REMEMBER">Remember</SelectItem>
+                      <SelectItem value="UNDERSTAND">Understand</SelectItem>
+                      <SelectItem value="APPLY">Apply</SelectItem>
+                      <SelectItem value="ANALYZE">Analyze</SelectItem>
+                      <SelectItem value="EVALUATE">Evaluate</SelectItem>
+                      <SelectItem value="CREATE">Create</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Status</Label>
+                  <Select value={status} onValueChange={(val) => setStatus(val as "ACTIVE" | "UNDER_REVIEW" | "QUARANTINED")}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="ACTIVE">Active</SelectItem>
+                      <SelectItem value="UNDER_REVIEW">Under Review</SelectItem>
+                      <SelectItem value="QUARANTINED">Quarantined</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <Label>Difficulty Index ($p$-value)</Label>
+                  <Input
+                    type="number"
+                    min={0}
+                    max={1}
+                    step={0.01}
+                    value={pValue}
+                    onChange={(e) => setPValue(e.target.value)}
+                    placeholder="e.g., 0.42"
+                  />
+                  <p className="text-[10px] text-muted-foreground font-normal">Proportion of correct solves (0.0 to 1.0)</p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Discrimination Index ($D$)</Label>
+                  <Input
+                    type="number"
+                    min={-1}
+                    max={1}
+                    step={0.01}
+                    value={discriminationIndex}
+                    onChange={(e) => setDiscriminationIndex(e.target.value)}
+                    placeholder="e.g., 0.37"
+                  />
+                  <p className="text-[10px] text-muted-foreground font-normal">Distinguishing power (-1.0 to 1.0)</p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Avg Solve Time (Seconds)</Label>
+                  <Input
+                    type="number"
+                    min={1}
+                    value={avgTimeSeconds}
+                    onChange={(e) => setAvgTimeSeconds(e.target.value)}
+                    placeholder="e.g., 162"
+                  />
+                  <p className="text-[10px] text-muted-foreground font-normal">Average execution time in seconds</p>
+                </div>
+              </div>
             </CardContent>
           </Card>
 

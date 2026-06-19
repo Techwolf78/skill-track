@@ -77,13 +77,7 @@ type CognitiveLevelType = "ALL" | "REMEMBER" | "UNDERSTAND" | "APPLY" | "ANALYZE
 type QuestionFormatType = "ALL" | "MCQ" | "CODING" | "SQL" | "SPREADSHEET" | "SJT" | "SUBJECTIVE";
 
 interface ExtendedQuestion extends Question {
-  domain?: DomainType;
-  cognitiveLevel?: CognitiveLevelType;
   format?: QuestionFormatType;
-  p_value?: number;
-  discrimination_index?: number;
-  avg_time_seconds?: number;
-  status?: "ACTIVE" | "UNDER_REVIEW" | "QUARANTINED";
 }
 
 export default function AdminQuestionBank() {
@@ -109,144 +103,38 @@ export default function AdminQuestionBank() {
   const [selectedAdvancedQuestion, setSelectedAdvancedQuestion] = useState<ExtendedQuestion | null>(null);
 
   // Mock questions for Business, Corporate, and Aptitude taxonomy representation
-  const [mockQuestions, setMockQuestions] = useState<ExtendedQuestion[]>([
-    {
-      id: "mock-mba-1",
-      questionType: "MCQ",
-      prompt: "Based on the provided Q3 financial statements for Gryphon Corp, compute the Weighted Average Cost of Capital (WACC) given a cost of equity of 12%, cost of debt of 6%, debt-to-equity ratio of 0.8, and a corporate tax rate of 25%.",
-      title: "WACC & Capital Structure Evaluation",
-      subjectId: "finance-subj",
-      marks: 15,
-      difficulty: "HARD",
-      domain: "BUSINESS",
-      cognitiveLevel: "EVALUATE",
-      format: "SPREADSHEET",
-      p_value: 0.34,
-      discrimination_index: 0.49,
-      avg_time_seconds: 495,
-      status: "ACTIVE",
-      tags: ["MBA", "Finance", "WACC", "Valuation"],
-      mcqType: "SINGLE_CORRECT",
-      mcqOptions: [
-        { text: "8.73%", isCorrect: false },
-        { text: "9.15%", isCorrect: false },
-        { text: "8.67%", isCorrect: true },
-        { text: "10.20%", isCorrect: false },
-      ]
-    },
-    {
-      id: "mock-corp-1",
-      questionType: "MCQ",
-      prompt: "A key corporate client is furious about a 3-hour dashboard service outage. They demand immediate refund policies and are threatening to terminate their contract on public channels. According to Gryphon CRM's Crisis Response policy, what is the most appropriate initial communication path?",
-      title: "Client Outage & Conflict Resolution",
-      subjectId: "corp-comm",
-      marks: 10,
-      difficulty: "MEDIUM",
-      domain: "CORPORATE",
-      cognitiveLevel: "APPLY",
-      format: "SJT",
-      p_value: 0.68,
-      discrimination_index: 0.42,
-      avg_time_seconds: 210,
-      status: "ACTIVE",
-      tags: ["Soft Skills", "Client Management", "Conflict Resolution", "SJT"],
-      mcqType: "SINGLE_CORRECT",
-      mcqOptions: [
-        { text: "Send a defensive response explaining that network outages are covered under the SLA's force majeure clause.", isCorrect: false },
-        { text: "Acknowledge the impact immediately, express empathy, state the issue resolution status, and transition to a private communication channel.", isCorrect: true },
-        { text: "Offer a 50% discount immediately on the public thread to pacify the client publicly.", isCorrect: false },
-        { text: "Decline public communication and flag the account for automatic legal review without response.", isCorrect: false },
-      ]
-    },
-    {
-      id: "mock-eng-1",
-      questionType: "CODING",
-      prompt: "Optimize the following database join query to run in O(N log N) time using a temporary index or Hash-Join layout. Your code template should take dynamic data arrays representing user relations and output the matched key-pair indexes.",
-      title: "SQL Query Hash-Join Optimization",
-      subjectId: "dbms-subj",
-      marks: 20,
-      difficulty: "HARD",
-      domain: "ENGINEERING",
-      cognitiveLevel: "ANALYZE",
-      format: "SQL",
-      p_value: 0.42,
-      discrimination_index: 0.38,
-      avg_time_seconds: 360,
-      status: "ACTIVE",
-      tags: ["Engineering", "Database", "SQL Optimization", "Hash-Join"]
-    },
-    {
-      id: "mock-bba-1",
-      questionType: "MCQ",
-      prompt: "In a local retail branch survey, Gryphon Apparel found that raising prices by 5% led to a 12% drop in quantity demanded. Calculate the Price Elasticity of Demand (PED) and classify the elasticity type.",
-      title: "Price Elasticity & Revenue Strategy",
-      subjectId: "economics-subj",
-      marks: 5,
-      difficulty: "EASY",
-      domain: "BUSINESS",
-      cognitiveLevel: "UNDERSTAND",
-      format: "MCQ",
-      p_value: 0.82,
-      discrimination_index: 0.31,
-      avg_time_seconds: 105,
-      status: "ACTIVE",
-      tags: ["BBA", "Microeconomics", "PED", "Pricing"],
-      mcqType: "SINGLE_CORRECT",
-      mcqOptions: [
-        { text: "PED = 2.4; Elastic", isCorrect: true },
-        { text: "PED = 0.42; Inelastic", isCorrect: false },
-        { text: "PED = -2.4; Unitary Elastic", isCorrect: false },
-        { text: "PED = 1.0; Perfect Elasticity", isCorrect: false },
-      ]
-    },
-    {
-      id: "mock-apt-1",
-      questionType: "MCQ",
-      prompt: "A training batch of 150 college graduates has 80 candidates fluent in Python, 60 fluent in Java, and 30 fluent in both languages. How many graduates in the cohort are fluent in neither Python nor Java?",
-      title: "Logical Deductions: Set Intersection",
-      subjectId: "aptitude-subj",
-      marks: 5,
-      difficulty: "EASY",
-      domain: "APTITUDE",
-      cognitiveLevel: "APPLY",
-      format: "MCQ",
-      p_value: 0.89,
-      discrimination_index: 0.35,
-      avg_time_seconds: 75,
-      status: "ACTIVE",
-      tags: ["Aptitude", "Logical Reasoning", "Venn Diagrams", "Placement Core"],
-      mcqType: "SINGLE_CORRECT",
-      mcqOptions: [
-        { text: "10 candidates", isCorrect: false },
-        { text: "40 candidates", isCorrect: true },
-        { text: "20 candidates", isCorrect: false },
-        { text: "30 candidates", isCorrect: false },
-      ]
-    }
-  ]);
+  const [mockQuestions, setMockQuestions] = useState<ExtendedQuestion[]>([]);
 
   const allQuestions = (() => {
     const dbExtended: ExtendedQuestion[] = dbQuestions.map(q => {
-      let domain: DomainType = "ENGINEERING";
+      let domain: Question['domain'] = q.domain || "ENGINEERING";
+      let cognitiveLevel: Question['cognitiveLevel'] = q.cognitiveLevel || "APPLY";
+      const status = q.status || "ACTIVE";
+      
       let format: QuestionFormatType = q.questionType === "CODING" ? "CODING" : "MCQ";
-      let cognitiveLevel: CognitiveLevelType = "APPLY";
       
       const promptLower = q.prompt?.toLowerCase() || "";
-      if (promptLower.includes("client") || promptLower.includes("communication") || promptLower.includes("manager")) {
-        domain = "CORPORATE";
+      const titleLower = q.title?.toLowerCase() || "";
+      if (promptLower.includes("client") || promptLower.includes("communication") || promptLower.includes("conflict") || promptLower.includes("outage") || titleLower.includes("conflict")) {
+        domain = q.domain || "CORPORATE";
         format = "SJT";
-        cognitiveLevel = "CREATE";
-      } else if (promptLower.includes("wacc") || promptLower.includes("financial") || promptLower.includes("price") || promptLower.includes("revenue")) {
-        domain = "BUSINESS";
-        cognitiveLevel = "EVALUATE";
-      } else if (promptLower.includes("candidate") || promptLower.includes("deduction") || promptLower.includes("aptitude")) {
-        domain = "APTITUDE";
+        cognitiveLevel = q.cognitiveLevel || "APPLY";
+      } else if (promptLower.includes("wacc") || promptLower.includes("financial") || promptLower.includes("price") || promptLower.includes("revenue") || titleLower.includes("wacc")) {
+        domain = q.domain || "BUSINESS";
+        format = (promptLower.includes("wacc") || titleLower.includes("wacc")) ? "SPREADSHEET" : "MCQ";
+        cognitiveLevel = q.cognitiveLevel || "EVALUATE";
+      } else if (promptLower.includes("candidate") || promptLower.includes("deduction") || promptLower.includes("aptitude") || titleLower.includes("intersection") || titleLower.includes("deduction")) {
+        domain = q.domain || "APTITUDE";
+      }
+      
+      if (q.questionType === "CODING" && (promptLower.includes("sql") || promptLower.includes("database join") || promptLower.includes("hash-join") || titleLower.includes("sql"))) {
+        format = "SQL";
       }
 
       const randomSeed = q.id.charCodeAt(0) || 42;
-      const p_value = parseFloat((0.4 + (randomSeed % 50) / 100).toFixed(2));
-      const discrimination_index = parseFloat((0.25 + (randomSeed % 30) / 100).toFixed(2));
-      const avg_time_seconds = 60 + (randomSeed % 300);
+      const p_value = q.p_value !== undefined && q.p_value !== null ? q.p_value : parseFloat((0.4 + (randomSeed % 50) / 100).toFixed(2));
+      const discrimination_index = q.discrimination_index !== undefined && q.discrimination_index !== null ? q.discrimination_index : parseFloat((0.25 + (randomSeed % 30) / 100).toFixed(2));
+      const avg_time_seconds = q.avg_time_seconds !== undefined && q.avg_time_seconds !== null ? q.avg_time_seconds : 60 + (randomSeed % 300);
 
       return {
         ...q,
@@ -256,7 +144,7 @@ export default function AdminQuestionBank() {
         p_value,
         discrimination_index,
         avg_time_seconds,
-        status: p_value < 0.25 ? "QUARANTINED" : "ACTIVE"
+        status: q.status || (p_value < 0.25 ? "QUARANTINED" : "ACTIVE")
       };
     });
 
@@ -585,8 +473,8 @@ export default function AdminQuestionBank() {
                 ) : (
                   paginatedQuestions.map((question) => {
                     const diffName = getDifficultyFromQuestion(question);
-                    const pVal = question.p_value || 0.5;
-                    const dIndex = question.discrimination_index || 0.35;
+                    const pVal = question.p_value ?? 0.5;
+                    const dIndex = question.discrimination_index ?? 0.35;
                     
                     let dText = "Excellent";
                     let dColor = "text-green-600 dark:text-green-400";
@@ -657,7 +545,7 @@ export default function AdminQuestionBank() {
                         </TableCell>
                         <TableCell className="py-4 text-center">
                           <span className="text-xs text-foreground">
-                            {Math.floor((question.avg_time_seconds || 120) / 60)}m { (question.avg_time_seconds || 120) % 60}s
+                            {Math.floor((question.avg_time_seconds ?? 120) / 60)}m { (question.avg_time_seconds ?? 120) % 60}s
                           </span>
                         </TableCell>
                         <TableCell className="py-4 text-right">
