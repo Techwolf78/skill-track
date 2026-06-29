@@ -36,8 +36,13 @@ apiClient.interceptors.response.use(
       localStorage.removeItem("token");
       localStorage.removeItem("user");
 
-      // Optional redirect
-      window.location.href = "/login";
+      // Prevent infinite redirect loop if already on login page or if the request is to login
+      const isLoginPage = typeof window !== "undefined" && window.location.pathname === "/login";
+      const isLoginRequest = error.config?.url?.includes("/auth/login");
+
+      if (!isLoginPage && !isLoginRequest) {
+        window.location.href = "/login";
+      }
     }
 
     if (error.response?.status === 429) {
