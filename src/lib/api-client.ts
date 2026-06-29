@@ -37,7 +37,7 @@ apiClient.interceptors.response.use(
       localStorage.removeItem("user");
 
       // Optional redirect
-      // window.location.href = "/login";
+      window.location.href = "/login";
     }
 
     if (error.response?.status === 429) {

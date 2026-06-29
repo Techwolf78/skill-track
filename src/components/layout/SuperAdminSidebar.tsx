@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { authService } from "@/lib/auth-service";
 
 const navItems = [
   { icon: LayoutDashboard, label: "Dashboard", path: "/superadmin", end: true },
@@ -42,9 +43,7 @@ export function SuperAdminSidebar() {
   const location = useLocation();
 
   const handleLogout = () => {
-    localStorage.removeItem("token");
-    localStorage.removeItem("user");
-    navigate("/login");
+    authService.logout();
   };
 
   const isItemActive = (item: { path: string; end?: boolean; matchPaths?: string[] }) => {
