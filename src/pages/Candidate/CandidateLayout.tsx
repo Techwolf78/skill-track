@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { authService } from "@/lib/auth-service";
 
 const navItems = [
   { icon: LayoutDashboard, label: "Dashboard", path: "/candidate", end: true },
@@ -24,7 +25,7 @@ const navItems = [
   { icon: Award, label: "Certificates", path: "/candidate/certificates" },
   { icon: User, label: "Profile", path: "/candidate/profile" },
   { icon: Bell, label: "Notifications", path: "/candidate/notifications" },
-  { icon: HelpCircle, label: "Support", path: "/candidate/support" },
+  { icon: HelpCircle, label: "Support & FAQs", path: "/candidate/support" },
   { icon: Settings, label: "Settings", path: "/candidate/settings" },
 ];
 
@@ -34,9 +35,7 @@ export function CandidateLayout() {
   const location = useLocation();
 
   const handleLogout = () => {
-    localStorage.removeItem("token");
-    localStorage.removeItem("user");
-    navigate("/login");
+    authService.logout();
   };
 
   const isItemActive = (item: { path: string; end?: boolean }) => {

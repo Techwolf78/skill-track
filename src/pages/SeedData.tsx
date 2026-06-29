@@ -278,17 +278,10 @@ export default function SeedData() {
             password: targetPassword,
             organisation_id: gryphonOrgId,
           }, "SUPERADMIN");
+          addLog(`✅ Registered Super Admin account: ${targetEmail}`, "success");
         } else {
-          addLog("⚠️ Not authenticated with admin rights. Falling back to public register endpoint...", "warning");
-          await authService.register({
-            name: "Super Admin",
-            email: targetEmail,
-            password: targetPassword,
-            role: "SUPERADMIN",
-            organisation_id: gryphonOrgId,
-          });
+          addLog("⚠️ Public registration endpoint is disabled (RX-067). Skipping Super Admin registration. Seeding will attempt to login using existing credentials.", "warning");
         }
-        addLog(`✅ Registered Super Admin account: ${targetEmail}`, "success");
       } catch (e: unknown) {
         const err = e as { response?: { data?: { message?: string } }; message?: string };
         addLog(`⚠️ Super Admin registration skipped or exists: ${err.response?.data?.message || err.message}.`, "warning");

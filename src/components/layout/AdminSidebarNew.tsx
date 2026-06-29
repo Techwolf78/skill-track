@@ -12,6 +12,7 @@ import {
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/auth-context";
+import { authService } from "@/lib/auth-service";
 
 const navItems = [
   { icon: LayoutDashboard, label: "Dashboard", path: "/admin", end: true },
@@ -32,9 +33,7 @@ export function AdminSidebar() {
   const { user } = useAuth();
 
   const handleLogout = () => {
-    localStorage.removeItem("token");
-    localStorage.removeItem("user");
-    navigate("/login");
+    authService.logout();
   };
 
   const isItemActive = (item: { path: string; end?: boolean; matchPaths?: string[] }) => {

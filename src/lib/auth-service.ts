@@ -125,9 +125,15 @@ export const authService = {
   },
 
   // Helper method to logout
-  logout: () => {
-    localStorage.removeItem("token");
-    localStorage.removeItem("user");
-    window.location.href = "/login";
+  logout: async () => {
+    try {
+      await apiClient.post("/auth/logout");
+    } catch (e) {
+      console.warn("Failed to call backend logout endpoint:", e);
+    } finally {
+      localStorage.removeItem("token");
+      localStorage.removeItem("user");
+      window.location.href = "/login";
+    }
   },
 };
