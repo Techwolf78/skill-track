@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback } from "react";
-import { useParams, useNavigate, Link } from "react-router-dom";
+import { useState, useEffect, useCallback, useMemo } from "react";
+import { useParams, useNavigate, Link, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -29,8 +29,24 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import {
   ArrowLeft,
   Save,
@@ -42,8 +58,17 @@ import {
   Target,
   AlertCircle,
   X,
+  Send,
+  CheckCircle2,
+  XCircle,
+  Link2,
+  Check,
+  Search,
+  Calendar,
 } from "lucide-react";
 import { testService, Test, CreateTestRequest, TestQuestion, Question, ProctoringMode } from "@/lib/test-service";
+import { candidateService } from "@/lib/candidate-service";
+import { apiClient } from "@/lib/api-client";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth-context";
 
@@ -127,6 +152,7 @@ const getProctoringPreset = (mode: ProctoringMode) => {
 export default function AdminTestsEdit() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const { toast } = useToast();
   const { user } = useAuth();
 
@@ -152,8 +178,28 @@ export default function AdminTestsEdit() {
   const [test, setTest] = useState<Test | null>(null);
   const [questionsData, setQuestionsData] = useState<(TestQuestion & { question?: Question })[]>([]);
   const [selectedQuestion, setSelectedQuestion] = useState<(TestQuestion & { question?: Question }) | null>(null);
+  const [activeTab, setActiveTab] = useState<string>(location.state?.activeTab || "details");
 
-  // Form state
+  useEffect(() => {
+    if (location.state?.activeTab) {
+      setActiveTab(location.state.activeTab);
+    }
+  }, [location.state]);
+
+  // Invitation states
+  const [candidates, setCandidates] = useState<any[]>([]);
+  const [invitations, setInvitations] = useState<any[]>([]);
+  const [inviteSearchTerm, setInviteSearchTerm] = useState("");
+  const [selectedSchedule, setSelectedSchedule] = useState<string>("");
+  const [selectedScheduleData, setSelectedScheduleData] = useState<any>(null);
+  const [isInviteDialogOpen, setIsInviteDialogOpen] = useState(false);
+  const [selectedCandidate, setSelectedCandidate] = useState<any>(null);
+  const [selectedCandidates, setSelectedCandidates] = useState<string[]>([]);
+  const [inviteSubmitting, setInviteSubmitting] = useState(false);
+  const [copiedToken, setCopiedToken] = useState<string | null>(null);
+  const [loadingInvitations, setLoadingInvitations] = useState(false);
+  const [scheduleStartTime, setScheduleStartTime] = useState("");
+  const [scheduleEndTime, setScheduleEndTime] = useState("");
   const [formData, setFormData] = useState<Partial<CreateTestRequest>>({
     title: "",
     description: "",
@@ -184,6 +230,76 @@ export default function AdminTestsEdit() {
     maxCriticalViolations: 0,
   });
 
+  // Form state
+  const [unsavedChangesDialogOpen, setUnsavedChangesDialogOpen] = useState(false);
+
+  const isFormDirty = useMemo(() => {
+    if (!test) return false;
+    if (formData.title !== test.title) return true;
+    if ((formData.description || "") !== (test.description || "")) return true;
+    if (formData.durationMins !== test.durationMins) return true;
+    if (formData.difficulty !== test.difficulty) return true;
+    if (formData.passMark !== test.passMark) return true;
+    if (formData.status !== test.status) return true;
+    if (formData.proctoringMode !== test.proctoringMode) return true;
+    
+    // Check instructions general text
+    const currentGeneral = (formData.instructions as any)?.general || "";
+    const originalGeneral = (test.instructions as any)?.general || "";
+    if (currentGeneral !== originalGeneral) return true;
+
+    // Check schedule times
+    const testSchedules = test.testSchedules || [];
+    const activeOrFirst = testSchedules.find((s: any) => s.status === "SCHEDULED" || s.status === "LIVE") || testSchedules[0];
+    const originalStart = activeOrFirst?.startTime ? new Date(activeOrFirst.startTime).toISOString().slice(0, 16) : "";
+    const originalEnd = activeOrFirst?.endTime ? new Date(activeOrFirst.endTime).toISOString().slice(0, 16) : "";
+    if (scheduleStartTime !== originalStart) return true;
+    if (scheduleEndTime !== originalEnd) return true;
+
+    // Proctoring settings
+    if (formData.enableTabSwitchTracking !== test.enableTabSwitchTracking) return true;
+    if (formData.blockCopyPaste !== test.blockCopyPaste) return true;
+    if (formData.blockRightClick !== test.blockRightClick) return true;
+    if (formData.warnOnFullscreenExit !== test.warnOnFullscreenExit) return true;
+    if (formData.maxWarnings !== test.maxWarnings) return true;
+    if (formData.requireWebcam !== test.requireWebcam) return true;
+    if (formData.detectFaceNotVisible !== test.detectFaceNotVisible) return true;
+    if (formData.detectMultipleFaces !== test.detectMultipleFaces) return true;
+    if (formData.detectSuspiciousAudio !== test.detectSuspiciousAudio) return true;
+    if (formData.detectObjects !== test.detectObjects) return true;
+    if (formData.periodicSnapshots !== test.periodicSnapshots) return true;
+    if (formData.evidenceCapture !== test.evidenceCapture) return true;
+    if (formData.requireMicrophone !== test.requireMicrophone) return true;
+    if (formData.requireScreenShare !== test.requireScreenShare) return true;
+    if (formData.detectDevTools !== test.detectDevTools) return true;
+    if (formData.detectScreenShareStop !== test.detectScreenShareStop) return true;
+    if (formData.enableLiveProctoring !== test.enableLiveProctoring) return true;
+    if (formData.autoSubmitOnCriticalViolations !== test.autoSubmitOnCriticalViolations) return true;
+    if (formData.maxCriticalViolations !== test.maxCriticalViolations) return true;
+
+    return false;
+  }, [formData, test, scheduleStartTime, scheduleEndTime]);
+
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (isFormDirty) {
+        e.preventDefault();
+        e.returnValue = "You have unsaved changes. Are you sure you want to leave?";
+        return e.returnValue;
+      }
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [isFormDirty]);
+
+  const handleBackClick = () => {
+    if (isFormDirty) {
+      setUnsavedChangesDialogOpen(true);
+    } else {
+      navigate("/admin/tests");
+    }
+  };
+
   const fetchTest = useCallback(async () => {
     try {
       setLoading(true);
@@ -210,7 +326,16 @@ export default function AdminTestsEdit() {
         difficulty: data.difficulty,
         passMark: data.passMark,
         status: data.status,
-        instructions: data.instructions || {},
+        instructions: data.instructions?.general ? data.instructions : {
+          general: `This is an online test.
+Please make sure that you are using the latest version of the browser. We recommend using Google Chrome.
+It's mandatory to disable all the browser extensions and enabled Add-ons or open the assessment in incognito mode.
+If you are solving a coding problem, you will either be required to choose a programming language from the options that have been enabled by the administrator or choose your preferred programming language in case no options have been enabled by the administrator. Note: In case you're solving coding problems: All inputs are from STDIN and output to STDOUT.
+ If test mandates you to use the webcam, please provide the required permissions and access.
+To know the results, please contact the administrator.
+To refer to the FAQ document, you can click on the HELP button which is present in the top right corner of the test environment.
+Best wishes from GRYPHON ACADEMY PRIVATE LIMITED!`
+        },
         proctoringMode: data.proctoringMode || "NONE",
         enableTabSwitchTracking: data.enableTabSwitchTracking || false,
         blockCopyPaste: data.blockCopyPaste || false,
@@ -333,6 +458,19 @@ export default function AdminTestsEdit() {
       return;
     }
 
+    if (scheduleStartTime && scheduleEndTime) {
+      const startDate = new Date(scheduleStartTime);
+      const endDate = new Date(scheduleEndTime);
+      if (endDate <= startDate) {
+        toast({
+          title: "Validation Error",
+          description: "Schedule end time must be after start time.",
+          variant: "destructive",
+        });
+        return;
+      }
+    }
+
     try {
       setSaving(true);
       await testService.updateTest(id!, {
@@ -364,6 +502,28 @@ export default function AdminTestsEdit() {
         autoSubmitOnCriticalViolations: formData.autoSubmitOnCriticalViolations || false,
         maxCriticalViolations: formData.maxCriticalViolations || 0,
       });
+
+      // Save schedule
+      if (scheduleStartTime && scheduleEndTime) {
+        const startISO = new Date(scheduleStartTime).toISOString();
+        const endISO = new Date(scheduleEndTime).toISOString();
+        if (selectedSchedule) {
+          // Update existing schedule
+          await apiClient.patch(`/test-schedules/${selectedSchedule}`, {
+            startTime: startISO,
+            endTime: endISO,
+          });
+        } else {
+          // Create new schedule
+          await apiClient.post("/test-schedules", {
+            testId: id,
+            startTime: startISO,
+            endTime: endISO,
+            maxCandidates: 100,
+          });
+        }
+      }
+
       toast({
         title: "Success",
         description: "Test has been updated successfully.",
@@ -435,6 +595,210 @@ export default function AdminTestsEdit() {
     }
   };
 
+  const fetchInvitationsData = useCallback(async () => {
+    try {
+      setLoadingInvitations(true);
+      const [schedulesData, candidatesData] = await Promise.all([
+        testService.getAllTestSchedules(),
+        candidateService.getCandidates(),
+      ]);
+
+      // Filter schedules to only keep the ones for THIS test
+      const testSchedules = schedulesData.filter((s: any) => s.testId === id);
+      
+      // Auto-select the first schedule if available
+      if (testSchedules.length > 0) {
+        const activeOrFirst = testSchedules.find((s: any) => s.status === "SCHEDULED" || s.status === "LIVE") || testSchedules[0];
+        setSelectedSchedule(activeOrFirst.id);
+        setSelectedScheduleData(activeOrFirst);
+        if (activeOrFirst.startTime) {
+          const date = new Date(activeOrFirst.startTime);
+          const tzOffset = date.getTimezoneOffset() * 60000;
+          const localISOTime = (new Date(date.getTime() - tzOffset)).toISOString().slice(0, 16);
+          setScheduleStartTime(localISOTime);
+        }
+        if (activeOrFirst.endTime) {
+          const date = new Date(activeOrFirst.endTime);
+          const tzOffset = date.getTimezoneOffset() * 60000;
+          const localISOTime = (new Date(date.getTime() - tzOffset)).toISOString().slice(0, 16);
+          setScheduleEndTime(localISOTime);
+        }
+      } else {
+        setSelectedSchedule("");
+        setSelectedScheduleData(null);
+        setScheduleStartTime("");
+        setScheduleEndTime("");
+      }
+
+      setCandidates(candidatesData);
+
+      try {
+        const response = await apiClient.get("/candidate-invitations?size=1000");
+        const invData = response.data?.data;
+        if (Array.isArray(invData)) {
+          setInvitations(invData);
+        } else if (invData && typeof invData === "object" && "content" in invData && Array.isArray((invData as any).content)) {
+          setInvitations((invData as any).content);
+        } else {
+          setInvitations([]);
+        }
+      } catch (error) {
+        console.log("No invitations data yet");
+      }
+    } catch (error) {
+      console.error("Failed to fetch invitation data:", error);
+    } finally {
+      setLoadingInvitations(false);
+    }
+  }, [id]);
+
+  useEffect(() => {
+    if (id) {
+      fetchInvitationsData();
+    }
+  }, [id, fetchInvitationsData]);
+
+  const handleInvite = async () => {
+    if (!selectedSchedule) {
+      toast({
+        title: "Error",
+        description: "Please create a schedule for this test first.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!selectedCandidate) {
+      toast({
+        title: "Error",
+        description: "No candidate selected",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setInviteSubmitting(true);
+    try {
+      await apiClient.post("/candidate-invitations", {
+        scheduleId: selectedSchedule,
+        candidateId: selectedCandidate.id,
+      });
+
+      toast({
+        title: "Success",
+        description: `Invitation sent to ${selectedCandidate.user.name}`,
+      });
+      setIsInviteDialogOpen(false);
+      setSelectedCandidate(null);
+      fetchInvitationsData();
+    } catch (error) {
+      console.error("Failed to send invitation:", error);
+      toast({
+        title: "Error",
+        description:
+          (error as any).response?.data?.message || "Failed to send invitation",
+        variant: "destructive",
+      });
+    } finally {
+      setInviteSubmitting(false);
+    }
+  };
+
+  const handleBulkInvite = async () => {
+    if (!selectedSchedule) {
+      toast({
+        title: "Error",
+        description: "Please create a schedule for this test first.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (selectedCandidates.length === 0) {
+      toast({
+        title: "Error",
+        description: "No candidates selected",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setInviteSubmitting(true);
+    let successCount = 0;
+    let failCount = 0;
+
+    try {
+      for (const candidateId of selectedCandidates) {
+        try {
+          await apiClient.post("/candidate-invitations", {
+            scheduleId: selectedSchedule,
+            candidateId: candidateId,
+          });
+          successCount++;
+        } catch (err) {
+          console.error(`Failed to invite candidate ${candidateId}:`, err);
+          failCount++;
+        }
+      }
+
+      toast({
+        title: "Bulk Invitation Complete",
+        description: `Successfully invited ${successCount} candidates. ${failCount > 0 ? `${failCount} failed.` : ""}`,
+      });
+
+      setSelectedCandidates([]);
+      fetchInvitationsData();
+    } catch (error) {
+      console.error("Bulk invitation error:", error);
+    } finally {
+      setInviteSubmitting(false);
+    }
+  };
+
+  const copyTestLink = (testId: string, token: string) => {
+    const baseUrl = window.location.origin;
+    const testUrl = `${baseUrl}/test/access/${testId}/${token}`;
+    navigator.clipboard.writeText(testUrl);
+    setCopiedToken(token);
+    toast({
+      title: "Link Copied!",
+      description: "Test URL copied to clipboard",
+    });
+    setTimeout(() => setCopiedToken(null), 2000);
+  };
+
+  const getInvitationForCandidate = (candidateId: string, scheduleId: string) => {
+    return invitations.find(
+      (i) => i.candidateId === candidateId && i.scheduleId === scheduleId,
+    ) || null;
+  };
+
+  const formatDateTime = (dateStr: string) => {
+    return new Date(dateStr).toLocaleString();
+  };
+
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case "ACCEPTED":
+        return <CheckCircle2 className="w-3 h-3 text-green-500" />;
+      case "EXPIRED":
+        return <XCircle className="w-3 h-3 text-red-500" />;
+      default:
+        return <Clock className="w-3 h-3 text-yellow-500" />;
+    }
+  };
+
+  const filteredCandidates = useMemo(() => {
+    return candidates.filter((candidate) => {
+      const name = candidate.user?.name || "";
+      const email = candidate.user?.email || "";
+      const matchesSearch =
+        name.toLowerCase().includes(inviteSearchTerm.toLowerCase()) ||
+        email.toLowerCase().includes(inviteSearchTerm.toLowerCase());
+      return matchesSearch;
+    });
+  }, [candidates, inviteSearchTerm]);
+
   const handleAddQuestions = () => {
     navigate(`/admin/tests/${id}/questions`);
   };
@@ -472,11 +836,9 @@ export default function AdminTestsEdit() {
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div className="flex items-center gap-4">
-          <Link to="/admin/tests">
-            <Button variant="ghost" size="icon">
-              <ArrowLeft className="w-5 h-5" />
-            </Button>
-          </Link>
+          <Button variant="ghost" size="icon" onClick={handleBackClick}>
+            <ArrowLeft className="w-5 h-5" />
+          </Button>
           <div>
             <h1 className="text-3xl font-heading font-bold">Edit Test</h1>
             <p className="text-muted-foreground mt-1">
@@ -509,13 +871,14 @@ export default function AdminTestsEdit() {
         </div>
       </div>
 
-      <Tabs defaultValue="details" className="w-full">
-        <TabsList className="grid w-full grid-cols-3 max-w-md">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <TabsList className="grid w-full grid-cols-4 max-w-lg">
           <TabsTrigger value="details">Basic Information</TabsTrigger>
           <TabsTrigger value="questions">
             Questions ({questionCount})
           </TabsTrigger>
           <TabsTrigger value="settings">Settings</TabsTrigger>
+          <TabsTrigger value="invite">Invite Candidates</TabsTrigger>
         </TabsList>
 
         <TabsContent value="details" className="pt-6">
@@ -539,6 +902,8 @@ export default function AdminTestsEdit() {
                       onChange={handleInputChange}
                     />
                   </div>
+
+
 
                   <div className="space-y-2">
                     <Label htmlFor="description">Description</Label>
@@ -617,51 +982,29 @@ export default function AdminTestsEdit() {
 
             </div>
 
-            <div className="space-y-6">
-              <Card>
+            <div className="space-y-6 flex flex-col h-full">
+              <Card className="flex-1 flex flex-col h-full">
                 <CardHeader>
-                  <CardTitle>Test Statistics</CardTitle>
+                  <CardTitle>Test Instructions</CardTitle>
+                  <CardDescription>
+                    General instructions shown to candidates before starting the test
+                  </CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="flex items-center justify-between text-sm">
-                    <div className="flex items-center gap-2 text-muted-foreground">
-                      <FileQuestion className="w-4 h-4" />
-                      <span>Questions</span>
-                    </div>
-                    <span className="font-semibold">{questionCount}</span>
-                  </div>
-                  <div className="flex items-center justify-between text-sm">
-                    <div className="flex items-center gap-2 text-muted-foreground">
-                      <Clock className="w-4 h-4" />
-                      <span>Total Duration</span>
-                    </div>
-                    <span className="font-semibold">
-                      {formData.durationMins} mins
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between text-sm">
-                    <div className="flex items-center gap-2 text-muted-foreground">
-                      <Target className="w-4 h-4" />
-                      <span>Avg. Difficulty</span>
-                    </div>
-                    <Badge variant="secondary">{formData.difficulty}</Badge>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className="bg-primary/5 border-primary/20">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm">Quick Actions</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-2">
-                  <Button
-                    variant="outline"
-                    className="w-full justify-start gap-2"
-                    onClick={handleAddQuestions}
-                  >
-                    <Plus className="w-4 h-4" />
-                    Manage Questions
-                  </Button>
+                <CardContent className="flex-1 flex flex-col">
+                  <Textarea
+                    placeholder="Enter test instructions..."
+                    className="flex-1 min-h-[350px] font-sans text-sm resize-none"
+                    value={(formData.instructions as any)?.general || ""}
+                    onChange={(e) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        instructions: {
+                          ...prev.instructions,
+                          general: e.target.value,
+                        },
+                      }))
+                    }
+                  />
                 </CardContent>
               </Card>
             </div>
@@ -743,53 +1086,32 @@ export default function AdminTestsEdit() {
         </TabsContent>
 
         <TabsContent value="settings" className="pt-6 space-y-6">
+
           <Card>
             <CardHeader>
-              <CardTitle>Test Settings</CardTitle>
+              <CardTitle>Test Schedule</CardTitle>
               <CardDescription>
-                Advanced configuration for your test
+                Set the availability window for this test (Organisation is set to your Admin home by default)
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label>Test ID</Label>
-                <Input value={test.id} disabled className="font-mono" />
-                <p className="text-xs text-muted-foreground">
-                  Unique identifier for this test
-                </p>
-              </div>
-
-              <div className="space-y-2">
-                <Label>Created By</Label>
-                <Input
-                  value={
-                    test.createdById || "Unknown"
-                  }
-                  disabled
-                />
-              </div>
-
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label>Created At</Label>
+                  <Label htmlFor="scheduleStartTime">Start Time *</Label>
                   <Input
-                    value={
-                      test.createdAt
-                        ? new Date(test.createdAt).toLocaleString()
-                        : "N/A"
-                    }
-                    disabled
+                    id="scheduleStartTime"
+                    type="datetime-local"
+                    value={scheduleStartTime}
+                    onChange={(e) => setScheduleStartTime(e.target.value)}
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>Last Updated</Label>
+                  <Label htmlFor="scheduleEndTime">End Time *</Label>
                   <Input
-                    value={
-                      test.updatedAt
-                        ? new Date(test.updatedAt).toLocaleString()
-                        : "N/A"
-                    }
-                    disabled
+                    id="scheduleEndTime"
+                    type="datetime-local"
+                    value={scheduleEndTime}
+                    onChange={(e) => setScheduleEndTime(e.target.value)}
                   />
                 </div>
               </div>
@@ -1189,6 +1511,226 @@ export default function AdminTestsEdit() {
             </CardContent>
           </Card>
         </TabsContent>
+
+        <TabsContent value="invite" className="pt-6">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle>Invite Candidates</CardTitle>
+                <CardDescription>
+                  Invite students or candidates to take this specific assessment
+                </CardDescription>
+              </div>
+              {selectedCandidates.length > 0 && selectedSchedule && (
+                <Button
+                  onClick={handleBulkInvite}
+                  disabled={inviteSubmitting}
+                  className="gap-2 shrink-0"
+                >
+                  {inviteSubmitting ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Send className="w-4 h-4" />
+                  )}
+                  Invite Selected ({selectedCandidates.length})
+                </Button>
+              )}
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {!selectedSchedule ? (
+                <div className="text-center py-12 border border-dashed rounded-lg bg-amber-50/10 border-amber-200/50">
+                  <AlertCircle className="w-12 h-12 mx-auto text-amber-500 mb-4 opacity-80" />
+                  <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-200">No Active Schedules</h3>
+                  <p className="text-muted-foreground max-w-md mx-auto mt-2 text-sm">
+                    This test has not been scheduled yet. You must create a schedule under Test Schedules before inviting candidates.
+                  </p>
+                </div>
+              ) : (
+                <>
+                  <div className="p-4 bg-primary/5 rounded-lg text-sm border border-primary/10 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div>
+                      <p className="font-semibold text-primary">Active Test Schedule Connected</p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Schedules: {formatDateTime(selectedScheduleData?.startTime || "")} - {formatDateTime(selectedScheduleData?.endTime || "")}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Search bar */}
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Search candidates by name or email..."
+                      value={inviteSearchTerm}
+                      onChange={(e) => setInviteSearchTerm(e.target.value)}
+                      className="pl-10 w-full"
+                    />
+                  </div>
+
+                  {/* Candidates Table */}
+                  <div className="border rounded-lg overflow-hidden">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="w-[50px]">
+                            <Checkbox
+                              checked={
+                                filteredCandidates.length > 0 &&
+                                filteredCandidates.every((c) =>
+                                  selectedCandidates.includes(c.id),
+                                )
+                              }
+                              onCheckedChange={(checked) => {
+                                if (checked) {
+                                  const allIds = filteredCandidates.map((c) => c.id);
+                                  setSelectedCandidates((prev) =>
+                                    Array.from(new Set([...prev, ...allIds])),
+                                  );
+                                } else {
+                                  const filteredIds = new Set(
+                                    filteredCandidates.map((c) => c.id),
+                                  );
+                                  setSelectedCandidates((prev) =>
+                                    prev.filter((id) => !filteredIds.has(id)),
+                                  );
+                                }
+                              }}
+                            />
+                          </TableHead>
+                          <TableHead className="w-[50px] text-center">#</TableHead>
+                          <TableHead>Candidate</TableHead>
+                          <TableHead>Contact</TableHead>
+                          <TableHead>Account</TableHead>
+                          <TableHead>Invitation</TableHead>
+                          <TableHead>Test Link</TableHead>
+                          <TableHead className="text-right">Action</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {loadingInvitations ? (
+                          <TableRow>
+                            <TableCell colSpan={8} className="text-center py-10">
+                              <Loader2 className="w-6 h-6 animate-spin mx-auto text-primary" />
+                            </TableCell>
+                          </TableRow>
+                        ) : filteredCandidates.length === 0 ? (
+                          <TableRow>
+                            <TableCell colSpan={8} className="text-center py-10 text-muted-foreground">
+                              No candidates found.
+                            </TableCell>
+                          </TableRow>
+                        ) : (
+                          filteredCandidates.map((candidate, index) => {
+                            const invitation = getInvitationForCandidate(candidate.id, selectedSchedule);
+                            const isScheduleCompleted =
+                              selectedScheduleData?.status === "COMPLETED" ||
+                              selectedScheduleData?.status === "EXPIRED";
+                            const displayStatus =
+                              invitation?.status === "PENDING" && isScheduleCompleted
+                                ? "EXPIRED"
+                                : invitation?.status;
+
+                            return (
+                              <TableRow key={candidate.id}>
+                                <TableCell>
+                                  <Checkbox
+                                    checked={selectedCandidates.includes(candidate.id)}
+                                    onCheckedChange={(checked) => {
+                                      if (checked) {
+                                        setSelectedCandidates((prev) => [...prev, candidate.id]);
+                                      } else {
+                                        setSelectedCandidates((prev) =>
+                                          prev.filter((id) => id !== candidate.id),
+                                        );
+                                      }
+                                    }}
+                                  />
+                                </TableCell>
+                                <TableCell className="text-center text-muted-foreground text-sm">
+                                  {index + 1}
+                                </TableCell>
+                                <TableCell>
+                                  <div className="flex items-center gap-3">
+                                    <div className="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center font-semibold text-xs">
+                                      {candidate.user.name
+                                        ?.split(" ")
+                                        .map((n: string) => n[0])
+                                        .join("") || "C"}
+                                    </div>
+                                    <div>
+                                      <p className="font-medium text-sm">{candidate.user.name}</p>
+                                    </div>
+                                  </div>
+                                </TableCell>
+                                <TableCell className="text-sm">
+                                  <div>{candidate.user.email}</div>
+                                  <div className="text-xs text-muted-foreground">{candidate.user.phoneNumber}</div>
+                                </TableCell>
+                                <TableCell>
+                                  <Badge variant="outline" className="text-xs">
+                                    {candidate.stale ? "Inactive" : "Active"}
+                                  </Badge>
+                                </TableCell>
+                                <TableCell>
+                                  {invitation ? (
+                                    <div className="flex items-center gap-1.5 text-sm">
+                                      {getStatusIcon(displayStatus || "")}
+                                      <span className="capitalize">{displayStatus?.toLowerCase()}</span>
+                                    </div>
+                                  ) : (
+                                    <span className="text-xs text-muted-foreground">Not invited</span>
+                                  )}
+                                </TableCell>
+                                <TableCell>
+                                  {invitation?.token ? (
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => copyTestLink(test.id, invitation.token)}
+                                      className="h-8 px-2"
+                                      disabled={displayStatus === "EXPIRED"}
+                                    >
+                                      {copiedToken === invitation.token ? (
+                                        <>
+                                          <Check className="w-3 h-3 mr-1 text-green-500" />
+                                          <span className="text-xs">Copied!</span>
+                                        </>
+                                      ) : (
+                                        <>
+                                          <Link2 className="w-3 h-3 mr-1" />
+                                          <span className="text-xs">Copy Link</span>
+                                        </>
+                                      )}
+                                    </Button>
+                                  ) : (
+                                    <span className="text-xs text-muted-foreground">-</span>
+                                  )}
+                                </TableCell>
+                                <TableCell className="text-right">
+                                  <Button
+                                    size="sm"
+                                    onClick={() => {
+                                      setSelectedCandidate(candidate);
+                                      setIsInviteDialogOpen(true);
+                                    }}
+                                    disabled={!!invitation || isScheduleCompleted}
+                                  >
+                                    <Send className="w-4 h-4 mr-2" />
+                                    {invitation ? "Invited" : "Send Invite"}
+                                  </Button>
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })
+                        )}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
       </Tabs>
 
       {/* Delete Test Confirmation Dialog */}
@@ -1252,6 +1794,85 @@ export default function AdminTestsEdit() {
                 <Trash2 className="w-4 h-4 mr-2" />
               )}
               Remove Question
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Invite Confirmation Dialog */}
+      <Dialog open={isInviteDialogOpen} onOpenChange={setIsInviteDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Confirm Invitation</DialogTitle>
+            <DialogDescription>
+              Send test invitation to candidate?
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <p className="text-sm">
+              This will send an invitation to{" "}
+              <span className="font-semibold text-slate-900">
+                {selectedCandidate?.user.name}
+              </span>{" "}
+              for the test{" "}
+              <span className="font-semibold text-slate-900">
+                {test?.title || "Test"}
+              </span>
+            </p>
+            {selectedScheduleData && (
+              <div className="mt-3 p-3 bg-muted/30 rounded-lg text-xs">
+                <div className="flex items-center gap-2">
+                  <Calendar className="w-3 h-3" />
+                  <span>
+                    Start: {formatDateTime(selectedScheduleData.startTime)}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2 mt-1">
+                  <Clock className="w-3 h-3" />
+                  <span>
+                    End: {formatDateTime(selectedScheduleData.endTime)}
+                  </span>
+                </div>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setIsInviteDialogOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button onClick={handleInvite} disabled={inviteSubmitting}>
+              {inviteSubmitting ? (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              ) : null}
+              Send Invitation
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      {/* Unsaved Changes Dialog */}
+      <AlertDialog open={unsavedChangesDialogOpen} onOpenChange={setUnsavedChangesDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Unsaved Changes</AlertDialogTitle>
+            <AlertDialogDescription>
+              You have unsaved changes to this test. Are you sure you want to go back without saving?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setUnsavedChangesDialogOpen(false)}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive hover:bg-destructive/90 text-destructive-foreground"
+              onClick={() => {
+                setUnsavedChangesDialogOpen(false);
+                navigate("/admin/tests");
+              }}
+            >
+              Discard & Go Back
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

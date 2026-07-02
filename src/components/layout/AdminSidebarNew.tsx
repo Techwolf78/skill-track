@@ -21,7 +21,7 @@ const navItems = [
   { icon: FileQuestion, label: "Question Bank", path: "/admin/questions" },
   { 
     icon: ClipboardList, 
-    label: "Assessments", 
+    label: "Tests", 
     path: "/admin/tests",
     matchPaths: ["/admin/tests", "/admin/schedules", "/admin/invitations"]
   },
