@@ -336,7 +336,7 @@ export default function Students() {
               <div className="space-y-2">
                 <label className="text-sm font-medium">Email Address*</label>
                 <Input type="email" placeholder="john@example.com" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} />
-                {emailError && <p className="text-xs text-destructive">{emailError}</p>}
+                {emailError ? <p className="text-xs text-destructive">{emailError}</p> : null}
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">

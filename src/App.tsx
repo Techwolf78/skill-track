@@ -1,66 +1,69 @@
+import React, { Suspense } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
-import Login from "./pages/Login";
-import NotFound from "./pages/NotFound";
-import NationalLandingPage from "./pages/NationalLandingPage";
 import { AdminLayout } from "./components/layout/AdminLayout";
 import { AssessmentsLayout } from "./components/layout/AssessmentsLayout";
-import AdminDashboard from "./pages/SuperAdmin/Dashboard";
-import Organisations from "./pages/SuperAdmin/Organisations";
-import Students from "./pages/SuperAdmin/SuperAdminCandidates";
-import Users from "./pages/SuperAdmin/Users";
-import QuestionBank from "./pages/SuperAdmin/QuestionBank";
-import ManageSubjects from "./pages/SuperAdmin/ManageSubjects";
-import Tests from "./pages/SuperAdmin/Tests";
-import TestCreate from "./pages/SuperAdmin/TestCreate";
-import TestsEdit from "./pages/SuperAdmin/TestsEdit";
-import TestQuestions from "./pages/SuperAdmin/TestQuestions";
-import TestDetails from "./pages/SuperAdmin/TestDetails"; // Add this import
-import TestScheduleDetails from "./pages/SuperAdmin/TestScheduleDetails";
-import InviteCandidates from "./pages/SuperAdmin/InviteCandidates";
-import InvitedCandidatesHistory from "./pages/SuperAdmin/InvitedCandidatesHistory";
-import TestAccess from "./pages/test/TestAccess";
-import EditQuestion from "./pages/SuperAdmin/EditQuestion";
-import AddQuestion from "./pages/SuperAdmin/AddQuestion";
-import Settings from "./pages/SuperAdmin/Settings";
-import DSAPlayground from "./pages/SuperAdmin/DSAPlayground";
-import Reports from "./pages/SuperAdmin/Reports";
-import TestSchedules from "./pages/SuperAdmin/TestSchedules";
-import AuditLogs from "./pages/SuperAdmin/AuditLogs";
-import SeedData from "./pages/SeedData";
 import { AuthProvider } from "./lib/auth-context";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { ROLES } from "./lib/roles";
-import ProctoringDashboard from "@/pages/Admin/ProctoringDashboard";
- 
+import { CandidateLayout } from "./pages/Candidate/CandidateLayout";
+
+// Lazy load pages
+const Login = React.lazy(() => import("./pages/Login"));
+const NotFound = React.lazy(() => import("./pages/NotFound"));
+const NationalLandingPage = React.lazy(() => import("./pages/NationalLandingPage"));
+const AdminDashboard = React.lazy(() => import("./pages/SuperAdmin/Dashboard"));
+const Organisations = React.lazy(() => import("./pages/SuperAdmin/Organisations"));
+const Students = React.lazy(() => import("./pages/SuperAdmin/SuperAdminCandidates"));
+const Users = React.lazy(() => import("./pages/SuperAdmin/Users"));
+const QuestionBank = React.lazy(() => import("./pages/SuperAdmin/QuestionBank"));
+const ManageSubjects = React.lazy(() => import("./pages/SuperAdmin/ManageSubjects"));
+const Tests = React.lazy(() => import("./pages/SuperAdmin/Tests"));
+const TestCreate = React.lazy(() => import("./pages/SuperAdmin/TestCreate"));
+const TestsEdit = React.lazy(() => import("./pages/SuperAdmin/TestsEdit"));
+const TestQuestions = React.lazy(() => import("./pages/SuperAdmin/TestQuestions"));
+const TestDetails = React.lazy(() => import("./pages/SuperAdmin/TestDetails"));
+const TestScheduleDetails = React.lazy(() => import("./pages/SuperAdmin/TestScheduleDetails"));
+const InviteCandidates = React.lazy(() => import("./pages/SuperAdmin/InviteCandidates"));
+const InvitedCandidatesHistory = React.lazy(() => import("./pages/SuperAdmin/InvitedCandidatesHistory"));
+const TestAccess = React.lazy(() => import("./pages/test/TestAccess"));
+const EditQuestion = React.lazy(() => import("./pages/SuperAdmin/EditQuestion"));
+const AddQuestion = React.lazy(() => import("./pages/SuperAdmin/AddQuestion"));
+const Settings = React.lazy(() => import("./pages/SuperAdmin/Settings"));
+const DSAPlayground = React.lazy(() => import("./pages/SuperAdmin/DSAPlayground"));
+const Reports = React.lazy(() => import("./pages/SuperAdmin/Reports"));
+const TestSchedules = React.lazy(() => import("./pages/SuperAdmin/TestSchedules"));
+const AuditLogs = React.lazy(() => import("./pages/SuperAdmin/AuditLogs"));
+const SeedData = React.lazy(() => import("./pages/SeedData"));
+const ProctoringDashboard = React.lazy(() => import("@/pages/Admin/ProctoringDashboard"));
+
 // Admin pages
-import AdminDashboardAdmin from "./pages/Admin/Dashboard";
-import AdminCandidates from "./pages/Admin/AdminCandidates";
-import AdminQuestionBank from "./pages/Admin/QuestionBank";
-import AdminTests from "./pages/Admin/Tests";
-import AdminTestCreate from "./pages/Admin/TestCreate";
-import AdminTestsEdit from "./pages/Admin/TestsEdit";
-import AdminTestDetails from "./pages/Admin/TestDetails";
- 
+const AdminDashboardAdmin = React.lazy(() => import("./pages/Admin/Dashboard"));
+const AdminCandidates = React.lazy(() => import("./pages/Admin/AdminCandidates"));
+const AdminQuestionBank = React.lazy(() => import("./pages/Admin/QuestionBank"));
+const AdminTests = React.lazy(() => import("./pages/Admin/Tests"));
+const AdminTestCreate = React.lazy(() => import("./pages/Admin/TestCreate"));
+const AdminTestsEdit = React.lazy(() => import("./pages/Admin/TestsEdit"));
+const AdminTestDetails = React.lazy(() => import("./pages/Admin/TestDetails"));
+
 // Test Taking
-import TestInterface from "./pages/test/TestInterface";
-import TestResults from "./pages/test/TestResults";
+const TestInterface = React.lazy(() => import("./pages/test/TestInterface"));
+const TestResults = React.lazy(() => import("./pages/test/TestResults"));
 
 // Candidate Dashboard pages
-import { CandidateLayout } from "./pages/Candidate/CandidateLayout";
-import CandidateDashboard from "./pages/Candidate/Dashboard";
-import MyAssessments from "./pages/Candidate/MyAssessments";
-import ResultsReports from "./pages/Candidate/ResultsReports";
-import Certificates from "./pages/Candidate/Certificates";
-import Profile from "./pages/Candidate/Profile";
-import Notifications from "./pages/Candidate/Notifications";
-import Support from "./pages/Candidate/Support";
-import CandidateSettings from "./pages/Candidate/Settings";
-import CandidateAssessmentFlow from "./pages/Candidate/CandidateAssessmentFlow";
+const CandidateDashboard = React.lazy(() => import("./pages/Candidate/Dashboard"));
+const MyAssessments = React.lazy(() => import("./pages/Candidate/MyAssessments"));
+const ResultsReports = React.lazy(() => import("./pages/Candidate/ResultsReports"));
+const Certificates = React.lazy(() => import("./pages/Candidate/Certificates"));
+const Profile = React.lazy(() => import("./pages/Candidate/Profile"));
+const Notifications = React.lazy(() => import("./pages/Candidate/Notifications"));
+const Support = React.lazy(() => import("./pages/Candidate/Support"));
+const CandidateSettings = React.lazy(() => import("./pages/Candidate/Settings"));
+const CandidateAssessmentFlow = React.lazy(() => import("./pages/Candidate/CandidateAssessmentFlow"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -81,7 +84,8 @@ const App = () => (
           <Toaster />
           <Sonner />
           <BrowserRouter>
-            <Routes>
+            <Suspense fallback={<div className="flex items-center justify-center min-h-screen bg-slate-950 text-slate-200 font-mono">Loading dynamic module...</div>}>
+              <Routes>
               <Route path="/" element={<NationalLandingPage />} />
               <Route path="/login" element={<Login />} />
               <Route path="/unauthorized" element={<NotFound />} />
@@ -200,7 +204,8 @@ const App = () => (
 
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
-            </Routes>
+             </Routes>
+            </Suspense>
           </BrowserRouter>
         </TooltipProvider>
       </AuthProvider>

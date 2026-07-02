@@ -118,13 +118,13 @@ export default function CandidateAssessmentFlow() {
 
   const handleNext = () => {
     if (currentQIndex < mockQuestions.length - 1) {
-      setCurrentQIndex(currentQIndex + 1);
+      setCurrentQIndex(prev => prev + 1);
     }
   };
 
   const handlePrev = () => {
     if (currentQIndex > 0) {
-      setCurrentQIndex(currentQIndex - 1);
+      setCurrentQIndex(prev => prev - 1);
     }
   };
 
