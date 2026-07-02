@@ -102,6 +102,16 @@ Always apply these guidelines when building new UI or modifying existing fronten
 ## 5. Micro-Animations & Dynamic Interactions
 - Use Framer Motion and custom CSS animations for meaningful state transitions (e.g. terminal logs printing line-by-line during compiles, warning border-pulse for tab switch violations).
 - Keep animations quiet and disciplined; avoid excessive decoration that feels AI-generated.
+
+# PONYTAIL RULESET (MINIMUM CODE FOR TOKEN EFFICIENCY)
+When writing, modifying, or refactoring code, follow the Ponytail ladder:
+1. **YAGNI**: Does this need to exist? Skip speculative/future requirements.
+2. **Reuse**: Reuse helpers, hooks, utilities, or patterns already living in this codebase.
+3. **Standard Library**: If standard language features do it, use them.
+4. **Native First**: Prefer native web/platform features (e.g., `<input type="date">` over external date picker libs).
+5. **Existing Deps**: Use already-installed dependencies instead of introducing new packages.
+6. **One-liners**: If it can be one line, write it in one line.
+7. **Minimum Viable Code**: Only then write the minimum code that works. Keep security, validation, error handling, and accessibility robust.
 </user_rules>
 
 <workflows>
