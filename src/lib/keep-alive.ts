@@ -62,7 +62,6 @@ const KEEP_ALIVE_ENDPOINTS: string[] = [
   "/organisations?sort=name,asc",
   "/candidates?sort=name,asc",
   "/auth/login",
-  "/auth/register",
   "/candidate-invitations/validate"
 ];
 

@@ -1,18 +1,11 @@
 /**
  * Auth form validation logic — pure, framework-agnostic validators.
- * Used by Login, Register, and ResetPassword pages.
+ * Used by Login and ResetPassword pages.
  */
 
 export interface LoginCredentials {
   email: string;
   password: string;
-}
-
-export interface RegisterPayload {
-  name: string;
-  email: string;
-  password: string;
-  organisationId: string;
 }
 
 export interface ResetPasswordPayload {
@@ -34,18 +27,6 @@ export const validateLoginForm = (
   if (!creds.password || creds.password.trim() === "") {
     errors.password = "Password is required";
   }
-  return { valid: Object.keys(errors).length === 0, errors };
-};
-
-export const validateRegisterForm = (
-  payload: Partial<RegisterPayload>
-): { valid: boolean; errors: Record<string, string> } => {
-  const errors: Record<string, string> = {};
-  if (!payload.name || payload.name.trim() === "") errors.name = "Name is required";
-  if (!payload.email || !EMAIL_RE.test(payload.email)) errors.email = "Invalid email format";
-  if (!payload.password || payload.password.length < 8)
-    errors.password = "Password must be at least 8 characters";
-  if (!payload.organisationId) errors.organisationId = "Organisation ID is required";
   return { valid: Object.keys(errors).length === 0, errors };
 };
 
