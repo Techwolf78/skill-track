@@ -1,5 +1,4 @@
-import { describe, it, expect } from "vitest";
-import { validateLoginForm, validateRegisterForm, validateResetPasswordForm } from "../../lib/auth/formValidation";
+import { validateLoginForm, validateResetPasswordForm } from "../../lib/auth/formValidation";
 
 describe("Auth Form Validation Logic", () => {
   describe("validateLoginForm", () => {
@@ -27,28 +26,6 @@ describe("Auth Form Validation Logic", () => {
       expect(valid).toBe(false);
       expect(errors.email).toBeDefined();
       expect(errors.password).toBeDefined();
-    });
-  });
-
-  describe("validateRegisterForm", () => {
-    it("should pass for a complete valid payload", () => {
-      const { valid } = validateRegisterForm({
-        name: "John",
-        email: "john@test.com",
-        password: "Password1",
-        organisationId: "org-1",
-      });
-      expect(valid).toBe(true);
-    });
-
-    it("should fail when password is too short", () => {
-      const { errors } = validateRegisterForm({ name: "John", email: "j@t.com", password: "abc", organisationId: "o1" });
-      expect(errors.password).toContain("8 characters");
-    });
-
-    it("should fail when organisation is missing", () => {
-      const { errors } = validateRegisterForm({ name: "John", email: "j@t.com", password: "Password1" });
-      expect(errors.organisationId).toBeDefined();
     });
   });
 

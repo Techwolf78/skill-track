@@ -25,15 +25,6 @@ export interface LoginRequest {
   password?: string;
 }
 
-export interface RegisterRequest {
-  name: string;
-  email: string;
-  password?: string;
-  phoneNumber?: string;
-  role: string;
-  organisation_id: string;
-}
-
 export interface BaseResponse<T> {
   success: boolean;
   status: number;
@@ -77,26 +68,6 @@ export const authService = {
 
       return authData;
     }
-  },
-
-  register: async (request: RegisterRequest): Promise<AuthResponse> => {
-    const response = await apiClient.post<BaseResponse<AuthResponse>>(
-      "/auth/register",
-      request,
-    );
-
-    if (response.data && "data" in response.data) {
-      const authData = response.data.data;
-
-      if (authData.accessToken) {
-        localStorage.setItem("token", authData.accessToken);
-        localStorage.setItem("user", JSON.stringify(authData.user));
-      }
-
-      return authData;
-    }
-
-    return response.data as unknown as AuthResponse;
   },
 
   resetPassword: async (request: unknown): Promise<AuthResponse> => {
