@@ -77,8 +77,8 @@ export default function ResultsReports() {
       );
 
       // Sort by most recent first
-      enriched.sort((a, b) => new Date(b.session.submittedAt || b.session.startedAt).getTime() - new Date(a.session.submittedAt || a.session.startedAt).getTime());
-      setEnrichedResults(enriched);
+      const sortedEnriched = [...enriched].sort((a, b) => new Date(b.session.submittedAt || b.session.startedAt).getTime() - new Date(a.session.submittedAt || a.session.startedAt).getTime());
+      setEnrichedResults(sortedEnriched);
     } catch (err: unknown) {
       toast.error("Failed to load results: " + ((err as Error).message || "Unknown error"));
     } finally {

@@ -762,9 +762,9 @@ export default function TestAccess() {
                         <li>This assessment runs without proctoring. No hardware permissions will be requested.</li>
                       ) : (
                         <>
-                          {testData.proctoring.webcamRequired && <li>We will request webcam access for identity verification.</li>}
-                          {testData.proctoring.microphoneRequired && <li>Microphone access is required for audio monitoring.</li>}
-                          {testData.proctoring.screenShareRequired && <li>You must share your entire screen for the duration of the test.</li>}
+                          {testData.proctoring.webcamRequired ? <li>We will request webcam access for identity verification.</li> : null}
+                          {testData.proctoring.microphoneRequired ? <li>Microphone access is required for audio monitoring.</li> : null}
+                          {testData.proctoring.screenShareRequired ? <li>You must share your entire screen for the duration of the test.</li> : null}
                           <li>Once checked, you will declare consent and launch the test in fullscreen.</li>
                         </>
                       )}
@@ -1043,14 +1043,14 @@ export default function TestAccess() {
                   </div>
                   <div className="space-y-1.5">
                     <RuleBadge icon={<Monitor className="w-3.5 h-3.5" />} text="Fullscreen Lock" active />
-                    {testData.proctoring.tabSwitchTrackingEnabled && <RuleBadge icon={<Ban className="w-3.5 h-3.5" />} text="Tab Switch Tracking" active />}
-                    {testData.proctoring.copyPasteBlocked && <RuleBadge icon={<Ban className="w-3.5 h-3.5" />} text="Copy/Paste Blocked" active />}
-                    {testData.proctoring.webcamRequired && <RuleBadge icon={<Camera className="w-3.5 h-3.5" />} text="Webcam Identity Check" active />}
-                    {testData.proctoring.microphoneRequired && <RuleBadge icon={<Mic className="w-3.5 h-3.5" />} text="Microphone Monitoring" active />}
-                    {testData.proctoring.screenShareRequired && <RuleBadge icon={<Monitor className="w-3.5 h-3.5" />} text="Screen Share Required" active />}
-                    {testData.proctoring.multipleFaceDetectionEnabled && <RuleBadge icon={<UserCheck className="w-3.5 h-3.5" />} text="Multiple Face Detection" active />}
-                    {testData.proctoring.objectDetectionEnabled && <RuleBadge icon={<Search className="w-3.5 h-3.5" />} text="Object Detection (AI)" active />}
-                    {testData.proctoring.devtoolsDetectionEnabled && <RuleBadge icon={<Shield className="w-3.5 h-3.5" />} text="DevTools Detection" active />}
+                    {testData.proctoring.tabSwitchTrackingEnabled ? <RuleBadge icon={<Ban className="w-3.5 h-3.5" />} text="Tab Switch Tracking" active /> : null}
+                    {testData.proctoring.copyPasteBlocked ? <RuleBadge icon={<Ban className="w-3.5 h-3.5" />} text="Copy/Paste Blocked" active /> : null}
+                    {testData.proctoring.webcamRequired ? <RuleBadge icon={<Camera className="w-3.5 h-3.5" />} text="Webcam Identity Check" active /> : null}
+                    {testData.proctoring.microphoneRequired ? <RuleBadge icon={<Mic className="w-3.5 h-3.5" />} text="Microphone Monitoring" active /> : null}
+                    {testData.proctoring.screenShareRequired ? <RuleBadge icon={<Monitor className="w-3.5 h-3.5" />} text="Screen Share Required" active /> : null}
+                    {testData.proctoring.multipleFaceDetectionEnabled ? <RuleBadge icon={<UserCheck className="w-3.5 h-3.5" />} text="Multiple Face Detection" active /> : null}
+                    {testData.proctoring.objectDetectionEnabled ? <RuleBadge icon={<Search className="w-3.5 h-3.5" />} text="Object Detection (AI)" active /> : null}
+                    {testData.proctoring.devtoolsDetectionEnabled ? <RuleBadge icon={<Shield className="w-3.5 h-3.5" />} text="DevTools Detection" active /> : null}
                     {testData.proctoring.proctoringMode === "NONE" && (
                       <p className="text-[10px] text-muted-foreground italic">No monitoring active for this assessment.</p>
                     )}
@@ -1110,9 +1110,9 @@ function DiagnosticRow({ label, status, desc }: { label: string; status: "pendin
         <p className="text-[10px] text-muted-foreground leading-normal">{desc}</p>
       </div>
       <div className="pt-0.5">
-        {status === "success" && <CheckCircle2 className="w-4 h-4 text-green-500 fill-current" />}
-        {status === "error" && <AlertCircle className="w-4 h-4 text-red-500 fill-current" />}
-        {status === "pending" && <div className="w-3.5 h-3.5 rounded-full border-2 border-muted" />}
+        {status === "success" ? <CheckCircle2 className="w-4 h-4 text-green-500 fill-current" /> : null}
+        {status === "error" ? <AlertCircle className="w-4 h-4 text-red-500 fill-current" /> : null}
+        {status === "pending" ? <div className="w-3.5 h-3.5 rounded-full border-2 border-muted" /> : null}
       </div>
     </div>
   );

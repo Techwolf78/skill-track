@@ -87,7 +87,7 @@ export function AdminSidebar() {
               )}
             >
               <item.icon className={cn("w-5 h-5 flex-shrink-0", collapsed && "mx-auto")} />
-              {!collapsed && <span className="font-medium">{item.label}</span>}
+              {!collapsed ? <span className="font-medium">{item.label}</span> : null}
             </NavLink>
           );
         })}
@@ -104,7 +104,7 @@ export function AdminSidebar() {
           )}
         >
           <LogOut className="w-5 h-5" />
-          {!collapsed && <span className="ml-3">Logout</span>}
+          {!collapsed ? <span className="ml-3">Logout</span> : null}
         </Button>
         <Button
           variant="ghost"

@@ -140,8 +140,8 @@ export default function Notifications() {
       );
 
       // Sort: unread first, then by recency (we use id order as proxy)
-      notifs.sort((a, b) => (a.read === b.read ? 0 : a.read ? 1 : -1));
-      setNotifications(notifs);
+      const sortedNotifs = [...notifs].sort((a, b) => (a.read === b.read ? 0 : a.read ? 1 : -1));
+      setNotifications(sortedNotifs);
     } catch (err: unknown) {
       toast.error("Failed to load notifications: " + ((err as Error).message || "Unknown error"));
     } finally {

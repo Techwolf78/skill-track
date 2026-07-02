@@ -58,11 +58,11 @@ export default function Certificates() {
       );
 
       // Sort newest first
-      certEntries.sort((a, b) =>
+      const sortedCertEntries = [...certEntries].sort((a, b) =>
         new Date(b.result.evaluatedAt || b.session.submittedAt || "").getTime() -
         new Date(a.result.evaluatedAt || a.session.submittedAt || "").getTime()
       );
-      setCerts(certEntries);
+      setCerts(sortedCertEntries);
     } catch (err: unknown) {
       toast.error("Failed to load certificates: " + ((err as Error).message || "Unknown error"));
     } finally {
