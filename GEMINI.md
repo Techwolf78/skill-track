@@ -79,7 +79,29 @@ CRITICAL REMINDER: AESTHETICS ARE VERY IMPORTANT. If your web app looks simple a
 </web_application_development>
 
 <user_rules>
-The user has not defined any custom rules.
+# FRONTEND DESIGN PRINCIPLES (MANDATORY FOR ALL WEB DEVELOPMENT TASKS)
+Always apply these guidelines when building new UI or modifying existing frontend code in this project:
+
+## 1. Ground Design in the Subject (Developer-Focused Proctored IDE)
+- Reject generic SaaS template aesthetics (cream/terracotta high-contrast serif themes or basic plain cards).
+- Use a **Tech-Industrial / Cyber-Minimalist** look. Pair technical layout aesthetics with crisp structural elements rather than generic drop shadows.
+
+## 2. Opinionated Typography
+- Do NOT use plain, default font families (like Inter/Montserrat).
+- Use **JetBrains Mono** or **Fira Code** for display headers, numeric data, and code blocks.
+- Use a modern, readable sans-serif like **Plus Jakarta Sans** or **Space Grotesk** for body text and navigation labels.
+
+## 3. High-Performance Color Themes
+- Customize theme variables using curated, HSL-based colors.
+- Use a default Dark Theme matching a terminal console: deep obsidian/slate background (`hsl(224, 25%, 8%)`), bordered dividers, and status indicators using high-saturation neon accents (e.g. Matrix Green for successes, Laser Crimson for proctor warnings/violations, and Laser Cyan for active code execution).
+
+## 4. Layout as Information Structure
+- Render workspaces like professional IDEs (using vertical panels, resizable containers, and clear division).
+- Use numbering, visual anchors, and indicators only if they encode actual sequence or progress data.
+
+## 5. Micro-Animations & Dynamic Interactions
+- Use Framer Motion and custom CSS animations for meaningful state transitions (e.g. terminal logs printing line-by-line during compiles, warning border-pulse for tab switch violations).
+- Keep animations quiet and disciplined; avoid excessive decoration that feels AI-generated.
 </user_rules>
 
 <workflows>
