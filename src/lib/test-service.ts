@@ -759,32 +759,68 @@ export const testService = {
   },
 
   // ==================== Test APIs ====================
+  // ==================== Test APIs ====================
   getAllTests: async (): Promise<Test[]> => {
     const response = await apiClient.get<Test[]>("/tests?size=1000");
-    return unwrapArrayResponse(response);
+    const list = unwrapArrayResponse(response);
+    return list.map((t) => testService.mapTestFromBackend(t));
   },
 
   getInactiveTests: async (): Promise<Test[]> => {
     const response = await apiClient.get<Test[]>("/tests/inactive");
-    return unwrapArrayResponse(response);
+    const list = unwrapArrayResponse(response);
+    return list.map((t) => testService.mapTestFromBackend(t));
   },
 
   getTestById: async (id: string): Promise<Test> => {
     const response = await apiClient.get<Test>(`/tests/${id}`);
-    return unwrapResponse(response);
+    return testService.mapTestFromBackend(unwrapResponse(response));
   },
 
   createTest: async (test: CreateTestRequest): Promise<Test> => {
-    const response = await apiClient.post<Test>("/tests", test);
-    return unwrapResponse(response);
+    const payload = testService.mapTestToBackend(test);
+    const response = await apiClient.post<Test>("/tests", payload);
+    return testService.mapTestFromBackend(unwrapResponse(response));
   },
 
   updateTest: async (
     id: string,
     test: Partial<CreateTestRequest>,
   ): Promise<Test> => {
-    const response = await apiClient.patch<Test>(`/tests/${id}`, test);
-    return unwrapResponse(response);
+    const payload = testService.mapTestToBackend(test);
+    const response = await apiClient.patch<Test>(`/tests/${id}`, payload);
+    return testService.mapTestFromBackend(unwrapResponse(response));
+  },
+
+  mapTestFromBackend: (data: any): Test => {
+    if (!data) return data;
+    return {
+      ...data,
+      enableTabSwitchTracking: data.tabSwitchTrackingEnabled ?? data.enableTabSwitchTracking ?? false,
+      blockCopyPaste: data.copyPasteBlocked ?? data.blockCopyPaste ?? false,
+      blockRightClick: data.rightClickBlocked ?? data.blockRightClick ?? false,
+      warnOnFullscreenExit: data.fullscreenExitTrackingEnabled ?? data.warnOnFullscreenExit ?? false,
+      maxWarnings: data.maxWarningsAllowed ?? data.maxWarnings ?? 0,
+      requireWebcam: data.webcamRequired ?? data.requireWebcam ?? false,
+      requireMicrophone: data.microphoneRequired ?? data.requireMicrophone ?? false,
+      requireScreenShare: data.screenShareRequired ?? data.requireScreenShare ?? false,
+      maxCriticalViolations: data.maxCriticalViolationsAllowed ?? data.maxCriticalViolations ?? 0,
+    };
+  },
+
+  mapTestToBackend: (data: Partial<CreateTestRequest>): any => {
+    if (!data) return data;
+    const payload = { ...data } as any;
+    if (data.enableTabSwitchTracking !== undefined) payload.tabSwitchTrackingEnabled = data.enableTabSwitchTracking;
+    if (data.blockCopyPaste !== undefined) payload.copyPasteBlocked = data.blockCopyPaste;
+    if (data.blockRightClick !== undefined) payload.rightClickBlocked = data.blockRightClick;
+    if (data.warnOnFullscreenExit !== undefined) payload.fullscreenExitTrackingEnabled = data.warnOnFullscreenExit;
+    if (data.maxWarnings !== undefined) payload.maxWarningsAllowed = data.maxWarnings;
+    if (data.requireWebcam !== undefined) payload.webcamRequired = data.requireWebcam;
+    if (data.requireMicrophone !== undefined) payload.microphoneRequired = data.requireMicrophone;
+    if (data.requireScreenShare !== undefined) payload.screenShareRequired = data.requireScreenShare;
+    if (data.maxCriticalViolations !== undefined) payload.maxCriticalViolationsAllowed = data.maxCriticalViolations;
+    return payload;
   },
 
   deleteTest: async (id: string): Promise<void> => {
