@@ -1,17 +1,16 @@
 /**
  * snapshotWorker.ts
- * Runs in a Web Worker — handles OffscreenCanvas drawing and JPEG encoding
- * completely off the main thread.
+ * Off-main-thread image capture using OffscreenCanvas.
  *
  * Messages IN  (main → worker):
  *   { type: "CAPTURE", bitmap: ImageBitmap, width: number, height: number, quality: number }
  *
  * Messages OUT (worker → main):
- *   { type: "DONE", dataUrl: string }
+ *   { type: "DONE", buffer: ArrayBuffer, mimeType: "image/jpeg" }
  *   { type: "ERROR", message: string }
  */
 
-self.onmessage = (e: MessageEvent) => {
+self.onmessage = async (e: MessageEvent) => {
   const { type, bitmap, width, height, quality } = e.data;
   if (type !== "CAPTURE") return;
 
@@ -21,13 +20,11 @@ self.onmessage = (e: MessageEvent) => {
     ctx.drawImage(bitmap, 0, 0, width, height);
     bitmap.close(); // free GPU memory immediately
 
-    canvas.convertToBlob({ type: "image/jpeg", quality }).then((blob) => {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        self.postMessage({ type: "DONE", dataUrl: reader.result as string });
-      };
-      reader.readAsDataURL(blob);
-    });
+    const blob = await canvas.convertToBlob({ type: "image/jpeg", quality });
+    const buffer = await blob.arrayBuffer();
+
+    // Transfer the buffer zero-copy back to the main thread
+    self.postMessage({ type: "DONE", buffer, mimeType: "image/jpeg" }, [buffer]);
   } catch (err) {
     self.postMessage({ type: "ERROR", message: String(err) });
   }
