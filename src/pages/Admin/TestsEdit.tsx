@@ -354,8 +354,7 @@ It's mandatory to disable all the browser extensions and enabled Add-ons or open
 If you are solving a coding problem, you will either be required to choose a programming language from the options that have been enabled by the administrator or choose your preferred programming language in case no options have been enabled by the administrator. Note: In case you're solving coding problems: All inputs are from STDIN and output to STDOUT.
  If test mandates you to use the webcam, please provide the required permissions and access.
 To know the results, please contact the administrator.
-To refer to the FAQ document, you can click on the HELP button which is present in the top right corner of the test environment.
-Best wishes from GRYPHON ACADEMY PRIVATE LIMITED!`
+To refer to the FAQ document, you can click on the HELP button which is present in the top right corner of the test environment.`
         },
         proctoringMode: data.proctoringMode || "NONE",
         enableTabSwitchTracking: data.enableTabSwitchTracking || false,
