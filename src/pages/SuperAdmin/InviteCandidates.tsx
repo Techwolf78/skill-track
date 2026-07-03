@@ -98,12 +98,22 @@ export default function InviteCandidates() {
       setCandidates(candidatesData);
 
       try {
-        const response = await apiClient.get("/candidate-invitations?size=1000");
+        const response = await apiClient.get(
+          "/candidate-invitations?size=1000",
+        );
         const invData = response.data?.data;
         if (Array.isArray(invData)) {
           setInvitations(invData);
-        } else if (invData && typeof invData === "object" && "content" in invData && Array.isArray((invData as Record<string, unknown>).content)) {
-          setInvitations((invData as Record<string, unknown>).content as CandidateInvitation[]);
+        } else if (
+          invData &&
+          typeof invData === "object" &&
+          "content" in invData &&
+          Array.isArray((invData as Record<string, unknown>).content)
+        ) {
+          setInvitations(
+            (invData as Record<string, unknown>)
+              .content as CandidateInvitation[],
+          );
         } else {
           setInvitations([]);
         }
@@ -166,7 +176,12 @@ export default function InviteCandidates() {
       toast({
         title: "Error",
         description:
-          (error as { response?: { data?: { message?: string } }; message?: string }).response?.data?.message ||
+          (
+            error as {
+              response?: { data?: { message?: string } };
+              message?: string;
+            }
+          ).response?.data?.message ||
           (error as { message?: string }).message ||
           "Failed to send invitation",
         variant: "destructive",
@@ -228,10 +243,10 @@ export default function InviteCandidates() {
     }
   };
 
-  const copyTestLink = (id: string, token: string) => {
-    const testUrl = `${baseUrl}/test/access/${id}/${token}`;
+  const copyTestLink = (id: string) => {
+    const testUrl = `${baseUrl}/test/access/${id}`;
     navigator.clipboard.writeText(testUrl);
-    setCopiedToken(token);
+    setCopiedToken(id);
     toast({
       title: "Link Copied!",
       description: "Test URL copied to clipboard",
@@ -261,9 +276,11 @@ export default function InviteCandidates() {
     scheduleId: string,
   ) => {
     // Find invitations for this candidate and the SELECTED schedule
-    return invitations.find(
-      (i) => i.candidateId === candidateId && i.scheduleId === scheduleId,
-    ) || null;
+    return (
+      invitations.find(
+        (i) => i.candidateId === candidateId && i.scheduleId === scheduleId,
+      ) || null
+    );
   };
 
   const formatDateTime = (dateStr: string) => {
@@ -291,7 +308,6 @@ export default function InviteCandidates() {
 
   return (
     <div className="space-y-6 animate-fade-in">
-
       {/* Select Schedule */}
       <div className="bg-muted/30 rounded-lg p-4 space-y-3">
         <Label className="text-sm font-medium">Select Test Schedule</Label>
@@ -361,191 +377,193 @@ export default function InviteCandidates() {
         )}
       </div>
 
-{/* Candidates Table */}
-<div className="border rounded-lg overflow-hidden">
-  <Table>
-    <TableHeader>
-      <TableRow>
-        <TableHead className="w-[50px]">
-          <Checkbox
-            checked={
-              filteredCandidates.length > 0 &&
-              filteredCandidates.every((c) =>
-                selectedCandidates.includes(c.id),
-              )
-            }
-            onCheckedChange={(checked) => {
-              if (checked) {
-                const allIds = filteredCandidates.map((c) => c.id);
-                setSelectedCandidates((prev) =>
-                  Array.from(new Set([...prev, ...allIds])),
-                );
-              } else {
-                const filteredIds = new Set(
-                  filteredCandidates.map((c) => c.id),
-                );
-                setSelectedCandidates((prev) =>
-                  prev.filter((id) => !filteredIds.has(id)),
-                );
-              }
-            }}
-          />
-        </TableHead>
-        <TableHead className="w-[50px] text-center">#</TableHead>
-        <TableHead>Candidate</TableHead>
-        <TableHead>Contact</TableHead>
-        <TableHead>Account</TableHead>
-        <TableHead>Invitation</TableHead>
-        <TableHead>Test Link</TableHead>
-        <TableHead className="text-right">Action</TableHead>
-      </TableRow>
-    </TableHeader>
-    <TableBody>
-      {loading ? (
-        <TableRow>
-          <TableCell colSpan={8} className="text-center py-10">
-            <Loader2 className="w-6 h-6 animate-spin mx-auto" />
-          </TableCell>
-        </TableRow>
-      ) : filteredCandidates.length === 0 ? (
-        <TableRow>
-          <TableCell
-            colSpan={8}
-            className="text-center py-10 text-muted-foreground"
-          >
-            No candidates found.
-          </TableCell>
-        </TableRow>
-      ) : (
-        filteredCandidates.map((candidate, index) => {
-          const invitation = selectedSchedule
-            ? getInvitationForCandidate(candidate.id, selectedSchedule)
-            : null;
-
-          // Check if the invitation should be considered EXPIRED based on schedule status
-          const isScheduleCompleted =
-            selectedScheduleData?.status === "COMPLETED" ||
-            selectedScheduleData?.status === "EXPIRED";
-
-          const displayStatus =
-            invitation?.status === "PENDING" && isScheduleCompleted
-              ? "EXPIRED"
-              : invitation?.status;
-
-          return (
-            <TableRow key={candidate.id}>
-              <TableCell>
+      {/* Candidates Table */}
+      <div className="border rounded-lg overflow-hidden">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="w-[50px]">
                 <Checkbox
-                  checked={selectedCandidates.includes(candidate.id)}
+                  checked={
+                    filteredCandidates.length > 0 &&
+                    filteredCandidates.every((c) =>
+                      selectedCandidates.includes(c.id),
+                    )
+                  }
                   onCheckedChange={(checked) => {
                     if (checked) {
-                      setSelectedCandidates((prev) => [
-                        ...prev,
-                        candidate.id,
-                      ]);
-                    } else {
+                      const allIds = filteredCandidates.map((c) => c.id);
                       setSelectedCandidates((prev) =>
-                        prev.filter((id) => id !== candidate.id),
+                        Array.from(new Set([...prev, ...allIds])),
+                      );
+                    } else {
+                      const filteredIds = new Set(
+                        filteredCandidates.map((c) => c.id),
+                      );
+                      setSelectedCandidates((prev) =>
+                        prev.filter((id) => !filteredIds.has(id)),
                       );
                     }
                   }}
                 />
-              </TableCell>
-              <TableCell className="text-center text-muted-foreground text-sm">
-                {index + 1}
-              </TableCell>
-              <TableCell>
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-gradient-primary flex items-center justify-center">
-                    <span className="text-sm font-semibold text-primary-foreground">
-                      {candidate.user.name
-                        ?.split(" ")
-                        .map((n) => n[0])
-                        .join("") || "U"}
-                    </span>
-                  </div>
-                  <div>
-                    <p className="font-medium">{candidate.user.name}</p>
-                    <p className="text-xs text-muted-foreground">
-                      ID: {candidate.id.slice(0, 8)}
-                    </p>
-                  </div>
-                </div>
-              </TableCell>
-              <TableCell>
-                <div className="text-sm">
-                  <div>{candidate.user.email}</div>
-                  <div className="text-muted-foreground">
-                    {candidate.user.phoneNumber || "No phone"}
-                  </div>
-                </div>
-              </TableCell>
-              <TableCell>
-                <Badge variant="outline">
-                  {candidate.stale ? "Inactive" : "Active"}
-                </Badge>
-              </TableCell>
-              <TableCell>
-                {invitation ? (
-                  <div className="flex items-center gap-1">
-                    {getStatusIcon(displayStatus || "")}
-                    <span className="text-sm">{displayStatus}</span>
-                  </div>
-                ) : (
-                  <span className="text-xs text-muted-foreground">
-                    Not invited
-                  </span>
-                )}
-              </TableCell>
-              <TableCell>
-                {invitation?.token ? (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => copyTestLink(invitation.id, invitation.token)}
-                    className="h-8 px-2"
-                    disabled={displayStatus === "EXPIRED"}
-                  >
-                    {copiedToken === invitation.token ? (
-                      <>
-                        <Check className="w-3 h-3 mr-1 text-green-500" />
-                        <span className="text-xs">Copied!</span>
-                      </>
-                    ) : (
-                      <>
-                        <Link2 className="w-3 h-3 mr-1" />
-                        <span className="text-xs">Copy Link</span>
-                      </>
-                    )}
-                  </Button>
-                ) : (
-                  <span className="text-xs text-muted-foreground">-</span>
-                )}
-              </TableCell>
-              <TableCell className="text-right">
-                <Button
-                  size="sm"
-                  onClick={() => {
-                    setSelectedCandidate(candidate);
-                    setIsInviteDialogOpen(true);
-                  }}
-                  disabled={
-                    !selectedSchedule ||
-                    !!invitation ||
-                    isScheduleCompleted
-                  }
-                >
-                  <Send className="w-4 h-4 mr-2" />
-                  {invitation ? "Invited" : "Send Invite"}
-                </Button>
-              </TableCell>
+              </TableHead>
+              <TableHead className="w-[50px] text-center">#</TableHead>
+              <TableHead>Candidate</TableHead>
+              <TableHead>Contact</TableHead>
+              <TableHead>Account</TableHead>
+              <TableHead>Invitation</TableHead>
+              <TableHead>Test Link</TableHead>
+              <TableHead className="text-right">Action</TableHead>
             </TableRow>
-          );
-        })
-      )}
-    </TableBody>
-  </Table>
-</div>
+          </TableHeader>
+          <TableBody>
+            {loading ? (
+              <TableRow>
+                <TableCell colSpan={8} className="text-center py-10">
+                  <Loader2 className="w-6 h-6 animate-spin mx-auto" />
+                </TableCell>
+              </TableRow>
+            ) : filteredCandidates.length === 0 ? (
+              <TableRow>
+                <TableCell
+                  colSpan={8}
+                  className="text-center py-10 text-muted-foreground"
+                >
+                  No candidates found.
+                </TableCell>
+              </TableRow>
+            ) : (
+              filteredCandidates.map((candidate, index) => {
+                const invitation = selectedSchedule
+                  ? getInvitationForCandidate(candidate.id, selectedSchedule)
+                  : null;
+
+                // Check if the invitation should be considered EXPIRED based on schedule status
+                const isScheduleCompleted =
+                  selectedScheduleData?.status === "COMPLETED" ||
+                  selectedScheduleData?.status === "EXPIRED";
+
+                const displayStatus =
+                  invitation?.status === "PENDING" && isScheduleCompleted
+                    ? "EXPIRED"
+                    : invitation?.status;
+
+                return (
+                  <TableRow key={candidate.id}>
+                    <TableCell>
+                      <Checkbox
+                        checked={selectedCandidates.includes(candidate.id)}
+                        onCheckedChange={(checked) => {
+                          if (checked) {
+                            setSelectedCandidates((prev) => [
+                              ...prev,
+                              candidate.id,
+                            ]);
+                          } else {
+                            setSelectedCandidates((prev) =>
+                              prev.filter((id) => id !== candidate.id),
+                            );
+                          }
+                        }}
+                      />
+                    </TableCell>
+                    <TableCell className="text-center text-muted-foreground text-sm">
+                      {index + 1}
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-gradient-primary flex items-center justify-center">
+                          <span className="text-sm font-semibold text-primary-foreground">
+                            {candidate.user.name
+                              ?.split(" ")
+                              .map((n) => n[0])
+                              .join("") || "U"}
+                          </span>
+                        </div>
+                        <div>
+                          <p className="font-medium">{candidate.user.name}</p>
+                          <p className="text-xs text-muted-foreground">
+                            ID: {candidate.id.slice(0, 8)}
+                          </p>
+                        </div>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="text-sm">
+                        <div>{candidate.user.email}</div>
+                        <div className="text-muted-foreground">
+                          {candidate.user.phoneNumber || "No phone"}
+                        </div>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="outline">
+                        {candidate.stale ? "Inactive" : "Active"}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      {invitation ? (
+                        <div className="flex items-center gap-1">
+                          {getStatusIcon(displayStatus || "")}
+                          <span className="text-sm">{displayStatus}</span>
+                        </div>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">
+                          Not invited
+                        </span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {invitation ? (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() =>
+                            copyTestLink(invitation.id)
+                          }
+                          className="h-8 px-2"
+                          disabled={displayStatus === "EXPIRED"}
+                        >
+                          {copiedToken === invitation.id ? (
+                            <>
+                              <Check className="w-3 h-3 mr-1 text-green-500" />
+                              <span className="text-xs">Copied!</span>
+                            </>
+                          ) : (
+                            <>
+                              <Link2 className="w-3 h-3 mr-1" />
+                              <span className="text-xs">Copy Link</span>
+                            </>
+                          )}
+                        </Button>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">-</span>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Button
+                        size="sm"
+                        onClick={() => {
+                          setSelectedCandidate(candidate);
+                          setIsInviteDialogOpen(true);
+                        }}
+                        disabled={
+                          !selectedSchedule ||
+                          !!invitation ||
+                          isScheduleCompleted
+                        }
+                      >
+                        <Send className="w-4 h-4 mr-2" />
+                        {invitation ? "Invited" : "Send Invite"}
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                );
+              })
+            )}
+          </TableBody>
+        </Table>
+      </div>
 
       {/* Invite Confirmation Dialog */}
       <Dialog open={isInviteDialogOpen} onOpenChange={setIsInviteDialogOpen}>

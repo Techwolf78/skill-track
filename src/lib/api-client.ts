@@ -32,16 +32,26 @@ apiClient.interceptors.response.use(
   (response) => response,
   (error: AxiosError) => {
     if (error.response?.status === 401) {
-      // 🔥 Token expired / invalid
-      localStorage.removeItem("token");
-      localStorage.removeItem("user");
+      const isKeepAlive = error.config?.headers?.["X-Keep-Alive"] === "true" || 
+                          error.config?.headers?.get?.("X-Keep-Alive") === "true" ||
+                          error.config?.url?.includes("_cb=bootstrap");
+                          
+      const isTestAccessPage = typeof window !== "undefined" && 
+                               (window.location.pathname.includes("/test/access") || 
+                                window.location.pathname.includes("/tests/access"));
 
-      // Prevent infinite redirect loop if already on login page or if the request is to login
-      const isLoginPage = typeof window !== "undefined" && window.location.pathname === "/login";
-      const isLoginRequest = error.config?.url?.includes("/auth/login");
+      if (!isKeepAlive && !isTestAccessPage) {
+        // 🔥 Token expired / invalid
+        localStorage.removeItem("token");
+        localStorage.removeItem("user");
 
-      if (!isLoginPage && !isLoginRequest) {
-        window.location.href = "/login";
+        // Prevent infinite redirect loop if already on login page or if the request is to login
+        const isLoginPage = typeof window !== "undefined" && window.location.pathname === "/login";
+        const isLoginRequest = error.config?.url?.includes("/auth/login");
+
+        if (!isLoginPage && !isLoginRequest) {
+          window.location.href = "/login";
+        }
       }
     }
 

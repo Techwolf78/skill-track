@@ -186,6 +186,8 @@ const App = () => (
               <Route path="/test/:testId/results" element={<TestResults />} />
               <Route path="/test/access/:id/:token" element={<TestAccess />} />
               <Route path="/tests/access/:id/:token" element={<TestAccess />} />
+              <Route path="/test/access/:id" element={<TestAccess />} />
+              <Route path="/tests/access/:id" element={<TestAccess />} />
               <Route path="/test/access/:token" element={<TestAccess />} />
               {/* ← Add this line */}
 

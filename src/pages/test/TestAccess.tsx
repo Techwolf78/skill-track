@@ -171,8 +171,12 @@ export default function TestAccess() {
       return;
     }
 
-    if (id && token) {
-      validateToken();
+    if (id) {
+      if (token || isAuthenticated) {
+        validateToken();
+      } else {
+        setLoading(false);
+      }
     } else if (token && !id) {
       setError("This link is outdated. Please use the secure invitation link containing both ID and token.");
       setLoading(false);
@@ -200,31 +204,38 @@ export default function TestAccess() {
   const validateToken = async () => {
     try {
       setLoading(true);
-      if (!id || !token) {
+      if (!id) {
         throw new Error("Invalid link parameters.");
       }
 
-      const authResponse = await apiClient.post("/candidate-invitations/validate", {
-        id,
-        token,
-      });
+      let decoded = null;
 
-      const authData = authResponse.data?.data || authResponse.data;
-      if (!authData || !authData.accessToken) {
-        throw new Error("Authentication failed.");
-      }
+      if (token) {
+        const authResponse = await apiClient.post("/candidate-invitations/validate", {
+          id,
+          token,
+        });
 
-      const decoded = parseJwt(authData.accessToken);
-      if (decoded) {
-        const userData = {
-          id: decoded.id,
-          name: decoded.name,
-          email: decoded.sub,
-          role: decoded.role,
-        };
-        loginToContext(authData.accessToken, userData);
-      } else {
-        throw new Error("Failed to parse authentication token.");
+        const authData = authResponse.data?.data || authResponse.data;
+        if (!authData || !authData.accessToken) {
+          throw new Error("Authentication failed.");
+        }
+
+        decoded = parseJwt(authData.accessToken);
+        if (decoded) {
+          const userData = {
+            id: decoded.id,
+            name: decoded.name,
+            email: decoded.sub,
+            role: decoded.role,
+          };
+          loginToContext(authData.accessToken, userData);
+        } else {
+          throw new Error("Failed to parse authentication token.");
+        }
+      } else if (!isAuthenticated) {
+        setLoading(false);
+        return;
       }
 
       // 403 Bypass/Fallback strategy: Try direct GET, fall back to list, then to JWT claims
