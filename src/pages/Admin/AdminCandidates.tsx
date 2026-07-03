@@ -96,6 +96,20 @@ export default function AdminCandidates() {
   // Get organisation ID from user context
   const orgId = user?.organisationData?.id || (user as any)?.organisationId;
 
+  const adminOrgName = user?.organisationData?.name || 
+                       (user as any)?.organisationName || 
+                       candidates.find(c => c.organisation?.id === orgId)?.organisation?.name || 
+                       "Your Organisation";
+
+  useEffect(() => {
+    if (isAddDialogOpen && orgId) {
+      setFormData(prev => ({
+        ...prev,
+        organisationId: orgId,
+      }));
+    }
+  }, [isAddDialogOpen, orgId]);
+
   // Filter candidates that belong to the current admin's organisation
   const candidates = orgId
     ? unfilteredCandidates.filter(c => c.organisation?.id === orgId)
@@ -225,7 +239,7 @@ export default function AdminCandidates() {
         email: "",
         password: "",
         phoneNumber: "",
-        organisationId: "",
+        organisationId: orgId || "",
         extraFields: {
           college: "",
           course: "",
@@ -610,6 +624,7 @@ export default function AdminCandidates() {
                   <select
                     className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                     value={formData.organisationId}
+                    disabled={!!orgId}
                     onChange={(e) =>
                       setFormData({
                         ...formData,
@@ -617,12 +632,18 @@ export default function AdminCandidates() {
                       })
                     }
                   >
-                    <option value="">Select Organisation</option>
-                    {organisations.map((org) => (
-                      <option key={org.id} value={org.id}>
-                        {org.name}
-                      </option>
-                    ))}
+                    {orgId ? (
+                      <option value={orgId}>{adminOrgName}</option>
+                    ) : (
+                      <>
+                        <option value="">Select Organisation</option>
+                        {organisations.map((org) => (
+                          <option key={org.id} value={org.id}>
+                            {org.name}
+                          </option>
+                        ))}
+                      </>
+                    )}
                   </select>
                 </div>
               </div>
@@ -730,7 +751,7 @@ export default function AdminCandidates() {
                   email: "",
                   password: "",
                   phoneNumber: "",
-                  organisationId: "",
+                  organisationId: orgId || "",
                   extraFields: {
                     college: "",
                     course: "",
