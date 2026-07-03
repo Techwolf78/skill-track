@@ -199,92 +199,62 @@ export const ProctoringProvider: React.FC<{
     return () => clearInterval(interval);
   }, [state.isProctoringActive, config.llmDetector, state.violations, addViolation]);
 
-  // Periodic Camera Snapshot capturing/auditing
-  useEffect(() => {
-    if (!state.isProctoringActive || !config.camera) return;
+  // In-memory snapshot buffer — avoids per-tick localStorage serialize/deserialize
+  const snapshotBufferRef = useRef<{ timestamp: number; image: string }[]>([]);
 
+  // Periodic Camera Snapshot capturing — only when periodicSnapshots is enabled
+  useEffect(() => {
+    if (!state.isProctoringActive || !config.camera || !config.periodicSnapshots) return;
+
+    const intervalMs = Math.max((config.snapshotIntervalSecs || 60) * 1000, 30000); // min 30s
     const interval = setInterval(() => {
       const video = document.querySelector("video");
-      if (video && !video.paused && !video.ended) {
-        try {
-          const canvas = document.createElement("canvas");
-          canvas.width = 160;
-          canvas.height = 120;
-          const ctx = canvas.getContext("2d");
-          if (ctx) {
-            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-            const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-            const data = imgData.data;
-            // Convert to grayscale to minimize base64 payload size by ~66%
-            for (let i = 0; i < data.length; i += 4) {
-              const brightness = 0.34 * data[i] + 0.5 * data[i + 1] + 0.16 * data[i + 2];
-              data[i] = brightness;
-              data[i + 1] = brightness;
-              data[i + 2] = brightness;
-            }
-            ctx.putImageData(imgData, 0, 0);
-            const snapshotBase64 = canvas.toDataURL("image/jpeg", 0.5); // 50% quality compressed JPEG
-
-            // Store in LocalStorage
-            const storageKey = `rxone_camera_snapshots_${sessionId}`;
-            const snapshotsRaw = localStorage.getItem(storageKey);
-            const snapshots = snapshotsRaw ? JSON.parse(snapshotsRaw) : [];
-            
-            snapshots.push({
-              timestamp: Date.now(),
-              image: snapshotBase64
-            });
-
-            // Enforce max 20 snapshots cap to stay well under browser quota
-            if (snapshots.length > 20) {
-              snapshots.shift();
-            }
-
-            localStorage.setItem(storageKey, JSON.stringify(snapshots));
-            console.log(`📸 Saved periodic camera snapshot evidence. Total snapshots: ${snapshots.length}`);
-          }
-        } catch (e) {
-          console.error("Failed to capture periodic camera snapshot:", e);
-        }
+      if (!video || video.paused || video.ended) return;
+      try {
+        const canvas = document.createElement("canvas");
+        canvas.width = 160;
+        canvas.height = 120;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) return;
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        const snapshotBase64 = canvas.toDataURL("image/jpeg", 0.5);
+        snapshotBufferRef.current.push({ timestamp: Date.now(), image: snapshotBase64 });
+        // Cap buffer to 20 entries in memory
+        if (snapshotBufferRef.current.length > 20) snapshotBufferRef.current.shift();
+        console.log(`📸 Buffered periodic snapshot. Buffer size: ${snapshotBufferRef.current.length}`);
+      } catch (e) {
+        console.error("Failed to capture periodic camera snapshot:", e);
       }
-    }, (config.snapshotIntervalSecs || 60) * 1000);
+    }, intervalMs);
 
     return () => clearInterval(interval);
-  }, [state.isProctoringActive, config.camera, config.snapshotIntervalSecs, sessionId]);
+  }, [state.isProctoringActive, config.camera, config.periodicSnapshots, config.snapshotIntervalSecs]);
 
-  // Batch upload worker for periodic webcam snapshots (every 5 minutes & component unmount)
+  // Batch upload worker — flushes in-memory snapshot buffer every 5 minutes & on unmount
   useEffect(() => {
     if (!state.isProctoringActive || !sessionId) return;
 
     const syncSnapshots = async () => {
-      const storageKey = `rxone_camera_snapshots_${sessionId}`;
-      const snapshotsRaw = localStorage.getItem(storageKey);
-      if (!snapshotsRaw) return;
-
+      const snapshots = snapshotBufferRef.current;
+      if (snapshots.length === 0) return;
+      const toSync = snapshots.splice(0, snapshots.length); // drain buffer atomically
       try {
-        const snapshots = JSON.parse(snapshotsRaw);
-        if (snapshots.length === 0) return;
-
-        console.log(`📤 Syncing ${snapshots.length} webcam snapshots in batch...`);
+        console.log(`📤 Syncing ${toSync.length} webcam snapshots in batch...`);
         await apiClient.post(`/test-sessions/${sessionId}/snapshots/batch`, {
-          snapshots: snapshots.map((s: { timestamp: number; image: string }) => ({
-            timestamp: s.timestamp,
-            image: s.image,
-          }))
+          snapshots: toSync.map((s) => ({ timestamp: s.timestamp, image: s.image }))
         });
-
-        localStorage.removeItem(storageKey);
         console.log("✅ Webcam snapshots synced successfully.");
       } catch (err) {
+        // Put frames back at front of buffer so they are retried next cycle
+        snapshotBufferRef.current.unshift(...toSync);
         console.error("Failed to batch upload webcam snapshots:", err);
       }
     };
 
     const batchInterval = setInterval(syncSnapshots, 300000); // 5 minutes
-
     return () => {
       clearInterval(batchInterval);
-      syncSnapshots(); // flush final snapshots on unmount
+      syncSnapshots(); // flush on unmount
     };
   }, [state.isProctoringActive, sessionId]);
 
