@@ -96,10 +96,10 @@ export default function InvitedCandidatesHistory() {
     fetchData();
   }, [fetchData]);
 
-  const copyTestLink = (id: string, token: string) => {
-    const testUrl = `${baseUrl}/test/access/${id}/${token}`;
+  const copyTestLink = (id: string) => {
+    const testUrl = `${baseUrl}/test/access/${id}`;
     navigator.clipboard.writeText(testUrl);
-    setCopiedToken(token);
+    setCopiedToken(id);
     toast({
       title: "Link Copied!",
       description: "Test URL copied to clipboard",
@@ -243,11 +243,11 @@ export default function InvitedCandidatesHistory() {
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => copyTestLink(inv.id, inv.token)}
+                      onClick={() => copyTestLink(inv.id)}
                       className="h-8 px-2"
                       disabled={inv.displayStatus === "EXPIRED"}
                     >
-                      {copiedToken === inv.token ? (
+                      {copiedToken === inv.id ? (
                         <>
                           <Check className="w-3 h-3 mr-1 text-green-500" />
                           <span className="text-xs">Copied</span>

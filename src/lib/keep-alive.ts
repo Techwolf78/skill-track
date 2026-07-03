@@ -127,7 +127,9 @@ export function initKeepAlive() {
   setTimeout(async () => {
     console.log("📡 Sending initial bootstrap keep-alive ping...");
     try {
-      await apiClient.get(`/subjects?_cb=bootstrap-${Math.floor(Math.random() * 1000000)}`);
+      await apiClient.get(`/subjects?_cb=bootstrap-${Math.floor(Math.random() * 1000000)}`, {
+        headers: { "X-Keep-Alive": "true" }
+      });
       console.log("✅ Initial bootstrap keep-alive ping completed.");
     } catch (e) {
       console.log("ℹ_ Initial bootstrap keep-alive ping processed.");
