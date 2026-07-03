@@ -39,7 +39,7 @@ import { ProctoringProvider, useProctoring, ProctoringConfigDto } from "@/procto
 import { CameraPreview } from "@/proctoring/components/CameraPreview";
 import { ViolationToast } from "@/proctoring/components/ViolationToast";
 import { EnvironmentCheck } from "@/proctoring/components/EnvironmentCheck";
-import { Shield, ShieldAlert, ShieldCheck as ShieldCheckIcon } from "lucide-react";
+import { Shield, ShieldAlert, ShieldCheck as ShieldCheckIcon, Camera } from "lucide-react";
 import { AnswerStore } from "@/lib/exam/answerStorage";
 
 // Types
@@ -204,7 +204,7 @@ export default function TestInterface() {
 }
 
 function TestInterfaceContent({ testId, sessionId, navigate, toast }: { testId?: string; sessionId?: string; navigate: (path: string) => void; toast: (props: { title?: string; description?: string; variant?: "default" | "destructive" }) => void }) {
-  const { violations, trustScore, isProctoringActive, startProctoring, syncViolations } = useProctoring();
+  const { violations, trustScore, isProctoringActive, startProctoring, syncViolations, videoRef } = useProctoring();
   const lastWarnedCountRef = useRef(0);
 
   const [loading, setLoading] = useState(true);
@@ -237,6 +237,90 @@ function TestInterfaceContent({ testId, sessionId, navigate, toast }: { testId?:
   const [timeLeft, setTimeLeft] = useState(0);
   const [showSubmitDialog, setShowSubmitDialog] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [capturingTest, setCapturingTest] = useState(false);
+
+  const handleUploadScreenshotTest = async () => {
+    setCapturingTest(true);
+    try {
+      const video = videoRef?.current;
+      let base64Image = "";
+
+      if (video && video.srcObject) {
+        const canvas = document.createElement("canvas");
+        canvas.width = video.videoWidth || 640;
+        canvas.height = video.videoHeight || 480;
+        const ctx = canvas.getContext("2d");
+        if (ctx) {
+          ctx.translate(canvas.width, 0);
+          ctx.scale(-1, 1);
+          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+          ctx.setTransform(1, 0, 0, 1, 0, 0);
+          
+          ctx.fillStyle = "rgba(6, 182, 212, 0.7)";
+          ctx.fillRect(10, 10, 180, 40);
+          ctx.fillStyle = "#ffffff";
+          ctx.font = "12px monospace";
+          ctx.fillText("LIVE CAMERA UPLOAD TEST", 20, 34);
+        }
+        base64Image = canvas.toDataURL("image/jpeg", 0.85);
+      } else {
+        console.warn("Webcam video element not active. Generating fallback mock image.");
+        const canvas = document.createElement("canvas");
+        canvas.width = 400;
+        canvas.height = 300;
+        const ctx = canvas.getContext("2d");
+        if (ctx) {
+          const grad = ctx.createLinearGradient(0, 0, 400, 300);
+          grad.addColorStop(0, "#1e293b");
+          grad.addColorStop(1, "#311042");
+          ctx.fillStyle = grad;
+          ctx.fillRect(0, 0, 400, 300);
+
+          ctx.strokeStyle = "#a21caf";
+          ctx.lineWidth = 4;
+          ctx.strokeRect(10, 10, 380, 280);
+
+          ctx.fillStyle = "#ffffff";
+          ctx.font = "bold 16px monospace";
+          ctx.fillText("MOCK CAMERA SCREENSHOT", 40, 80);
+
+          ctx.fillStyle = "#a21caf";
+          ctx.font = "12px monospace";
+          ctx.fillText("Webcam offline - generated mock", 40, 130);
+
+          ctx.fillStyle = "#10b981";
+          ctx.font = "12px monospace";
+          ctx.fillText("Time: " + new Date().toLocaleTimeString(), 40, 170);
+        }
+        base64Image = canvas.toDataURL("image/jpeg");
+      }
+
+      await apiClient.post(`/test-sessions/${sessionId}/violations`, {
+        type: "CAMERA_CHECK",
+        severity: "INFO",
+        timestamp: Date.now(),
+        evidence: base64Image,
+        metadata: { message: "Manual screenshot test upload" }
+      });
+
+      toast({
+        title: "Screenshot Saved!",
+        description: "The screenshot has been uploaded to Supabase Storage and stored in PostgreSQL violation db successfully!",
+      });
+
+      await syncViolations();
+    } catch (err: unknown) {
+      console.error("Manual screenshot upload failed:", err);
+      const errorMsg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message || "Failed to submit manual screenshot check.";
+      toast({
+        title: "Test Connection Error",
+        description: errorMsg,
+        variant: "destructive",
+      });
+    } finally {
+      setCapturingTest(false);
+    }
+  };
 
   const prevIndexRef = useRef(currentIndex);
 
@@ -1279,9 +1363,23 @@ useEffect(() => {
             <span className="hidden sm:inline">Trust Score:</span> {trustScore}%
           </div>
 
-          <div className="text-sm text-muted-foreground">
+           <div className="text-sm text-muted-foreground">
             Q{currentIndex + 1}/{questions.length}
           </div>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={handleUploadScreenshotTest}
+            disabled={capturingTest}
+            className="border-cyan-500/30 text-cyan-400 hover:bg-cyan-500/10 hover:text-cyan-300"
+          >
+            {capturingTest ? (
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            ) : (
+              <Camera className="w-4 h-4 mr-2" />
+            )}
+            Take Screenshot
+          </Button>
           <Button variant="outline" size="sm" onClick={() => setShowSubmitDialog(true)}>
             <Send className="w-4 h-4 mr-2" /> Submit
           </Button>
