@@ -203,34 +203,40 @@ export const ProctoringProvider: React.FC<{
   }, [state.isProctoringActive, config.llmDetector, state.violations]);
 
   /**
-   * HIGH mode: Periodic audit snapshot every 20 seconds (or snapshotIntervalSecs if set).
+   * HIGH mode: Periodic audit snapshot at a random interval between 1 and 5 minutes.
    * Captures off-thread and enqueues upload — never blocks the main thread.
    * Only active when config.periodicSnapshots === true (HIGH / CUSTOM modes).
    */
   useEffect(() => {
     if (!state.isProctoringActive || !config.camera || !config.periodicSnapshots) return;
 
-    // Respect config interval but enforce a minimum of 20s to avoid hammering storage
-    const intervalMs = Math.max((config.snapshotIntervalSecs || 20) * 1000, 20000);
+    let timeoutId: NodeJS.Timeout;
 
-    const interval = setInterval(() => {
-      const video = document.querySelector<HTMLVideoElement>("video");
-      if (!video || video.paused || video.ended) return;
+    const scheduleNextSnapshot = () => {
+      // Random interval between 1 minute (60,000ms) and 5 minutes (300,000ms)
+      const randomIntervalMs = Math.floor(Math.random() * (300000 - 60000 + 1)) + 60000;
 
-      captureFrame(video, 640, 480, 0.6)
-        .then((buffer) => {
-          uploadQueue.current.enqueue({
-            buffer,
-            evidenceType: "AUDIT_FRAME",
-            capturedAt: Date.now(),
-          });
-          console.log(`📸 Audit snapshot enqueued. Queue depth: ${uploadQueue.current.pendingCount}`);
-        })
-        .catch((e) => console.error("Periodic snapshot capture failed:", e));
-    }, intervalMs);
+      timeoutId = setTimeout(() => {
+        const video = document.querySelector<HTMLVideoElement>("video");
+        if (video && !video.paused && !video.ended) {
+          captureFrame(video, 640, 480, 0.6)
+            .then((buffer) => {
+              uploadQueue.current.enqueue({
+                buffer,
+                evidenceType: "AUDIT_FRAME",
+                capturedAt: Date.now(),
+              });
+              console.log(`📸 Audit snapshot enqueued. Next in ${Math.round(randomIntervalMs / 1000)}s.`);
+            })
+            .catch((e) => console.error("Periodic snapshot capture failed:", e));
+        }
+        scheduleNextSnapshot();
+      }, randomIntervalMs);
+    };
 
-    return () => clearInterval(interval);
-  }, [state.isProctoringActive, config.camera, config.periodicSnapshots, config.snapshotIntervalSecs]);
+    scheduleNextSnapshot();
+    return () => clearTimeout(timeoutId);
+  }, [state.isProctoringActive, config.camera, config.periodicSnapshots]);
 
   // Initial load & AI model init
   useEffect(() => {
