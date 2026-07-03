@@ -94,10 +94,16 @@ export default function AdminCandidates() {
   const deleteCandidateMutation = useDeleteCandidateMutation();
 
   // Get organisation ID from user context
-  const orgId = user?.organisationData?.id || (user as any)?.organisationId;
+  const userExtra = user as { organisationId?: string; organisationName?: string } | null;
+  const orgId = user?.organisationData?.id || userExtra?.organisationId;
+
+  // Filter candidates that belong to the current admin's organisation
+  const candidates = orgId
+    ? unfilteredCandidates.filter(c => c.organisation?.id === orgId)
+    : unfilteredCandidates;
 
   const adminOrgName = user?.organisationData?.name || 
-                       (user as any)?.organisationName || 
+                       userExtra?.organisationName || 
                        candidates.find(c => c.organisation?.id === orgId)?.organisation?.name || 
                        "Your Organisation";
 
@@ -109,11 +115,6 @@ export default function AdminCandidates() {
       }));
     }
   }, [isAddDialogOpen, orgId]);
-
-  // Filter candidates that belong to the current admin's organisation
-  const candidates = orgId
-    ? unfilteredCandidates.filter(c => c.organisation?.id === orgId)
-    : unfilteredCandidates;
 
   const fetchData = refetchCandidates;
 
@@ -250,11 +251,12 @@ export default function AdminCandidates() {
       });
       setEmailError(null);
       setIsAddDialogOpen(false);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Failed to create candidate:", error);
 
+      const err = error as { response?: { data?: { message?: string } }; message?: string };
       // Check if error is due to duplicate email
-      const errorMessage = error.response?.data?.message || error.message;
+      const errorMessage = err.response?.data?.message || err.message;
       if (errorMessage?.includes("Email already exists")) {
         setEmailError(errorMessage);
         toast({
@@ -309,12 +311,13 @@ export default function AdminCandidates() {
 
       setIsDeleteDialogOpen(false);
       setCandidateToDelete(null);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Failed to delete candidate:", error);
+      const err = error as { response?: { data?: { message?: string } } };
       toast({
         title: "Delete Failed",
         description:
-          error.response?.data?.message || "Failed to delete candidate. This action is restricted by the backend (e.g. if the candidate has active test sessions, submissions, or invitations).",
+          err.response?.data?.message || "Failed to delete candidate. This action is restricted by the backend (e.g. if the candidate has active test sessions, submissions, or invitations).",
         variant: "destructive",
       });
     } finally {
