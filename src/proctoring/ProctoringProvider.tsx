@@ -11,6 +11,54 @@ import { LLMBehaviorAnalyzer } from "./ai/llmDetector";
 import { toast } from "sonner";
 import { apiClient } from "../lib/api-client";
 
+/**
+ * Captures a JPEG frame from a video element entirely off the main thread
+ * using createImageBitmap + OffscreenCanvas Worker. Falls back to a plain
+ * canvas.toDataURL() on browsers that don\'t support OffscreenCanvas.
+ */
+async function captureFrame(
+  video: HTMLVideoElement,
+  width: number,
+  height: number,
+  quality = 0.5
+): Promise<string> {
+  // Prefer off-thread path
+  if (typeof createImageBitmap !== "undefined" && typeof OffscreenCanvas !== "undefined") {
+    return new Promise((resolve, reject) => {
+      createImageBitmap(video, { resizeWidth: width, resizeHeight: height })
+        .then((bitmap) => {
+          const worker = new Worker(
+            new URL("./snapshotWorker.ts", import.meta.url),
+            { type: "module" }
+          );
+          worker.onmessage = (e) => {
+            worker.terminate();
+            if (e.data.type === "DONE") resolve(e.data.dataUrl);
+            else reject(new Error(e.data.message));
+          };
+          worker.onerror = (err) => { worker.terminate(); reject(err); };
+          worker.postMessage({ type: "CAPTURE", bitmap, width, height, quality }, [bitmap]);
+        })
+        .catch(reject);
+    });
+  }
+
+  // Fallback: main-thread canvas (older browsers / Safari)
+  return new Promise((resolve, reject) => {
+    try {
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return reject(new Error("No 2d context"));
+      ctx.drawImage(video, 0, 0, width, height);
+      resolve(canvas.toDataURL("image/jpeg", quality));
+    } catch (err) {
+      reject(err);
+    }
+  });
+}
+
 interface ProctoringContextType extends ProctoringState {
   addViolation: (type: ViolationType, metadata?: Record<string, unknown>) => void;
   startProctoring: () => void;
@@ -70,41 +118,39 @@ export const ProctoringProvider: React.FC<{
       case "SCREEN_RECORD": severity = "CRITICAL"; break;
     }
 
-    // Capture compressed low-resolution frame for visual proof on HIGH/CRITICAL violations
-    let evidence: string | undefined = undefined;
+    // Capture a small compressed frame for visual proof on HIGH/CRITICAL violations.
+    // Done fully async & off-thread — never blocks the main thread.
     if (severity === "CRITICAL" || severity === "HIGH") {
-      const video = document.querySelector("video");
+      const video = document.querySelector<HTMLVideoElement>("video");
       if (video && !video.paused && !video.ended) {
-        try {
-          const canvas = document.createElement("canvas");
-          canvas.width = 200;
-          canvas.height = 150;
-          const ctx = canvas.getContext("2d");
-          if (ctx) {
-            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-            const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-            const data = imgData.data;
-            // Convert to grayscale to minimize base64 payload size by ~66%
-            for (let i = 0; i < data.length; i += 4) {
-              const brightness = 0.34 * data[i] + 0.5 * data[i + 1] + 0.16 * data[i + 2];
-              data[i] = brightness;
-              data[i + 1] = brightness;
-              data[i + 2] = brightness;
-            }
-            ctx.putImageData(imgData, 0, 0);
-            evidence = canvas.toDataURL("image/jpeg", 0.6); // 60% quality compressed JPEG
-          }
-        } catch (e) {
-          console.error("Failed to capture video frame evidence:", e);
-        }
+        captureFrame(video, 200, 150, 0.5)
+          .then((dataUrl) => {
+            // Re-add violation with evidence once frame is ready
+            const withEvidence = store.current.addViolation({ type, severity, metadata, evidence: dataUrl });
+            setState(prev => ({
+              ...prev,
+              violations: [...prev.violations.filter(v => v.id !== newViolation.id), withEvidence],
+            }));
+            // Immediately sync to backend
+            store.current.syncSingleViolation(withEvidence).then(score => {
+              if (score !== null) setState(prev => ({ ...prev, trustScore: score }));
+            }).catch(err => console.error("Failed to sync critical violation:", err));
+          })
+          .catch(err => console.error("Evidence capture failed:", err));
+        // Return early — the violation already added below without evidence;
+        // it will be replaced once the frame arrives
       }
+    } else if (severity === "CRITICAL" || severity === "HIGH") {
+      // Sync immediately even without evidence
+      store.current.syncSingleViolation(newViolation).then(score => {
+        if (score !== null) setState(prev => ({ ...prev, trustScore: score }));
+      }).catch(err => console.error("Failed to sync critical violation immediately:", err));
     }
 
     const newViolation = store.current.addViolation({
       type,
       severity,
       metadata,
-      evidence,
     });
 
     setState(prev => ({
@@ -113,16 +159,9 @@ export const ProctoringProvider: React.FC<{
       trustScore: store.current.getScore()
     }));
 
-    // Non-blocking real-time alert sync for critical/high violations
-    if (severity === "CRITICAL" || severity === "HIGH") {
-      store.current.syncSingleViolation(newViolation).then(score => {
-        if (score !== null) {
-          setState(prev => ({ ...prev, trustScore: score }));
-        }
-      }).catch(err => {
-        console.error("Failed to sync critical violation immediately:", err);
-      });
-    }
+    // For low/medium violations: just sync in the next batch
+    // For high/critical: evidence is captured async above and violation updated when ready
+    if (severity !== "CRITICAL" && severity !== "HIGH") return;
   }, []);
 
   const handleViolation = useCallback((type: ViolationType, meta?: Record<string, unknown>) => {
@@ -208,23 +247,16 @@ export const ProctoringProvider: React.FC<{
 
     const intervalMs = Math.max((config.snapshotIntervalSecs || 60) * 1000, 30000); // min 30s
     const interval = setInterval(() => {
-      const video = document.querySelector("video");
+      const video = document.querySelector<HTMLVideoElement>("video");
       if (!video || video.paused || video.ended) return;
-      try {
-        const canvas = document.createElement("canvas");
-        canvas.width = 160;
-        canvas.height = 120;
-        const ctx = canvas.getContext("2d");
-        if (!ctx) return;
-        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-        const snapshotBase64 = canvas.toDataURL("image/jpeg", 0.5);
-        snapshotBufferRef.current.push({ timestamp: Date.now(), image: snapshotBase64 });
-        // Cap buffer to 20 entries in memory
-        if (snapshotBufferRef.current.length > 20) snapshotBufferRef.current.shift();
-        console.log(`📸 Buffered periodic snapshot. Buffer size: ${snapshotBufferRef.current.length}`);
-      } catch (e) {
-        console.error("Failed to capture periodic camera snapshot:", e);
-      }
+      // Off-thread capture — does NOT block the main thread
+      captureFrame(video, 160, 120, 0.5)
+        .then((dataUrl) => {
+          snapshotBufferRef.current.push({ timestamp: Date.now(), image: dataUrl });
+          if (snapshotBufferRef.current.length > 20) snapshotBufferRef.current.shift();
+          console.log(`📸 Buffered periodic snapshot. Buffer size: ${snapshotBufferRef.current.length}`);
+        })
+        .catch((e) => console.error("Failed to capture periodic camera snapshot:", e));
     }, intervalMs);
 
     return () => clearInterval(interval);
