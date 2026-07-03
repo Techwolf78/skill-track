@@ -10,6 +10,7 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
+  CardFooter,
 } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -232,6 +233,31 @@ export default function AdminTestsEdit() {
 
   // Form state
   const [unsavedChangesDialogOpen, setUnsavedChangesDialogOpen] = useState(false);
+  const [unsavedScheduleDialogOpen, setUnsavedScheduleDialogOpen] = useState(false);
+  const [pendingTab, setPendingTab] = useState<string | null>(null);
+  const [savingSchedule, setSavingSchedule] = useState(false);
+
+  const isScheduleDirty = useMemo(() => {
+    if (!test) return false;
+
+    const getLocalISOTime = (isoString?: string) => {
+      if (!isoString) return "";
+      const date = new Date(isoString);
+      const tzOffset = date.getTimezoneOffset() * 60000;
+      return (new Date(date.getTime() - tzOffset)).toISOString().slice(0, 16);
+    };
+
+    const testSchedules = test.testSchedules || [];
+    const activeOrFirst = testSchedules.find((s: any) => s.status === "SCHEDULED" || s.status === "LIVE") || testSchedules[0];
+    const originalStart = getLocalISOTime(activeOrFirst?.startTime);
+    const originalEnd = getLocalISOTime(activeOrFirst?.endTime);
+
+    // Fall back to selectedScheduleData if available
+    const currentOrigStart = selectedScheduleData?.startTime ? getLocalISOTime(selectedScheduleData.startTime) : originalStart;
+    const currentOrigEnd = selectedScheduleData?.endTime ? getLocalISOTime(selectedScheduleData.endTime) : originalEnd;
+
+    return scheduleStartTime !== currentOrigStart || scheduleEndTime !== currentOrigEnd;
+  }, [test, selectedScheduleData, scheduleStartTime, scheduleEndTime]);
 
   const isFormDirty = useMemo(() => {
     if (!test) return false;
@@ -249,12 +275,7 @@ export default function AdminTestsEdit() {
     if (currentGeneral !== originalGeneral) return true;
 
     // Check schedule times
-    const testSchedules = test.testSchedules || [];
-    const activeOrFirst = testSchedules.find((s: any) => s.status === "SCHEDULED" || s.status === "LIVE") || testSchedules[0];
-    const originalStart = activeOrFirst?.startTime ? new Date(activeOrFirst.startTime).toISOString().slice(0, 16) : "";
-    const originalEnd = activeOrFirst?.endTime ? new Date(activeOrFirst.endTime).toISOString().slice(0, 16) : "";
-    if (scheduleStartTime !== originalStart) return true;
-    if (scheduleEndTime !== originalEnd) return true;
+    if (isScheduleDirty) return true;
 
     // Proctoring settings
     if (formData.enableTabSwitchTracking !== test.enableTabSwitchTracking) return true;
@@ -278,7 +299,7 @@ export default function AdminTestsEdit() {
     if (formData.maxCriticalViolations !== test.maxCriticalViolations) return true;
 
     return false;
-  }, [formData, test, scheduleStartTime, scheduleEndTime]);
+  }, [formData, test, isScheduleDirty]);
 
   useEffect(() => {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
@@ -539,6 +560,135 @@ Best wishes from GRYPHON ACADEMY PRIVATE LIMITED!`
       });
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleSaveSchedule = async () => {
+    if (!scheduleStartTime || !scheduleEndTime) {
+      toast({
+        title: "Validation Error",
+        description: "Both start time and end time are required.",
+        variant: "destructive",
+      });
+      return false;
+    }
+
+    const startDate = new Date(scheduleStartTime);
+    const endDate = new Date(scheduleEndTime);
+    if (endDate <= startDate) {
+      toast({
+        title: "Validation Error",
+        description: "Schedule end time must be after start time.",
+        variant: "destructive",
+      });
+      return false;
+    }
+
+    try {
+      setSavingSchedule(true);
+      const startISO = startDate.toISOString();
+      const endISO = endDate.toISOString();
+
+      if (selectedSchedule) {
+        // Update existing schedule
+        await apiClient.patch(`/test-schedules/${selectedSchedule}`, {
+          startTime: startISO,
+          endTime: endISO,
+        });
+      } else {
+        // Create new schedule
+        await apiClient.post("/test-schedules", {
+          testId: id,
+          startTime: startISO,
+          endTime: endISO,
+          maxCandidates: 100,
+        });
+      }
+
+      toast({
+        title: "Success",
+        description: "Test schedule has been saved successfully.",
+      });
+
+      // Update the test state in memory with the new schedule times
+      setTest(prev => {
+        if (!prev) return prev;
+        const testSchedules = prev.testSchedules || [];
+        const activeOrFirst = testSchedules.find((s: any) => s.status === "SCHEDULED" || s.status === "LIVE") || testSchedules[0];
+        
+        let newSchedules;
+        if (activeOrFirst) {
+          newSchedules = testSchedules.map(s => s.id === activeOrFirst.id ? { ...s, startTime: startISO, endTime: endISO } : s);
+        } else {
+          newSchedules = [...testSchedules, { id: selectedSchedule || "new-id", startTime: startISO, endTime: endISO }];
+        }
+        
+        return {
+          ...prev,
+          testSchedules: newSchedules
+        };
+      });
+
+      // Refresh invitation/schedule data (does not trigger full screen loader)
+      await fetchInvitationsData();
+      return true;
+    } catch (error: unknown) {
+      console.error("Failed to save schedule:", error);
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to save schedule. Please try again.",
+        variant: "destructive",
+      });
+      return false;
+    } finally {
+      setSavingSchedule(false);
+    }
+  };
+
+  const handleTabChange = (value: string) => {
+    if (isScheduleDirty) {
+      setPendingTab(value);
+      setUnsavedScheduleDialogOpen(true);
+    } else {
+      setActiveTab(value);
+    }
+  };
+
+  const handleDiscardScheduleChanges = () => {
+    if (selectedScheduleData) {
+      if (selectedScheduleData.startTime) {
+        const date = new Date(selectedScheduleData.startTime);
+        const tzOffset = date.getTimezoneOffset() * 60000;
+        const localISOTime = (new Date(date.getTime() - tzOffset)).toISOString().slice(0, 16);
+        setScheduleStartTime(localISOTime);
+      } else {
+        setScheduleStartTime("");
+      }
+      if (selectedScheduleData.endTime) {
+        const date = new Date(selectedScheduleData.endTime);
+        const tzOffset = date.getTimezoneOffset() * 60000;
+        const localISOTime = (new Date(date.getTime() - tzOffset)).toISOString().slice(0, 16);
+        setScheduleEndTime(localISOTime);
+      } else {
+        setScheduleEndTime("");
+      }
+    } else {
+      setScheduleStartTime("");
+      setScheduleEndTime("");
+    }
+    if (pendingTab) {
+      setActiveTab(pendingTab);
+      setPendingTab(null);
+    }
+    setUnsavedScheduleDialogOpen(false);
+  };
+
+  const handleSaveAndSwitch = async () => {
+    const success = await handleSaveSchedule();
+    if (success && pendingTab) {
+      setActiveTab(pendingTab);
+      setPendingTab(null);
+      setUnsavedScheduleDialogOpen(false);
     }
   };
 
@@ -871,7 +1021,7 @@ Best wishes from GRYPHON ACADEMY PRIVATE LIMITED!`
         </div>
       </div>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+      <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
         <TabsList className="grid w-full grid-cols-4 max-w-lg">
           <TabsTrigger value="details">Basic Information</TabsTrigger>
           <TabsTrigger value="questions">
@@ -1116,6 +1266,31 @@ Best wishes from GRYPHON ACADEMY PRIVATE LIMITED!`
                 </div>
               </div>
             </CardContent>
+            <CardFooter className="flex justify-end gap-2 border-t px-6 py-4 bg-muted/20">
+              {isScheduleDirty && (
+                <span className="text-xs text-muted-foreground self-center mr-auto">
+                  You have unsaved schedule changes
+                </span>
+              )}
+              <Button 
+                type="button"
+                onClick={handleSaveSchedule} 
+                disabled={savingSchedule || !isScheduleDirty}
+                size="sm"
+              >
+                {savingSchedule ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Saving Schedule...
+                  </>
+                ) : (
+                  <>
+                    <Save className="w-4 h-4 mr-2" />
+                    Save Schedule
+                  </>
+                )}
+              </Button>
+            </CardFooter>
           </Card>
 
           <Card>
@@ -1873,6 +2048,37 @@ Best wishes from GRYPHON ACADEMY PRIVATE LIMITED!`
               }}
             >
               Discard & Go Back
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Unsaved Schedule Changes Dialog */}
+      <AlertDialog open={unsavedScheduleDialogOpen} onOpenChange={setUnsavedScheduleDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Unsaved Schedule Changes</AlertDialogTitle>
+            <AlertDialogDescription>
+              You have unsaved changes to the test schedule. Would you like to save them before switching tabs?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => {
+              setUnsavedScheduleDialogOpen(false);
+              setPendingTab(null);
+            }}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              className="border border-destructive bg-background text-destructive hover:bg-destructive/10 hover:text-destructive"
+              onClick={handleDiscardScheduleChanges}
+            >
+              Discard Changes
+            </AlertDialogAction>
+            <AlertDialogAction
+              onClick={handleSaveAndSwitch}
+            >
+              Save & Switch
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
