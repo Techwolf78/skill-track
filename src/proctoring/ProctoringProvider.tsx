@@ -5,11 +5,9 @@ import { useCameraMonitor } from "./hooks/useCameraMonitor";
 import { useTabMonitor } from "./hooks/useTabMonitor";
 import { useDevToolsDetector } from "./hooks/useDevToolsDetector";
 import { useAudioMonitor } from "./hooks/useAudioMonitor";
-import { useScreenMonitor } from "./hooks/useScreenMonitor";
 import { ObjectDetector } from "./ai/objectDetector";
 import { LLMBehaviorAnalyzer } from "./ai/llmDetector";
-import { toast } from "sonner";
-import { apiClient } from "../lib/api-client";
+import { UploadQueue } from "./uploadQueue";
 
 interface ProctoringContextType extends ProctoringState {
   addViolation: (type: ViolationType, metadata?: Record<string, unknown>) => void;
@@ -17,6 +15,7 @@ interface ProctoringContextType extends ProctoringState {
   stopProctoring: () => void;
   videoRef: React.RefObject<HTMLVideoElement | null>;
   syncViolations: () => Promise<number | null>;
+  flushEvidence: () => Promise<void>;
 }
 
 const ProctoringContext = createContext<ProctoringContextType | undefined>(undefined);
@@ -31,18 +30,71 @@ export interface ProctoringConfigDto {
   llmDetector: boolean;
   maxTabSwitches: number;
   snapshotIntervalSecs: number;
+  periodicSnapshots: boolean;
   violationThresholds: Record<string, number>;
 }
 
-export const ProctoringProvider: React.FC<{ 
-  children: React.ReactNode; 
+/**
+ * Captures a JPEG frame from a video element entirely off the main thread
+ * using createImageBitmap + OffscreenCanvas Worker.
+ * Falls back to a plain canvas.toDataURL() on browsers that don't support OffscreenCanvas.
+ * Returns an ArrayBuffer (raw JPEG bytes) for direct upload — no Base64.
+ */
+async function captureFrame(
+  video: HTMLVideoElement,
+  width: number,
+  height: number,
+  quality = 0.6
+): Promise<ArrayBuffer> {
+  // Off-thread path (Chrome, Edge, Firefox)
+  if (typeof createImageBitmap !== "undefined" && typeof OffscreenCanvas !== "undefined") {
+    return new Promise((resolve, reject) => {
+      createImageBitmap(video, { resizeWidth: width, resizeHeight: height })
+        .then((bitmap) => {
+          const worker = new Worker(
+            new URL("./snapshotWorker.ts", import.meta.url),
+            { type: "module" }
+          );
+          worker.onmessage = (e) => {
+            worker.terminate();
+            if (e.data.type === "DONE") resolve(e.data.buffer as ArrayBuffer);
+            else reject(new Error(e.data.message));
+          };
+          worker.onerror = (err) => { worker.terminate(); reject(err); };
+          worker.postMessage({ type: "CAPTURE", bitmap, width, height, quality }, [bitmap]);
+        })
+        .catch(reject);
+    });
+  }
+
+  // Fallback: main-thread canvas (Safari)
+  return new Promise((resolve, reject) => {
+    try {
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return reject(new Error("No 2d context"));
+      ctx.drawImage(video, 0, 0, width, height);
+      canvas.toBlob(
+        (blob) => {
+          if (!blob) return reject(new Error("toBlob returned null"));
+          blob.arrayBuffer().then(resolve).catch(reject);
+        },
+        "image/jpeg",
+        quality
+      );
+    } catch (err) {
+      reject(err);
+    }
+  });
+}
+
+export const ProctoringProvider: React.FC<{
+  children: React.ReactNode;
   sessionId: string;
   config: ProctoringConfigDto;
-}> = ({ 
-  children, 
-  sessionId,
-  config
-}) => {
+}> = ({ children, sessionId, config }) => {
   const [state, setState] = useState<ProctoringState>({
     violations: [],
     trustScore: 100,
@@ -55,10 +107,10 @@ export const ProctoringProvider: React.FC<{
   const store = useRef(new ViolationStore(sessionId));
   const objectDetector = useRef(new ObjectDetector());
   const behaviorAnalyzer = useRef(new LLMBehaviorAnalyzer());
+  const uploadQueue = useRef(new UploadQueue(sessionId));
 
   const addViolation = useCallback((type: ViolationType, metadata: Record<string, unknown> = {}) => {
     let severity: Severity = "LOW";
-    
     switch (type) {
       case "MULTI_FACE": severity = "HIGH"; break;
       case "LOOK_AWAY": severity = "MEDIUM"; break;
@@ -70,58 +122,33 @@ export const ProctoringProvider: React.FC<{
       case "SCREEN_RECORD": severity = "CRITICAL"; break;
     }
 
-    // Capture compressed low-resolution frame for visual proof on HIGH/CRITICAL violations
-    let evidence: string | undefined = undefined;
-    if (severity === "CRITICAL" || severity === "HIGH") {
-      const video = document.querySelector("video");
-      if (video && !video.paused && !video.ended) {
-        try {
-          const canvas = document.createElement("canvas");
-          canvas.width = 200;
-          canvas.height = 150;
-          const ctx = canvas.getContext("2d");
-          if (ctx) {
-            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-            const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-            const data = imgData.data;
-            // Convert to grayscale to minimize base64 payload size by ~66%
-            for (let i = 0; i < data.length; i += 4) {
-              const brightness = 0.34 * data[i] + 0.5 * data[i + 1] + 0.16 * data[i + 2];
-              data[i] = brightness;
-              data[i + 1] = brightness;
-              data[i + 2] = brightness;
-            }
-            ctx.putImageData(imgData, 0, 0);
-            evidence = canvas.toDataURL("image/jpeg", 0.6); // 60% quality compressed JPEG
-          }
-        } catch (e) {
-          console.error("Failed to capture video frame evidence:", e);
-        }
-      }
-    }
-
-    const newViolation = store.current.addViolation({
-      type,
-      severity,
-      metadata,
-      evidence,
-    });
-
+    // Record violation in store immediately (non-blocking)
+    const newViolation = store.current.addViolation({ type, severity, metadata });
     setState(prev => ({
       ...prev,
       violations: [...prev.violations, newViolation],
-      trustScore: store.current.getScore()
+      trustScore: store.current.getScore(),
     }));
 
-    // Non-blocking real-time alert sync for critical/high violations
+    // For HIGH/CRITICAL: capture evidence frame off-thread and enqueue upload
     if (severity === "CRITICAL" || severity === "HIGH") {
-      store.current.syncSingleViolation(newViolation).then(score => {
-        if (score !== null) {
-          setState(prev => ({ ...prev, trustScore: score }));
-        }
-      }).catch(err => {
-        console.error("Failed to sync critical violation immediately:", err);
-      });
+      const video = document.querySelector<HTMLVideoElement>("video");
+      if (video && !video.paused && !video.ended) {
+        captureFrame(video, 640, 480, 0.6)
+          .then((buffer) => {
+            uploadQueue.current.enqueue({
+              buffer,
+              evidenceType: "VIOLATION_FRAME",
+              violationType: type,
+              capturedAt: Date.now(),
+            });
+          })
+          .catch((err) => console.error("Evidence capture failed:", err));
+      }
+      // Sync trust score immediately for critical violations
+      store.current.syncSingleViolation(newViolation)
+        .then(score => { if (score !== null) setState(prev => ({ ...prev, trustScore: score })); })
+        .catch(err => console.error("Failed to sync violation:", err));
     }
   }, []);
 
@@ -133,49 +160,30 @@ export const ProctoringProvider: React.FC<{
   useTabMonitor(state.isProctoringActive && config.tabSwitch, handleViolation);
   useDevToolsDetector(state.isProctoringActive && config.devtools, () => addViolation("DEVTOOLS_OPEN"));
   useAudioMonitor(state.isProctoringActive && config.audio, handleViolation);
-  // useScreenMonitor(state.isProctoringActive && config.screenShare, handleViolation);
 
   // Periodic Object Detection with Dynamic Degradation
   useEffect(() => {
     if (!state.isProctoringActive || !config.objectDetection || !videoRef.current) return;
-
-    let checkInterval = 5000; // start at 5s
+    let checkInterval = 5000;
     let timeoutId: NodeJS.Timeout;
-
     const runObjectDetection = async () => {
       if (!state.isProctoringActive || !config.objectDetection) return;
       if (videoRef.current) {
         try {
           const t0 = performance.now();
           const suspicious = await objectDetector.current.detect(videoRef.current);
-          const t1 = performance.now();
-          const duration = t1 - t0;
-          
-          if (duration > 3000) {
-            console.warn(`⚠️ Object detection took ${duration.toFixed(2)}ms. Critical delay, degrading check interval to 60s.`);
-            checkInterval = 60000;
-          } else if (duration > 1500) {
-            console.warn(`⚠️ Object detection took ${duration.toFixed(2)}ms. Major delay, degrading check interval to 30s.`);
-            checkInterval = 30000;
-          } else if (duration > 800) {
-            console.warn(`⚠️ Object detection took ${duration.toFixed(2)}ms. Moderate delay, degrading check interval to 15s.`);
-            checkInterval = 15000;
-          } else {
-            checkInterval = 5000; // Normal speed
-          }
-
-          if (suspicious.length > 0) {
-            addViolation("BACKGROUND_OBJECT", { objects: suspicious.map(s => s.class) });
-          }
-        } catch (e) {
-          console.error("Object detection error:", e);
-        }
+          const duration = performance.now() - t0;
+          if (duration > 3000) checkInterval = 60000;
+          else if (duration > 1500) checkInterval = 30000;
+          else if (duration > 800) checkInterval = 15000;
+          else checkInterval = 5000;
+          if (suspicious.length > 0) addViolation("BACKGROUND_OBJECT", { objects: suspicious.map(s => s.class) });
+        } catch (e) { console.error("Object detection error:", e); }
       }
       if (state.isProctoringActive && config.objectDetection) {
         timeoutId = setTimeout(runObjectDetection, checkInterval);
       }
     };
-
     timeoutId = setTimeout(runObjectDetection, checkInterval);
     return () => clearTimeout(timeoutId);
   }, [state.isProctoringActive, config.objectDetection, addViolation, videoRef]);
@@ -183,137 +191,71 @@ export const ProctoringProvider: React.FC<{
   // Periodic behavior analysis
   useEffect(() => {
     if (!state.isProctoringActive || !config.llmDetector) return;
-
     const interval = setInterval(async () => {
       const recentViolations = state.violations.slice(-5);
       if (recentViolations.length >= 3) {
-        const result = await behaviorAnalyzer.current.analyzeSequence(
+        await behaviorAnalyzer.current.analyzeSequence(
           recentViolations.map(v => ({ type: v.type, timestamp: v.timestamp }))
         );
-        if (result && result[0].label === "POSITIVE") { // Placeholder logic
-           // addViolation("UNUSUAL_BEHAVIOR", { details: "AI detected suspicious sequence" });
-        }
       }
     }, 30000);
-
     return () => clearInterval(interval);
-  }, [state.isProctoringActive, config.llmDetector, state.violations, addViolation]);
+  }, [state.isProctoringActive, config.llmDetector, state.violations]);
 
-  // Periodic Camera Snapshot capturing/auditing
+  /**
+   * HIGH mode: Periodic audit snapshot at a random interval between 1 and 5 minutes.
+   * Captures off-thread and enqueues upload — never blocks the main thread.
+   * Only active when config.periodicSnapshots === true (HIGH / CUSTOM modes).
+   */
   useEffect(() => {
-    if (!state.isProctoringActive || !config.camera) return;
+    if (!state.isProctoringActive || !config.camera || !config.periodicSnapshots) return;
 
-    const interval = setInterval(() => {
-      const video = document.querySelector("video");
-      if (video && !video.paused && !video.ended) {
-        try {
-          const canvas = document.createElement("canvas");
-          canvas.width = 160;
-          canvas.height = 120;
-          const ctx = canvas.getContext("2d");
-          if (ctx) {
-            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-            const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-            const data = imgData.data;
-            // Convert to grayscale to minimize base64 payload size by ~66%
-            for (let i = 0; i < data.length; i += 4) {
-              const brightness = 0.34 * data[i] + 0.5 * data[i + 1] + 0.16 * data[i + 2];
-              data[i] = brightness;
-              data[i + 1] = brightness;
-              data[i + 2] = brightness;
-            }
-            ctx.putImageData(imgData, 0, 0);
-            const snapshotBase64 = canvas.toDataURL("image/jpeg", 0.5); // 50% quality compressed JPEG
+    let timeoutId: NodeJS.Timeout;
 
-            // Store in LocalStorage
-            const storageKey = `rxone_camera_snapshots_${sessionId}`;
-            const snapshotsRaw = localStorage.getItem(storageKey);
-            const snapshots = snapshotsRaw ? JSON.parse(snapshotsRaw) : [];
-            
-            snapshots.push({
-              timestamp: Date.now(),
-              image: snapshotBase64
-            });
+    const scheduleNextSnapshot = () => {
+      // Random interval between 1 minute (60,000ms) and 5 minutes (300,000ms)
+      const randomIntervalMs = Math.floor(Math.random() * (300000 - 60000 + 1)) + 60000;
 
-            // Enforce max 20 snapshots cap to stay well under browser quota
-            if (snapshots.length > 20) {
-              snapshots.shift();
-            }
-
-            localStorage.setItem(storageKey, JSON.stringify(snapshots));
-            console.log(`📸 Saved periodic camera snapshot evidence. Total snapshots: ${snapshots.length}`);
-          }
-        } catch (e) {
-          console.error("Failed to capture periodic camera snapshot:", e);
+      timeoutId = setTimeout(() => {
+        const video = document.querySelector<HTMLVideoElement>("video");
+        if (video && !video.paused && !video.ended) {
+          captureFrame(video, 640, 480, 0.6)
+            .then((buffer) => {
+              uploadQueue.current.enqueue({
+                buffer,
+                evidenceType: "AUDIT_FRAME",
+                capturedAt: Date.now(),
+              });
+              console.log(`📸 Audit snapshot enqueued. Next in ${Math.round(randomIntervalMs / 1000)}s.`);
+            })
+            .catch((e) => console.error("Periodic snapshot capture failed:", e));
         }
-      }
-    }, (config.snapshotIntervalSecs || 60) * 1000);
-
-    return () => clearInterval(interval);
-  }, [state.isProctoringActive, config.camera, config.snapshotIntervalSecs, sessionId]);
-
-  // Batch upload worker for periodic webcam snapshots (every 5 minutes & component unmount)
-  useEffect(() => {
-    if (!state.isProctoringActive || !sessionId) return;
-
-    const syncSnapshots = async () => {
-      const storageKey = `rxone_camera_snapshots_${sessionId}`;
-      const snapshotsRaw = localStorage.getItem(storageKey);
-      if (!snapshotsRaw) return;
-
-      try {
-        const snapshots = JSON.parse(snapshotsRaw);
-        if (snapshots.length === 0) return;
-
-        console.log(`📤 Syncing ${snapshots.length} webcam snapshots in batch...`);
-        await apiClient.post(`/test-sessions/${sessionId}/snapshots/batch`, {
-          snapshots: snapshots.map((s: { timestamp: number; image: string }) => ({
-            timestamp: s.timestamp,
-            image: s.image,
-          }))
-        });
-
-        localStorage.removeItem(storageKey);
-        console.log("✅ Webcam snapshots synced successfully.");
-      } catch (err) {
-        console.error("Failed to batch upload webcam snapshots:", err);
-      }
+        scheduleNextSnapshot();
+      }, randomIntervalMs);
     };
 
-    const batchInterval = setInterval(syncSnapshots, 300000); // 5 minutes
+    scheduleNextSnapshot();
+    return () => clearTimeout(timeoutId);
+  }, [state.isProctoringActive, config.camera, config.periodicSnapshots]);
 
-    return () => {
-      clearInterval(batchInterval);
-      syncSnapshots(); // flush final snapshots on unmount
-    };
-  }, [state.isProctoringActive, sessionId]);
-
+  // Initial load & AI model init
   useEffect(() => {
-    // Initial Load
     setState(prev => ({
       ...prev,
       violations: store.current.getAll(),
-      trustScore: store.current.getScore()
+      trustScore: store.current.getScore(),
     }));
-    
-    // Initialize AI models
     objectDetector.current.init();
     behaviorAnalyzer.current.init();
   }, [sessionId]);
 
-  // Flush cached offline violations when connection returns
+  // Re-sync offline violations when connection restores
   useEffect(() => {
     const handleOnline = () => {
-      console.log("🌐 Connection restored. Syncing unsynced violations to backend...");
       store.current.syncUnsynced().then(score => {
-        if (score !== null) {
-          setState(prev => ({ ...prev, trustScore: score }));
-        }
-      }).catch(err => {
-        console.error("Failed to sync offline queue:", err);
-      });
+        if (score !== null) setState(prev => ({ ...prev, trustScore: score }));
+      }).catch(err => console.error("Failed to sync offline queue:", err));
     };
-
     window.addEventListener("online", handleOnline);
     return () => window.removeEventListener("online", handleOnline);
   }, []);
@@ -323,20 +265,24 @@ export const ProctoringProvider: React.FC<{
 
   const syncViolations = useCallback(async () => {
     const score = await store.current.syncToBackend();
-    if (score !== null) {
-      setState(prev => ({ ...prev, trustScore: score }));
-    }
+    if (score !== null) setState(prev => ({ ...prev, trustScore: score }));
     return score;
   }, []);
 
+  /** Flush pending evidence uploads — call on test submit */
+  const flushEvidence = useCallback(async () => {
+    await uploadQueue.current.flush();
+  }, []);
+
   return (
-    <ProctoringContext.Provider value={{ 
-      ...state, 
-      addViolation, 
-      startProctoring, 
+    <ProctoringContext.Provider value={{
+      ...state,
+      addViolation,
+      startProctoring,
       stopProctoring,
       videoRef,
-      syncViolations
+      syncViolations,
+      flushEvidence,
     }}>
       {children}
     </ProctoringContext.Provider>

@@ -39,7 +39,7 @@ import { ProctoringProvider, useProctoring, ProctoringConfigDto } from "@/procto
 import { CameraPreview } from "@/proctoring/components/CameraPreview";
 import { ViolationToast } from "@/proctoring/components/ViolationToast";
 import { EnvironmentCheck } from "@/proctoring/components/EnvironmentCheck";
-import { Shield, ShieldAlert, ShieldCheck as ShieldCheckIcon } from "lucide-react";
+import { Shield, ShieldAlert, ShieldCheck as ShieldCheckIcon, Camera } from "lucide-react";
 import { AnswerStore } from "@/lib/exam/answerStorage";
 
 // Types
@@ -178,7 +178,8 @@ export default function TestInterface() {
           objectDetection: false,
           llmDetector: false,
           maxTabSwitches: 2,
-          snapshotIntervalSecs: 60,
+          snapshotIntervalSecs: 20,
+          periodicSnapshots: false,
           violationThresholds: { look_away: 3, multi_face: 2 }
         });
       });
@@ -204,7 +205,7 @@ export default function TestInterface() {
 }
 
 function TestInterfaceContent({ testId, sessionId, navigate, toast }: { testId?: string; sessionId?: string; navigate: (path: string) => void; toast: (props: { title?: string; description?: string; variant?: "default" | "destructive" }) => void }) {
-  const { violations, trustScore, isProctoringActive, startProctoring, syncViolations } = useProctoring();
+  const { violations, trustScore, isProctoringActive, startProctoring, syncViolations, flushEvidence, videoRef } = useProctoring();
   const lastWarnedCountRef = useRef(0);
 
   const [loading, setLoading] = useState(true);
@@ -237,6 +238,8 @@ function TestInterfaceContent({ testId, sessionId, navigate, toast }: { testId?:
   const [timeLeft, setTimeLeft] = useState(0);
   const [showSubmitDialog, setShowSubmitDialog] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+
+
 
   const prevIndexRef = useRef(currentIndex);
 
@@ -576,7 +579,14 @@ useEffect(() => {
       try {
         await syncViolations();
       } catch (syncErr) {
-        console.warn("Failed to sync proctoring violations (endpoint might not be deployed yet):", syncErr);
+        console.warn("Failed to sync proctoring violations:", syncErr);
+      }
+
+      // Flush any pending evidence uploads before marking test as submitted
+      try {
+        await flushEvidence();
+      } catch (evidenceErr) {
+        console.warn("Evidence flush failed (non-blocking):", evidenceErr);
       }
 
       // Use the new dedicated submit endpoint
@@ -1279,7 +1289,7 @@ useEffect(() => {
             <span className="hidden sm:inline">Trust Score:</span> {trustScore}%
           </div>
 
-          <div className="text-sm text-muted-foreground">
+           <div className="text-sm text-muted-foreground">
             Q{currentIndex + 1}/{questions.length}
           </div>
           <Button variant="outline" size="sm" onClick={() => setShowSubmitDialog(true)}>

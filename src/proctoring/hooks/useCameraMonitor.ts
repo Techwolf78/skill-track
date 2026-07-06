@@ -70,7 +70,7 @@ export function useCameraMonitor(
     let timeoutId: NodeJS.Timeout;
     let lastViolationTime = 0;
     const VIOLATION_COOLDOWN = 3000; // 3 seconds
-    let detectionInterval = 1500; // 1.5 seconds
+    let detectionInterval = 5000; // 5.0 seconds (increased from 1.5s to prevent UI lag on lower-end devices)
 
     const detect = async () => {
       if (!videoRef.current || videoRef.current.paused || videoRef.current.ended) {
@@ -97,7 +97,7 @@ export function useCameraMonitor(
           console.warn(`⚠️ Face detection took ${duration.toFixed(2)}ms. Slight delay, degrading interval to 4s.`);
           detectionInterval = 4000;
         } else {
-          detectionInterval = 1500; // Normal speed
+          detectionInterval = 5000; // Normal speed
         }
 
         const now = Date.now();
