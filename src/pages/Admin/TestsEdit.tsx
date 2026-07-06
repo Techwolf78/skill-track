@@ -157,14 +157,15 @@ export default function AdminTestsEdit() {
   const { toast } = useToast();
   const { user } = useAuth();
 
-  const formatDuration = (secs: number) => {
-    if (secs <= 0) return "N/A";
-    if (secs % 60 === 0) {
-      const mins = secs / 60;
+  const formatDuration = (secs: any) => {
+    const s = Number(secs);
+    if (isNaN(s) || s <= 0) return "N/A";
+    if (s % 60 === 0) {
+      const mins = s / 60;
       return `${mins} min${mins > 1 ? "s" : ""}`;
     }
-    const mins = Math.floor(secs / 60);
-    const remainingSecs = secs % 60;
+    const mins = Math.floor(s / 60);
+    const remainingSecs = s % 60;
     if (mins === 0) return `${remainingSecs} sec`;
     return `${mins} min ${remainingSecs} sec`;
   };
@@ -242,9 +243,7 @@ export default function AdminTestsEdit() {
 
     const getLocalISOTime = (isoString?: string) => {
       if (!isoString) return "";
-      const date = new Date(isoString);
-      const tzOffset = date.getTimezoneOffset() * 60000;
-      return (new Date(date.getTime() - tzOffset)).toISOString().slice(0, 16);
+      return isoString.slice(0, 16);
     };
 
     const testSchedules = test.testSchedules || [];
@@ -327,15 +326,17 @@ export default function AdminTestsEdit() {
       const data = await testService.getTestById(id!);
       setTest(data);
 
-      // Fetch full question details for each question in the test
-      if (data.questions && data.questions.length > 0) {
-        const allQuestions = await testService.getAllQuestions();
-        const enrichedQuestions = data.questions.map((tq) => ({
+      // Fetch detailed test questions from the backend/database
+      try {
+        const response = await apiClient.get(`/test-questions/test/${id}`);
+        const detailedQuestions = response.data?.data || [];
+        const enrichedQuestions = detailedQuestions.map((tq: any) => ({
           ...tq,
-          question: allQuestions.find((q) => q.id === tq.questionId),
+          timeLimitSecs: tq.timeLimitSecs ?? tq.question?.timeLimitSecs ?? tq.question?.avgTimeSeconds ?? tq.question?.avg_time_seconds ?? 0,
         }));
         setQuestionsData(enrichedQuestions);
-      } else {
+      } catch (err) {
+        console.error("Failed to fetch detailed questions:", err);
         setQuestionsData([]);
       }
 
@@ -585,8 +586,8 @@ To refer to the FAQ document, you can click on the HELP button which is present 
 
     try {
       setSavingSchedule(true);
-      const startISO = startDate.toISOString();
-      const endISO = endDate.toISOString();
+      const startISO = scheduleStartTime;
+      const endISO = scheduleEndTime;
 
       if (selectedSchedule) {
         // Update existing schedule
@@ -656,18 +657,12 @@ To refer to the FAQ document, you can click on the HELP button which is present 
   const handleDiscardScheduleChanges = () => {
     if (selectedScheduleData) {
       if (selectedScheduleData.startTime) {
-        const date = new Date(selectedScheduleData.startTime);
-        const tzOffset = date.getTimezoneOffset() * 60000;
-        const localISOTime = (new Date(date.getTime() - tzOffset)).toISOString().slice(0, 16);
-        setScheduleStartTime(localISOTime);
+        setScheduleStartTime(selectedScheduleData.startTime.slice(0, 16));
       } else {
         setScheduleStartTime("");
       }
       if (selectedScheduleData.endTime) {
-        const date = new Date(selectedScheduleData.endTime);
-        const tzOffset = date.getTimezoneOffset() * 60000;
-        const localISOTime = (new Date(date.getTime() - tzOffset)).toISOString().slice(0, 16);
-        setScheduleEndTime(localISOTime);
+        setScheduleEndTime(selectedScheduleData.endTime.slice(0, 16));
       } else {
         setScheduleEndTime("");
       }
@@ -761,16 +756,10 @@ To refer to the FAQ document, you can click on the HELP button which is present 
         setSelectedSchedule(activeOrFirst.id);
         setSelectedScheduleData(activeOrFirst);
         if (activeOrFirst.startTime) {
-          const date = new Date(activeOrFirst.startTime);
-          const tzOffset = date.getTimezoneOffset() * 60000;
-          const localISOTime = (new Date(date.getTime() - tzOffset)).toISOString().slice(0, 16);
-          setScheduleStartTime(localISOTime);
+          setScheduleStartTime(activeOrFirst.startTime.slice(0, 16));
         }
         if (activeOrFirst.endTime) {
-          const date = new Date(activeOrFirst.endTime);
-          const tzOffset = date.getTimezoneOffset() * 60000;
-          const localISOTime = (new Date(date.getTime() - tzOffset)).toISOString().slice(0, 16);
-          setScheduleEndTime(localISOTime);
+          setScheduleEndTime(activeOrFirst.endTime.slice(0, 16));
         }
       } else {
         setSelectedSchedule("");
@@ -1202,11 +1191,11 @@ To refer to the FAQ document, you can click on the HELP button which is present 
                         </div>
                         <div className="flex-1">
                           <p className="font-medium line-clamp-1">
-                            {item.question?.title || "Unknown Question"}
+                            {item.question?.title || item.question?.prompt || "Unknown Question"}
                           </p>
                           <div className="flex gap-3 text-xs text-muted-foreground mt-1">
                             <span className="capitalize">
-                              {item.question?.type?.toLowerCase()}
+                              {(item.question?.type || item.question?.questionType)?.toLowerCase()}
                             </span>
                             <span>•</span>
                             <span>{item.marks} marks</span>
