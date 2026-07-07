@@ -275,7 +275,7 @@ export default function AdminTestCreate() {
 
       let testId =
         typeof createdTest === "object"
-          ? createdTest.id || createdTest._id
+          ? createdTest.id
           : null;
 
       if (!testId) {
@@ -290,10 +290,11 @@ export default function AdminTestCreate() {
       }
 
       navigate(`/admin/tests/${testId}/questions`);
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const err = error as Error;
       toast({
         title: "Error",
-        description: error.message || "Failed to create test",
+        description: err.message || "Failed to create test",
         variant: "destructive",
       });
     } finally {

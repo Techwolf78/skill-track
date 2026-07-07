@@ -15,7 +15,7 @@ export interface OfflineSubmission {
   id: string;
   questionId: string;
   type: "MCQ" | "CODING";
-  payload: any;
+  payload: unknown;
   timestamp: number;
 }
 
@@ -58,7 +58,7 @@ export const AnswerStore = {
   },
 
   // ==================== Saved Answers (Completed status) ====================
-  saveAnswer(sessionId: string, questionId: string, answer: any): void {
+  saveAnswer(sessionId: string, questionId: string, answer: unknown): void {
     try {
       const key = `${ANSWERS_PREFIX}_${sessionId}`;
       const answersRaw = localStorage.getItem(key);
@@ -71,7 +71,7 @@ export const AnswerStore = {
     }
   },
 
-  getAnswers(sessionId: string): Record<string, any> {
+  getAnswers(sessionId: string): Record<string, unknown> {
     try {
       const key = `${ANSWERS_PREFIX}_${sessionId}`;
       const answersRaw = localStorage.getItem(key);
@@ -83,7 +83,7 @@ export const AnswerStore = {
   },
 
   // ==================== Offline Submission Queue ====================
-  queueOfflineSubmission(sessionId: string, questionId: string, type: "MCQ" | "CODING", payload: any): OfflineSubmission {
+  queueOfflineSubmission(sessionId: string, questionId: string, type: "MCQ" | "CODING", payload: unknown): OfflineSubmission {
     const queueKey = `${OFFLINE_QUEUE_PREFIX}_${sessionId}`;
     const queueRaw = localStorage.getItem(queueKey);
     const queue: OfflineSubmission[] = queueRaw ? JSON.parse(queueRaw) : [];
@@ -129,7 +129,7 @@ export const AnswerStore = {
     }
   },
 
-  async syncOfflineQueue(sessionId: string, onProgress?: (questionId: string, success: boolean, result?: any) => void): Promise<boolean> {
+  async syncOfflineQueue(sessionId: string, onProgress?: (questionId: string, success: boolean, result?: unknown) => void): Promise<boolean> {
     const queue = this.getOfflineQueue(sessionId);
     if (queue.length === 0) return true;
     
@@ -139,29 +139,31 @@ export const AnswerStore = {
     // Process sequentially to avoid race conditions
     for (const item of queue) {
       try {
-        let result: any = null;
+        let result: unknown = null;
         if (item.type === "MCQ") {
+          const payloadVal = item.payload && typeof item.payload === "object" && "value" in item.payload ? item.payload.value : item.payload;
+          const versionVal = item.payload && typeof item.payload === "object" && "saveVersion" in item.payload ? item.payload.saveVersion : 0;
           await apiClient.post("/submissions", {
             sessionId: sessionId,
             questionId: item.questionId,
-            selectedOptionIds: [item.payload]
+            selectedOptionIds: [payloadVal],
+            saveVersion: versionVal
           });
-          // Save to local answers status
-          this.saveAnswer(sessionId, item.questionId, item.payload);
+          this.saveAnswer(sessionId, item.questionId, payloadVal);
         } else if (item.type === "CODING") {
-          // Trigger submission
-          const submissionId = await testService.submitCode({
+          const codeVal = item.payload?.code || "";
+          const langVal = item.payload?.language || "python3";
+          const versionVal = item.payload?.saveVersion || 0;
+
+          await apiClient.post("/submissions", {
             sessionId: sessionId,
             questionId: item.questionId,
-            language: item.payload.language,
-            sourceCode: item.payload.code
+            answerText: codeVal,
+            language: langVal,
+            saveVersion: versionVal
           });
-          
-          // Try to poll for result immediately since we are back online
-          // But do not block sync completely if polling takes time.
-          // We can let the background polling in TestInterface handle it, 
-          // or do a quick check here.
-          result = { submissionId, status: "PENDING", code: item.payload.code, language: item.payload.language };
+
+          result = { code: codeVal, language: langVal };
           this.saveAnswer(sessionId, item.questionId, result);
         }
         
@@ -170,8 +172,15 @@ export const AnswerStore = {
         if (onProgress) {
           onProgress(item.questionId, true, result);
         }
-      } catch (err) {
+      } catch (err: unknown) {
         console.error(`Failed to sync offline submission for question ${item.questionId}:`, err);
+        // Expiry handling: stop queue retries on session expiration
+        const axiosErr = err as { response?: { status: number; data?: { message?: string } } };
+        if (axiosErr.response?.status === 400 && axiosErr.response?.data?.message?.includes("expired")) {
+          AnswerStore.clearSession(sessionId);
+          window.location.reload();
+          return false;
+        }
         allSuccess = false;
         if (onProgress) {
           onProgress(item.questionId, false);

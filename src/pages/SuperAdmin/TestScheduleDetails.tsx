@@ -21,6 +21,7 @@ import { useToast } from "@/hooks/use-toast";
 import { testService, TestScheduleExtended, Test } from "@/lib/test-service";
 import { apiClient } from "@/lib/api-client";
 import { useAuth } from "@/lib/auth-context";
+import { organisationService } from "@/lib/organisation-service";
 
 interface Organisation {
   id: string;
@@ -82,8 +83,7 @@ export default function TestScheduleDetails() {
       
       // Fetch organisation details
       if (scheduleData.organisationId) {
-        const orgsData = await apiClient.get("/organisations?size=1000");
-        const orgs = orgsData.data?.data || [];
+        const orgs = await organisationService.getOrganisations();
         const org = orgs.find((o: Organisation) => o.id === scheduleData.organisationId);
         setOrganisation(org || null);
       }

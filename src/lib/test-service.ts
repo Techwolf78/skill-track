@@ -375,6 +375,7 @@ export interface Test {
   updatedAt?: string;
   questions?: TestQuestion[];
   testQuestions?: TestQuestion[];
+  testSchedules?: TestScheduleExtended[];
   isActive?: boolean;
   organisationId?: string;
   // Proctoring Settings
@@ -794,25 +795,26 @@ export const testService = {
     return testService.mapTestFromBackend(unwrapResponse(response));
   },
 
-  mapTestFromBackend: (data: any): Test => {
-    if (!data) return data;
+  mapTestFromBackend: (data: unknown): Test => {
+    if (!data) return data as unknown as Test;
+    const d = data as Record<string, unknown>;
     return {
-      ...data,
-      enableTabSwitchTracking: data.tabSwitchTrackingEnabled ?? data.enableTabSwitchTracking ?? false,
-      blockCopyPaste: data.copyPasteBlocked ?? data.blockCopyPaste ?? false,
-      blockRightClick: data.rightClickBlocked ?? data.blockRightClick ?? false,
-      warnOnFullscreenExit: data.fullscreenExitTrackingEnabled ?? data.warnOnFullscreenExit ?? false,
-      maxWarnings: data.maxWarningsAllowed ?? data.maxWarnings ?? 0,
-      requireWebcam: data.webcamRequired ?? data.requireWebcam ?? false,
-      requireMicrophone: data.microphoneRequired ?? data.requireMicrophone ?? false,
-      requireScreenShare: data.screenShareRequired ?? data.requireScreenShare ?? false,
-      maxCriticalViolations: data.maxCriticalViolationsAllowed ?? data.maxCriticalViolations ?? 0,
+      ...(data as Test),
+      enableTabSwitchTracking: (d.tabSwitchTrackingEnabled ?? d.enableTabSwitchTracking ?? false) as boolean,
+      blockCopyPaste: (d.copyPasteBlocked ?? d.blockCopyPaste ?? false) as boolean,
+      blockRightClick: (d.rightClickBlocked ?? d.blockRightClick ?? false) as boolean,
+      warnOnFullscreenExit: (d.fullscreenExitTrackingEnabled ?? d.warnOnFullscreenExit ?? false) as boolean,
+      maxWarnings: (d.maxWarningsAllowed ?? d.maxWarnings ?? 0) as number,
+      requireWebcam: (d.webcamRequired ?? d.requireWebcam ?? false) as boolean,
+      requireMicrophone: (d.microphoneRequired ?? d.requireMicrophone ?? false) as boolean,
+      requireScreenShare: (d.screenShareRequired ?? d.requireScreenShare ?? false) as boolean,
+      maxCriticalViolations: (d.maxCriticalViolationsAllowed ?? d.maxCriticalViolations ?? 0) as number,
     };
   },
 
-  mapTestToBackend: (data: Partial<CreateTestRequest>): any => {
-    if (!data) return data;
-    const payload = { ...data } as any;
+  mapTestToBackend: (data: Partial<CreateTestRequest>): Record<string, unknown> => {
+    if (!data) return data as unknown as Record<string, unknown>;
+    const payload: Record<string, unknown> = { ...data };
     if (data.enableTabSwitchTracking !== undefined) payload.tabSwitchTrackingEnabled = data.enableTabSwitchTracking;
     if (data.blockCopyPaste !== undefined) payload.copyPasteBlocked = data.blockCopyPaste;
     if (data.blockRightClick !== undefined) payload.rightClickBlocked = data.blockRightClick;

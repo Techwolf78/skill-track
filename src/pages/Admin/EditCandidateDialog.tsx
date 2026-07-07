@@ -15,7 +15,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiClient } from "@/lib/api-client";
 import { Loader2, AlertCircle, Building2 } from "lucide-react";
 import type { Candidate } from "@/lib/candidate-service";
-import type { OrganisationResponse } from "@/lib/organisation-service";
+import { organisationService, type OrganisationResponse } from "@/lib/organisation-service";
 import {
   Select,
   SelectContent,
@@ -50,8 +50,8 @@ export function EditCandidateDialog({ open, onOpenChange, candidate, onSuccess, 
   // Fetch organisations if SuperAdmin
   useEffect(() => {
     if (isSuperAdmin && open) {
-      apiClient.get("/organisations?size=1000")
-        .then(res => setOrganisations(res.data.data || []))
+      organisationService.getOrganisations()
+        .then(data => setOrganisations(data))
         .catch(err => console.error("Failed to fetch organisations", err));
     }
   }, [isSuperAdmin, open]);

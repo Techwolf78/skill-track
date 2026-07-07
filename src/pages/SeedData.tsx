@@ -14,7 +14,7 @@ import { useToast } from "@/hooks/use-toast";
 import { authService } from "@/lib/auth-service";
 import { organisationService } from "@/lib/organisation-service";
 import { userService } from "@/lib/user-service";
-import { testService, CreateQuestionRequest } from "@/lib/test-service";
+import { testService, CreateQuestionRequest, Question } from "@/lib/test-service";
 import { candidateService } from "@/lib/candidate-service";
 import { apiClient } from "@/lib/api-client";
 import { Input } from "@/components/ui/input";
@@ -942,7 +942,7 @@ export default function SeedData() {
       ];
 
       // Query existing questions in case they exist
-      let dbQuestions: Array<{ id: string; title: string }> = [];
+      let dbQuestions: Question[] = [];
       try {
         dbQuestions = await testService.getAllQuestions();
       } catch (e) {
@@ -1262,7 +1262,7 @@ export default function SeedData() {
 
         const matchInv = listInv.find(inv => inv.candidateId === cId && inv.scheduleId === schedId);
         if (matchInv && matchInv.token) {
-          const testLink = `${window.location.origin}/test/access/${matchInv.id}/${matchInv.token}`;
+          const testLink = `${window.location.origin}/test/access/${matchInv.id}`;
           newSeededCandidates.push({
             name: cand.name,
             email: cand.email,
@@ -1282,7 +1282,7 @@ export default function SeedData() {
             email: cand.email,
             token: `demo-invite-token-${idx}`,
             testTitle: testNames[0],
-            link: `${window.location.origin}/test/access/demo-invite-id-${idx}/demo-invite-token-${idx}`
+            link: `${window.location.origin}/test/access/demo-invite-id-${idx}`
           });
         });
       }
@@ -1328,7 +1328,7 @@ export default function SeedData() {
       
       toast({
         title: "Seeding Fault",
-        description: error.response?.data?.message || error.message || "Seeder fault.",
+        description: err.response?.data?.message || err.message || "Seeder fault.",
         variant: "destructive"
       });
     } finally {

@@ -134,7 +134,7 @@ export default function Students() {
 
     setSubmitting(true);
     try {
-      const extraFields: any = {};
+      const extraFields: Record<string, string> = {};
       Object.entries(formData.extraFields).forEach(([key, value]) => {
         if (value) extraFields[key] = value;
       });
@@ -150,10 +150,11 @@ export default function Students() {
         name: "", email: "", password: "", phoneNumber: "", organisationId: "",
         extraFields: { college: "", course: "", year: "", skills: "", city: "" }
       });
-    } catch (error: any) {
+    } catch (error) {
+      const err = error as { response?: { data?: { message?: string } } };
       toast({ 
         title: "Error", 
-        description: error.response?.data?.message || "Failed to add candidate", 
+        description: err.response?.data?.message || "Failed to add candidate", 
         variant: "destructive" 
       });
     } finally {
@@ -168,10 +169,11 @@ export default function Students() {
       await deleteCandidateMutation.mutateAsync(candidateToDelete.id);
       toast({ title: "Success", description: "Candidate deleted successfully" });
       setIsDeleteDialogOpen(false);
-    } catch (error: any) {
+    } catch (error) {
+      const err = error as { response?: { data?: { message?: string } } };
       toast({ 
         title: "Delete Failed", 
-        description: error.response?.data?.message || "Failed to delete candidate. This action is restricted by the backend (e.g. if the candidate has active test sessions, submissions, or invitations).", 
+        description: err.response?.data?.message || "Failed to delete candidate. This action is restricted by the backend (e.g. if the candidate has active test sessions, submissions, or invitations).", 
         variant: "destructive" 
       });
     } finally {
@@ -304,7 +306,7 @@ export default function Students() {
                         <div>
                           <p className="text-xs font-semibold text-muted-foreground uppercase mb-2">Metadata</p>
                           <p className="text-sm">Created: <span className="text-muted-foreground">{candidate.createdAt ? new Date(candidate.createdAt).toLocaleDateString() : "N/A"}</span></p>
-                          <p className="text-sm">Stale Data: <Badge variant={candidate.stale ? "destructive" : "secondary"} className="ml-2">{candidate.stale ? "Yes" : "No"}</Badge></p>
+                          <div className="text-sm flex items-center">Stale Data: <Badge variant={candidate.stale ? "destructive" : "secondary"} className="ml-2">{candidate.stale ? "Yes" : "No"}</Badge></div>
                         </div>
                         <div>
                           <p className="text-xs font-semibold text-muted-foreground uppercase mb-2">Organisation Info</p>

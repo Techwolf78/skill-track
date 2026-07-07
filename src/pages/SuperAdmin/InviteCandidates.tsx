@@ -39,6 +39,7 @@ import {
   Link2,
   Copy,
   Check,
+  Trash2,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { testService, TestSchedule } from "@/lib/test-service";
@@ -541,21 +542,68 @@ export default function InviteCandidates() {
                       )}
                     </TableCell>
                     <TableCell className="text-right">
-                      <Button
-                        size="sm"
-                        onClick={() => {
-                          setSelectedCandidate(candidate);
-                          setIsInviteDialogOpen(true);
-                        }}
-                        disabled={
-                          !selectedSchedule ||
-                          !!invitation ||
-                          isScheduleCompleted
-                        }
-                      >
-                        <Send className="w-4 h-4 mr-2" />
-                        {invitation ? "Invited" : "Send Invite"}
-                      </Button>
+                      {invitation ? (
+                        <div className="flex items-center justify-end gap-2">
+                          <Badge variant="secondary" className="bg-emerald-500/10 text-emerald-400 border-emerald-500/20">
+                            Invited
+                          </Badge>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-destructive hover:bg-destructive/10"
+                            onClick={async (e) => {
+                              e.stopPropagation();
+                              if (confirm(`Are you sure you want to delete this invitation for ${candidate.user.name}?`)) {
+                                try {
+                                  await apiClient.delete(`/candidate-invitations/${invitation.id}`);
+                                  toast({
+                                    title: "Invitation Deleted",
+                                    description: "You can now invite this candidate again.",
+                                  });
+                                  fetchData();
+                                } catch (err) {
+                                  const axiosErr = err as { 
+                                    response?: { 
+                                      data?: { 
+                                        message?: string; 
+                                        error?: string; 
+                                      } 
+                                    }; 
+                                    message?: string; 
+                                  };
+                                  const errorMessage = 
+                                    axiosErr.response?.data?.message || 
+                                    axiosErr.response?.data?.error || 
+                                    axiosErr.message || 
+                                    "Failed to delete invitation";
+                                  toast({
+                                    title: "Error",
+                                    description: errorMessage,
+                                    variant: "destructive",
+                                  });
+                                }
+                              }
+                            }}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      ) : (
+                        <Button
+                          size="sm"
+                          onClick={() => {
+                            setSelectedCandidate(candidate);
+                            setIsInviteDialogOpen(true);
+                          }}
+                          disabled={
+                            !selectedSchedule ||
+                            isScheduleCompleted
+                          }
+                        >
+                          <Send className="w-4 h-4 mr-2" />
+                          Send Invite
+                        </Button>
+                      )}
                     </TableCell>
                   </TableRow>
                 );

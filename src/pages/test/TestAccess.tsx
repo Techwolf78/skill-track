@@ -148,6 +148,20 @@ export default function TestAccess() {
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [showColdStartMessage, setShowColdStartMessage] = useState(false);
 
+  // Magic link / OTP states
+  const [otpCode, setOtpCode] = useState("");
+  const [otpRequested, setOtpRequested] = useState(false);
+  const [otpCooldown, setOtpCooldown] = useState(0);
+  const [devOtp, setDevOtp] = useState<string | null>(null);
+  const [isVerifyingOtp, setIsVerifyingOtp] = useState(false);
+
+  useEffect(() => {
+    if (otpCooldown > 0) {
+      const timer = setTimeout(() => setOtpCooldown(otpCooldown - 1), 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [otpCooldown]);
+
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout> | undefined;
     if (loading || isLoggingIn) {
@@ -171,14 +185,21 @@ export default function TestAccess() {
       return;
     }
 
+    const searchParams = new URLSearchParams(window.location.search);
+    const magicToken = searchParams.get("magicToken");
+
     if (id) {
-      if (token || isAuthenticated) {
+      if (magicToken) {
+        verifyMagicToken(magicToken);
+      } else if (token || isAuthenticated) {
         validateToken();
       } else {
         setLoading(false);
       }
     } else if (token && !id) {
       setError("This link is outdated. Please use the secure invitation link containing both ID and token.");
+      setLoading(false);
+    } else {
       setLoading(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -198,6 +219,109 @@ export default function TestAccess() {
       return JSON.parse(jsonPayload);
     } catch (e) {
       return null;
+    }
+  };
+
+  const verifyMagicToken = async (magicTokenStr: string) => {
+    try {
+      setLoading(true);
+      setError(null);
+      const response = await apiClient.post(`/candidate-invitations/${id}/access/verify`, {
+        magicToken: magicTokenStr
+      });
+      const authData = response.data?.data || response.data;
+      if (!authData || !authData.accessToken) {
+        throw new Error("Authentication failed.");
+      }
+      const decoded = parseJwt(authData.accessToken);
+      if (decoded) {
+        const userData = {
+          id: decoded.id,
+          name: decoded.name,
+          email: decoded.sub,
+          role: decoded.role,
+        };
+        loginToContext(authData.accessToken, userData);
+        window.history.replaceState({}, "", `/test/access/${id}`);
+        toast({
+          title: "Verification Successful",
+          description: "One-click magic link authenticated successfully.",
+        });
+        validateToken();
+      } else {
+        throw new Error("Failed to parse authentication token.");
+      }
+    } catch (err: unknown) {
+      const errorVal = err as { response?: { data?: { message?: string } }; message?: string };
+      console.error("Magic token verification failed:", err);
+      window.history.replaceState({}, "", `/test/access/${id}`);
+      setError(errorVal.response?.data?.message || errorVal.message || "Failed to verify magic access link");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSendAccessCode = async () => {
+    if (!id) return;
+    setIsLoggingIn(true);
+    setError(null);
+    try {
+      const response = await apiClient.post(`/candidate-invitations/${id}/access/request`);
+      const resData = response.data?.data || response.data;
+      setOtpRequested(true);
+      setOtpCooldown(60);
+      if (resData?.devOtp) {
+        setDevOtp(resData.devOtp);
+      }
+      toast({
+        title: "Access Link Sent",
+        description: "A secure access link and OTP have been sent to your email.",
+      });
+    } catch (err: unknown) {
+      const errorVal = err as { response?: { data?: { message?: string } }; message?: string };
+      console.error("Request access link failed:", err);
+      setError(errorVal.response?.data?.message || errorVal.message || "Failed to send access link");
+    } finally {
+      setIsLoggingIn(false);
+    }
+  };
+
+  const handleOtpSubmit = async (codeVal: string) => {
+    if (!id || isVerifyingOtp) return;
+    setIsVerifyingOtp(true);
+    setError(null);
+    try {
+      const response = await apiClient.post(`/candidate-invitations/${id}/access/verify`, {
+        otpCode: codeVal
+      });
+      const authData = response.data?.data || response.data;
+      if (!authData || !authData.accessToken) {
+        throw new Error("Authentication failed.");
+      }
+      const decoded = parseJwt(authData.accessToken);
+      if (decoded) {
+        const userData = {
+          id: decoded.id,
+          name: decoded.name,
+          email: decoded.sub,
+          role: decoded.role,
+        };
+        loginToContext(authData.accessToken, userData);
+        toast({
+          title: "Verification Successful",
+          description: "Access code verified successfully.",
+        });
+        validateToken();
+      } else {
+        throw new Error("Failed to parse authentication token.");
+      }
+    } catch (err: unknown) {
+      const errorVal = err as { response?: { data?: { message?: string } }; message?: string };
+      console.error("OTP verification failed:", err);
+      setError(errorVal.response?.data?.message || errorVal.message || "Invalid or expired access code.");
+      setOtpCode("");
+    } finally {
+      setIsVerifyingOtp(false);
     }
   };
 
@@ -233,9 +357,15 @@ export default function TestAccess() {
         } else {
           throw new Error("Failed to parse authentication token.");
         }
-      } else if (!isAuthenticated) {
-        setLoading(false);
-        return;
+      } else {
+        const storedToken = localStorage.getItem("token");
+        if (storedToken) {
+          decoded = parseJwt(storedToken);
+        }
+        if (!isAuthenticated || !decoded) {
+          setLoading(false);
+          return;
+        }
       }
 
       // 403 Bypass/Fallback strategy: Try direct GET, fall back to list, then to JWT claims
@@ -639,54 +769,119 @@ export default function TestAccess() {
 
   if (error || !testData) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-4 bg-background">
-        <Card className="max-w-md w-full border border-border/60 shadow-2xl animate-in fade-in duration-300">
-          <CardHeader className="text-center">
-            <div className="mx-auto mb-4 w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
-              <Shield className="w-8 h-8 text-primary" />
+      <div className="min-h-screen flex items-center justify-center p-4 bg-slate-950 text-slate-100 font-sans relative">
+        {/* Cyberpunk grid backdrop */}
+        <div className="absolute inset-0 bg-[linear-gradient(to_right,#1e293b12_1px,transparent_1px),linear-gradient(to_bottom,#1e293b12_1px,transparent_1px)] bg-[size:24px_24px] pointer-events-none" />
+        
+        <Card className="max-w-md w-full border border-slate-800 bg-slate-900/80 backdrop-blur-md shadow-2xl relative overflow-hidden animate-in fade-in duration-300">
+          <div className="h-1 bg-emerald-500 w-full" />
+          
+          <CardHeader className="text-center pt-8 pb-6">
+            <div className="mx-auto mb-4 w-14 h-14 rounded-xl border border-emerald-500/20 bg-emerald-950/20 flex items-center justify-center shadow-lg shadow-emerald-950/30">
+              <Shield className="w-7 h-7 text-emerald-400" />
             </div>
-            <CardTitle className="text-2xl">Authentication Required</CardTitle>
-            <CardDescription className="text-base mt-2">
-              {error || "Please log in to access this test."}
+            <CardTitle className="text-2xl font-bold tracking-tight font-mono text-emerald-400">
+              {otpRequested ? "SECURITY VERIFICATION" : "SECURE TEST ACCESS"}
+            </CardTitle>
+            <CardDescription className="text-slate-400 font-sans mt-2">
+              {otpRequested
+                ? "Enter the 6-digit access code sent to your registered email."
+                : "Identify verification is required to start your secure test."}
             </CardDescription>
           </CardHeader>
-          <CardContent>
-            <form onSubmit={handleLogin} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="candidate@email.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                />
+          
+          <CardContent className="px-6 pb-6">
+            {error && (
+              <div className="mb-4 p-3 rounded-lg bg-red-950/30 border border-red-500/20 flex items-start gap-2.5 text-xs text-red-400">
+                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                <span>{error}</span>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="password">Password</Label>
-                <Input
-                  id="password"
-                  type="password"
-                  placeholder="••••••••"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                />
+            )}
+
+            {otpRequested ? (
+              <div className="space-y-6">
+                <div className="space-y-2">
+                  <Label htmlFor="otp" className="text-xs uppercase tracking-widest font-mono text-slate-400">
+                    Verification Code
+                  </Label>
+                  <Input
+                    id="otp"
+                    type="text"
+                    maxLength={6}
+                    placeholder="Enter 6-digit code"
+                    value={otpCode}
+                    onChange={(e) => {
+                      const val = e.target.value.replace(/\D/g, "");
+                      setOtpCode(val);
+                      if (val.length === 6) {
+                        handleOtpSubmit(val);
+                      }
+                    }}
+                    disabled={isVerifyingOtp}
+                    className="text-center text-2xl tracking-[0.3em] font-mono h-12 bg-slate-950 border-slate-800 text-emerald-400 focus-visible:ring-emerald-500"
+                    autoComplete="one-time-code"
+                  />
+                </div>
+
+                {devOtp && (
+                  <div className="p-3 rounded-lg bg-emerald-950/30 border border-emerald-500/20 text-xs font-mono text-emerald-400 animate-pulse">
+                    <span className="font-bold">[Dev Environment Mock Email]</span>
+                    <br />
+                    Access Code: <span className="underline font-bold text-sm tracking-wider">{devOtp}</span>
+                  </div>
+                )}
+
+                <div className="flex flex-col gap-2">
+                  <Button
+                    onClick={() => handleOtpSubmit(otpCode)}
+                    disabled={otpCode.length !== 6 || isVerifyingOtp}
+                    className="w-full h-11 bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold tracking-wider"
+                  >
+                    {isVerifyingOtp ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : null}
+                    {isVerifyingOtp ? "VERIFYING..." : "SUBMIT CODE"}
+                  </Button>
+                  
+                  <Button
+                    onClick={handleSendAccessCode}
+                    disabled={otpCooldown > 0 || isLoggingIn}
+                    variant="outline"
+                    className="w-full h-11 border-slate-800 bg-slate-950 hover:bg-slate-900 text-slate-300 font-medium"
+                  >
+                    {otpCooldown > 0 ? `RESEND IN ${otpCooldown}S` : "RESEND EMAIL"}
+                  </Button>
+                </div>
               </div>
-              <Button type="submit" className="w-full h-12 text-lg mt-4" disabled={isLoggingIn}>
-                {isLoggingIn ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : null}
-                {isLoggingIn ? "Logging in..." : "Login to Continue"}
-              </Button>
-              {showColdStartMessage && (
-                <p className="text-center text-xs text-amber-500 animate-pulse mt-2">
-                  ⏳ Backend is waking up... Cold start on Render free tier can take up to 50 seconds. Please wait.
+            ) : (
+              <div className="space-y-4">
+                <p className="text-sm text-slate-400 text-center leading-relaxed">
+                  We will send a one-click magic login link and a fallback 6-digit verification code to the email address associated with your invitation.
                 </p>
-              )}
-            </form>
+                <Button
+                  onClick={handleSendAccessCode}
+                  disabled={isLoggingIn}
+                  className="w-full h-12 bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold tracking-wider"
+                >
+                  {isLoggingIn ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : null}
+                  {isLoggingIn ? "SENDING LINK..." : "SEND ACCESS LINK"}
+                </Button>
+              </div>
+            )}
           </CardContent>
-          <CardFooter>
-            <Button onClick={() => navigate("/")} variant="ghost" className="w-full">
+          
+          <CardFooter className="border-t border-slate-800/40 bg-slate-950/20 px-6 py-4 flex justify-between">
+            <Button
+              onClick={() => {
+                setOtpRequested(false);
+                setError(null);
+                setOtpCode("");
+              }}
+              variant="ghost"
+              className="text-xs text-slate-500 hover:text-slate-300 font-mono hover:bg-transparent"
+              disabled={!otpRequested}
+            >
+              &larr; BACK
+            </Button>
+            <Button onClick={() => navigate("/")} variant="ghost" className="text-xs text-slate-500 hover:text-slate-300 font-mono hover:bg-transparent">
               Return to Homepage
             </Button>
           </CardFooter>
