@@ -193,7 +193,7 @@ export default function ProctoringDashboard() {
     setLoadingSchedules(true);
     setErrorSchedules(null);
     try {
-      const response = await apiClient.get("/admin/proctoring/assessment-schedules");
+      const response = await apiClient.get("/api/admin/proctoring/assessment-schedules");
       const data = response.data?.data ?? response.data;
       if (Array.isArray(data) && data.length > 0) {
         setSchedules(data);
@@ -218,10 +218,22 @@ export default function ProctoringDashboard() {
     setErrorCandidates(null);
     try {
       const response = await apiClient.get(
-        `/admin/proctoring/assessment-schedules/${scheduleId}/candidates`,
+        `/api/admin/proctoring/assessment-schedules/${scheduleId}/candidates`,
       );
       const data = response.data?.data ?? response.data;
-      setCandidates(Array.isArray(data) ? data : []);
+      const mappedCandidates = Array.isArray(data) ? data.map((cand: any) => ({
+        id: cand.candidateId,
+        name: cand.candidateName,
+        email: cand.email,
+        testStatus: cand.testStatus === "ACTIVE" ? "IN_PROGRESS" : cand.testStatus,
+        proctoringMode: cand.proctoringMode,
+        riskLevel: cand.riskLevel,
+        violationsCount: cand.violationCount,
+        criticalViolationsCount: cand.criticalViolationCount,
+        lastActivity: cand.lastActivityAt ? new Date(cand.lastActivityAt).toLocaleString() : "No activity",
+        reviewStatus: cand.reviewStatus || "NOT_REVIEWED",
+      })) : [];
+      setCandidates(mappedCandidates);
     } catch {
       setErrorCandidates("Could not load candidates for this schedule.");
       setCandidates([]);
@@ -240,11 +252,52 @@ export default function ProctoringDashboard() {
     setErrorDetails(null);
     try {
       const response = await apiClient.get(
-        `/admin/proctoring/candidates/${candidate.id}/details?scheduleId=${selectedScheduleId}`,
+        `/api/admin/proctoring/candidates/${candidate.id}/details?scheduleId=${selectedScheduleId}`,
       );
       const data = response.data?.data ?? response.data;
       if (data && typeof data === "object") {
-        setCandidateDetails(data);
+        const mappedDetail: CandidateProctoringDetail = {
+          id: data.candidate?.candidateId || candidate.id,
+          name: data.candidate?.candidateName || candidate.name,
+          email: data.candidate?.email || candidate.email,
+          testStatus: data.testStatus === "ACTIVE" ? "IN_PROGRESS" : data.testStatus,
+          riskScore: Math.round(data.riskScore || 0),
+          riskLevel: data.riskLevel || "NONE",
+          violationsCount: data.violationCount || 0,
+          criticalViolationsCount: data.criticalViolationCount || 0,
+          startedAt: data.systemInfo?.startedAt ? new Date(data.systemInfo.startedAt).toLocaleString() : "N/A",
+          submittedAt: data.systemInfo?.endedAt ? new Date(data.systemInfo.endedAt).toLocaleString() : null,
+          violations: data.violations?.map((v: any) => ({
+            id: v.eventId || v.id,
+            time: v.occurredAt ? new Date(v.occurredAt).toLocaleTimeString() : "N/A",
+            eventType: v.eventType,
+            severity: v.severity,
+            description: v.metadata?.description || `Triggered ${v.eventType?.replace(/_/g, " ") || "violation"}`,
+            evidenceAvailable: data.evidence?.some((e: any) => e.eventId === v.eventId) || false,
+          })) || [],
+          evidences: data.evidence?.map((e: any) => ({
+            id: e.id,
+            imageUrl: e.imageData || e.s3Key || "",
+            eventType: e.snapshotType || "VIOLATION",
+            capturedAt: e.capturedAt ? new Date(e.capturedAt).toLocaleString() : "N/A",
+            severity: "HIGH",
+            description: e.s3Key || "Attached Frame Capture",
+          })) || [],
+          snapshots: data.snapshots?.map((s: any) => ({
+            id: s.id,
+            imageUrl: s.imageData || s.s3Key || "",
+            capturedAt: s.capturedAt ? new Date(s.capturedAt).toLocaleTimeString() : "N/A",
+          })) || [],
+          systemInfo: {
+            browser: data.systemInfo?.latestEventMetadata?.userAgent || data.systemInfo?.latestEventMetadata?.browser || "Chrome / Safari",
+            os: data.systemInfo?.latestEventMetadata?.os || "Windows 11 / macOS",
+            ipAddress: data.systemInfo?.ipAddress || "Unknown",
+            device: data.systemInfo?.latestEventMetadata?.device || "Desktop",
+            screenResolution: data.systemInfo?.latestEventMetadata?.screenResolution || "1920x1080",
+          },
+          reviewStatus: data.reviewDecision?.reviewStatus || "NOT_REVIEWED",
+        };
+        setCandidateDetails(mappedDetail);
       } else {
         throw new Error("Invalid response");
       }
@@ -482,10 +535,30 @@ export default function ProctoringDashboard() {
   const CameraFeedPlaceholder = ({
     eventType,
     isEvidence,
+    imageUrl,
   }: {
     eventType: string;
     isEvidence: boolean;
+    imageUrl?: string;
   }) => {
+    if (imageUrl && (imageUrl.startsWith("http") || imageUrl.startsWith("data:"))) {
+      return (
+        <div className="relative w-full h-36 bg-slate-950 rounded-lg overflow-hidden flex items-center justify-center border border-slate-850">
+          <img src={imageUrl} alt="Proctoring feed capture" className="w-full h-full object-cover" />
+          <div className="absolute top-2 left-2 text-[8px] font-mono text-white bg-slate-950/60 px-1 rounded uppercase tracking-wider">
+            {isEvidence ? "VIOLATION FRAME" : "PERIODIC AUDIT"}
+          </div>
+          {isEvidence && (
+            <div className="absolute border border-rose-500/50 bg-rose-500/5 w-28 h-20 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 rounded flex flex-col justify-between p-1">
+              <span className="text-[8px] font-mono text-rose-500 font-bold tracking-tight">
+                FLAGGED
+              </span>
+            </div>
+          )}
+        </div>
+      );
+    }
+
     return (
       <div className="relative w-full h-36 bg-slate-950 rounded-lg overflow-hidden flex items-center justify-center border border-slate-850">
         {/* Scanner line overlay */}
@@ -1224,7 +1297,7 @@ export default function ProctoringDashboard() {
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         {candidateDetails.evidences.map((ev) => (
                           <div key={ev.id} className="bg-card border border-border/60 rounded-xl p-3.5 space-y-3 shadow-sm hover:shadow transition-shadow">
-                            <CameraFeedPlaceholder eventType={ev.eventType} isEvidence={true} />
+                            <CameraFeedPlaceholder eventType={ev.eventType} isEvidence={true} imageUrl={ev.imageUrl} />
                             
                             <div className="space-y-1">
                               <div className="flex justify-between items-center gap-1.5">
@@ -1267,7 +1340,7 @@ export default function ProctoringDashboard() {
                       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                         {candidateDetails.snapshots.map((snap, idx) => (
                           <div key={snap.id} className="bg-slate-950/5 border border-border/60 p-2 rounded-lg flex flex-col space-y-2">
-                            <CameraFeedPlaceholder eventType="AUDIT_SNAP" isEvidence={false} />
+                            <CameraFeedPlaceholder eventType="AUDIT_SNAP" isEvidence={false} imageUrl={snap.imageUrl} />
                             <div className="flex justify-between items-center text-[9px] font-mono text-muted-foreground">
                               <span>SNAP #{idx + 1}</span>
                               <span>{snap.capturedAt}</span>
