@@ -157,464 +157,8 @@ export interface CandidateProctoringDetail {
 }
 
 // ==========================================
-// Fallback Dummy Data
+// Component
 // ==========================================
-const DUMMY_SCHEDULES: AssessmentSchedule[] = [
-  {
-    id: "sch-1",
-    assessmentName: "Java Full Stack Hiring Test",
-    scheduledDate: "18 June 2026",
-    startTime: "10:00 AM",
-    proctoringMode: "HIGH",
-  },
-  {
-    id: "sch-2",
-    assessmentName: "Frontend Engineer Assessment",
-    scheduledDate: "19 June 2026",
-    startTime: "02:00 PM",
-    proctoringMode: "MEDIUM",
-  },
-  {
-    id: "sch-3",
-    assessmentName: "Python Data Science Quiz",
-    scheduledDate: "20 June 2026",
-    startTime: "11:30 AM",
-    proctoringMode: "LOW",
-  },
-];
-
-const DUMMY_CANDIDATES: Record<string, ProctoringCandidate[]> = {
-  "sch-1": [
-    {
-      id: "cand-101",
-      name: "John Doe",
-      email: "john.doe@example.com",
-      testStatus: "IN_PROGRESS",
-      proctoringMode: "HIGH",
-      riskLevel: "HIGH",
-      violationsCount: 4,
-      criticalViolationsCount: 1,
-      lastActivity: "10:15 AM",
-      reviewStatus: "NEEDS_MANUAL_REVIEW",
-    },
-    {
-      id: "cand-102",
-      name: "Jane Smith",
-      email: "jane.smith@example.com",
-      testStatus: "SUBMITTED",
-      proctoringMode: "HIGH",
-      riskLevel: "NONE",
-      violationsCount: 0,
-      criticalViolationsCount: 0,
-      lastActivity: "10:45 AM",
-      reviewStatus: "CLEAN",
-    },
-    {
-      id: "cand-103",
-      name: "Alice Johnson",
-      email: "alice.j@example.com",
-      testStatus: "TERMINATED",
-      proctoringMode: "HIGH",
-      riskLevel: "CRITICAL",
-      violationsCount: 7,
-      criticalViolationsCount: 3,
-      lastActivity: "10:20 AM",
-      reviewStatus: "DISQUALIFIED",
-    },
-    {
-      id: "cand-104",
-      name: "Bob Brown",
-      email: "bob.brown@example.com",
-      testStatus: "NOT_STARTED",
-      proctoringMode: "HIGH",
-      riskLevel: "NONE",
-      violationsCount: 0,
-      criticalViolationsCount: 0,
-      lastActivity: "N/A",
-      reviewStatus: "NOT_REVIEWED",
-    },
-    {
-      id: "cand-105",
-      name: "Charlie Green",
-      email: "charlie@example.com",
-      testStatus: "AUTO_SUBMITTED",
-      proctoringMode: "HIGH",
-      riskLevel: "MEDIUM",
-      violationsCount: 2,
-      criticalViolationsCount: 0,
-      lastActivity: "10:30 AM",
-      reviewStatus: "WARNING_ISSUED",
-    },
-  ],
-  "sch-2": [
-    {
-      id: "cand-201",
-      name: "Daniel White",
-      email: "daniel.w@example.com",
-      testStatus: "IN_PROGRESS",
-      proctoringMode: "MEDIUM",
-      riskLevel: "LOW",
-      violationsCount: 1,
-      criticalViolationsCount: 0,
-      lastActivity: "02:10 PM",
-      reviewStatus: "NOT_REVIEWED",
-    },
-    {
-      id: "cand-202",
-      name: "Eva Black",
-      email: "eva.b@example.com",
-      testStatus: "SUBMITTED",
-      proctoringMode: "MEDIUM",
-      riskLevel: "NONE",
-      violationsCount: 0,
-      criticalViolationsCount: 0,
-      lastActivity: "02:45 PM",
-      reviewStatus: "CLEAN",
-    },
-    {
-      id: "cand-203",
-      name: "Frank Miller",
-      email: "frank.m@example.com",
-      testStatus: "TERMINATED",
-      proctoringMode: "MEDIUM",
-      riskLevel: "HIGH",
-      violationsCount: 5,
-      criticalViolationsCount: 2,
-      lastActivity: "02:22 PM",
-      reviewStatus: "DISQUALIFIED",
-    },
-  ],
-  "sch-3": [
-    {
-      id: "cand-301",
-      name: "Grace Hopper",
-      email: "grace@example.com",
-      testStatus: "SUBMITTED",
-      proctoringMode: "LOW",
-      riskLevel: "NONE",
-      violationsCount: 0,
-      criticalViolationsCount: 0,
-      lastActivity: "11:55 AM",
-      reviewStatus: "CLEAN",
-    },
-    {
-      id: "cand-302",
-      name: "Henry Cavill",
-      email: "henry@example.com",
-      testStatus: "SUBMITTED",
-      proctoringMode: "LOW",
-      riskLevel: "NONE",
-      violationsCount: 0,
-      criticalViolationsCount: 0,
-      lastActivity: "12:15 PM",
-      reviewStatus: "CLEAN",
-    },
-    {
-      id: "cand-303",
-      name: "Ivy League",
-      email: "ivy@example.com",
-      testStatus: "SUBMITTED",
-      proctoringMode: "LOW",
-      riskLevel: "NONE",
-      violationsCount: 0,
-      criticalViolationsCount: 0,
-      lastActivity: "12:05 PM",
-      reviewStatus: "CLEAN",
-    },
-    {
-      id: "cand-304",
-      name: "Jack Sparrow",
-      email: "jack@example.com",
-      testStatus: "NOT_STARTED",
-      proctoringMode: "LOW",
-      riskLevel: "NONE",
-      violationsCount: 0,
-      criticalViolationsCount: 0,
-      lastActivity: "N/A",
-      reviewStatus: "NOT_REVIEWED",
-    },
-  ],
-};
-
-const DUMMY_CANDIDATE_DETAILS: Record<string, CandidateProctoringDetail> = {
-  "cand-101": {
-    id: "cand-101",
-    name: "John Doe",
-    email: "john.doe@example.com",
-    testStatus: "IN_PROGRESS",
-    riskScore: 78,
-    riskLevel: "HIGH",
-    violationsCount: 4,
-    criticalViolationsCount: 1,
-    startedAt: "10:00 AM",
-    submittedAt: null,
-    systemInfo: {
-      browser: "Chrome 125.0.0",
-      os: "macOS Sonoma",
-      ipAddress: "192.168.1.45",
-      device: "Desktop (MacBook Pro)",
-      screenResolution: "3024 x 1964",
-    },
-    reviewStatus: "NEEDS_MANUAL_REVIEW",
-    violations: [
-      {
-        id: "viol-1",
-        time: "10:03 AM",
-        eventType: "TAB_SWITCH",
-        severity: "MEDIUM",
-        description: "Candidate switched browser tab/window",
-        evidenceAvailable: false,
-      },
-      {
-        id: "viol-2",
-        time: "10:08 AM",
-        eventType: "MULTIPLE_FACES",
-        severity: "HIGH",
-        description: "Additional face detected in camera frame",
-        evidenceAvailable: true,
-      },
-      {
-        id: "viol-3",
-        time: "10:12 AM",
-        eventType: "LOOKING_AWAY",
-        severity: "LOW",
-        description: "Candidate looking away from screen persistently",
-        evidenceAvailable: false,
-      },
-      {
-        id: "viol-4",
-        time: "10:15 AM",
-        eventType: "UNAUTHORIZED_OBJECT",
-        severity: "CRITICAL",
-        description: "Mobile phone detected in frame",
-        evidenceAvailable: true,
-      },
-    ],
-    evidences: [
-      {
-        id: "ev-1",
-        eventType: "MULTIPLE_FACES",
-        capturedAt: "10:08 AM",
-        severity: "HIGH",
-        description: "Webcam screenshot showing a second face in the background.",
-      },
-      {
-        id: "ev-2",
-        eventType: "UNAUTHORIZED_OBJECT",
-        capturedAt: "10:15 AM",
-        severity: "CRITICAL",
-        description: "Webcam screenshot showing mobile phone usage.",
-      },
-    ],
-    snapshots: [
-      { id: "snap-1", imageUrl: "", capturedAt: "10:02 AM" },
-      { id: "snap-2", imageUrl: "", capturedAt: "10:05 AM" },
-      { id: "snap-3", imageUrl: "", capturedAt: "10:08 AM" },
-      { id: "snap-4", imageUrl: "", capturedAt: "10:12 AM" },
-      { id: "snap-5", imageUrl: "", capturedAt: "10:15 AM" },
-    ],
-  },
-  "cand-103": {
-    id: "cand-103",
-    name: "Alice Johnson",
-    email: "alice.j@example.com",
-    testStatus: "TERMINATED",
-    riskScore: 96,
-    riskLevel: "CRITICAL",
-    violationsCount: 7,
-    criticalViolationsCount: 3,
-    startedAt: "10:00 AM",
-    submittedAt: "10:20 AM",
-    systemInfo: {
-      browser: "Edge 124.0.0",
-      os: "Windows 11",
-      ipAddress: "103.45.210.12",
-      device: "Desktop PC",
-      screenResolution: "1920 x 1080",
-    },
-    reviewStatus: "DISQUALIFIED",
-    violations: [
-      {
-        id: "viol-11",
-        time: "10:01 AM",
-        eventType: "FULLSCREEN_EXIT",
-        severity: "MEDIUM",
-        description: "Candidate exited full screen mode",
-        evidenceAvailable: false,
-      },
-      {
-        id: "viol-12",
-        time: "10:04 AM",
-        eventType: "TAB_SWITCH",
-        severity: "MEDIUM",
-        description: "Candidate switched browser tab",
-        evidenceAvailable: false,
-      },
-      {
-        id: "viol-13",
-        time: "10:06 AM",
-        eventType: "FACE_MISSING",
-        severity: "CRITICAL",
-        description: "No face detected in webcam frame for 15+ seconds",
-        evidenceAvailable: true,
-      },
-      {
-        id: "viol-14",
-        time: "10:10 AM",
-        eventType: "SPEECH_DETECTED",
-        severity: "HIGH",
-        description: "Continuous human speech audio detected",
-        evidenceAvailable: false,
-      },
-      {
-        id: "viol-15",
-        time: "10:14 AM",
-        eventType: "UNAUTHORIZED_OBJECT",
-        severity: "CRITICAL",
-        description: "Secondary screen / tablet detected in frame",
-        evidenceAvailable: true,
-      },
-      {
-        id: "viol-16",
-        time: "10:18 AM",
-        eventType: "TAB_SWITCH",
-        severity: "CRITICAL",
-        description: "Multiple tab switches; threshold exceeded",
-        evidenceAvailable: false,
-      },
-      {
-        id: "viol-17",
-        time: "10:20 AM",
-        eventType: "TEST_TERMINATED",
-        severity: "CRITICAL",
-        description: "Test auto-terminated due to maximum violation limit",
-        evidenceAvailable: false,
-      },
-    ],
-    evidences: [
-      {
-        id: "ev-11",
-        eventType: "FACE_MISSING",
-        capturedAt: "10:06 AM",
-        severity: "CRITICAL",
-        description: "Webcam screenshot showing empty desk/chair.",
-      },
-      {
-        id: "ev-12",
-        eventType: "UNAUTHORIZED_OBJECT",
-        capturedAt: "10:14 AM",
-        severity: "CRITICAL",
-        description: "Webcam screenshot showing tablet device on desk.",
-      },
-    ],
-    snapshots: [
-      { id: "snap-11", imageUrl: "", capturedAt: "10:02 AM" },
-      { id: "snap-12", imageUrl: "", capturedAt: "10:06 AM" },
-      { id: "snap-13", imageUrl: "", capturedAt: "10:10 AM" },
-      { id: "snap-14", imageUrl: "", capturedAt: "10:14 AM" },
-      { id: "snap-15", imageUrl: "", capturedAt: "10:18 AM" },
-    ],
-  },
-};
-
-const generateDummyDetails = (
-  candidate: ProctoringCandidate,
-): CandidateProctoringDetail => {
-  const hasViolations = candidate.violationsCount > 0;
-  const violations: ProctoringViolation[] = [];
-  const evidences: EvidenceItem[] = [];
-  const snapshots: SnapshotItem[] = [];
-
-  if (hasViolations) {
-    for (let i = 0; i < candidate.violationsCount; i++) {
-      const isCritical = i < candidate.criticalViolationsCount;
-      const severity = isCritical
-        ? "CRITICAL"
-        : i % 2 === 0
-          ? "HIGH"
-          : "MEDIUM";
-      const eventType = isCritical
-        ? "UNAUTHORIZED_OBJECT"
-        : i % 2 === 0
-          ? "TAB_SWITCH"
-          : "LOOKING_AWAY";
-      const description =
-        eventType === "UNAUTHORIZED_OBJECT"
-          ? "Mobile device detected in candidate camera view"
-          : eventType === "TAB_SWITCH"
-            ? "Candidate switched to an external window"
-            : "Gaze deviation detected";
-
-      violations.push({
-        id: `gen-viol-${candidate.id}-${i}`,
-        time: `10:${10 + i * 5} AM`,
-        eventType,
-        severity: severity as ProctoringEventSeverity,
-        description,
-        evidenceAvailable: isCritical || i % 2 === 0,
-      });
-
-      if (isCritical || i % 2 === 0) {
-        evidences.push({
-          id: `gen-ev-${candidate.id}-${i}`,
-          eventType,
-          capturedAt: `10:${10 + i * 5} AM`,
-          severity: severity as ProctoringEventSeverity,
-          description: `Captured screenshot of violation: ${description}`,
-        });
-      }
-    }
-  }
-
-  // Generate snapshots
-  const snapCount = Math.max(3, candidate.violationsCount + 1);
-  for (let i = 0; i < snapCount; i++) {
-    snapshots.push({
-      id: `gen-snap-${candidate.id}-${i}`,
-      imageUrl: "",
-      capturedAt: `10:${5 + i * 8} AM`,
-    });
-  }
-
-  return {
-    id: candidate.id,
-    name: candidate.name,
-    email: candidate.email,
-    testStatus: candidate.testStatus,
-    riskScore:
-      candidate.riskLevel === "CRITICAL"
-        ? 95
-        : candidate.riskLevel === "HIGH"
-          ? 75
-          : candidate.riskLevel === "MEDIUM"
-            ? 45
-            : candidate.riskLevel === "LOW"
-              ? 20
-              : 5,
-    riskLevel: candidate.riskLevel,
-    violationsCount: candidate.violationsCount,
-    criticalViolationsCount: candidate.criticalViolationsCount,
-    startedAt: "10:00 AM",
-    submittedAt:
-      candidate.testStatus === "SUBMITTED" ||
-      candidate.testStatus === "AUTO_SUBMITTED" ||
-      candidate.testStatus === "TERMINATED"
-        ? "10:50 AM"
-        : null,
-    systemInfo: {
-      browser: "Chrome 125.0.0",
-      os: "Windows 11",
-      ipAddress: "192.168.1.18",
-      device: "Laptop (Asus Zenbook)",
-      screenResolution: "2880 x 1800",
-    },
-    reviewStatus: candidate.reviewStatus,
-    violations,
-    evidences,
-    snapshots,
-  };
-};
-
 export default function ProctoringDashboard() {
   const { toast } = useToast();
 
@@ -627,8 +171,9 @@ export default function ProctoringDashboard() {
   const [loadingSchedules, setLoadingSchedules] = useState(false);
   const [loadingCandidates, setLoadingCandidates] = useState(false);
   const [loadingDetails, setLoadingDetails] = useState(false);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [isMockActive, setIsMockActive] = useState(false);
+  const [errorSchedules, setErrorSchedules] = useState<string | null>(null);
+  const [errorCandidates, setErrorCandidates] = useState<string | null>(null);
+  const [errorDetails, setErrorDetails] = useState<string | null>(null);
 
   // Filters State
   const [searchQuery, setSearchQuery] = useState("");
@@ -646,30 +191,21 @@ export default function ProctoringDashboard() {
   // Fetch Schedules API
   const loadSchedules = useCallback(async () => {
     setLoadingSchedules(true);
-    setErrorMsg(null);
+    setErrorSchedules(null);
     try {
-      const response = await apiClient.get(
-        "/admin/proctoring/assessment-schedules",
-      );
-      const data = response.data?.data || response.data;
+      const response = await apiClient.get("/admin/proctoring/assessment-schedules");
+      const data = response.data?.data ?? response.data;
       if (Array.isArray(data) && data.length > 0) {
         setSchedules(data);
-        setIsMockActive(false);
-        // Auto-select the first schedule
         setSelectedScheduleId(data[0].id);
       } else {
-        throw new Error("No assessment schedules found");
+        setSchedules([]);
+        setSelectedScheduleId("");
       }
-    } catch (err) {
-      console.warn(
-        "Failed to load schedules from API, falling back to dummy schedules:",
-        err,
-      );
-      setSchedules(DUMMY_SCHEDULES);
-      setIsMockActive(true);
-      if (DUMMY_SCHEDULES.length > 0) {
-        setSelectedScheduleId(DUMMY_SCHEDULES[0].id);
-      }
+    } catch {
+      setErrorSchedules("Could not load assessment schedules. Check your connection or try again.");
+      setSchedules([]);
+      setSelectedScheduleId("");
     } finally {
       setLoadingSchedules(false);
     }
@@ -679,52 +215,42 @@ export default function ProctoringDashboard() {
   const loadCandidates = useCallback(async (scheduleId: string) => {
     if (!scheduleId) return;
     setLoadingCandidates(true);
-    setErrorMsg(null);
+    setErrorCandidates(null);
     try {
       const response = await apiClient.get(
         `/admin/proctoring/assessment-schedules/${scheduleId}/candidates`,
       );
-      const data = response.data?.data || response.data;
-      if (Array.isArray(data)) {
-        setCandidates(data);
-      } else {
-        throw new Error("No candidates list returned");
-      }
-    } catch (err) {
-      console.warn(
-        `Failed to load candidates for schedule ${scheduleId} from API, falling back to dummy candidates:`,
-        err,
-      );
-      setCandidates(DUMMY_CANDIDATES[scheduleId] || []);
+      const data = response.data?.data ?? response.data;
+      setCandidates(Array.isArray(data) ? data : []);
+    } catch {
+      setErrorCandidates("Could not load candidates for this schedule.");
+      setCandidates([]);
     } finally {
       setLoadingCandidates(false);
     }
   }, []);
+
+
 
   // Fetch Candidate Detailed Info API
   const loadCandidateDetails = async (candidate: ProctoringCandidate) => {
     setSelectedCandidate(candidate);
     setIsDrawerOpen(true);
     setLoadingDetails(true);
+    setErrorDetails(null);
     try {
       const response = await apiClient.get(
-        `/admin/proctoring/candidates/${candidate.id}/details`,
+        `/admin/proctoring/candidates/${candidate.id}/details?scheduleId=${selectedScheduleId}`,
       );
-      const data = response.data?.data || response.data;
+      const data = response.data?.data ?? response.data;
       if (data && typeof data === "object") {
         setCandidateDetails(data);
       } else {
-        throw new Error("Invalid candidate details data");
+        throw new Error("Invalid response");
       }
-    } catch (err) {
-      console.warn(
-        `Failed to load candidate details for ${candidate.id} from API, falling back to dummy details:`,
-        err,
-      );
-      const fallback =
-        DUMMY_CANDIDATE_DETAILS[candidate.id] ||
-        generateDummyDetails(candidate);
-      setCandidateDetails(fallback);
+    } catch {
+      setErrorDetails("Could not load detailed proctoring data for this candidate.");
+      setCandidateDetails(null);
     } finally {
       setLoadingDetails(false);
     }
@@ -999,23 +525,20 @@ export default function ProctoringDashboard() {
 
   return (
     <div className="p-4 md:p-8 space-y-6 md:space-y-8 animate-fade-in w-full max-w-7xl mx-auto">
-      {/* Top Banner Notice for Mock mode */}
-      {isMockActive && (
-        <div className="flex items-center justify-between gap-4 p-3 bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-400 rounded-lg text-xs md:text-sm shadow-sm transition-all duration-300">
+      {/* API Error Banner for Schedules */}
+      {errorSchedules && (
+        <div className="flex items-center justify-between gap-4 p-3 bg-red-500/10 border border-red-500/20 text-red-700 dark:text-red-400 rounded-lg text-xs md:text-sm shadow-sm">
           <div className="flex items-center gap-2">
-            <Info className="h-4.5 w-4.5 shrink-0 text-amber-500" />
-            <span>
-              <strong>Demo Environment Active:</strong> Backend proctoring API is
-              offline/unreachable. Displaying simulated data.
-            </span>
+            <AlertCircle className="h-4 w-4 shrink-0 text-red-500" />
+            <span>{errorSchedules}</span>
           </div>
           <Button
             variant="outline"
             size="sm"
             onClick={loadSchedules}
-            className="h-8 border-amber-500/20 hover:bg-amber-500/20 text-amber-700 dark:text-amber-400 flex gap-1 items-center shrink-0"
+            className="h-8 border-red-500/20 hover:bg-red-500/10 text-red-600 dark:text-red-400 flex gap-1 items-center shrink-0"
           >
-            <RefreshCw className="h-3 w-3" /> Retry API
+            <RefreshCw className="h-3 w-3" /> Retry
           </Button>
         </div>
       )}
@@ -1033,6 +556,7 @@ export default function ProctoringDashboard() {
           </p>
         </div>
         <div className="flex items-center gap-3 shrink-0">
+
           <Button
             variant="outline"
             onClick={handleRetry}
@@ -1083,12 +607,16 @@ export default function ProctoringDashboard() {
       </div>
 
       {/* Main Panel Content */}
-      {loadingSchedules || loadingCandidates ? (
+      {loadingSchedules ? (
         <div className="flex flex-col items-center justify-center py-24 gap-4">
           <RefreshCw className="h-10 w-10 animate-spin text-rose-500" />
-          <p className="text-muted-foreground text-sm font-medium">
-            Fetching proctoring metrics and candidate telemetry...
-          </p>
+          <p className="text-muted-foreground text-sm font-medium">Loading assessment schedules...</p>
+        </div>
+      ) : !errorSchedules && schedules.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-20 border border-dashed rounded-xl bg-card/10 text-center gap-3">
+          <Shield className="h-12 w-12 text-muted-foreground/30" />
+          <p className="text-base font-semibold text-muted-foreground">No assessment schedules found.</p>
+          <p className="text-sm text-muted-foreground/70">Create a scheduled test first to begin proctoring.</p>
         </div>
       ) : !selectedScheduleId ? (
         <div className="flex flex-col items-center justify-center py-20 border border-dashed rounded-xl bg-card/10 text-center">
@@ -1096,6 +624,19 @@ export default function ProctoringDashboard() {
           <p className="text-base font-semibold text-muted-foreground">
             Select an assessment schedule to view proctoring activity.
           </p>
+        </div>
+      ) : loadingCandidates ? (
+        <div className="flex flex-col items-center justify-center py-24 gap-4">
+          <RefreshCw className="h-10 w-10 animate-spin text-rose-500" />
+          <p className="text-muted-foreground text-sm font-medium">Fetching proctoring metrics and candidate telemetry...</p>
+        </div>
+      ) : errorCandidates ? (
+        <div className="flex flex-col items-center justify-center py-20 border border-dashed rounded-xl bg-card/10 text-center gap-3">
+          <AlertCircle className="h-10 w-10 text-red-400/60" />
+          <p className="text-base font-semibold text-muted-foreground">{errorCandidates}</p>
+          <Button variant="outline" size="sm" onClick={() => loadCandidates(selectedScheduleId)} className="mt-1">
+            <RefreshCw className="h-3.5 w-3.5 mr-2" /> Retry
+          </Button>
         </div>
       ) : (
         <div className="space-y-8 animate-slide-up">

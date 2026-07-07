@@ -208,6 +208,15 @@ function TestInterfaceContent({ testId, sessionId, navigate, toast }: { testId?:
   const { violations, trustScore, isProctoringActive, startProctoring, syncViolations, flushEvidence, videoRef } = useProctoring();
   const lastWarnedCountRef = useRef(0);
 
+  const [saveStatus, setSaveStatus] = useState<"Saving..." | "Saved" | "Offline" | "Failed">("Saved");
+  const saveVersionsRef = useRef<Record<string, number>>({});
+  const getNextSaveVersion = useCallback((questionId: string) => {
+    const current = saveVersionsRef.current[questionId] || 0;
+    const next = current + 1;
+    saveVersionsRef.current[questionId] = next;
+    return next;
+  }, []);
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -316,10 +325,19 @@ function TestInterfaceContent({ testId, sessionId, navigate, toast }: { testId?:
       setError(null);
       
       console.log("🚀 STEP 1: Fetching session for ID:", sessionId);
-      const sessionResponse = await apiClient.get(`/test-sessions/${sessionId}`);
+      const sessionResponse = await apiClient.get(`/test-sessions/${sessionId}/resume`);
       const sessionData = sessionResponse.data?.data || sessionResponse.data;
       console.log("✅ STEP 2: Session Data:", sessionData);
-      setSession(sessionData);
+      
+      const normalizedSession: TestSession = {
+        id: sessionData.sessionId || sessionData.id,
+        testId: sessionData.testId || "",
+        candidateId: sessionData.candidateId || "",
+        status: sessionData.status,
+        startedAt: sessionData.serverNow || "",
+        remainingTimeSecs: sessionData.remainingSeconds || 0,
+      };
+      setSession(normalizedSession);
 
       console.log("🚀 STEP 3: Fetching paper for session:", sessionId);
       if (!sessionId) throw new Error("No session ID provided");
@@ -382,9 +400,29 @@ function TestInterfaceContent({ testId, sessionId, navigate, toast }: { testId?:
       // Auto-start proctoring as checks were done in gateway
       startProctoring();
 
+      const recoveredAnswers: Record<string, unknown> = {};
+      if (sessionData.submissions && Array.isArray(sessionData.submissions)) {
+        sessionData.submissions.forEach((sub: { questionId: string; answerText?: string; questionType?: string; gradingLanguage?: string }) => {
+          if (sub.questionType === "MCQ") {
+            try {
+              if (sub.answerText) {
+                recoveredAnswers[sub.questionId] = JSON.parse(sub.answerText);
+              }
+            } catch (e) {
+              console.warn("Failed to parse MCQ answer", sub.answerText, e);
+            }
+          } else if (sub.questionType === "CODING") {
+            recoveredAnswers[sub.questionId] = {
+              code: sub.answerText || "",
+              language: sub.gradingLanguage || "python3"
+            };
+          }
+        });
+      }
+
       if (sessionId) {
         const cachedAnswers = AnswerStore.getAnswers(sessionId);
-        setAnswers(prev => ({ ...prev, ...cachedAnswers }));
+        setAnswers(prev => ({ ...prev, ...recoveredAnswers, ...cachedAnswers }));
         setUnsyncedCount(AnswerStore.getOfflineQueue(sessionId).length);
       }
       
@@ -499,14 +537,55 @@ useEffect(() => {
   }
 }, [currentIndex, questions, language, answers, sessionId]);
 
-// Save code draft on change
+// Save code draft on change with debounced database synchronization
 useEffect(() => {
   if (questions.length === 0 || !sessionId) return;
   const currentQ = questions[currentIndex];
-  if (currentQ?.type === "CODING" && code) {
-    AnswerStore.saveDraft(sessionId, currentQ.id, language, code);
-  }
-}, [code, currentIndex, questions, language, sessionId]);
+  if (currentQ?.type !== "CODING" || !code) return;
+
+  // Save to local draft buffer (immediate local feedback)
+  AnswerStore.saveDraft(sessionId, currentQ.id, language, code);
+
+  setSaveStatus("Saving...");
+
+  const delayDebounceFn = setTimeout(async () => {
+    const version = getNextSaveVersion(currentQ.id);
+
+    if (!navigator.onLine) {
+      setSaveStatus("Offline");
+      AnswerStore.queueOfflineSubmission(sessionId, currentQ.id, "CODING", { code, language, saveVersion: version });
+      setUnsyncedCount(AnswerStore.getOfflineQueue(sessionId).length);
+      return;
+    }
+
+    try {
+      await apiClient.post("/submissions", {
+        sessionId: sessionId,
+        questionId: currentQ.id,
+        answerText: code,
+        language: LANGUAGE_MAP[language]?.slug || "python3",
+        saveVersion: version
+      });
+      setSaveStatus("Saved");
+    } catch (err: unknown) {
+      console.error("Autosave failed:", err);
+      const axiosErr = err as { response?: { status: number; data?: { message?: string } } };
+      if (axiosErr.response?.status === 400 && axiosErr.response?.data?.message?.includes("expired")) {
+        setSaveStatus("Failed");
+        toast({
+          title: "Session Expired",
+          description: "Your session duration has expired.",
+          variant: "destructive"
+        });
+        navigate(`/test/${testId}/results?session=${sessionId}`);
+      } else {
+        setSaveStatus("Failed");
+      }
+    }
+  }, 2500);
+
+  return () => clearTimeout(delayDebounceFn);
+}, [code, language, currentIndex, questions, sessionId, testId, navigate, toast, getNextSaveVersion]);
 
   // Set time left from session or test
   useEffect(() => {
@@ -609,7 +688,7 @@ useEffect(() => {
       setSubmitting(false);
       setShowSubmitDialog(false);
     }
-  }, [sessionId, answers, testId, navigate, toast, syncViolations, questions, currentIndex, flushQuestionTiming]);
+  }, [sessionId, answers, testId, navigate, toast, syncViolations, flushEvidence, questions, currentIndex, flushQuestionTiming]);
 
   const handleAutoSubmit = useCallback(async () => {
     toast({
@@ -1101,8 +1180,10 @@ useEffect(() => {
     // Flush current timing as this is an autosave event
     flushQuestionTiming(questionId);
 
+    const version = getNextSaveVersion(questionId);
+
     if (!isOnline) {
-      AnswerStore.queueOfflineSubmission(sessionId, questionId, "MCQ", value);
+      AnswerStore.queueOfflineSubmission(sessionId, questionId, "MCQ", { value, saveVersion: version });
       setUnsyncedCount(AnswerStore.getOfflineQueue(sessionId).length);
       return;
     }
@@ -1111,14 +1192,15 @@ useEffect(() => {
       await apiClient.post("/submissions", {
         sessionId: sessionId,
         questionId: questionId,
-        selectedOptionIds: [value]
+        selectedOptionIds: [value],
+        saveVersion: version
       });
     } catch (error) {
       console.error("Auto-save MCQ error:", error);
-      AnswerStore.queueOfflineSubmission(sessionId, questionId, "MCQ", value);
+      AnswerStore.queueOfflineSubmission(sessionId, questionId, "MCQ", { value, saveVersion: version });
       setUnsyncedCount(AnswerStore.getOfflineQueue(sessionId).length);
     }
-  }, [answers, sessionId, isOnline, flushQuestionTiming]);
+  }, [answers, sessionId, isOnline, flushQuestionTiming, getNextSaveVersion]);
 
 
   const formatTime = (seconds: number) => {
