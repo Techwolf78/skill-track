@@ -67,11 +67,23 @@ import {
   Search,
   Calendar,
 } from "lucide-react";
-import { testService, Test, CreateTestRequest, TestQuestion, Question, ProctoringMode } from "@/lib/test-service";
-import { candidateService } from "@/lib/candidate-service";
+import { testService, Test, CreateTestRequest, TestQuestion, Question, ProctoringMode, TestScheduleExtended } from "@/lib/test-service";
+import { candidateService, Candidate } from "@/lib/candidate-service";
 import { apiClient } from "@/lib/api-client";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth-context";
+
+interface CandidateInvitation {
+  id: string;
+  scheduleId?: string;
+  candidateId?: string;
+  status?: string;
+  token?: string;
+}
+
+interface EnrichedTestQuestion extends TestQuestion {
+  question?: Question & { type?: string; avgTimeSeconds?: number; avg_time_seconds?: number };
+}
 
 const getProctoringPreset = (mode: ProctoringMode) => {
   const defaults = {
@@ -157,7 +169,7 @@ export default function AdminTestsEdit() {
   const { toast } = useToast();
   const { user } = useAuth();
 
-  const formatDuration = (secs: any) => {
+  const formatDuration = (secs: unknown) => {
     const s = Number(secs);
     if (isNaN(s) || s <= 0) return "N/A";
     if (s % 60 === 0) {
@@ -178,8 +190,8 @@ export default function AdminTestsEdit() {
   const [deleting, setDeleting] = useState(false);
   const [deletingQuestion, setDeletingQuestion] = useState(false);
   const [test, setTest] = useState<Test | null>(null);
-  const [questionsData, setQuestionsData] = useState<(TestQuestion & { question?: Question })[]>([]);
-  const [selectedQuestion, setSelectedQuestion] = useState<(TestQuestion & { question?: Question }) | null>(null);
+  const [questionsData, setQuestionsData] = useState<EnrichedTestQuestion[]>([]);
+  const [selectedQuestion, setSelectedQuestion] = useState<EnrichedTestQuestion | null>(null);
   const [activeTab, setActiveTab] = useState<string>(location.state?.activeTab || "details");
 
   useEffect(() => {
@@ -189,13 +201,13 @@ export default function AdminTestsEdit() {
   }, [location.state]);
 
   // Invitation states
-  const [candidates, setCandidates] = useState<any[]>([]);
-  const [invitations, setInvitations] = useState<any[]>([]);
+  const [candidates, setCandidates] = useState<Candidate[]>([]);
+  const [invitations, setInvitations] = useState<CandidateInvitation[]>([]);
   const [inviteSearchTerm, setInviteSearchTerm] = useState("");
   const [selectedSchedule, setSelectedSchedule] = useState<string>("");
-  const [selectedScheduleData, setSelectedScheduleData] = useState<any>(null);
+  const [selectedScheduleData, setSelectedScheduleData] = useState<TestScheduleExtended | null>(null);
   const [isInviteDialogOpen, setIsInviteDialogOpen] = useState(false);
-  const [selectedCandidate, setSelectedCandidate] = useState<any>(null);
+  const [selectedCandidate, setSelectedCandidate] = useState<Candidate | null>(null);
   const [selectedCandidates, setSelectedCandidates] = useState<string[]>([]);
   const [inviteSubmitting, setInviteSubmitting] = useState(false);
   const [copiedToken, setCopiedToken] = useState<string | null>(null);
@@ -247,7 +259,7 @@ export default function AdminTestsEdit() {
     };
 
     const testSchedules = test.testSchedules || [];
-    const activeOrFirst = testSchedules.find((s: any) => s.status === "SCHEDULED" || s.status === "LIVE") || testSchedules[0];
+    const activeOrFirst = testSchedules.find((s) => s.status === "SCHEDULED" || s.status === "LIVE") || testSchedules[0];
     const originalStart = getLocalISOTime(activeOrFirst?.startTime);
     const originalEnd = getLocalISOTime(activeOrFirst?.endTime);
 
@@ -269,8 +281,8 @@ export default function AdminTestsEdit() {
     if (formData.proctoringMode !== test.proctoringMode) return true;
     
     // Check instructions general text
-    const currentGeneral = (formData.instructions as any)?.general || "";
-    const originalGeneral = (test.instructions as any)?.general || "";
+    const currentGeneral = (formData.instructions as Record<string, unknown> | undefined)?.general || "";
+    const originalGeneral = (test.instructions as Record<string, unknown> | undefined)?.general || "";
     if (currentGeneral !== originalGeneral) return true;
 
     // Check schedule times
@@ -330,7 +342,7 @@ export default function AdminTestsEdit() {
       try {
         const response = await apiClient.get(`/test-questions/test/${id}`);
         const detailedQuestions = response.data?.data || [];
-        const enrichedQuestions = detailedQuestions.map((tq: any) => ({
+        const enrichedQuestions = detailedQuestions.map((tq: EnrichedTestQuestion) => ({
           ...tq,
           timeLimitSecs: tq.timeLimitSecs ?? tq.question?.timeLimitSecs ?? tq.question?.avgTimeSeconds ?? tq.question?.avg_time_seconds ?? 0,
         }));
@@ -614,13 +626,13 @@ To refer to the FAQ document, you can click on the HELP button which is present 
       setTest(prev => {
         if (!prev) return prev;
         const testSchedules = prev.testSchedules || [];
-        const activeOrFirst = testSchedules.find((s: any) => s.status === "SCHEDULED" || s.status === "LIVE") || testSchedules[0];
+        const activeOrFirst = testSchedules.find((s) => s.status === "SCHEDULED" || s.status === "LIVE") || testSchedules[0];
         
         let newSchedules;
         if (activeOrFirst) {
           newSchedules = testSchedules.map(s => s.id === activeOrFirst.id ? { ...s, startTime: startISO, endTime: endISO } : s);
         } else {
-          newSchedules = [...testSchedules, { id: selectedSchedule || "new-id", startTime: startISO, endTime: endISO }];
+          newSchedules = [...testSchedules, { id: selectedSchedule || "new-id", startTime: startISO, endTime: endISO } as unknown as TestScheduleExtended];
         }
         
         return {
@@ -748,11 +760,11 @@ To refer to the FAQ document, you can click on the HELP button which is present 
       ]);
 
       // Filter schedules to only keep the ones for THIS test
-      const testSchedules = schedulesData.filter((s: any) => s.testId === id);
+      const testSchedules = schedulesData.filter((s) => s.testId === id);
       
       // Auto-select the first schedule if available
       if (testSchedules.length > 0) {
-        const activeOrFirst = testSchedules.find((s: any) => s.status === "SCHEDULED" || s.status === "LIVE") || testSchedules[0];
+        const activeOrFirst = testSchedules.find((s) => s.status === "SCHEDULED" || s.status === "LIVE") || testSchedules[0];
         setSelectedSchedule(activeOrFirst.id);
         setSelectedScheduleData(activeOrFirst);
         if (activeOrFirst.startTime) {
@@ -775,8 +787,8 @@ To refer to the FAQ document, you can click on the HELP button which is present 
         const invData = response.data?.data;
         if (Array.isArray(invData)) {
           setInvitations(invData);
-        } else if (invData && typeof invData === "object" && "content" in invData && Array.isArray((invData as any).content)) {
-          setInvitations((invData as any).content);
+        } else if (invData && typeof invData === "object" && "content" in invData && Array.isArray((invData as Record<string, unknown>).content)) {
+          setInvitations((invData as Record<string, unknown>).content as CandidateInvitation[]);
         } else {
           setInvitations([]);
         }
@@ -834,7 +846,7 @@ To refer to the FAQ document, you can click on the HELP button which is present 
       toast({
         title: "Error",
         description:
-          (error as any).response?.data?.message || "Failed to send invitation",
+          (error as { response?: { data?: { message?: string } } }).response?.data?.message || "Failed to send invitation",
         variant: "destructive",
       });
     } finally {
@@ -893,11 +905,11 @@ To refer to the FAQ document, you can click on the HELP button which is present 
     }
   };
 
-  const copyTestLink = (testId: string, token: string) => {
+  const copyTestLink = (invitationId: string) => {
     const baseUrl = window.location.origin;
-    const testUrl = `${baseUrl}/test/access/${testId}/${token}`;
+    const testUrl = `${baseUrl}/test/access/${invitationId}`;
     navigator.clipboard.writeText(testUrl);
-    setCopiedToken(token);
+    setCopiedToken(invitationId);
     toast({
       title: "Link Copied!",
       description: "Test URL copied to clipboard",
@@ -1132,7 +1144,7 @@ To refer to the FAQ document, you can click on the HELP button which is present 
                   <Textarea
                     placeholder="Enter test instructions..."
                     className="flex-1 min-h-[350px] font-sans text-sm resize-none"
-                    value={(formData.instructions as any)?.general || ""}
+                    value={(formData.instructions as Record<string, unknown> | undefined)?.general as string || ""}
                     onChange={(e) =>
                       setFormData((prev) => ({
                         ...prev,
@@ -1195,7 +1207,7 @@ To refer to the FAQ document, you can click on the HELP button which is present 
                           </p>
                           <div className="flex gap-3 text-xs text-muted-foreground mt-1">
                             <span className="capitalize">
-                              {(item.question?.type || item.question?.questionType)?.toLowerCase()}
+                              {((item.question as Record<string, unknown> | undefined)?.type as string || item.question?.questionType || "")?.toLowerCase()}
                             </span>
                             <span>•</span>
                             <span>{item.marks} marks</span>
@@ -1845,15 +1857,15 @@ To refer to the FAQ document, you can click on the HELP button which is present 
                                   )}
                                 </TableCell>
                                 <TableCell>
-                                  {invitation?.token ? (
+                                  {invitation ? (
                                     <Button
                                       variant="ghost"
                                       size="sm"
-                                      onClick={() => copyTestLink(test.id, invitation.token)}
+                                      onClick={() => copyTestLink(invitation.id)}
                                       className="h-8 px-2"
                                       disabled={displayStatus === "EXPIRED"}
                                     >
-                                      {copiedToken === invitation.token ? (
+                                      {copiedToken === invitation.id ? (
                                         <>
                                           <Check className="w-3 h-3 mr-1 text-green-500" />
                                           <span className="text-xs">Copied!</span>
