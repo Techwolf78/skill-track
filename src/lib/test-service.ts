@@ -398,7 +398,9 @@ export interface Test {
   enableLiveProctoring?: boolean;
   autoSubmitOnCriticalViolations?: boolean;
   maxCriticalViolations?: number;
+  testSchedules?: TestSchedule[];
 }
+
 
 export interface TestViewModel {
   id: string;

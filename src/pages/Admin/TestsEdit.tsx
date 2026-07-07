@@ -1195,7 +1195,7 @@ To refer to the FAQ document, you can click on the HELP button which is present 
                           </p>
                           <div className="flex gap-3 text-xs text-muted-foreground mt-1">
                             <span className="capitalize">
-                              {(item.question?.type || item.question?.questionType)?.toLowerCase()}
+                              {item.question?.questionType?.toLowerCase()}
                             </span>
                             <span>•</span>
                             <span>{item.marks} marks</span>
