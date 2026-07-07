@@ -52,46 +52,8 @@ export class UploadQueue {
   }
 
   private async upload(item: QueueItem): Promise<void> {
-    const retries = item.retries ?? 0;
-    try {
-      // Step 1 — get presigned upload URL from backend
-      const presignRes = await apiClient.post<{
-        data: { signedUploadUrl: string; storagePath: string };
-      }>(`/test-sessions/${this.sessionId}/evidence/presign`, {
-        evidenceType: item.evidenceType,
-        violationType: item.violationType ?? null,
-      });
-      const { signedUploadUrl, storagePath } = presignRes.data.data;
-
-      // Step 2 — PUT blob directly to Supabase (no backend routing of binary data)
-      const blob = new Blob([item.buffer], { type: "image/jpeg" });
-      await fetch(signedUploadUrl, {
-        method: "PUT",
-        body: blob,
-        headers: { "Content-Type": "image/jpeg" },
-      });
-
-      // Step 3 — confirm with backend so it saves path to PostgreSQL
-      await apiClient.post(`/test-sessions/${this.sessionId}/evidence/confirm`, {
-        storagePath,
-        evidenceType: item.evidenceType,
-        violationType: item.violationType ?? null,
-        capturedAt: item.capturedAt,
-        fileSizeBytes: item.buffer.byteLength,
-      });
-
-      console.log(`✅ Evidence uploaded: ${storagePath}`);
-    } catch (err) {
-      if (retries < MAX_RETRIES) {
-        const delay = 2000 * Math.pow(2, retries); // 2s, 4s, 8s
-        console.warn(`⚠️ Evidence upload failed (attempt ${retries + 1}/${MAX_RETRIES}). Retrying in ${delay}ms...`);
-        await new Promise((r) => setTimeout(r, delay));
-        this.queue.unshift({ ...item, retries: retries + 1 });
-        this.drain();
-      } else {
-        console.error("❌ Evidence upload permanently failed after max retries:", err);
-      }
-    }
+    console.log(`[MOCK] Skipping Supabase Storage Upload for ${item.evidenceType}`);
+    return Promise.resolve();
   }
 
   /** Flush all remaining items — call on test submit */
