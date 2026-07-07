@@ -79,6 +79,7 @@ interface TestAssessment {
   id: string;
   title?: string;
   durationMins?: number;
+  status?: "DRAFT" | "PUBLISHED" | "ARCHIVED";
   proctoringMode?: ProctoringMode;
   tabSwitchTrackingEnabled?: boolean;
   copyPasteBlocked?: boolean;
@@ -445,6 +446,10 @@ export default function TestAccess() {
         } catch (testErr) {
           console.warn("Failed to fetch test details, continuing with defaults:", testErr);
         }
+      }
+
+      if (test && test.status && test.status !== "PUBLISHED") {
+        throw new Error("This test is currently in Draft or Archived state and cannot be accessed.");
       }
 
       // Populate testData with whatever we resolved, falling back to safe defaults/decoded payload values

@@ -556,6 +556,14 @@ export default function AdminTests() {
                             Edit Test
                           </DropdownMenuItem>
                           <DropdownMenuItem
+                            onClick={() =>
+                              navigate(`/admin/tests/edit/${test.id}?tab=reports`)
+                            }
+                          >
+                            <TrendingUp className="w-4 h-4 mr-2 text-indigo-600" />
+                            View Reports
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
                             onClick={() => handleDuplicate(test)}
                           >
                             <Copy className="w-4 h-4 mr-2" />

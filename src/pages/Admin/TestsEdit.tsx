@@ -66,6 +66,9 @@ import {
   Check,
   Search,
   Calendar,
+  Download,
+  TrendingUp,
+  RefreshCw,
 } from "lucide-react";
 import { testService, Test, CreateTestRequest, TestQuestion, Question, ProctoringMode, TestScheduleExtended } from "@/lib/test-service";
 import { candidateService, Candidate } from "@/lib/candidate-service";
@@ -192,13 +195,22 @@ export default function AdminTestsEdit() {
   const [test, setTest] = useState<Test | null>(null);
   const [questionsData, setQuestionsData] = useState<EnrichedTestQuestion[]>([]);
   const [selectedQuestion, setSelectedQuestion] = useState<EnrichedTestQuestion | null>(null);
-  const [activeTab, setActiveTab] = useState<string>(location.state?.activeTab || "details");
+  const [activeTab, setActiveTab] = useState<string>(() => {
+    const searchParams = new URLSearchParams(window.location.search);
+    const tabParam = searchParams.get("tab");
+    if (tabParam) return tabParam;
+    return location.state?.activeTab || "details";
+  });
 
   useEffect(() => {
-    if (location.state?.activeTab) {
+    const searchParams = new URLSearchParams(window.location.search);
+    const tabParam = searchParams.get("tab");
+    if (tabParam) {
+      setActiveTab(tabParam);
+    } else if (location.state?.activeTab) {
       setActiveTab(location.state.activeTab);
     }
-  }, [location.state]);
+  }, [location.state, location.search]);
 
   // Invitation states
   const [candidates, setCandidates] = useState<Candidate[]>([]);
@@ -249,6 +261,30 @@ export default function AdminTestsEdit() {
   const [unsavedScheduleDialogOpen, setUnsavedScheduleDialogOpen] = useState(false);
   const [pendingTab, setPendingTab] = useState<string | null>(null);
   const [savingSchedule, setSavingSchedule] = useState(false);
+
+  // Reports States
+  const [loadingReports, setLoadingReports] = useState(false);
+  const [reportScheduleId, setReportScheduleId] = useState<string>("all");
+  const [reportCandidates, setReportCandidates] = useState<any[]>([]);
+  const [reportSchedules, setReportSchedules] = useState<any[]>([]);
+  const [candidateResults, setCandidateResults] = useState<Record<string, any>>({});
+  const [selectedReportCandidate, setSelectedReportCandidate] = useState<any>(null);
+  const [reportCandidateDetails, setReportCandidateDetails] = useState<any>(null);
+  const [loadingAdvancedDetails, setLoadingAdvancedDetails] = useState(false);
+  const [candidatePaperSubmissions, setCandidatePaperSubmissions] = useState<any[]>([]);
+  const [isAdvancedReportOpen, setIsAdvancedReportOpen] = useState(false);
+
+  const displayedCandidates = useMemo(() => {
+    // Only show candidates who actually appeared (status is not NOT_STARTED)
+    const appeared = reportCandidates.filter(
+      (c) => c.testStatus && c.testStatus !== "NOT_STARTED"
+    );
+
+    if (!reportScheduleId || reportScheduleId === "all") {
+      return appeared;
+    }
+    return appeared.filter((c) => c.scheduleId === reportScheduleId);
+  }, [reportCandidates, reportScheduleId]);
 
   const isScheduleDirty = useMemo(() => {
     if (!test) return false;
@@ -808,6 +844,170 @@ To refer to the FAQ document, you can click on the HELP button which is present 
     }
   }, [id, fetchInvitationsData]);
 
+  const loadReportData = useCallback(async () => {
+    if (!id) return;
+    setLoadingReports(true);
+    try {
+      // Fetch all test schedules and filter to those belonging to this test
+      const schedulesData = await testService.getAllTestSchedules();
+      const schedules = schedulesData.filter((s) => s.testId === id);
+      setReportSchedules(schedules);
+      
+      if (schedules.length === 0) {
+        setReportCandidates([]);
+        setLoadingReports(false);
+        return;
+      }
+
+      // Fetch candidates for all schedules in parallel
+      const candidatesLists = await Promise.all(
+        schedules.map(async (s) => {
+          try {
+            const res = await apiClient.get(`/api/admin/proctoring/assessment-schedules/${s.id}/candidates`);
+            const list = res.data?.data || res.data || [];
+            return list.map((c: any) => ({ ...c, scheduleId: s.id }));
+          } catch {
+            return [];
+          }
+        })
+      );
+      
+      const candidatesList = candidatesLists.flat();
+      setReportCandidates(candidatesList);
+
+      const resultsMap: Record<string, any> = {};
+      await Promise.allSettled(
+        candidatesList.map(async (c: any) => {
+          try {
+            const detailRes = await apiClient.get(
+              `/api/admin/proctoring/candidates/${c.candidateId}/details?scheduleId=${c.scheduleId}`
+            );
+            const detail = detailRes.data?.data || detailRes.data;
+            const sessionId = detail?.systemInfo?.sessionId;
+            
+            if (sessionId) {
+              const resultRes = await apiClient.get(`/test-results/session/${sessionId}`);
+              const result = resultRes.data?.data || resultRes.data;
+              resultsMap[c.candidateId] = {
+                sessionId,
+                detail,
+                scheduleId: c.scheduleId,
+                result: result && result.id ? result : null
+              };
+            } else {
+              resultsMap[c.candidateId] = {
+                detail,
+                scheduleId: c.scheduleId,
+                result: null
+              };
+            }
+          } catch (err) {
+            console.warn(`Failed to load details/result for candidate ${c.candidateId}:`, err);
+          }
+        })
+      );
+      setCandidateResults(resultsMap);
+    } catch (err) {
+      console.error("Failed to load report data:", err);
+      toast({
+        title: "Error",
+        description: "Failed to load report data",
+        variant: "destructive",
+      });
+    } finally {
+      setLoadingReports(false);
+    }
+  }, [id, toast]);
+
+  useEffect(() => {
+    if (activeTab === "reports" && id) {
+      loadReportData();
+    }
+  }, [activeTab, id, loadReportData]);
+
+  const handleOpenAdvancedReport = async (candidate: any) => {
+    setSelectedReportCandidate(candidate);
+    setIsAdvancedReportOpen(true);
+    const candidateData = candidateResults[candidate.candidateId];
+    if (!candidateData) return;
+
+    setLoadingAdvancedDetails(true);
+    setReportCandidateDetails(candidateData.detail);
+    setCandidatePaperSubmissions([]);
+
+    try {
+      const sessionId = candidateData.sessionId;
+      if (sessionId) {
+        const [paperRes, resumeRes] = await Promise.all([
+          apiClient.get(`/test-sessions/${sessionId}/paper`),
+          apiClient.get(`/test-sessions/${sessionId}/resume`)
+        ]);
+
+        const paperData = paperRes.data?.data || paperRes.data;
+        const resumeData = resumeRes.data?.data || resumeRes.data;
+
+        const questionsList = paperData?.paper?.questions || [];
+        const submissionsList = resumeData?.submissions || [];
+
+        const mappedSubmissions = questionsList.map((q: any) => {
+          const questionId = q.sourceQuestionId || q.id;
+          const submission = submissionsList.find((s: any) => s.questionId === questionId);
+          
+          const normalizedQuestion = {
+            id: questionId,
+            prompt: q.prompt,
+            title: q.coding?.title || q.prompt || "Question",
+            questionType: q.type,
+            type: q.type,
+            mcqOptions: q.options || q.mcqOptions || []
+          };
+
+          return {
+            question: normalizedQuestion,
+            submission: submission || null
+          };
+        });
+        setCandidatePaperSubmissions(mappedSubmissions);
+      }
+    } catch (err) {
+      console.error("Failed to load advanced report details:", err);
+      toast({
+        title: "Error",
+        description: "Failed to load detailed submissions data.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoadingAdvancedDetails(false);
+    }
+  };
+
+  const downloadScorecard = async (sessionId: string, candidateName: string) => {
+    try {
+      toast({
+        title: "Downloading Scorecard",
+        description: "Please wait while we generate the PDF scorecard...",
+      });
+      const response = await apiClient.get(`/test-results/session/${sessionId}/scorecard`, {
+        responseType: "blob",
+      });
+      const blob = new Blob([response.data], { type: "application/pdf" });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.setAttribute("download", `Scorecard_${candidateName.replace(/\s+/g, "_")}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (err) {
+      console.error("Failed to download scorecard:", err);
+      toast({
+        title: "Download Failed",
+        description: "Failed to generate or download the scorecard.",
+        variant: "destructive",
+      });
+    }
+  };
+
   const handleInvite = async () => {
     if (!selectedSchedule) {
       toast({
@@ -829,10 +1029,12 @@ To refer to the FAQ document, you can click on the HELP button which is present 
 
     setInviteSubmitting(true);
     try {
-      await apiClient.post("/candidate-invitations", {
+      const response = await apiClient.post("/candidate-invitations", {
         scheduleId: selectedSchedule,
         candidateId: selectedCandidate.id,
       });
+
+      console.log("Invitation created successfully. Response:", response.data);
 
       toast({
         title: "Success",
@@ -1022,13 +1224,14 @@ To refer to the FAQ document, you can click on the HELP button which is present 
       </div>
 
       <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
-        <TabsList className="grid w-full grid-cols-4 max-w-lg">
+        <TabsList className="grid w-full grid-cols-5 max-w-2xl">
           <TabsTrigger value="details">Basic Information</TabsTrigger>
           <TabsTrigger value="questions">
             Questions ({questionCount})
           </TabsTrigger>
           <TabsTrigger value="settings">Settings</TabsTrigger>
           <TabsTrigger value="invite">Invite Candidates</TabsTrigger>
+          <TabsTrigger value="reports">Reports</TabsTrigger>
         </TabsList>
 
         <TabsContent value="details" className="pt-6">
@@ -1906,6 +2109,154 @@ To refer to the FAQ document, you can click on the HELP button which is present 
             </CardContent>
           </Card>
         </TabsContent>
+
+        <TabsContent value="reports" className="pt-6">
+          <Card className="border border-slate-200">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+              <div>
+                <CardTitle className="text-xl font-bold flex items-center gap-2">
+                  <TrendingUp className="w-5 h-5 text-indigo-500" />
+                  Candidate Performance Reports
+                </CardTitle>
+                <CardDescription>
+                  View test scores, detailed submissions, and proctoring metrics candidate-wise
+                </CardDescription>
+              </div>
+              <div className="flex items-center gap-3">
+                <Label htmlFor="report-schedule" className="text-sm font-medium whitespace-nowrap">
+                  Filter by Schedule:
+                </Label>
+                <Select value={reportScheduleId} onValueChange={setReportScheduleId}>
+                  <SelectTrigger className="w-64">
+                    <SelectValue placeholder="Select a schedule" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Schedules</SelectItem>
+                    {reportSchedules.map((schedule) => (
+                      <SelectItem key={schedule.id} value={schedule.id}>
+                        {new Date(schedule.startTime).toLocaleString()}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => loadReportData()}
+                  disabled={loadingReports}
+                  className="shrink-0"
+                  title="Refresh Reports"
+                >
+                  <RefreshCw className={`w-4 h-4 ${loadingReports ? "animate-spin" : ""}`} />
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {loadingReports ? (
+                <div className="flex flex-col items-center justify-center py-16 gap-3">
+                  <Loader2 className="w-8 h-8 animate-spin text-primary" />
+                  <p className="text-sm text-muted-foreground">Loading candidate reports...</p>
+                </div>
+              ) : displayedCandidates.length === 0 ? (
+                <div className="text-center py-16 border-2 border-dashed rounded-lg">
+                  <TrendingUp className="w-12 h-12 mx-auto text-muted-foreground mb-4 opacity-50" />
+                  <p className="text-muted-foreground font-medium">No candidate records found for this test.</p>
+                </div>
+              ) : (
+                <div className="border rounded-lg overflow-hidden">
+                  <Table>
+                    <TableHeader className="bg-slate-50/75">
+                      <TableRow>
+                        <TableHead>Candidate</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead className="text-center">Score</TableHead>
+                        <TableHead className="text-center">Result</TableHead>
+                        <TableHead className="text-center">Proctoring Risk</TableHead>
+                        <TableHead className="text-center">Violations</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {displayedCandidates.map((candidate) => {
+                        const scoreData = candidateResults[candidate.candidateId];
+                        const testStatus = candidate.testStatus;
+                        
+                        let statusColor = "bg-slate-100 text-slate-700";
+                        if (testStatus === "SUBMITTED") statusColor = "bg-emerald-500/10 text-emerald-600 border-emerald-500/20";
+                        else if (testStatus === "AUTO_SUBMITTED") statusColor = "bg-amber-500/10 text-amber-600 border-amber-500/20";
+                        else if (testStatus === "IN_PROGRESS") statusColor = "bg-sky-500/10 text-sky-600 border-sky-500/20";
+
+                        const risk = scoreData?.detail?.riskLevel || candidate.riskLevel || "NONE";
+                        let riskColor = "bg-slate-100 text-slate-700";
+                        if (risk === "HIGH") riskColor = "bg-red-500/15 text-red-500";
+                        else if (risk === "CRITICAL") riskColor = "bg-red-500 text-white animate-pulse";
+                        else if (risk === "MEDIUM") riskColor = "bg-amber-500/15 text-amber-500";
+                        else if (risk === "LOW") riskColor = "bg-yellow-500/15 text-yellow-600";
+                        else if (risk === "NONE") riskColor = "bg-emerald-500/15 text-emerald-500";
+
+                        const totalScore = scoreData?.result?.totalScore;
+                        const maxScore = scoreData?.result?.maxScore;
+                        const passed = scoreData?.result?.passed;
+
+                        return (
+                          <TableRow key={candidate.candidateId}>
+                            <TableCell>
+                              <div className="font-semibold">{candidate.candidateName}</div>
+                              <div className="text-xs text-muted-foreground">{candidate.email}</div>
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant="outline" className={statusColor}>
+                                {testStatus?.replace(/_/g, " ") || "NOT STARTED"}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="text-center font-medium">
+                              {totalScore !== undefined ? `${totalScore} / ${maxScore}` : "-"}
+                            </TableCell>
+                            <TableCell className="text-center">
+                              {passed !== undefined ? (
+                                <Badge variant="outline" className={passed ? "bg-emerald-500/15 text-emerald-500" : "bg-red-500/15 text-red-500"}>
+                                  {passed ? "Passed" : "Failed"}
+                                </Badge>
+                              ) : "-"}
+                            </TableCell>
+                            <TableCell className="text-center">
+                              <Badge variant="outline" className={riskColor}>
+                                {risk}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="text-center font-medium">
+                              {candidate.violationCount || 0}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <div className="flex justify-end gap-2">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleOpenAdvancedReport(candidate)}
+                                >
+                                  Advanced Report
+                                </Button>
+                                {scoreData?.sessionId && (
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => downloadScorecard(scoreData.sessionId, candidate.candidateName)}
+                                  >
+                                    <Download className="w-4 h-4" />
+                                  </Button>
+                                )}
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
       </Tabs>
 
       {/* Delete Test Confirmation Dialog */}
@@ -2083,6 +2434,223 @@ To refer to the FAQ document, you can click on the HELP button which is present 
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Advanced Candidate Report Dialog */}
+      <Dialog open={isAdvancedReportOpen} onOpenChange={setIsAdvancedReportOpen}>
+        <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-bold flex items-center gap-2">
+              <TrendingUp className="w-6 h-6 text-indigo-500" />
+              Advanced Report: {selectedReportCandidate?.candidateName}
+            </DialogTitle>
+            <DialogDescription>
+              Detailed logs of questions, selected options/submitted code, and proctoring metrics.
+            </DialogDescription>
+          </DialogHeader>
+
+          {loadingAdvancedDetails ? (
+            <div className="flex flex-col items-center justify-center py-20 gap-3">
+              <Loader2 className="w-8 h-8 animate-spin text-primary" />
+              <p className="text-sm text-muted-foreground">Loading submission details...</p>
+            </div>
+          ) : (
+            <div className="space-y-6">
+              {/* Candidate Info Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 p-4 bg-muted/30 rounded-xl border">
+                <div>
+                  <div className="text-xs text-muted-foreground font-medium">Email</div>
+                  <div className="text-sm font-semibold truncate">{selectedReportCandidate?.email}</div>
+                </div>
+                <div>
+                  <div className="text-xs text-muted-foreground font-medium">Test Status</div>
+                  <div className="text-sm font-semibold capitalize">{selectedReportCandidate?.testStatus?.replace(/_/g, " ") || "Not Started"}</div>
+                </div>
+                <div>
+                  <div className="text-xs text-muted-foreground font-medium">Final Score</div>
+                  <div className="text-sm font-semibold">
+                    {candidateResults[selectedReportCandidate?.candidateId]?.result?.totalScore !== undefined
+                      ? `${candidateResults[selectedReportCandidate?.candidateId].result.totalScore} / ${candidateResults[selectedReportCandidate?.candidateId].result.maxScore}`
+                      : "-"}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-xs text-muted-foreground font-medium">Passed / Failed</div>
+                  <div className="text-sm font-semibold">
+                    {candidateResults[selectedReportCandidate?.candidateId]?.result?.passed !== undefined
+                      ? (candidateResults[selectedReportCandidate?.candidateId].result.passed ? "PASSED" : "FAILED")
+                      : "-"}
+                  </div>
+                </div>
+              </div>
+
+              <Tabs defaultValue="answers" className="w-full">
+                <TabsList className="grid w-full grid-cols-2 max-w-sm mb-4">
+                  <TabsTrigger value="answers">Questions & Submissions</TabsTrigger>
+                  <TabsTrigger value="proctoring">Proctoring Timeline</TabsTrigger>
+                </TabsList>
+
+                {/* Answers Tab */}
+                <TabsContent value="answers" className="space-y-4">
+                  {candidatePaperSubmissions.length === 0 ? (
+                    <div className="text-center py-10 text-muted-foreground">
+                      No submissions found for this candidate.
+                    </div>
+                  ) : (
+                    candidatePaperSubmissions.map((item: any, idx: number) => {
+                      const q = item.question;
+                      const sub = item.submission;
+                      const isCoding = q.questionType === "CODING" || q.type === "CODING";
+
+                      return (
+                        <Card key={q.id} className="border border-slate-200 shadow-sm overflow-hidden">
+                          <CardHeader className="bg-slate-50/50 p-4 border-b">
+                            <div className="flex justify-between items-start gap-4">
+                              <span className="font-semibold text-sm text-slate-800">
+                                Question {idx + 1}: {q.title || "Untitled Question"}
+                              </span>
+                              <Badge variant="secondary" className="shrink-0 text-xs">
+                                {isCoding ? "Coding" : "MCQ"}
+                              </Badge>
+                            </div>
+                            <p className="text-sm text-slate-600 mt-2 whitespace-pre-wrap">{q.prompt}</p>
+                          </CardHeader>
+                          <CardContent className="p-4 space-y-3">
+                            {isCoding ? (
+                              <div className="space-y-2">
+                                <div className="text-xs font-semibold text-slate-500">Submitted Source Code:</div>
+                                {sub?.answerText ? (
+                                  <pre className="p-4 bg-slate-900 text-slate-100 rounded-lg text-xs font-mono overflow-x-auto max-h-72">
+                                    <code>{sub.answerText}</code>
+                                  </pre>
+                                ) : (
+                                  <div className="text-sm text-muted-foreground italic">No code submitted.</div>
+                                )}
+                              </div>
+                            ) : (
+                              <div className="space-y-2">
+                                <div className="text-xs font-semibold text-slate-500">MCQ Options:</div>
+                                <div className="grid gap-2">
+                                  {(q.mcqOptions || []).map((opt: any) => {
+                                    const isSelected = sub?.answerText?.includes(opt.id) || sub?.answerText?.includes(opt.text);
+                                    const isCorrect = opt.isCorrect;
+
+                                    let optionStyle = "border-slate-200 bg-white";
+                                    if (isSelected && isCorrect) optionStyle = "border-emerald-500 bg-emerald-500/5 text-emerald-700";
+                                    else if (isSelected && !isCorrect) optionStyle = "border-red-500 bg-red-500/5 text-red-700";
+                                    else if (!isSelected && isCorrect) optionStyle = "border-emerald-200 bg-emerald-50/20 text-emerald-600";
+
+                                    return (
+                                      <div key={opt.id} className={`p-3 border rounded-lg text-sm flex items-center justify-between ${optionStyle}`}>
+                                        <span>{opt.text}</span>
+                                        <div className="flex items-center gap-1.5 shrink-0 text-xs font-medium">
+                                          {isSelected && <Badge variant="outline" className="bg-primary/10 text-primary border-primary/20">Selected</Badge>}
+                                          {isCorrect && <Badge variant="outline" className="bg-emerald-500/10 text-emerald-600 border-emerald-500/20">Correct Answer</Badge>}
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            )}
+                          </CardContent>
+                        </Card>
+                      );
+                    })
+                  )}
+                </TabsContent>
+
+                {/* Proctoring Tab */}
+                <TabsContent value="proctoring" className="space-y-4">
+                  {/* System & Device Specs */}
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 border rounded-lg bg-slate-50/50">
+                    <div>
+                      <div className="text-xs text-muted-foreground">IP Address</div>
+                      <div className="text-sm font-semibold">{reportCandidateDetails?.systemInfo?.ipAddress || "N/A"}</div>
+                    </div>
+                    <div>
+                      <div className="text-xs text-muted-foreground">Browser / OS</div>
+                      <div className="text-sm font-semibold truncate">
+                        {reportCandidateDetails?.systemInfo?.browser || "Chrome"} / {reportCandidateDetails?.systemInfo?.os || "Windows"}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-xs text-muted-foreground">Fullscreen Violations</div>
+                      <div className="text-sm font-semibold">{reportCandidateDetails?.systemInfo?.fullscreenViolations ?? 0}</div>
+                    </div>
+                    <div>
+                      <div className="text-xs text-muted-foreground">Total Warnings</div>
+                      <div className="text-sm font-semibold">{selectedReportCandidate?.violationCount || 0}</div>
+                    </div>
+                  </div>
+
+                  {/* Violation Timeline */}
+                  <div className="space-y-3">
+                    <h3 className="font-bold text-sm text-slate-800">Violation Records</h3>
+                    {!reportCandidateDetails?.violations || reportCandidateDetails.violations.length === 0 ? (
+                      <div className="text-sm text-muted-foreground italic">No proctoring violations recorded for this session.</div>
+                    ) : (
+                      <div className="border rounded-lg overflow-hidden">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>Time</TableHead>
+                              <TableHead>Type</TableHead>
+                              <TableHead>Severity</TableHead>
+                              <TableHead>Details</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {reportCandidateDetails.violations.map((v: any) => {
+                              let sevColor = "bg-slate-100 text-slate-700";
+                              if (v.severity === "CRITICAL" || v.severity === "HIGH") sevColor = "bg-red-500/10 text-red-500";
+                              else if (v.severity === "MEDIUM") sevColor = "bg-amber-500/10 text-amber-500";
+
+                              return (
+                                <TableRow key={v.id}>
+                                  <TableCell className="text-xs whitespace-nowrap">{new Date(v.occurredAt || v.time).toLocaleTimeString()}</TableCell>
+                                  <TableCell className="text-xs font-semibold">{v.eventType?.replace(/_/g, " ")}</TableCell>
+                                  <TableCell>
+                                    <Badge variant="outline" className={sevColor}>{v.severity}</Badge>
+                                  </TableCell>
+                                  <TableCell className="text-xs text-muted-foreground">{v.description || "Violation triggered"}</TableCell>
+                                </TableRow>
+                              );
+                            })}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Snapshot / Evidence Captures */}
+                  <div className="space-y-3">
+                    <h3 className="font-bold text-sm text-slate-800">Snapshot Evidence</h3>
+                    {!reportCandidateDetails?.evidence || reportCandidateDetails.evidence.length === 0 ? (
+                      <div className="text-sm text-muted-foreground italic">No image evidence collected.</div>
+                    ) : (
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        {reportCandidateDetails.evidence.map((img: any) => (
+                          <div key={img.id} className="border rounded-lg overflow-hidden bg-muted/20">
+                            <img src={img.imageData || img.imageUrl} alt="Proctor Capture" className="w-full h-32 object-cover" />
+                            <div className="p-2 text-[10px] text-muted-foreground">
+                              <div>{img.snapshotType || "VIOLATION"}</div>
+                              <div>{new Date(img.capturedAt).toLocaleTimeString()}</div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </TabsContent>
+              </Tabs>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button onClick={() => setIsAdvancedReportOpen(false)}>Close Report</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
