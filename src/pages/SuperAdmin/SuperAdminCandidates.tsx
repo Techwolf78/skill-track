@@ -30,6 +30,8 @@ import {
   Loader2,
   ChevronDown,
   ChevronUp,
+  Brain,
+  MessageSquare,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -44,6 +46,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { apiClient } from "@/lib/api-client";
 import { useToast } from "@/hooks/use-toast";
 import {
   useCandidatesQuery,
@@ -56,8 +59,177 @@ import { BulkUploadCandidates } from "../Admin/BulkUploadCandidates";
 import { EditCandidateDialog } from "../Admin/EditCandidateDialog";
 import { DeleteConfirmDialog } from "../Admin/DeleteConfirmDialog";
 
+function CandidateInsightsSection({ candidateId, onInsightsLoaded }: { candidateId: string; onInsightsLoaded?: (totalTests: number) => void }) {
+  const [insights, setInsights] = useState<any>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    async function fetchInsights() {
+      setLoading(true);
+      setError(null);
+      try {
+        const response = await apiClient.get(`/candidates/${candidateId}/insights`);
+        const data = response.data?.data ?? response.data;
+        setInsights(data);
+        if (data && typeof data.totalTests === "number" && onInsightsLoaded) {
+          onInsightsLoaded(data.totalTests);
+        }
+      } catch (err: any) {
+        console.error("Failed to load insights:", err);
+        setError("No insights generated for this candidate yet.");
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchInsights();
+  }, [candidateId]);
+
+  if (loading) {
+    return (
+      <div className="mt-4 pt-4 border-t border-border flex items-center justify-center py-6 gap-2">
+        <Loader2 className="w-5 h-5 animate-spin text-primary" />
+        <span className="text-xs text-muted-foreground">Loading talent insights...</span>
+      </div>
+    );
+  }
+
+  if (error || !insights) {
+    return (
+      <div className="mt-4 pt-4 border-t border-border py-4 text-center">
+        <Brain className="w-8 h-8 text-muted-foreground/30 mx-auto mb-2 animate-pulse" />
+        <p className="text-xs font-medium text-muted-foreground">{error || "No talent insights computed yet."}</p>
+        <p className="text-[10px] text-muted-foreground/60 mt-1 max-w-xs mx-auto">
+          Insights are automatically generated nightly at 2:00 AM once candidate test submissions are evaluated.
+        </p>
+      </div>
+    );
+  }
+
+  const parseList = (raw: any): string[] => {
+    if (!raw) return [];
+    if (Array.isArray(raw)) return raw;
+    if (typeof raw === "string") {
+      try {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) return parsed;
+      } catch {}
+      return raw.split(",").map(s => s.trim()).filter(Boolean);
+    }
+    return [];
+  };
+
+  const strongList = parseList(insights.strongTopics);
+  const weakList = parseList(insights.weakTopics);
+  const improvementList = parseList(insights.improvementAreas);
+
+  return (
+    <div className="mt-6 pt-6 border-t border-border space-y-4">
+      <div className="flex items-center gap-2 mb-2">
+        <Brain className="w-5 h-5 text-indigo-500 animate-pulse" />
+        <h4 className="text-xs font-bold uppercase tracking-wider text-foreground">Talent & Cognitive Analytics</h4>
+        <span className="text-[10px] text-muted-foreground ml-auto">
+          Last computed: {insights.lastComputed ? new Date(insights.lastComputed).toLocaleDateString() : "N/A"}
+        </span>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {/* Talent Percentile Gauge */}
+        <div className="bg-card border rounded-xl p-4 flex flex-col items-center justify-center text-center shadow-sm relative overflow-hidden bg-gradient-to-br from-card to-muted/20">
+          <div className="relative h-20 w-20 flex items-center justify-center">
+            <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
+              <circle cx="50" cy="50" r="40" className="stroke-muted" strokeWidth="6" fill="transparent" />
+              <circle
+                cx="50" cy="50" r="40"
+                className="stroke-indigo-650 dark:stroke-indigo-500 transition-all duration-1000"
+                strokeWidth="6"
+                fill="transparent"
+                strokeDasharray={251.2}
+                strokeDashoffset={251.2 - (251.2 * (insights.overallPercentile || 0)) / 100}
+                strokeLinecap="round"
+              />
+            </svg>
+            <div className="absolute text-center flex flex-col">
+              <span className="text-base font-bold font-mono text-indigo-600 dark:text-indigo-400">{Math.round(insights.overallPercentile || 0)}%</span>
+            </div>
+          </div>
+          <span className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground mt-2">Overall Percentile</span>
+          <div className="flex gap-4 mt-3 text-xs w-full justify-around border-t pt-2">
+            <div>
+              <span className="text-muted-foreground block text-[9px] uppercase font-semibold">Tests</span>
+              <span className="font-semibold text-sm">{insights.totalTests || 0}</span>
+            </div>
+            <div>
+              <span className="text-muted-foreground block text-[9px] uppercase font-semibold">Evaluations</span>
+              <span className="font-semibold text-sm">{insights.totalEvals || 0}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Communication Skills */}
+        <div className="bg-card border rounded-xl p-4 flex flex-col justify-between shadow-sm bg-gradient-to-br from-card to-muted/20">
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground">Communication Index</span>
+              <MessageSquare className="w-4 h-4 text-indigo-500" />
+            </div>
+            <div className="flex items-baseline gap-1 mt-1">
+              <span className="text-2xl font-bold font-mono text-indigo-600 dark:text-indigo-400">{Math.round(insights.commPercentile || 0)}%</span>
+              <span className="text-xs text-muted-foreground">percentile</span>
+            </div>
+            <p className="text-[10px] text-muted-foreground mt-2 leading-relaxed">
+              Analyzed based on commentary structure, syntax style patterns, and problem decomposition clarity.
+            </p>
+          </div>
+          
+          {improvementList.length > 0 && (
+            <div className="mt-3 pt-2 border-t text-[10px] text-left">
+              <span className="font-bold text-muted-foreground uppercase tracking-wider block text-[8px] mb-1">Growth Recommendation</span>
+              <span className="text-foreground italic">"{improvementList[0]}"</span>
+            </div>
+          )}
+        </div>
+
+        {/* Strong vs Weak Skills */}
+        <div className="bg-card border rounded-xl p-4 space-y-3.5 shadow-sm bg-gradient-to-br from-card to-muted/20">
+          <div className="space-y-1.5 text-left">
+            <span className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground block">Key Strengths</span>
+            <div className="flex flex-wrap gap-1">
+              {strongList.length > 0 ? (
+                strongList.map((topic, i) => (
+                  <Badge key={i} variant="outline" className="bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20 text-[9px] py-0 px-1.5">
+                    {topic}
+                  </Badge>
+                ))
+              ) : (
+                <span className="text-[10px] text-muted-foreground italic">No strong topics identified yet.</span>
+              )}
+            </div>
+          </div>
+
+          <div className="space-y-1.5 pt-2 border-t text-left">
+            <span className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground block">Weak Areas</span>
+            <div className="flex flex-wrap gap-1">
+              {weakList.length > 0 ? (
+                weakList.map((topic, i) => (
+                  <Badge key={i} variant="outline" className="bg-rose-500/10 text-rose-700 dark:text-rose-400 border-rose-500/20 text-[9px] py-0 px-1.5">
+                    {topic}
+                  </Badge>
+                ))
+              ) : (
+                <span className="text-[10px] text-muted-foreground italic">No weak topics identified yet.</span>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function Students() {
   const [searchTerm, setSearchTerm] = useState("");
+  const [testsCountMap, setTestsCountMap] = useState<Record<string, number>>({});
   const { data: candidates = [], isLoading: candidatesLoading, refetch: refetchCandidates } = useCandidatesQuery();
   const { data: organisations = [], isLoading: orgsLoading, refetch: refetchOrgs } = useOrganisationsQuery();
   const loading = candidatesLoading || orgsLoading;
@@ -281,7 +453,7 @@ export default function Students() {
                   </TableCell>
                   <TableCell>{candidate.organisation.name}</TableCell>
                   <TableCell><Badge variant="outline">{candidate.user.role || "CANDIDATE"}</Badge></TableCell>
-                  <TableCell className="text-center font-medium">0</TableCell>
+                   <TableCell className="text-center font-medium">{testsCountMap[candidate.id] ?? 0}</TableCell>
                   <TableCell className="text-right">
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
@@ -314,6 +486,14 @@ export default function Students() {
                         </div>
                       </div>
                       {formatExtraFields(candidate.extraFields)}
+                      <CandidateInsightsSection 
+                        candidateId={candidate.id} 
+                        onInsightsLoaded={(count) => {
+                          if (testsCountMap[candidate.id] !== count) {
+                            setTestsCountMap(prev => ({ ...prev, [candidate.id]: count }));
+                          }
+                        }} 
+                      />
                     </TableCell>
                   </TableRow>
                 )}
