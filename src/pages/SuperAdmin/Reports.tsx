@@ -291,6 +291,14 @@ export default function Reports() {
 
   // Force grade calculation
   const handleForceGenerate = async (sid: string, cid: string) => {
+    const existingResult = sessionStates[sid]?.result;
+    if (existingResult) {
+      const confirmRecalculate = window.confirm(
+        `A scorecard already exists for this candidate with a score of ${existingResult.totalScore}/${existingResult.maxScore}. Are you sure you want to recalculate and overwrite it?`
+      );
+      if (!confirmRecalculate) return;
+    }
+
     setSessionStates((prev) => ({
       ...prev,
       [sid]: {
