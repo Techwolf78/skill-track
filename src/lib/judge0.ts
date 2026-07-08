@@ -62,7 +62,10 @@ export function mapFriendlyError(error: string, lang: string): string {
 
   // C++ specific
   if (lang === "cpp") {
-    if (err.includes("'string' was not declared") || err.includes("'string' does not name a type")) {
+    if (
+      err.includes("'string' was not declared") ||
+      err.includes("'string' does not name a type")
+    ) {
       return "Hint: In C++, use lowercase 'string' (not 'String').";
     }
     if (err.includes("was not declared in this scope")) {
@@ -88,7 +91,10 @@ export function mapFriendlyError(error: string, lang: string): string {
   }
 
   // General
-  if (err.includes("stackoverflowerror") || err.includes("recursion depth exceeded")) {
+  if (
+    err.includes("stackoverflowerror") ||
+    err.includes("recursion depth exceeded")
+  ) {
     return "Hint: Your code might have infinite recursion. Check your base cases.";
   }
 
@@ -1553,7 +1559,7 @@ int main() {
     map<string, string> parsed = parser.parseObject();
     
     if (parsed.empty() && line.length() > 0 && line[0] != '{') {
-        ${metadata.parameterTypes.length === 1 ? `parsed["${metadata.parameterTypes[0].name}"] = line;` : ''}
+        ${metadata.parameterTypes.length === 1 ? `parsed["${metadata.parameterTypes[0].name}"] = line;` : ""}
     }
 
 ${paramDeclarations}
@@ -1659,8 +1665,12 @@ export async function createSubmission(
       language_id: languageId,
       stdin: stdin ? encodeBase64(stdin) : undefined,
       base64_encoded: true,
-      cpu_time_limit: metadata.timeLimit ? metadata.timeLimit / 1000 : undefined,
-      memory_limit: metadata.memoryLimit ? metadata.memoryLimit * 1024 : undefined,
+      cpu_time_limit: metadata.timeLimit
+        ? metadata.timeLimit / 1000
+        : undefined,
+      memory_limit: metadata.memoryLimit
+        ? metadata.memoryLimit * 1024
+        : undefined,
       fields: "*",
     }),
   };
@@ -1860,7 +1870,9 @@ export async function createBatchSubmissions(
     stdin: encodeBase64(prepareStdin(stdin, safeMetadata)),
     base64_encoded: true,
     cpu_time_limit: metadata.timeLimit ? metadata.timeLimit / 1000 : undefined,
-    memory_limit: metadata.memoryLimit ? metadata.memoryLimit * 1024 : undefined,
+    memory_limit: metadata.memoryLimit
+      ? metadata.memoryLimit * 1024
+      : undefined,
     fields: "*",
   }));
 

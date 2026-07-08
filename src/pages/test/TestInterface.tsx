@@ -406,10 +406,18 @@ function TestInterfaceContent({ testId, sessionId, navigate, toast }: { testId?:
           if (sub.questionType === "MCQ") {
             try {
               if (sub.answerText) {
-                recoveredAnswers[sub.questionId] = JSON.parse(sub.answerText);
+                const parsed = JSON.parse(sub.answerText);
+                if (Array.isArray(parsed)) {
+                  recoveredAnswers[sub.questionId] = parsed[0] || "";
+                } else if (parsed && typeof parsed === "object") {
+                  recoveredAnswers[sub.questionId] = (parsed as any).value || (parsed as any).selectedOptionIds?.[0] || "";
+                } else {
+                  recoveredAnswers[sub.questionId] = parsed;
+                }
               }
             } catch (e) {
-              console.warn("Failed to parse MCQ answer", sub.answerText, e);
+              console.warn("Failed to parse MCQ answer, using raw text", sub.answerText, e);
+              recoveredAnswers[sub.questionId] = sub.answerText;
             }
           } else if (sub.questionType === "CODING") {
             recoveredAnswers[sub.questionId] = {

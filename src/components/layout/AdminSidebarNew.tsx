@@ -72,7 +72,7 @@ export function AdminSidebar() {
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 py-6 px-3 space-y-1 overflow-y-auto">
+      <nav className="flex-1 py-6 px-3 space-y-1 overflow-y-auto scrollbar-none">
         {navItems.map((item) => {
           const active = isItemActive(item);
           return (
