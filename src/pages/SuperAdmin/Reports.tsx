@@ -385,13 +385,9 @@ export default function Reports() {
 
     let cancelled = false;
 
-    // Filter to only trigger load for sessions that are NOT already fetching/fetched
+    // Filter to only trigger load for sessions that are NOT already checked (i.e. no state exists)
     const sessionsToFetch = filteredSessions.filter((session) => {
-      const currentState = sessionStates[session.id];
-      return (
-        !currentState ||
-        (currentState.status !== "SUCCESS" && currentState.status !== "POLLING")
-      );
+      return !sessionStates[session.id];
     });
 
     if (sessionsToFetch.length === 0) return;
@@ -1179,17 +1175,22 @@ export default function Reports() {
                                 </TableCell>
                                 <TableCell className="text-right pr-6">
                                   <div className="flex items-center justify-end gap-2">
-                                    <Button
-                                      size="sm"
-                                      variant="outline"
-                                      onClick={() =>
-                                        startPollingSession(session.id)
-                                      }
-                                      disabled={state.status === "POLLING"}
-                                      className="h-8 text-xs border-primary/20 hover:bg-primary/5"
-                                    >
-                                      Fetch Result
-                                    </Button>
+                                    {state.status !== "SUCCESS" && (
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() =>
+                                          startPollingSession(session.id)
+                                        }
+                                        disabled={
+                                          state.status === "POLLING" ||
+                                          session.status === "STARTED"
+                                        }
+                                        className="h-8 text-xs border-primary/20 hover:bg-primary/5"
+                                      >
+                                        Fetch Result
+                                      </Button>
+                                    )}
                                     {state.status === "SUCCESS" &&
                                       state.result && (
                                         <Button
@@ -1227,7 +1228,10 @@ export default function Reports() {
                                           session.candidateId,
                                         )
                                       }
-                                      disabled={state.status === "POLLING"}
+                                      disabled={
+                                        state.status === "POLLING" ||
+                                        session.status === "STARTED"
+                                      }
                                       className="h-8 text-xs text-muted-foreground hover:text-primary hover:bg-primary/5"
                                     >
                                       Force Grade

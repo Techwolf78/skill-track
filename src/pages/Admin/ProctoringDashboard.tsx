@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { useParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -161,6 +162,7 @@ export interface CandidateProctoringDetail {
 // ==========================================
 export default function ProctoringDashboard() {
   const { toast } = useToast();
+  const { sessionId } = useParams<{ sessionId?: string }>();
 
   // Core State
   const [schedules, setSchedules] = useState<AssessmentSchedule[]>([]);
@@ -221,7 +223,7 @@ export default function ProctoringDashboard() {
         `/api/admin/proctoring/assessment-schedules/${scheduleId}/candidates`,
       );
       const data = response.data?.data ?? response.data;
-      const mappedCandidates = Array.isArray(data) ? data.map((cand: any) => ({
+      const mappedCandidates = Array.isArray(data) ? data.map((cand: { candidateId: string; candidateName: string; email: string; testStatus: string; proctoringMode: ProctoringMode; riskLevel: RiskLevel; violationCount: number; criticalViolationCount: number; lastActivityAt?: string; reviewStatus?: ReviewStatus }) => ({
         id: cand.candidateId,
         name: cand.candidateName,
         email: cand.email,
@@ -267,23 +269,23 @@ export default function ProctoringDashboard() {
           criticalViolationsCount: data.criticalViolationCount || 0,
           startedAt: data.systemInfo?.startedAt ? new Date(data.systemInfo.startedAt).toLocaleString() : "N/A",
           submittedAt: data.systemInfo?.endedAt ? new Date(data.systemInfo.endedAt).toLocaleString() : null,
-          violations: data.violations?.map((v: any) => ({
+          violations: data.violations?.map((v: { eventId?: string; id?: string; occurredAt?: string; eventType?: string; severity?: ProctoringEventSeverity; metadata?: { description?: string } }) => ({
             id: v.eventId || v.id,
             time: v.occurredAt ? new Date(v.occurredAt).toLocaleTimeString() : "N/A",
             eventType: v.eventType,
             severity: v.severity,
             description: v.metadata?.description || `Triggered ${v.eventType?.replace(/_/g, " ") || "violation"}`,
-            evidenceAvailable: data.evidence?.some((e: any) => e.eventId === v.eventId) || false,
+            evidenceAvailable: data.evidence?.some((e: { eventId?: string }) => e.eventId === v.eventId) || false,
           })) || [],
-          evidences: data.evidence?.map((e: any) => ({
+          evidences: data.evidence?.map((e: { id?: string; imageData?: string; s3Key?: string; snapshotType?: string; capturedAt?: string }) => ({
             id: e.id,
             imageUrl: e.imageData || e.s3Key || "",
             eventType: e.snapshotType || "VIOLATION",
             capturedAt: e.capturedAt ? new Date(e.capturedAt).toLocaleString() : "N/A",
-            severity: "HIGH",
+            severity: "HIGH" as ProctoringEventSeverity,
             description: e.s3Key || "Attached Frame Capture",
           })) || [],
-          snapshots: data.snapshots?.map((s: any) => ({
+          snapshots: data.snapshots?.map((s: { id?: string; imageData?: string; s3Key?: string; capturedAt?: string }) => ({
             id: s.id,
             imageUrl: s.imageData || s.s3Key || "",
             capturedAt: s.capturedAt ? new Date(s.capturedAt).toLocaleTimeString() : "N/A",
@@ -352,6 +354,115 @@ export default function ProctoringDashboard() {
       setCandidates([]);
     }
   }, [selectedScheduleId, loadCandidates]);
+
+  // Auto-load candidate proctoring details drawer if sessionId URL param is present
+  useEffect(() => {
+    const autoLoadSession = async () => {
+      if (!sessionId) return;
+      try {
+        const sessionRes = await apiClient.get(`/test-sessions/${sessionId}`);
+        const sessionData = sessionRes.data?.data ?? sessionRes.data;
+        if (!sessionData) return;
+
+        const scheduleId = sessionData.scheduleId;
+        const candidateId = sessionData.candidateId;
+
+        if (scheduleId && candidateId) {
+          setSelectedScheduleId(scheduleId);
+
+          const tempCandidate: ProctoringCandidate = {
+            id: candidateId,
+            name: "Loading Candidate...",
+            email: "",
+            testStatus: "SUBMITTED",
+            proctoringMode: "NONE",
+            riskLevel: "NONE",
+            violationsCount: 0,
+            criticalViolationsCount: 0,
+            lastActivity: "",
+            reviewStatus: "NOT_REVIEWED",
+          };
+
+          setSelectedCandidate(tempCandidate);
+          setIsDrawerOpen(true);
+          setLoadingDetails(true);
+          setErrorDetails(null);
+
+          try {
+            const detailRes = await apiClient.get(
+              `/api/admin/proctoring/candidates/${candidateId}/details?scheduleId=${scheduleId}`
+            );
+            const data = detailRes.data?.data ?? detailRes.data;
+            if (data && typeof data === "object") {
+              const mappedDetail: CandidateProctoringDetail = {
+                id: data.candidate?.candidateId || candidateId,
+                name: data.candidate?.candidateName || "Candidate",
+                email: data.candidate?.email || "",
+                testStatus: data.testStatus === "ACTIVE" ? "IN_PROGRESS" : data.testStatus,
+                riskScore: Math.round(data.riskScore || 0),
+                riskLevel: data.riskLevel || "NONE",
+                violationsCount: data.violationCount || 0,
+                criticalViolationsCount: data.criticalViolationCount || 0,
+                startedAt: data.systemInfo?.startedAt ? new Date(data.systemInfo.startedAt).toLocaleString() : "N/A",
+                submittedAt: data.systemInfo?.endedAt ? new Date(data.systemInfo.endedAt).toLocaleString() : null,
+                violations: data.violations?.map((v: { eventId?: string; id?: string; occurredAt?: string; eventType?: string; severity?: ProctoringEventSeverity; metadata?: { description?: string } }) => ({
+                  id: v.eventId || v.id,
+                  time: v.occurredAt ? new Date(v.occurredAt).toLocaleTimeString() : "N/A",
+                  eventType: v.eventType,
+                  severity: v.severity,
+                  description: v.metadata?.description || `Triggered ${v.eventType?.replace(/_/g, " ") || "violation"}`,
+                  evidenceAvailable: data.evidence?.some((e: { eventId?: string }) => e.eventId === v.eventId) || false,
+                })) || [],
+                evidences: data.evidence?.map((e: { id?: string; imageData?: string; s3Key?: string; snapshotType?: string; capturedAt?: string }) => ({
+                  id: e.id,
+                  imageUrl: e.imageData || e.s3Key || "",
+                  eventType: e.snapshotType || "VIOLATION",
+                  capturedAt: e.capturedAt ? new Date(e.capturedAt).toLocaleString() : "N/A",
+                  severity: "HIGH" as ProctoringEventSeverity,
+                  description: e.s3Key || "Attached Frame Capture",
+                })) || [],
+                snapshots: data.snapshots?.map((s: { id?: string; imageData?: string; s3Key?: string; capturedAt?: string }) => ({
+                  id: s.id,
+                  imageUrl: s.imageData || s.s3Key || "",
+                  capturedAt: s.capturedAt ? new Date(s.capturedAt).toLocaleTimeString() : "N/A",
+                })) || [],
+                systemInfo: {
+                  browser: data.systemInfo?.latestEventMetadata?.userAgent || data.systemInfo?.latestEventMetadata?.browser || "Chrome / Safari",
+                  os: data.systemInfo?.latestEventMetadata?.os || "Windows 11 / macOS",
+                  ipAddress: data.systemInfo?.ipAddress || "Unknown",
+                  device: data.systemInfo?.latestEventMetadata?.device || "Desktop",
+                  screenResolution: data.systemInfo?.latestEventMetadata?.screenResolution || "1920x1080",
+                },
+                reviewStatus: data.reviewDecision?.reviewStatus || "NOT_REVIEWED",
+              };
+              setCandidateDetails(mappedDetail);
+              setSelectedCandidate((prev) => prev ? {
+                ...prev,
+                name: mappedDetail.name,
+                email: mappedDetail.email,
+                testStatus: mappedDetail.testStatus,
+                riskLevel: mappedDetail.riskLevel,
+                violationsCount: mappedDetail.violationsCount,
+                criticalViolationsCount: mappedDetail.criticalViolationsCount,
+                reviewStatus: mappedDetail.reviewStatus,
+              } : null);
+            }
+          } catch {
+            setErrorDetails("Could not load detailed proctoring data for this candidate.");
+            setCandidateDetails(null);
+          } finally {
+            setLoadingDetails(false);
+          }
+        }
+      } catch (err) {
+        console.error("Auto loading session failed:", err);
+      }
+    };
+
+    if (sessionId && schedules.length > 0) {
+      autoLoadSession();
+    }
+  }, [sessionId, schedules]);
 
   // Filter candidates client-side
   const filteredCandidates = candidates.filter((cand) => {
