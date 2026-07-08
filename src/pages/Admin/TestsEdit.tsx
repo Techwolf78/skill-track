@@ -69,10 +69,17 @@ import {
   Download,
   TrendingUp,
   RefreshCw,
+  Eye,
 } from "lucide-react";
 import { testService, Test, CreateTestRequest, TestQuestion, Question, ProctoringMode, TestScheduleExtended } from "@/lib/test-service";
 import { candidateService, Candidate } from "@/lib/candidate-service";
 import { apiClient } from "@/lib/api-client";
+import { jsPDF } from "jspdf";
+import autoTable from "jspdf-autotable";
+
+// jspdf-autotable attaches lastAutoTable at runtime; augment jsPDF here
+type JsPDFWithAutoTable = jsPDF & { lastAutoTable: { finalY: number } };
+
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth-context";
 import { MaterialDatePickerDialog, MaterialTimePickerDialog } from "@/components/ui/material-pickers";
@@ -83,6 +90,73 @@ interface CandidateInvitation {
   candidateId?: string;
   status?: string;
   token?: string;
+}
+
+// Report data shapes
+interface ReportCandidate {
+  candidateId: string;
+  candidateName: string;
+  email: string;
+  testStatus?: string;
+  violationCount?: number;
+  scheduleId?: string;
+  riskLevel?: string;
+  [key: string]: unknown;
+}
+
+interface CandidateResult {
+  totalScore?: number;
+  maxScore?: number;
+  passed?: boolean;
+  id?: string;
+  [key: string]: unknown;
+}
+
+interface CandidateResultEntry {
+  sessionId?: string;
+  detail?: ReportCandidateDetails;
+  scheduleId?: string;
+  result?: CandidateResult | null;
+}
+
+interface ReportCandidateDetails {
+  riskLevel?: string;
+  ipAddress?: string;
+  browser?: string;
+  os?: string;
+  fullscreenViolations?: number;
+  violations?: ReportViolation[];
+  evidence?: ReportEvidence[];
+  sessionInfo?: Record<string, unknown>;
+  systemInfo?: {
+    sessionId?: string;
+    ipAddress?: string;
+    browser?: string;
+    os?: string;
+    fullscreenViolations?: number;
+    [key: string]: unknown;
+  };
+  [key: string]: unknown;
+}
+
+interface ReportViolation {
+  id?: string;
+  eventType?: string;
+  severity?: string;
+  occurredAt?: string;
+  time?: string;
+  metadata?: { description?: string };
+  description?: string;
+  createdAt?: string;
+  [key: string]: unknown;
+}
+
+interface ReportEvidence {
+  id?: string;
+  imageData?: string;
+  imageUrl?: string;
+  snapshotType?: string;
+  capturedAt: string;
 }
 
 interface EnrichedTestQuestion extends TestQuestion {
@@ -166,6 +240,14 @@ const getProctoringPreset = (mode: ProctoringMode) => {
   return defaults;
 };
 
+const DEFAULT_TEST_INSTRUCTIONS = `This is an online test.
+Please make sure that you are using the latest version of the browser. We recommend using Google Chrome.
+It's mandatory to disable all the browser extensions and enabled Add-ons or open the assessment in incognito mode.
+If you are solving a coding problem, you will either be required to choose a programming language from the options that have been enabled by the administrator or choose your preferred programming language in case no options have been enabled by the administrator. Note: In case you're solving coding problems: All inputs are from STDIN and output to STDOUT.
+ If test mandates you to use the webcam, please provide the required permissions and access.
+To know the results, please contact the administrator.
+To refer to the FAQ document, you can click on the HELP button which is present in the top right corner of the test environment.`;
+
 export default function AdminTestsEdit() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -217,6 +299,7 @@ export default function AdminTestsEdit() {
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [invitations, setInvitations] = useState<CandidateInvitation[]>([]);
   const [inviteSearchTerm, setInviteSearchTerm] = useState("");
+  const [inviteTab, setInviteTab] = useState<"available" | "invited" | "all">("available");
   const [selectedSchedule, setSelectedSchedule] = useState<string>("");
   const [selectedScheduleData, setSelectedScheduleData] = useState<TestScheduleExtended | null>(null);
   const [isInviteDialogOpen, setIsInviteDialogOpen] = useState(false);
@@ -272,13 +355,13 @@ export default function AdminTestsEdit() {
   // Reports States
   const [loadingReports, setLoadingReports] = useState(false);
   const [reportScheduleId, setReportScheduleId] = useState<string>("all");
-  const [reportCandidates, setReportCandidates] = useState<any[]>([]);
-  const [reportSchedules, setReportSchedules] = useState<any[]>([]);
-  const [candidateResults, setCandidateResults] = useState<Record<string, any>>({});
-  const [selectedReportCandidate, setSelectedReportCandidate] = useState<any>(null);
-  const [reportCandidateDetails, setReportCandidateDetails] = useState<any>(null);
+  const [reportCandidates, setReportCandidates] = useState<ReportCandidate[]>([]);
+  const [reportSchedules, setReportSchedules] = useState<TestScheduleExtended[]>([]);
+  const [candidateResults, setCandidateResults] = useState<Record<string, CandidateResultEntry>>({});
+  const [selectedReportCandidate, setSelectedReportCandidate] = useState<ReportCandidate | null>(null);
+  const [reportCandidateDetails, setReportCandidateDetails] = useState<ReportCandidateDetails | null>(null);
   const [loadingAdvancedDetails, setLoadingAdvancedDetails] = useState(false);
-  const [candidatePaperSubmissions, setCandidatePaperSubmissions] = useState<any[]>([]);
+  const [candidatePaperSubmissions, setCandidatePaperSubmissions] = useState<Record<string, unknown>[]>([]);
   const [isAdvancedReportOpen, setIsAdvancedReportOpen] = useState(false);
 
   const displayedCandidates = useMemo(() => {
@@ -292,6 +375,17 @@ export default function AdminTestsEdit() {
     }
     return appeared.filter((c) => c.scheduleId === reportScheduleId);
   }, [reportCandidates, reportScheduleId]);
+
+  const getReportCandidateKey = (candidate: Pick<ReportCandidate, "candidateId" | "scheduleId">) =>
+    `${candidate.scheduleId || "no-schedule"}:${candidate.candidateId}`;
+
+  const totalTestMarks = useMemo(() => {
+    const mappedQuestions = questionsData.length > 0
+      ? questionsData
+      : test?.testQuestions || test?.questions || [];
+
+    return mappedQuestions.reduce((sum, question) => sum + (Number(question.marks) || 0), 0);
+  }, [questionsData, test]);
 
   const isScheduleDirty = useMemo(() => {
     if (!test) return false;
@@ -321,36 +415,36 @@ export default function AdminTestsEdit() {
     if (formData.difficulty !== test.difficulty) return true;
     if (formData.passMark !== test.passMark) return true;
     if (formData.status !== test.status) return true;
-    if (formData.proctoringMode !== test.proctoringMode) return true;
+    if ((formData.proctoringMode || "NONE") !== (test.proctoringMode || "NONE")) return true;
     
     // Check instructions general text
     const currentGeneral = (formData.instructions as Record<string, unknown> | undefined)?.general || "";
-    const originalGeneral = (test.instructions as Record<string, unknown> | undefined)?.general || "";
+    const originalGeneral = (test.instructions as Record<string, unknown> | undefined)?.general || DEFAULT_TEST_INSTRUCTIONS;
     if (currentGeneral !== originalGeneral) return true;
 
     // Check schedule times
     if (isScheduleDirty) return true;
 
     // Proctoring settings
-    if (formData.enableTabSwitchTracking !== test.enableTabSwitchTracking) return true;
-    if (formData.blockCopyPaste !== test.blockCopyPaste) return true;
-    if (formData.blockRightClick !== test.blockRightClick) return true;
-    if (formData.warnOnFullscreenExit !== test.warnOnFullscreenExit) return true;
-    if (formData.maxWarnings !== test.maxWarnings) return true;
-    if (formData.requireWebcam !== test.requireWebcam) return true;
-    if (formData.detectFaceNotVisible !== test.detectFaceNotVisible) return true;
-    if (formData.detectMultipleFaces !== test.detectMultipleFaces) return true;
-    if (formData.detectSuspiciousAudio !== test.detectSuspiciousAudio) return true;
-    if (formData.detectObjects !== test.detectObjects) return true;
-    if (formData.periodicSnapshots !== test.periodicSnapshots) return true;
-    if (formData.evidenceCapture !== test.evidenceCapture) return true;
-    if (formData.requireMicrophone !== test.requireMicrophone) return true;
-    if (formData.requireScreenShare !== test.requireScreenShare) return true;
-    if (formData.detectDevTools !== test.detectDevTools) return true;
-    if (formData.detectScreenShareStop !== test.detectScreenShareStop) return true;
-    if (formData.enableLiveProctoring !== test.enableLiveProctoring) return true;
-    if (formData.autoSubmitOnCriticalViolations !== test.autoSubmitOnCriticalViolations) return true;
-    if (formData.maxCriticalViolations !== test.maxCriticalViolations) return true;
+    if ((formData.enableTabSwitchTracking || false) !== (test.enableTabSwitchTracking || false)) return true;
+    if ((formData.blockCopyPaste || false) !== (test.blockCopyPaste || false)) return true;
+    if ((formData.blockRightClick || false) !== (test.blockRightClick || false)) return true;
+    if ((formData.warnOnFullscreenExit || false) !== (test.warnOnFullscreenExit || false)) return true;
+    if ((formData.maxWarnings || 0) !== (test.maxWarnings || 0)) return true;
+    if ((formData.requireWebcam || false) !== (test.requireWebcam || false)) return true;
+    if ((formData.detectFaceNotVisible || false) !== (test.detectFaceNotVisible || false)) return true;
+    if ((formData.detectMultipleFaces || false) !== (test.detectMultipleFaces || false)) return true;
+    if ((formData.detectSuspiciousAudio || false) !== (test.detectSuspiciousAudio || false)) return true;
+    if ((formData.detectObjects || false) !== (test.detectObjects || false)) return true;
+    if ((formData.periodicSnapshots || false) !== (test.periodicSnapshots || false)) return true;
+    if ((formData.evidenceCapture || false) !== (test.evidenceCapture || false)) return true;
+    if ((formData.requireMicrophone || false) !== (test.requireMicrophone || false)) return true;
+    if ((formData.requireScreenShare || false) !== (test.requireScreenShare || false)) return true;
+    if ((formData.detectDevTools || false) !== (test.detectDevTools || false)) return true;
+    if ((formData.detectScreenShareStop || false) !== (test.detectScreenShareStop || false)) return true;
+    if ((formData.enableLiveProctoring || false) !== (test.enableLiveProctoring || false)) return true;
+    if ((formData.autoSubmitOnCriticalViolations || false) !== (test.autoSubmitOnCriticalViolations || false)) return true;
+    if ((formData.maxCriticalViolations || 0) !== (test.maxCriticalViolations || 0)) return true;
 
     return false;
   }, [formData, test, isScheduleDirty]);
@@ -409,13 +503,7 @@ export default function AdminTestsEdit() {
         passMark: data.passMark,
         status: data.status,
         instructions: data.instructions?.general ? data.instructions : {
-          general: `This is an online test.
-Please make sure that you are using the latest version of the browser. We recommend using Google Chrome.
-It's mandatory to disable all the browser extensions and enabled Add-ons or open the assessment in incognito mode.
-If you are solving a coding problem, you will either be required to choose a programming language from the options that have been enabled by the administrator or choose your preferred programming language in case no options have been enabled by the administrator. Note: In case you're solving coding problems: All inputs are from STDIN and output to STDOUT.
- If test mandates you to use the webcam, please provide the required permissions and access.
-To know the results, please contact the administrator.
-To refer to the FAQ document, you can click on the HELP button which is present in the top right corner of the test environment.`
+          general: DEFAULT_TEST_INSTRUCTIONS
         },
         proctoringMode: data.proctoringMode || "NONE",
         enableTabSwitchTracking: data.enableTabSwitchTracking || false,
@@ -669,7 +757,7 @@ To refer to the FAQ document, you can click on the HELP button which is present 
         maxCriticalViolations: formData.maxCriticalViolations || 0,
       });
       // Sync local test state so dirty-check resets
-      setTest((prev) => prev ? { ...prev, title: formData.title!, description: formData.description, durationMins: formData.durationMins!, difficulty: formData.difficulty as any, passMark: formData.passMark!, status: formData.status as any, instructions: formData.instructions } : prev);
+      setTest((prev) => prev ? { ...prev, title: formData.title!, description: formData.description, durationMins: formData.durationMins!, difficulty: formData.difficulty as "EASY" | "MEDIUM" | "HARD", passMark: formData.passMark!, status: formData.status as "DRAFT" | "PUBLISHED" | "ARCHIVED", instructions: formData.instructions } : prev);
       toast({ title: "Saved", description: "Basic information saved successfully." });
     } catch (error: unknown) {
       toast({ title: "Error", description: error instanceof Error ? error.message : "Failed to save.", variant: "destructive" });
@@ -714,7 +802,7 @@ To refer to the FAQ document, you can click on the HELP button which is present 
       // Sync local test state so dirty-check resets
       setTest((prev) => prev ? {
         ...prev,
-        proctoringMode: formData.proctoringMode as any,
+        proctoringMode: formData.proctoringMode as ProctoringMode,
         enableTabSwitchTracking: formData.enableTabSwitchTracking,
         blockCopyPaste: formData.blockCopyPaste,
         blockRightClick: formData.blockRightClick,
@@ -1031,7 +1119,7 @@ To refer to the FAQ document, you can click on the HELP button which is present 
           try {
             const res = await apiClient.get(`/api/admin/proctoring/assessment-schedules/${s.id}/candidates`);
             const list = res.data?.data || res.data || [];
-            return list.map((c: any) => ({ ...c, scheduleId: s.id }));
+            return list.map((c: ReportCandidate) => ({ ...c, scheduleId: s.id }));
           } catch {
             return [];
           }
@@ -1041,9 +1129,9 @@ To refer to the FAQ document, you can click on the HELP button which is present 
       const candidatesList = candidatesLists.flat();
       setReportCandidates(candidatesList);
 
-      const resultsMap: Record<string, any> = {};
+      const resultsMap: Record<string, CandidateResultEntry> = {};
       await Promise.allSettled(
-        candidatesList.map(async (c: any) => {
+        candidatesList.map(async (c: ReportCandidate) => {
           try {
             const detailRes = await apiClient.get(
               `/api/admin/proctoring/candidates/${c.candidateId}/details?scheduleId=${c.scheduleId}`
@@ -1054,14 +1142,14 @@ To refer to the FAQ document, you can click on the HELP button which is present 
             if (sessionId) {
               const resultRes = await apiClient.get(`/test-results/session/${sessionId}`);
               const result = resultRes.data?.data || resultRes.data;
-              resultsMap[c.candidateId] = {
+              resultsMap[getReportCandidateKey(c)] = {
                 sessionId,
                 detail,
                 scheduleId: c.scheduleId,
                 result: result && result.id ? result : null
               };
             } else {
-              resultsMap[c.candidateId] = {
+              resultsMap[getReportCandidateKey(c)] = {
                 detail,
                 scheduleId: c.scheduleId,
                 result: null
@@ -1091,10 +1179,10 @@ To refer to the FAQ document, you can click on the HELP button which is present 
     }
   }, [activeTab, id, loadReportData]);
 
-  const handleOpenAdvancedReport = async (candidate: any) => {
+  const handleOpenAdvancedReport = async (candidate: ReportCandidate) => {
     setSelectedReportCandidate(candidate);
     setIsAdvancedReportOpen(true);
-    const candidateData = candidateResults[candidate.candidateId];
+    const candidateData = candidateResults[getReportCandidateKey(candidate)];
     if (!candidateData) return;
 
     setLoadingAdvancedDetails(true);
@@ -1115,14 +1203,14 @@ To refer to the FAQ document, you can click on the HELP button which is present 
         const questionsList = paperData?.paper?.questions || [];
         const submissionsList = resumeData?.submissions || [];
 
-        const mappedSubmissions = questionsList.map((q: any) => {
-          const questionId = q.sourceQuestionId || q.id;
-          const submission = submissionsList.find((s: any) => s.questionId === questionId);
+        const mappedSubmissions = questionsList.map((q: Record<string, unknown>) => {
+          const questionId = (q.sourceQuestionId || q.id) as string;
+          const submission = submissionsList.find((s: Record<string, unknown>) => s.questionId === questionId);
           
           const normalizedQuestion = {
             id: questionId,
             prompt: q.prompt,
-            title: q.coding?.title || q.prompt || "Question",
+            title: (q.coding as { title?: string } | undefined)?.title || (q.prompt as string | undefined) || "Question",
             questionType: q.type,
             type: q.type,
             mcqOptions: q.options || q.mcqOptions || []
@@ -1169,6 +1257,216 @@ To refer to the FAQ document, you can click on the HELP button which is present 
       toast({
         title: "Download Failed",
         description: "Failed to generate or download the scorecard.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const escapeHtml = (unsafe: string) => {
+    return (unsafe || "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#039;");
+  };
+
+  const downloadAdvancedReport = async (candidate: { candidateId: string; candidateName: string; email: string; testStatus?: string; violationCount?: number; scheduleId?: string }) => {
+    try {
+      toast({
+        title: "Generating Advanced PDF",
+        description: "Compiling telemetry into a premium PDF report...",
+      });
+
+      const scoreData = candidateResults[getReportCandidateKey(candidate)];
+      if (!scoreData?.sessionId) {
+        toast({
+          title: "Download Failed",
+          description: "No active session found to build advanced report.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const detailRes = await apiClient.get(
+        `/api/admin/proctoring/candidates/${candidate.candidateId}/details?scheduleId=${candidate.scheduleId || reportScheduleId}`
+      );
+      const detailData = detailRes.data?.data ?? detailRes.data;
+
+      const [paperRes, resumeRes] = await Promise.all([
+        apiClient.get(`/test-sessions/${scoreData.sessionId}/paper`),
+        apiClient.get(`/test-sessions/${scoreData.sessionId}/resume`),
+      ]);
+
+      const paperData = paperRes.data?.data || paperRes.data;
+      const resumeData = resumeRes.data?.data || resumeRes.data;
+
+      const questionsList = paperData?.paper?.questions || [];
+      const submissionsList = resumeData?.submissions || [];
+
+      const scoreText = scoreData?.result?.totalScore !== undefined
+        ? `${scoreData.result.totalScore} / ${scoreData.result.maxScore}`
+        : "N/A";
+      const passText = scoreData?.result?.passed !== undefined
+        ? (scoreData.result.passed ? "PASSED" : "FAILED")
+        : "N/A";
+
+      // Initialize jsPDF document
+      const doc = new jsPDF();
+
+      // Premium Header Banner
+      doc.setFillColor(15, 23, 42); // Obsidian background
+      doc.rect(0, 0, 210, 32, "F");
+
+      doc.setTextColor(255, 255, 255);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(18);
+      doc.text("CANDIDATE SESSION AUDIT", 14, 18);
+
+      doc.setTextColor(52, 211, 153); // Matrix Green
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(8.5);
+      doc.text("SECURE ADVANCED PROCTORING TELEMETRY REPORT", 14, 25);
+
+      // Metadata Table
+      autoTable(doc, {
+        startY: 36,
+        head: [[{ content: 'CANDIDATE METADATA & SESSION INFORMATION', colSpan: 4, styles: { halign: 'left', fillColor: [30, 41, 59], fontStyle: 'bold' } }]],
+        body: [
+          [
+            { content: 'Candidate Name:', styles: { fontStyle: 'bold', textColor: [100, 116, 139] } },
+            candidate.candidateName,
+            { content: 'Final Score:', styles: { fontStyle: 'bold', textColor: [100, 116, 139] } },
+            { content: `${scoreText} (${passText})`, styles: { fontStyle: 'bold', textColor: scoreData?.result?.passed ? [16, 185, 129] : [239, 68, 68] } }
+          ],
+          [
+            { content: 'Email Address:', styles: { fontStyle: 'bold', textColor: [100, 116, 139] } },
+            candidate.email,
+            { content: 'Proctoring Risk:', styles: { fontStyle: 'bold', textColor: [100, 116, 139] } },
+            { content: detailData?.riskLevel || 'NONE', styles: { fontStyle: 'bold', textColor: (detailData?.riskLevel === 'CRITICAL' || detailData?.riskLevel === 'HIGH') ? [239, 68, 68] : [16, 185, 129] } }
+          ],
+          [
+            { content: 'Session Status:', styles: { fontStyle: 'bold', textColor: [100, 116, 139] } },
+            (candidate.testStatus || 'N/A').replace(/_/g, ' '),
+            { content: 'Total Violations:', styles: { fontStyle: 'bold', textColor: [100, 116, 139] } },
+            { content: String(candidate.violationCount || 0), styles: { fontStyle: 'bold', textColor: (candidate.violationCount || 0) > 0 ? [239, 68, 68] : [100, 116, 139] } }
+          ],
+          [
+            { content: 'IP Address:', styles: { fontStyle: 'bold', textColor: [100, 116, 139] } },
+            detailData?.systemInfo?.ipAddress || 'N/A',
+            { content: 'Browser / OS:', styles: { fontStyle: 'bold', textColor: [100, 116, 139] } },
+            `${detailData?.systemInfo?.browser || 'Chrome'} / ${detailData?.systemInfo?.os || 'Windows'}`
+          ]
+        ],
+        theme: 'grid',
+        styles: { fontSize: 8.5, cellPadding: 4.5 },
+        columnStyles: {
+          0: { cellWidth: 35 },
+          1: { cellWidth: 65 },
+          2: { cellWidth: 35 },
+          3: { cellWidth: 65 }
+        }
+      });
+
+      // Warnings Timeline Table
+      const violations = detailData?.violations || [];
+      const violationsBody = violations.map((v: { eventId?: string; id?: string; occurredAt?: string; time?: string; eventType?: string; severity?: string; metadata?: { description?: string }; description?: string }) => [
+        new Date(v.occurredAt || v.time || '').toLocaleTimeString(),
+        (v.eventType || '').replace(/_/g, ' '),
+        v.severity || 'INFO',
+        v.metadata?.description || v.description || 'Violation logged'
+      ]);
+
+      autoTable(doc, {
+        startY: (doc as JsPDFWithAutoTable).lastAutoTable.finalY + 8,
+        head: [
+          [{ content: 'PROCTORING WARNINGS TIMELINE', colSpan: 4, styles: { halign: 'left', fillColor: [30, 41, 59], fontStyle: 'bold' } }],
+          ['Time', 'Event Type', 'Severity', 'Description']
+        ],
+        body: violationsBody.length > 0 ? violationsBody : [['-', 'No proctoring violations recorded during this session.', '-', '-']],
+        theme: 'striped',
+        headStyles: { fillColor: [71, 85, 105], textColor: [255, 255, 255], fontStyle: 'bold' },
+        styles: { fontSize: 8, cellPadding: 4 },
+        columnStyles: {
+          0: { cellWidth: 25 },
+          1: { cellWidth: 40 },
+          2: { cellWidth: 25 },
+          3: { cellWidth: 92 }
+        }
+      });
+
+      // Section Separator Label
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(11);
+      doc.setTextColor(30, 41, 59);
+      doc.text("QUESTIONS & SUBMISSIONS DETAILS", 14, (doc as JsPDFWithAutoTable).lastAutoTable.finalY + 10);
+
+      // Question Cards using autoTables
+      questionsList.forEach((q: { id: string; sourceQuestionId?: string; prompt?: string; type?: string; coding?: { title?: string }; options?: Array<{ id: string; text: string; isCorrect: boolean }>; mcqOptions?: Array<{ id: string; text: string; isCorrect: boolean }> }, idx: number) => {
+        const questionId = q.sourceQuestionId || q.id;
+        const sub = submissionsList.find((s: { questionId: string; answerText?: string; selectedOptionIds?: string[] }) => s.questionId === questionId);
+        const isCoding = q.type === "CODING";
+
+        // Build exact selected ID set — prefer structured selectedOptionIds, fall back to parsing raw answerText JSON
+        let selectedIds = new Set<string>();
+        if (sub?.selectedOptionIds && Array.isArray(sub.selectedOptionIds)) {
+          selectedIds = new Set(sub.selectedOptionIds.map(String));
+        } else if (sub?.answerText) {
+          try {
+            const parsed = JSON.parse(sub.answerText);
+            if (Array.isArray(parsed)) parsed.forEach((id: string) => selectedIds.add(String(id)));
+          } catch { /* raw text, leave selectedIds empty */ }
+        }
+
+        let submissionText = selectedIds.size === 0 ? (sub?.answerText || "No submission") : "";
+        if (!isCoding) {
+          const optionsList = q.options || q.mcqOptions || [];
+          if (optionsList.length > 0) {
+            submissionText = optionsList.map((opt: { id: string; text: string; isCorrect: boolean }) => {
+              const isSelected = selectedIds.has(opt.id);
+              const statusLabel = isSelected && opt.isCorrect
+                ? "[SELECTED & CORRECT]"
+                : isSelected
+                  ? "[SELECTED - INCORRECT]"
+                  : opt.isCorrect
+                    ? "[CORRECT ANSWER]"
+                    : "";
+              return `${opt.text} ${statusLabel}`.trim();
+            }).join("\n");
+          }
+        }
+
+        autoTable(doc, {
+        startY: idx === 0 ? (doc as JsPDFWithAutoTable).lastAutoTable.finalY + 14 : (doc as JsPDFWithAutoTable).lastAutoTable.finalY + 8,
+          head: [[
+            { content: `QUESTION ${idx + 1}: ${q.coding?.title || q.prompt || "Question"}`, styles: { halign: 'left', fillColor: [30, 41, 59], textColor: [255, 255, 255], fontStyle: 'bold' } },
+            { content: q.type || 'MCQ', styles: { halign: 'right', fillColor: [30, 41, 59], textColor: [255, 255, 255], fontStyle: 'bold' } }
+          ]],
+          body: [
+            [{ content: `Prompt:\n${q.prompt || ""}`, colSpan: 2, styles: { textColor: [51, 65, 85], fontStyle: 'normal' } }],
+            [{ content: `Submitted Answer:\n${submissionText}`, colSpan: 2, styles: { fontStyle: isCoding ? 'normal' : 'bold', fillColor: [248, 250, 252], textColor: isCoding ? [15, 23, 42] : [79, 70, 229] } }]
+          ],
+          theme: 'grid',
+          styles: { fontSize: 8, cellPadding: 4.5 },
+          columnStyles: {
+            0: { cellWidth: 150 },
+            1: { cellWidth: 32 }
+          }
+        });
+      });
+
+      // Save PDF directly to user's downloads folder
+      doc.save(`Advanced_Report_${candidate.candidateName.replace(/\s+/g, "_")}.pdf`);
+
+      toast({
+        title: "Download Successful",
+        description: "Advanced PDF report downloaded directly.",
+      });
+    } catch (err) {
+      console.error("Failed to download advanced report:", err);
+      toast({
+        title: "Download Failed",
+        description: "Failed to download advanced report details.",
         variant: "destructive",
       });
     }
@@ -1306,16 +1604,75 @@ To refer to the FAQ document, you can click on the HELP button which is present 
     }
   };
 
+  const getInvitationStatusBadge = (status: string) => {
+    switch (status) {
+      case "ACCEPTED":
+        return (
+          <Badge variant="outline" className="border-emerald-500/20 bg-emerald-500/10 text-emerald-600 text-xs">
+            Accepted
+          </Badge>
+        );
+      case "EXPIRED":
+        return (
+          <Badge variant="outline" className="border-red-500/20 bg-red-500/10 text-red-600 text-xs">
+            Expired
+          </Badge>
+        );
+      case "PENDING":
+        return (
+          <Badge variant="outline" className="border-amber-500/20 bg-amber-500/10 text-amber-600 text-xs">
+            Pending
+          </Badge>
+        );
+      default:
+        return (
+          <Badge variant="outline" className="text-xs">
+            {status.toLowerCase()}
+          </Badge>
+        );
+    }
+  };
+
   const filteredCandidates = useMemo(() => {
     return candidates.filter((candidate) => {
       const name = candidate.user?.name || "";
       const email = candidate.user?.email || "";
+      const invitation = selectedSchedule
+        ? getInvitationForCandidate(candidate.id, selectedSchedule)
+        : null;
       const matchesSearch =
         name.toLowerCase().includes(inviteSearchTerm.toLowerCase()) ||
         email.toLowerCase().includes(inviteSearchTerm.toLowerCase());
-      return matchesSearch;
+      const matchesTab =
+        inviteTab === "all" ||
+        (inviteTab === "available" && !invitation) ||
+        (inviteTab === "invited" && !!invitation);
+      return matchesSearch && matchesTab;
     });
-  }, [candidates, inviteSearchTerm]);
+  }, [candidates, inviteSearchTerm, inviteTab, invitations, selectedSchedule]);
+
+  const inviteCounts = useMemo(() => {
+    if (!selectedSchedule) {
+      return {
+        available: candidates.length,
+        invited: 0,
+        all: candidates.length,
+      };
+    }
+
+    const invitedIds = new Set(
+      invitations
+        .filter((invitation) => invitation.scheduleId === selectedSchedule)
+        .map((invitation) => invitation.candidateId)
+        .filter(Boolean),
+    );
+
+    return {
+      available: candidates.filter((candidate) => !invitedIds.has(candidate.id)).length,
+      invited: candidates.filter((candidate) => invitedIds.has(candidate.id)).length,
+      all: candidates.length,
+    };
+  }, [candidates, invitations, selectedSchedule]);
 
   const handleAddQuestions = () => {
     navigate(`/admin/tests/${id}/questions`);
@@ -1571,7 +1928,7 @@ To refer to the FAQ document, you can click on the HELP button which is present 
                           </p>
                           <div className="flex gap-3 text-xs text-muted-foreground mt-1">
                             <span className="capitalize">
-                              {((item.question as Record<string, unknown> | undefined)?.type as string || item.question?.questionType || "")?.toLowerCase()}
+                              {((item.question as unknown as Record<string, unknown> | undefined)?.type as string || item.question?.questionType || "")?.toLowerCase()}
                             </span>
                             <span>•</span>
                             <span>{item.marks} marks</span>
@@ -2140,10 +2497,13 @@ To refer to the FAQ document, you can click on the HELP button which is present 
         </TabsContent>
 
         <TabsContent value="invite" className="pt-6">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
+          <Card className="border border-border">
+            <CardHeader className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
               <div>
-                <CardTitle>Invite Candidates</CardTitle>
+                <CardTitle className="flex items-center gap-2">
+                  <Send className="w-5 h-5 text-primary" />
+                  Invite Candidates
+                </CardTitle>
                 <CardDescription>
                   Invite students or candidates to take this specific assessment
                 </CardDescription>
@@ -2174,76 +2534,96 @@ To refer to the FAQ document, you can click on the HELP button which is present 
                 </div>
               ) : (
                 <>
-                  <div className="p-4 bg-primary/5 rounded-lg text-sm border border-primary/10 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                  <div className="rounded-lg border border-primary/10 bg-primary/5 p-4 text-sm">
                     <div>
-                      <p className="font-semibold text-primary">Active Test Schedule Connected</p>
+                      <p className="font-semibold text-primary">Schedule connected for this test</p>
                       <p className="text-xs text-muted-foreground mt-1">
-                        Schedules: {formatDateTime(selectedScheduleData?.startTime || "")} - {formatDateTime(selectedScheduleData?.endTime || "")}
+                        {formatDateTime(selectedScheduleData?.startTime || "")} - {formatDateTime(selectedScheduleData?.endTime || "")}
                       </p>
                     </div>
                   </div>
 
-                  {/* Search bar */}
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                    <Input
-                      placeholder="Search candidates by name or email..."
-                      value={inviteSearchTerm}
-                      onChange={(e) => setInviteSearchTerm(e.target.value)}
-                      className="pl-10 w-full"
-                    />
+                  <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                    <div className="relative w-full md:max-w-md">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                      <Input
+                        placeholder="Search candidates by name or email..."
+                        value={inviteSearchTerm}
+                        onChange={(e) => setInviteSearchTerm(e.target.value)}
+                        className="pl-10 w-full"
+                      />
+                    </div>
+                    <Tabs value={inviteTab} onValueChange={(value) => setInviteTab(value as "available" | "invited" | "all")}>
+                      <TabsList className="bg-muted/40 border border-border p-1">
+                        <TabsTrigger value="available" className="text-xs">
+                          Available ({inviteCounts.available})
+                        </TabsTrigger>
+                        <TabsTrigger value="invited" className="text-xs">
+                          Invited ({inviteCounts.invited})
+                        </TabsTrigger>
+                        <TabsTrigger value="all" className="text-xs">
+                          All ({inviteCounts.all})
+                        </TabsTrigger>
+                      </TabsList>
+                    </Tabs>
                   </div>
 
                   {/* Candidates Table */}
-                  <div className="border rounded-lg overflow-hidden">
+                  <div className="border rounded-lg overflow-hidden bg-card">
                     <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead className="w-[50px]">
-                            <Checkbox
-                              checked={
-                                filteredCandidates.length > 0 &&
-                                filteredCandidates.every((c) =>
-                                  selectedCandidates.includes(c.id),
-                                )
-                              }
-                              onCheckedChange={(checked) => {
-                                if (checked) {
-                                  const allIds = filteredCandidates.map((c) => c.id);
-                                  setSelectedCandidates((prev) =>
-                                    Array.from(new Set([...prev, ...allIds])),
-                                  );
-                                } else {
-                                  const filteredIds = new Set(
-                                    filteredCandidates.map((c) => c.id),
-                                  );
-                                  setSelectedCandidates((prev) =>
-                                    prev.filter((id) => !filteredIds.has(id)),
-                                  );
+                      <TableHeader className="bg-muted/40">
+                        <TableRow className="hover:bg-transparent">
+                          <TableHead className="w-[42px]">
+                            {inviteTab !== "invited" && (
+                              <Checkbox
+                                checked={
+                                  filteredCandidates.length > 0 &&
+                                  filteredCandidates.every((c) =>
+                                    selectedCandidates.includes(c.id),
+                                  )
                                 }
-                              }}
-                            />
+                                onCheckedChange={(checked) => {
+                                  if (checked) {
+                                    const allIds = filteredCandidates.map((c) => c.id);
+                                    setSelectedCandidates((prev) =>
+                                      Array.from(new Set([...prev, ...allIds])),
+                                    );
+                                  } else {
+                                    const filteredIds = new Set(
+                                      filteredCandidates.map((c) => c.id),
+                                    );
+                                    setSelectedCandidates((prev) =>
+                                      prev.filter((id) => !filteredIds.has(id)),
+                                    );
+                                  }
+                                }}
+                              />
+                            )}
                           </TableHead>
-                          <TableHead className="w-[50px] text-center">#</TableHead>
-                          <TableHead>Candidate</TableHead>
-                          <TableHead>Contact</TableHead>
-                          <TableHead>Account</TableHead>
-                          <TableHead>Invitation</TableHead>
-                          <TableHead>Test Link</TableHead>
-                          <TableHead className="text-right">Action</TableHead>
+                          <TableHead className="w-[50px] text-center text-xs text-muted-foreground">#</TableHead>
+                          <TableHead className="text-xs text-muted-foreground">Candidate</TableHead>
+                          <TableHead className="text-xs text-muted-foreground">Contact</TableHead>
+                          <TableHead className="text-xs text-muted-foreground">Account</TableHead>
+                          <TableHead className="text-xs text-muted-foreground">Invitation</TableHead>
+                          <TableHead className="text-xs text-muted-foreground">Test Link</TableHead>
+                          <TableHead className="text-right text-xs text-muted-foreground">Action</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {loadingInvitations ? (
-                          <TableRow>
+                          <TableRow className="hover:bg-transparent">
                             <TableCell colSpan={8} className="text-center py-10">
                               <Loader2 className="w-6 h-6 animate-spin mx-auto text-primary" />
                             </TableCell>
                           </TableRow>
                         ) : filteredCandidates.length === 0 ? (
-                          <TableRow>
+                          <TableRow className="hover:bg-transparent">
                             <TableCell colSpan={8} className="text-center py-10 text-muted-foreground">
-                              No candidates found.
+                              {inviteTab === "available"
+                                ? "No candidates available to invite."
+                                : inviteTab === "invited"
+                                  ? "No invited candidates for this schedule."
+                                  : "No candidates found."}
                             </TableCell>
                           </TableRow>
                         ) : (
@@ -2258,20 +2638,22 @@ To refer to the FAQ document, you can click on the HELP button which is present 
                                 : invitation?.status;
 
                             return (
-                              <TableRow key={candidate.id}>
+                              <TableRow key={candidate.id} className="hover:bg-muted/30">
                                 <TableCell>
-                                  <Checkbox
-                                    checked={selectedCandidates.includes(candidate.id)}
-                                    onCheckedChange={(checked) => {
-                                      if (checked) {
-                                        setSelectedCandidates((prev) => [...prev, candidate.id]);
-                                      } else {
-                                        setSelectedCandidates((prev) =>
-                                          prev.filter((id) => id !== candidate.id),
-                                        );
-                                      }
-                                    }}
-                                  />
+                                  {!invitation && (
+                                    <Checkbox
+                                      checked={selectedCandidates.includes(candidate.id)}
+                                      onCheckedChange={(checked) => {
+                                        if (checked) {
+                                          setSelectedCandidates((prev) => [...prev, candidate.id]);
+                                        } else {
+                                          setSelectedCandidates((prev) =>
+                                            prev.filter((id) => id !== candidate.id),
+                                          );
+                                        }
+                                      }}
+                                    />
+                                  )}
                                 </TableCell>
                                 <TableCell className="text-center text-muted-foreground text-sm">
                                   {index + 1}
@@ -2282,10 +2664,13 @@ To refer to the FAQ document, you can click on the HELP button which is present 
                                       {candidate.user.name
                                         ?.split(" ")
                                         .map((n: string) => n[0])
-                                        .join("") || "C"}
+                                        .join("")
+                                        .toUpperCase()
+                                        .slice(0, 2) || "C"}
                                     </div>
                                     <div>
                                       <p className="font-medium text-sm">{candidate.user.name}</p>
+                                      <p className="text-[10px] text-muted-foreground">ID: {candidate.id.slice(0, 8)}</p>
                                     </div>
                                   </div>
                                 </TableCell>
@@ -2300,10 +2685,7 @@ To refer to the FAQ document, you can click on the HELP button which is present 
                                 </TableCell>
                                 <TableCell>
                                   {invitation ? (
-                                    <div className="flex items-center gap-1.5 text-sm">
-                                      {getStatusIcon(displayStatus || "")}
-                                      <span className="capitalize">{displayStatus?.toLowerCase()}</span>
-                                    </div>
+                                    getInvitationStatusBadge(displayStatus || "")
                                   ) : (
                                     <span className="text-xs text-muted-foreground">Not invited</span>
                                   )}
@@ -2334,17 +2716,24 @@ To refer to the FAQ document, you can click on the HELP button which is present 
                                   )}
                                 </TableCell>
                                 <TableCell className="text-right">
-                                  <Button
-                                    size="sm"
-                                    onClick={() => {
-                                      setSelectedCandidate(candidate);
-                                      setIsInviteDialogOpen(true);
-                                    }}
-                                    disabled={!!invitation || isScheduleCompleted}
-                                  >
-                                    <Send className="w-4 h-4 mr-2" />
-                                    {invitation ? "Invited" : "Send Invite"}
-                                  </Button>
+                                  {invitation ? (
+                                    <Badge className="bg-emerald-500/10 text-emerald-600 border border-emerald-500/20">
+                                      Invited
+                                    </Badge>
+                                  ) : (
+                                    <Button
+                                      size="sm"
+                                      className="h-8"
+                                      onClick={() => {
+                                        setSelectedCandidate(candidate);
+                                        setIsInviteDialogOpen(true);
+                                      }}
+                                      disabled={isScheduleCompleted}
+                                    >
+                                      <Send className="w-4 h-4 mr-2" />
+                                      Send Invite
+                                    </Button>
+                                  )}
                                 </TableCell>
                               </TableRow>
                             );
@@ -2422,12 +2811,13 @@ To refer to the FAQ document, you can click on the HELP button which is present 
                         <TableHead className="text-center">Result</TableHead>
                         <TableHead className="text-center">Proctoring Risk</TableHead>
                         <TableHead className="text-center">Violations</TableHead>
-                        <TableHead className="text-right">Actions</TableHead>
+                        <TableHead className="text-right">Download Reports / View</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {displayedCandidates.map((candidate) => {
-                        const scoreData = candidateResults[candidate.candidateId];
+                        const reportCandidateKey = getReportCandidateKey(candidate);
+                        const scoreData = candidateResults[reportCandidateKey];
                         const testStatus = candidate.testStatus;
                         
                         let statusColor = "bg-slate-100 text-slate-700";
@@ -2446,9 +2836,13 @@ To refer to the FAQ document, you can click on the HELP button which is present 
                         const totalScore = scoreData?.result?.totalScore;
                         const maxScore = scoreData?.result?.maxScore;
                         const passed = scoreData?.result?.passed;
+                        const isResultPending =
+                          testStatus === "IN_PROGRESS" ||
+                          testStatus === "NOT_STARTED" ||
+                          (!scoreData?.sessionId && totalScore === undefined && passed === undefined);
 
                         return (
-                          <TableRow key={candidate.candidateId}>
+                          <TableRow key={reportCandidateKey}>
                             <TableCell>
                               <div className="font-semibold">{candidate.candidateName}</div>
                               <div className="text-xs text-muted-foreground">{candidate.email}</div>
@@ -2459,12 +2853,16 @@ To refer to the FAQ document, you can click on the HELP button which is present 
                               </Badge>
                             </TableCell>
                             <TableCell className="text-center font-medium">
-                              {totalScore !== undefined ? `${totalScore} / ${maxScore}` : "-"}
+                              {totalScore !== undefined ? `${totalScore} / ${maxScore}` : isResultPending ? `0 / ${totalTestMarks}` : "-"}
                             </TableCell>
                             <TableCell className="text-center">
                               {passed !== undefined ? (
                                 <Badge variant="outline" className={passed ? "bg-emerald-500/15 text-emerald-500" : "bg-red-500/15 text-red-500"}>
                                   {passed ? "Passed" : "Failed"}
+                                </Badge>
+                              ) : isResultPending ? (
+                                <Badge variant="outline" className="bg-sky-500/10 text-sky-600 border-sky-500/20">
+                                  Pending
                                 </Badge>
                               ) : "-"}
                             </TableCell>
@@ -2477,24 +2875,44 @@ To refer to the FAQ document, you can click on the HELP button which is present 
                               {candidate.violationCount || 0}
                             </TableCell>
                             <TableCell className="text-right">
-                              <div className="flex justify-end gap-2">
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => handleOpenAdvancedReport(candidate)}
-                                >
-                                  Advanced Report
-                                </Button>
-                                {scoreData?.sessionId && (
+                              {isResultPending ? (
+                                <span className="inline-flex h-8 items-center rounded-md border border-dashed px-3 text-xs text-muted-foreground">
+                                  Result yet to be declared
+                                </span>
+                              ) : (
+                                <div className="flex flex-wrap justify-end items-center gap-2">
                                   <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    onClick={() => downloadScorecard(scoreData.sessionId, candidate.candidateName)}
+                                    variant="outline"
+                                    size="sm"
+                                    className="h-8 gap-1.5 text-xs border-indigo-500/20 text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-950/10 font-semibold"
+                                    onClick={() => handleOpenAdvancedReport(candidate)}
+                                    title="View advanced submissions, telemetry, and violations"
                                   >
-                                    <Download className="w-4 h-4" />
+                                    <Eye className="w-3.5 h-3.5" />
+                                    View Advanced
                                   </Button>
-                                )}
-                              </div>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="h-8 gap-1.5 text-xs border-emerald-500/20 text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/10 font-semibold"
+                                    onClick={() => downloadScorecard(scoreData.sessionId, candidate.candidateName)}
+                                    title="Download normal scorecard PDF"
+                                  >
+                                    <Download className="w-3.5 h-3.5" />
+                                    Normal
+                                  </Button>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="h-8 gap-1.5 text-xs border-indigo-500/20 text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-950/10 font-semibold"
+                                    onClick={() => downloadAdvancedReport(candidate)}
+                                    title="Download advanced proctoring and submissions PDF"
+                                  >
+                                    <Download className="w-3.5 h-3.5" />
+                                    Advanced
+                                  </Button>
+                                </div>
+                              )}
                             </TableCell>
                           </TableRow>
                         );
@@ -2717,16 +3135,16 @@ To refer to the FAQ document, you can click on the HELP button which is present 
                 <div>
                   <div className="text-xs text-muted-foreground font-medium">Final Score</div>
                   <div className="text-sm font-semibold">
-                    {candidateResults[selectedReportCandidate?.candidateId]?.result?.totalScore !== undefined
-                      ? `${candidateResults[selectedReportCandidate?.candidateId].result.totalScore} / ${candidateResults[selectedReportCandidate?.candidateId].result.maxScore}`
+                    {selectedReportCandidate && candidateResults[getReportCandidateKey(selectedReportCandidate)]?.result?.totalScore !== undefined
+                      ? `${candidateResults[getReportCandidateKey(selectedReportCandidate)].result.totalScore} / ${candidateResults[getReportCandidateKey(selectedReportCandidate)].result.maxScore}`
                       : "-"}
                   </div>
                 </div>
                 <div>
                   <div className="text-xs text-muted-foreground font-medium">Passed / Failed</div>
                   <div className="text-sm font-semibold">
-                    {candidateResults[selectedReportCandidate?.candidateId]?.result?.passed !== undefined
-                      ? (candidateResults[selectedReportCandidate?.candidateId].result.passed ? "PASSED" : "FAILED")
+                    {selectedReportCandidate && candidateResults[getReportCandidateKey(selectedReportCandidate)]?.result?.passed !== undefined
+                      ? (candidateResults[getReportCandidateKey(selectedReportCandidate)].result.passed ? "PASSED" : "FAILED")
                       : "-"}
                   </div>
                 </div>
@@ -2745,9 +3163,9 @@ To refer to the FAQ document, you can click on the HELP button which is present 
                       No submissions found for this candidate.
                     </div>
                   ) : (
-                    candidatePaperSubmissions.map((item: any, idx: number) => {
-                      const q = item.question;
-                      const sub = item.submission;
+                    candidatePaperSubmissions.map((item: Record<string, unknown>, idx: number) => {
+                      const q = item.question as { id?: string; title?: string; prompt?: string; questionType?: string; type?: string; mcqOptions?: { id: string; text: string; isCorrect: boolean }[] };
+                      const sub = item.submission as { answerText?: string; selectedOptionIds?: string[]; questionId?: string } | null;
                       const isCoding = q.questionType === "CODING" || q.type === "CODING";
 
                       return (
@@ -2779,7 +3197,7 @@ To refer to the FAQ document, you can click on the HELP button which is present 
                               <div className="space-y-2">
                                 <div className="text-xs font-semibold text-slate-500">MCQ Options:</div>
                                 <div className="grid gap-2">
-                                  {(q.mcqOptions || []).map((opt: any) => {
+                                  {(q.mcqOptions || []).map((opt: { id: string; text: string; isCorrect: boolean }) => {
                                     const isSelected = sub?.answerText?.includes(opt.id) || sub?.answerText?.includes(opt.text);
                                     const isCorrect = opt.isCorrect;
 
@@ -2849,7 +3267,7 @@ To refer to the FAQ document, you can click on the HELP button which is present 
                             </TableRow>
                           </TableHeader>
                           <TableBody>
-                            {reportCandidateDetails.violations.map((v: any) => {
+                            {reportCandidateDetails.violations.map((v: ReportViolation) => {
                               let sevColor = "bg-slate-100 text-slate-700";
                               if (v.severity === "CRITICAL" || v.severity === "HIGH") sevColor = "bg-red-500/10 text-red-500";
                               else if (v.severity === "MEDIUM") sevColor = "bg-amber-500/10 text-amber-500";
@@ -2878,7 +3296,7 @@ To refer to the FAQ document, you can click on the HELP button which is present 
                       <div className="text-sm text-muted-foreground italic">No image evidence collected.</div>
                     ) : (
                       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                        {reportCandidateDetails.evidence.map((img: any) => (
+                        {reportCandidateDetails.evidence.map((img: ReportEvidence) => (
                           <div key={img.id} className="border rounded-lg overflow-hidden bg-muted/20">
                             <img src={img.imageData || img.imageUrl} alt="Proctor Capture" className="w-full h-32 object-cover" />
                             <div className="p-2 text-[10px] text-muted-foreground">
