@@ -769,12 +769,25 @@ To refer to the FAQ document, you can click on the HELP button which is present 
 
     try {
       setDeletingQuestion(true);
+      console.log("[Admin/TestsEdit] Initiating API call to remove question with mapping ID:", selectedQuestion.id);
       // Call API to remove question from test
       await testService.removeQuestionFromTest(selectedQuestion.id);
+      console.log("[Admin/TestsEdit] API call succeeded. Question with ID:", selectedQuestion.id, "successfully removed from backend.");
 
       toast({
         title: "Success",
         description: `Question has been removed from the test.`,
+      });
+
+      // Update local state immediately to reflect removal in UI
+      setQuestionsData((prev) => prev.filter((q) => q.id !== selectedQuestion.id));
+      setTest((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          questions: prev.questions?.filter((q) => q.id !== selectedQuestion.id),
+          testQuestions: prev.testQuestions?.filter((q) => q.id !== selectedQuestion.id),
+        };
       });
 
       // Refresh the test data

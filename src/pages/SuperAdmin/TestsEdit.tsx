@@ -184,10 +184,12 @@ export default function TestsEdit() {
       const data = await testService.getTestById(id!);
       setTest(data);
 
-      // Fetch full question details for each question in the test
-      if (data.questions && data.questions.length > 0) {
+      // Fetch test questions directly from the mapping table to avoid cached stale relationship on the test object
+      const testQuestions = await testService.getTestQuestions(id!);
+      
+      if (testQuestions && testQuestions.length > 0) {
         const allQuestions = await testService.getAllQuestions();
-        const enrichedQuestions = data.questions.map((tq) => ({
+        const enrichedQuestions = testQuestions.map((tq) => ({
           ...tq,
           question: allQuestions.find((q) => q.id === tq.questionId),
         }));
@@ -429,7 +431,7 @@ export default function TestsEdit() {
     );
   }
 
-  const questionCount = test.questions?.length || 0;
+  const questionCount = questionsData.length;
 
   return (
     <div className="p-8 space-y-6 animate-fade-in">
@@ -680,10 +682,22 @@ export default function TestsEdit() {
                                 confirm("Remove this question from the test?")
                               ) {
                                 try {
+                                  console.log("[SuperAdmin/TestsEdit] Initiating API call to remove question with mapping ID:", tq.id);
                                   await testService.deleteTestQuestion(tq.id);
+                                  console.log("[SuperAdmin/TestsEdit] API call succeeded. Question with ID:", tq.id, "successfully removed from backend.");
                                   toast({
                                     title: "Success",
                                     description: "Question removed from test.",
+                                  });
+                                  // Update local state immediately to reflect removal in UI
+                                  setQuestionsData((prev) => prev.filter((q) => q.id !== tq.id));
+                                  setTest((prev) => {
+                                    if (!prev) return prev;
+                                    return {
+                                      ...prev,
+                                      questions: prev.questions?.filter((q) => q.id !== tq.id),
+                                      testQuestions: prev.testQuestions?.filter((q) => q.id !== tq.id),
+                                    };
                                   });
                                   fetchTest();
                                 } catch (error) {
