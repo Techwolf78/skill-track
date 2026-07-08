@@ -74,9 +74,8 @@ export default function TestQuestions() {
     setCurrentPage(1);
   }, [searchTerm, subjectFilter, typeFilter, difficultyFilter]);
 
-  // Marks and time limit for selected questions
+  // Marks for selected questions
   const [defaultMarks, setDefaultMarks] = useState<number>(5);
-  const [defaultTimeLimit, setDefaultTimeLimit] = useState<number>(10);
 
   const fetchTestAndQuestions = useCallback(async () => {
     try {
@@ -152,8 +151,7 @@ const handleAddQuestions = async () => {
       testId: id,
       selectedQuestions: Array.from(selectedQuestions),
       startOrderIndex: orderIndex,
-      defaultMarks,
-      defaultTimeLimit
+      defaultMarks
     });
 
     // Add each question individually (since no bulk endpoint)
@@ -165,7 +163,6 @@ const handleAddQuestions = async () => {
           questionId: questionId,
           orderIndex: currentOrderIndex,
           marks: defaultMarks,
-          timeLimitSecs: defaultTimeLimit * 60,
         };
         
         console.log("Adding question:", requestData);
@@ -174,8 +171,7 @@ const handleAddQuestions = async () => {
           id!,
           questionId,
           currentOrderIndex,
-          defaultMarks,
-          defaultTimeLimit * 60
+          defaultMarks
         );
         
         console.log("Question added successfully:", response);
@@ -197,9 +193,9 @@ const handleAddQuestions = async () => {
         title: "Success",
         description: `${successCount} question(s) added to test.${failCount > 0 ? ` ${failCount} failed.` : ''}`,
       });
-      // Navigate back to test edit page with role-awareness
+      // Navigate back to test edit page with role-awareness, directly on Questions tab
       const rolePath = user?.role === 'ADMIN' ? 'admin' : 'superadmin';
-      navigate(`/${rolePath}/tests/edit/${id}`);
+      navigate(`/${rolePath}/tests/edit/${id}?tab=questions`);
     } else {
       throw new Error("Failed to add any questions");
     }
@@ -256,9 +252,11 @@ const handleAddQuestions = async () => {
   };
 
   // Filter questions - only show ones not already in test
-  const alreadyAddedIds = new Set(
-    test?.questions?.map((q) => q.questionId) || [],
-  );
+  // testQuestions is the actual linked list; fallback to questions array
+  const alreadyAddedIds = new Set([
+    ...(test?.testQuestions?.map((q) => q.questionId) || []),
+    ...(test?.questions?.map((q) => q.questionId || (q as any).id) || []),
+  ]);
   const availableQuestions = questions.filter(
     (q) => !alreadyAddedIds.has(q.id),
   );
@@ -303,11 +301,9 @@ const handleAddQuestions = async () => {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Link to={`/${user?.role === 'ADMIN' ? 'admin' : 'superadmin'}/tests/edit/${id}`}>
-            <Button variant="ghost" size="icon">
-              <ArrowLeft className="w-5 h-5" />
-            </Button>
-          </Link>
+          <Button variant="ghost" size="icon" onClick={() => navigate(`/${user?.role === 'ADMIN' ? 'admin' : 'superadmin'}/tests/edit/${id}?tab=questions`)}>
+            <ArrowLeft className="w-5 h-5" />
+          </Button>
           <div>
             <h1 className="text-3xl font-heading font-bold">Add Questions</h1>
             <p className="text-muted-foreground mt-1">
@@ -507,7 +503,7 @@ const handleAddQuestions = async () => {
                   {selectedQuestions.size} Question(s) Selected
                 </p>
                 <p className="text-xs opacity-80">
-                  Configure marks and time limit
+                  Configure marks
                 </p>
               </div>
             </div>
@@ -519,18 +515,6 @@ const handleAddQuestions = async () => {
                   value={defaultMarks}
                   onChange={(e) =>
                     setDefaultMarks(parseInt(e.target.value) || 0)
-                  }
-                  className="w-20 h-8 text-sm bg-white/10 text-white border-white/20"
-                  min={1}
-                />
-              </div>
-              <div className="flex items-center gap-2">
-                <Label className="text-xs text-white/80">Time (min):</Label>
-                <Input
-                  type="number"
-                  value={defaultTimeLimit}
-                  onChange={(e) =>
-                    setDefaultTimeLimit(parseInt(e.target.value) || 0)
                   }
                   className="w-20 h-8 text-sm bg-white/10 text-white border-white/20"
                   min={1}

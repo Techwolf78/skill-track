@@ -233,7 +233,7 @@ export default function AdminTestsEdit() {
     durationMins: 60,
     difficulty: "MEDIUM",
     passMark: 40,
-    status: "DRAFT",
+    status: "PUBLISHED",
     instructions: {},
     proctoringMode: "NONE",
     enableTabSwitchTracking: false,
@@ -381,15 +381,20 @@ export default function AdminTestsEdit() {
       const data = await testService.getTestById(id!);
       setTest(data);
 
-      // Fetch detailed test questions from the backend/database
+      // Fetch test questions directly from the mapping table to avoid cached stale relationship on the test object
       try {
-        const response = await apiClient.get(`/test-questions/test/${id}`);
-        const detailedQuestions = response.data?.data || [];
-        const enrichedQuestions = detailedQuestions.map((tq: EnrichedTestQuestion) => ({
-          ...tq,
-          timeLimitSecs: tq.timeLimitSecs ?? tq.question?.timeLimitSecs ?? tq.question?.avgTimeSeconds ?? tq.question?.avg_time_seconds ?? 0,
-        }));
-        setQuestionsData(enrichedQuestions);
+        const testQuestions = await testService.getTestQuestions(id!);
+        
+        if (testQuestions && testQuestions.length > 0) {
+          const allQuestions = await testService.getAllQuestions();
+          const enrichedQuestions = testQuestions.map((tq) => ({
+            ...tq,
+            question: allQuestions.find((q) => q.id === tq.questionId),
+          }));
+          setQuestionsData(enrichedQuestions);
+        } else {
+          setQuestionsData([]);
+        }
       } catch (err) {
         console.error("Failed to fetch detailed questions:", err);
         setQuestionsData([]);
@@ -555,7 +560,7 @@ To refer to the FAQ document, you can click on the HELP button which is present 
         durationMins: formData.durationMins,
         difficulty: formData.difficulty as "EASY" | "MEDIUM" | "HARD",
         passMark: formData.passMark,
-        status: formData.status as "DRAFT" | "PUBLISHED" | "ARCHIVED",
+        status: "PUBLISHED",
         instructions: formData.instructions,
         proctoringMode: formData.proctoringMode || "NONE",
         enableTabSwitchTracking: formData.enableTabSwitchTracking || false,
@@ -613,6 +618,126 @@ To refer to the FAQ document, you can click on the HELP button which is present 
           error instanceof Error ? error.message : "Failed to update test. Please try again.",
         variant: "destructive",
       });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Save only basic info fields (title, description, duration, difficulty, passMark, status, instructions) — stays on page
+  const handleSaveBasicInfo = async () => {
+    if (!formData.title?.trim()) {
+      toast({ title: "Validation Error", description: "Test title is required.", variant: "destructive" });
+      return;
+    }
+    if (formData.durationMins && formData.durationMins <= 0) {
+      toast({ title: "Validation Error", description: "Duration must be greater than 0 minutes.", variant: "destructive" });
+      return;
+    }
+    if (formData.passMark && (formData.passMark < 0 || formData.passMark > 100)) {
+      toast({ title: "Validation Error", description: "Passing mark must be between 0 and 100.", variant: "destructive" });
+      return;
+    }
+    try {
+      setSaving(true);
+      await testService.updateTest(id!, {
+        title: formData.title,
+        description: formData.description,
+        durationMins: formData.durationMins,
+        difficulty: formData.difficulty as "EASY" | "MEDIUM" | "HARD",
+        passMark: formData.passMark,
+        status: "PUBLISHED",
+        instructions: formData.instructions,
+        proctoringMode: formData.proctoringMode || "NONE",
+        enableTabSwitchTracking: formData.enableTabSwitchTracking || false,
+        blockCopyPaste: formData.blockCopyPaste || false,
+        blockRightClick: formData.blockRightClick || false,
+        warnOnFullscreenExit: formData.warnOnFullscreenExit || false,
+        maxWarnings: formData.maxWarnings || 0,
+        requireWebcam: formData.requireWebcam || false,
+        detectFaceNotVisible: formData.detectFaceNotVisible || false,
+        detectMultipleFaces: formData.detectMultipleFaces || false,
+        detectSuspiciousAudio: formData.detectSuspiciousAudio || false,
+        detectObjects: formData.detectObjects || false,
+        periodicSnapshots: formData.periodicSnapshots || false,
+        evidenceCapture: formData.evidenceCapture || false,
+        requireMicrophone: formData.requireMicrophone || false,
+        requireScreenShare: formData.requireScreenShare || false,
+        detectDevTools: formData.detectDevTools || false,
+        detectScreenShareStop: formData.detectScreenShareStop || false,
+        enableLiveProctoring: formData.enableLiveProctoring || false,
+        autoSubmitOnCriticalViolations: formData.autoSubmitOnCriticalViolations || false,
+        maxCriticalViolations: formData.maxCriticalViolations || 0,
+      });
+      // Sync local test state so dirty-check resets
+      setTest((prev) => prev ? { ...prev, title: formData.title!, description: formData.description, durationMins: formData.durationMins!, difficulty: formData.difficulty as any, passMark: formData.passMark!, status: formData.status as any, instructions: formData.instructions } : prev);
+      toast({ title: "Saved", description: "Basic information saved successfully." });
+    } catch (error: unknown) {
+      toast({ title: "Error", description: error instanceof Error ? error.message : "Failed to save.", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Save only proctoring settings — stays on page
+  const handleSaveProctoring = async () => {
+    try {
+      setSaving(true);
+      await testService.updateTest(id!, {
+        title: formData.title,
+        description: formData.description,
+        durationMins: formData.durationMins,
+        difficulty: formData.difficulty as "EASY" | "MEDIUM" | "HARD",
+        passMark: formData.passMark,
+        status: "PUBLISHED",
+        instructions: formData.instructions,
+        proctoringMode: formData.proctoringMode || "NONE",
+        enableTabSwitchTracking: formData.enableTabSwitchTracking || false,
+        blockCopyPaste: formData.blockCopyPaste || false,
+        blockRightClick: formData.blockRightClick || false,
+        warnOnFullscreenExit: formData.warnOnFullscreenExit || false,
+        maxWarnings: formData.maxWarnings || 0,
+        requireWebcam: formData.requireWebcam || false,
+        detectFaceNotVisible: formData.detectFaceNotVisible || false,
+        detectMultipleFaces: formData.detectMultipleFaces || false,
+        detectSuspiciousAudio: formData.detectSuspiciousAudio || false,
+        detectObjects: formData.detectObjects || false,
+        periodicSnapshots: formData.periodicSnapshots || false,
+        evidenceCapture: formData.evidenceCapture || false,
+        requireMicrophone: formData.requireMicrophone || false,
+        requireScreenShare: formData.requireScreenShare || false,
+        detectDevTools: formData.detectDevTools || false,
+        detectScreenShareStop: formData.detectScreenShareStop || false,
+        enableLiveProctoring: formData.enableLiveProctoring || false,
+        autoSubmitOnCriticalViolations: formData.autoSubmitOnCriticalViolations || false,
+        maxCriticalViolations: formData.maxCriticalViolations || 0,
+      });
+      // Sync local test state so dirty-check resets
+      setTest((prev) => prev ? {
+        ...prev,
+        proctoringMode: formData.proctoringMode as any,
+        enableTabSwitchTracking: formData.enableTabSwitchTracking,
+        blockCopyPaste: formData.blockCopyPaste,
+        blockRightClick: formData.blockRightClick,
+        warnOnFullscreenExit: formData.warnOnFullscreenExit,
+        maxWarnings: formData.maxWarnings,
+        requireWebcam: formData.requireWebcam,
+        detectFaceNotVisible: formData.detectFaceNotVisible,
+        detectMultipleFaces: formData.detectMultipleFaces,
+        detectSuspiciousAudio: formData.detectSuspiciousAudio,
+        detectObjects: formData.detectObjects,
+        periodicSnapshots: formData.periodicSnapshots,
+        evidenceCapture: formData.evidenceCapture,
+        requireMicrophone: formData.requireMicrophone,
+        requireScreenShare: formData.requireScreenShare,
+        detectDevTools: formData.detectDevTools,
+        detectScreenShareStop: formData.detectScreenShareStop,
+        enableLiveProctoring: formData.enableLiveProctoring,
+        autoSubmitOnCriticalViolations: formData.autoSubmitOnCriticalViolations,
+        maxCriticalViolations: formData.maxCriticalViolations,
+      } : prev);
+      toast({ title: "Saved", description: "Proctoring settings saved successfully." });
+    } catch (error: unknown) {
+      toast({ title: "Error", description: error instanceof Error ? error.message : "Failed to save proctoring.", variant: "destructive" });
     } finally {
       setSaving(false);
     }
@@ -774,24 +899,45 @@ To refer to the FAQ document, you can click on the HELP button which is present 
       await testService.removeQuestionFromTest(selectedQuestion.id);
       console.log("[Admin/TestsEdit] API call succeeded. Question with ID:", selectedQuestion.id, "successfully removed from backend.");
 
+      // Optimistically remove from local state immediately (no full reload)
+      const removedId = selectedQuestion.id;
+      setQuestionsData((prev) => prev.filter((q) => q.id !== removedId));
+
+      // Also update test.questions count in memory
+      setTest((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          questions: (prev.questions || []).filter(
+            (q) => q.questionId !== selectedQuestion.questionId
+          ),
+          testQuestions: (prev.testQuestions || []).filter(
+            (q) => q.id !== removedId
+          ),
+        };
+      });
+
       toast({
         title: "Success",
         description: `Question has been removed from the test.`,
       });
 
-      // Update local state immediately to reflect removal in UI
-      setQuestionsData((prev) => prev.filter((q) => q.id !== selectedQuestion.id));
-      setTest((prev) => {
-        if (!prev) return prev;
-        return {
-          ...prev,
-          questions: prev.questions?.filter((q) => q.id !== selectedQuestion.id),
-          testQuestions: prev.testQuestions?.filter((q) => q.id !== selectedQuestion.id),
-        };
-      });
-
-      // Refresh the test data
-      await fetchTest();
+      // Silently re-sync questions from backend without triggering full loading
+      try {
+        const testQuestions = await testService.getTestQuestions(id!);
+        if (testQuestions && testQuestions.length > 0) {
+          const allQuestions = await testService.getAllQuestions();
+          const enrichedQuestions = testQuestions.map((tq) => ({
+            ...tq,
+            question: allQuestions.find((q) => q.id === tq.questionId),
+          }));
+          setQuestionsData(enrichedQuestions);
+        } else {
+          setQuestionsData([]);
+        }
+      } catch (_) {
+        // silently ignore; optimistic update already applied
+      }
     } catch (error: unknown) {
       console.error("Failed to remove question:", error);
       toast({
@@ -1332,22 +1478,6 @@ To refer to the FAQ document, you can click on the HELP button which is present 
                         </SelectContent>
                       </Select>
                     </div>
-                    <div className="space-y-2">
-                      <Label>Status</Label>
-                      <Select
-                        value={formData.status}
-                        onValueChange={(v) => handleSelectChange("status", v)}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select status" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="DRAFT">Draft</SelectItem>
-                          <SelectItem value="PUBLISHED">Published</SelectItem>
-                          <SelectItem value="ARCHIVED">Archived</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
                   </div>
                 </CardContent>
               </Card>
@@ -1381,6 +1511,17 @@ To refer to the FAQ document, you can click on the HELP button which is present 
                 </CardContent>
               </Card>
             </div>
+          </div>
+
+          {/* Basic Info Save Button */}
+          <div className="flex justify-end pt-2">
+            <Button onClick={handleSaveBasicInfo} disabled={saving}>
+              {saving ? (
+                <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Saving...</>
+              ) : (
+                <><Save className="w-4 h-4 mr-2" />Save Basic Info</>
+              )}
+            </Button>
           </div>
         </TabsContent>
 
@@ -1434,8 +1575,6 @@ To refer to the FAQ document, you can click on the HELP button which is present 
                             </span>
                             <span>•</span>
                             <span>{item.marks} marks</span>
-                            <span>•</span>
-                            <span>{formatDuration(item.timeLimitSecs)}</span>
                           </div>
                         </div>
                       </div>
@@ -1988,6 +2127,15 @@ To refer to the FAQ document, you can click on the HELP button which is present 
                 </div>
               )}
             </CardContent>
+            <CardFooter className="flex justify-end border-t px-6 py-4 bg-muted/20">
+              <Button onClick={handleSaveProctoring} disabled={saving}>
+                {saving ? (
+                  <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Saving...</>
+                ) : (
+                  <><Save className="w-4 h-4 mr-2" />Save Proctoring Settings</>
+                )}
+              </Button>
+            </CardFooter>
           </Card>
         </TabsContent>
 

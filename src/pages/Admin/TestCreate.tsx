@@ -112,7 +112,7 @@ export default function AdminTestCreate() {
     durationMins: 60,
     difficulty: "MEDIUM",
     passMark: 40,
-    status: "DRAFT",
+    status: "PUBLISHED",
     instructions: {},
     questions: [],
     proctoringMode: "NONE",
@@ -210,8 +210,9 @@ export default function AdminTestCreate() {
     }));
   };
 
-  const createTestAndContinue = async (status: "DRAFT" | "PUBLISHED") => {
-    if (status === "PUBLISHED" && !validateForm()) {
+  const createTestAndContinue = async () => {
+    const status = "PUBLISHED";
+    if (!validateForm()) {
       toast({
         title: "Validation Error",
         description: "Please fix the errors before publishing",
@@ -267,10 +268,7 @@ export default function AdminTestCreate() {
 
       toast({
         title: "Success",
-        description:
-          status === "DRAFT"
-            ? "Test saved as draft! Now add questions."
-            : "Test published! Now add questions.",
+        description: "Test created! Now add questions.",
       });
 
       let testId =
@@ -321,22 +319,9 @@ export default function AdminTestCreate() {
             </p>
           </div>
         </div>
-        <div className="flex gap-3">
-          <Button
-            variant="outline"
-            onClick={() => createTestAndContinue("DRAFT")}
-            disabled={loading}
-          >
-            {loading ? (
-              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-            ) : (
-              <Save className="w-4 h-4 mr-2" />
-            )}
-            Save as Draft & Add Questions
-          </Button>
           <Button
             variant="hero"
-            onClick={() => createTestAndContinue("PUBLISHED")}
+            onClick={() => createTestAndContinue()}
             disabled={loading}
           >
             {loading ? (
@@ -344,9 +329,8 @@ export default function AdminTestCreate() {
             ) : (
               <Play className="w-4 h-4 mr-2" />
             )}
-            Publish & Add Questions
+            Create & Add Questions
           </Button>
-        </div>
       </div>
 
       <div className="grid grid-cols-3 gap-6">

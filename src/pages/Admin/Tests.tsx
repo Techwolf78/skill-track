@@ -192,7 +192,7 @@ export default function AdminTests() {
         description: test.description || "",
         durationMins: test.durationMins,
         difficulty: test.difficulty,
-        status: "DRAFT" as const,
+        status: "PUBLISHED" as const,
         passMark: test.passMark,
         isActive: true,
         questions: questionsPayload,
@@ -345,24 +345,7 @@ export default function AdminTests() {
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         {/* Left: Tab Navigation */}
         <div className="shrink-0">
-          <Tabs
-            value={activeFilter}
-            onValueChange={(v) => setActiveFilter(v as "all" | "published" | "draft" | "archived")}
-            className="w-full md:w-auto"
-          >
-            <TabsList className="bg-white/50 backdrop-blur-sm border border-slate-200 p-1 h-auto w-full md:w-auto">
-              {filterTabs.map((tab) => (
-                <TabsTrigger
-                  key={tab.id}
-                  value={tab.id}
-                  className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground px-3 md:px-4 py-2 text-sm"
-                >
-                  {tab.label}
-                  <span className="ml-1.5 text-xs opacity-70">{tab.count}</span>
-                </TabsTrigger>
-              ))}
-            </TabsList>
-          </Tabs>
+          <h2 className="text-xl font-semibold text-slate-800">All Tests ({tests.length})</h2>
         </div>
 
         {/* Center: Search Bar */}
@@ -406,9 +389,7 @@ export default function AdminTests() {
                 <TableHead className="font-semibold text-slate-700">
                   Test Info
                 </TableHead>
-                <TableHead className="font-semibold text-slate-700">
-                  Status
-                </TableHead>
+
                 <TableHead className="font-semibold text-slate-700 text-center">
                   Proctoring
                 </TableHead>
@@ -429,7 +410,7 @@ export default function AdminTests() {
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center py-16">
+                  <TableCell colSpan={6} className="text-center py-16">
                     <div className="flex flex-col items-center gap-3">
                       <Loader2 className="w-8 h-8 animate-spin text-primary" />
                       <p className="text-sm text-muted-foreground">
@@ -440,7 +421,7 @@ export default function AdminTests() {
                 </TableRow>
               ) : filteredTests.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center py-16">
+                  <TableCell colSpan={6} className="text-center py-16">
                     <div className="flex flex-col items-center gap-3">
                       <FileQuestion className="w-12 h-12 text-muted-foreground/50" />
                       <div>
@@ -485,13 +466,7 @@ export default function AdminTests() {
                         )}
                       </div>
                     </TableCell>
-                    <TableCell>
-                      <Badge
-                        className={`${getStatusColor(test.status)} border`}
-                      >
-                        {getStatusBadge(test.status)}
-                      </Badge>
-                    </TableCell>
+
                     <TableCell className="text-center">
                       {getProctoringModeBadge(test.proctoringMode)}
                     </TableCell>
@@ -569,42 +544,7 @@ export default function AdminTests() {
                             <Copy className="w-4 h-4 mr-2" />
                             Duplicate Test
                           </DropdownMenuItem>
-                          {test.status === "DRAFT" && (
-                            <DropdownMenuItem
-                              className="text-emerald-600 font-medium"
-                              onClick={() => handleStatusUpdate(test.id, "PUBLISHED", "The test status has been set to Published.")}
-                            >
-                              <CheckCircle className="w-4 h-4 mr-2" />
-                              Publish Test
-                            </DropdownMenuItem>
-                          )}
-                          {test.status === "PUBLISHED" && (
-                            <DropdownMenuItem
-                              className="text-amber-600 font-medium"
-                              onClick={() => handleStatusUpdate(test.id, "ARCHIVED", "The test status has been set to Archived.")}
-                            >
-                              <Archive className="w-4 h-4 mr-2" />
-                              Archive Test
-                            </DropdownMenuItem>
-                          )}
-                          {test.status === "ARCHIVED" && (
-                            <>
-                              <DropdownMenuItem
-                                className="text-emerald-600 font-medium"
-                                onClick={() => handleStatusUpdate(test.id, "PUBLISHED", "The test status has been set to Published.")}
-                              >
-                                <CheckCircle className="w-4 h-4 mr-2" />
-                                Publish Test
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                className="text-blue-600 font-medium"
-                                onClick={() => handleStatusUpdate(test.id, "DRAFT", "The test status has been set to Draft.")}
-                              >
-                                <Edit className="w-4 h-4 mr-2" />
-                                Unarchive to Draft
-                              </DropdownMenuItem>
-                            </>
-                          )}
+
                           <DropdownMenuSeparator />
                           <DropdownMenuItem
                             className="text-primary"

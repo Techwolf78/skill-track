@@ -17,7 +17,7 @@ export interface CreateTestRequest {
     questionId: string;
     orderIndex: number;
     marks: number;
-    timeLimitSecs: number;
+    timeLimitSecs?: number;
   }>;
   // Proctoring Settings
   proctoringMode?: ProctoringMode;
@@ -47,7 +47,7 @@ export interface CreateTestQuestionRequest {
   questionId: string;
   orderIndex: number;
   marks: number;
-  timeLimitSecs: number;
+  timeLimitSecs?: number;
 }
 
 export interface BulkAddQuestionsRequest {
@@ -342,7 +342,7 @@ export interface TestQuestion {
   questionId: string;
   orderIndex: number;
   marks: number;
-  timeLimitSecs: number;
+  timeLimitSecs?: number;
   sectionName?: string;
   question?: Question;
   createdAt?: string;
@@ -873,13 +873,12 @@ export const testService = {
     await apiClient.delete(`/test-questions/${id}`);
   },
 
-  // Helper: Add question to test
   addQuestionToTest: async (
     testId: string,
     questionId: string,
     orderIndex: number,
     marks: number,
-    timeLimitSecs: number,
+    timeLimitSecs?: number,
   ): Promise<TestQuestion> => {
     return testService.createTestQuestion({
       testId,

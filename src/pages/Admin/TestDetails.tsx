@@ -121,7 +121,7 @@ export default function AdminTestDetails() {
         durationMins: test!.durationMins,
         difficulty: test!.difficulty,
         instructions: test!.instructions,
-        status: "DRAFT",
+        status: "PUBLISHED",
         passMark: test!.passMark,
       });
 
@@ -305,16 +305,7 @@ export default function AdminTestDetails() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="text-sm font-medium text-muted-foreground">
-                    Status
-                  </label>
-                  <div className="mt-1">
-                    <Badge className={getStatusColor(test.status)}>
-                      {test.status}
-                    </Badge>
-                  </div>
-                </div>
+
                 <div>
                   <label className="text-sm font-medium text-muted-foreground">
                     Difficulty
