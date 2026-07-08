@@ -25,7 +25,6 @@ import {
   ChevronUp,
   AlertCircle,
   CheckCircle2,
-  Database,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -107,76 +106,7 @@ export default function AdminCandidates() {
                        userExtra?.organisationName || 
                        candidates.find(c => c.organisation?.id === orgId)?.organisation?.name || 
                        "Your Organisation";
-
-  const [testingStorage, setTestingStorage] = useState(false);
-
-  const handleTestStorageConnection = async () => {
-    setTestingStorage(true);
-    try {
-      const canvas = document.createElement("canvas");
-      canvas.width = 400;
-      canvas.height = 300;
-      const ctx = canvas.getContext("2d");
-      if (ctx) {
-        const grad = ctx.createLinearGradient(0, 0, 400, 300);
-        grad.addColorStop(0, "#0f172a");
-        grad.addColorStop(1, "#1e1b4b");
-        ctx.fillStyle = grad;
-        ctx.fillRect(0, 0, 400, 300);
-
-        ctx.strokeStyle = "#06b6d4";
-        ctx.lineWidth = 4;
-        ctx.strokeRect(10, 10, 380, 280);
-
-        ctx.fillStyle = "#ffffff";
-        ctx.font = "bold 18px monospace";
-        ctx.fillText("SUPABASE STORAGE TEST", 50, 80);
-
-        ctx.fillStyle = "#06b6d4";
-        ctx.font = "13px monospace";
-        ctx.fillText("Status: UPLOADING...", 50, 130);
-
-        ctx.fillStyle = "#10b981";
-        ctx.font = "13px monospace";
-        ctx.fillText("Time: " + new Date().toLocaleString(), 50, 170);
-
-        ctx.fillStyle = "#94a3b8";
-        ctx.font = "11px sans-serif";
-        ctx.fillText("Testing connectivity from Admin Candidates panel", 50, 220);
-      }
-
-      const mockBase64 = canvas.toDataURL("image/jpeg");
-
-      const response = await apiClient.post("/proctoring/test-upload", { image: mockBase64 });
-      const data = response.data?.data || response.data;
-
-      if (data && typeof data === "string" && data.startsWith("http")) {
-        toast({
-          title: "Test Connection Successful!",
-          description: "Image uploaded successfully. Opening URL in new tab...",
-        });
-        window.open(data, "_blank");
-      } else {
-        toast({
-          title: "Test Connection Failed",
-          description: "Storage upload failed. Check backend logs.",
-          variant: "destructive",
-        });
-      }
-    } catch (err: unknown) {
-      console.error("Storage test failed:", err);
-      const errorMsg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message || "Failed to connect to storage API.";
-      toast({
-        title: "Test Connection Error",
-        description: errorMsg,
-        variant: "destructive",
-      });
-    } finally {
-      setTestingStorage(false);
-    }
-  };
-
-  useEffect(() => {
+   useEffect(() => {
     if (isAddDialogOpen && orgId) {
       setFormData(prev => ({
         ...prev,
@@ -436,19 +366,6 @@ export default function AdminCandidates() {
           <Button variant="outline" onClick={() => setIsBulkUploadOpen(true)}>
             <Upload className="w-4 h-4 mr-2" />
             Bulk Upload
-          </Button>
-          <Button 
-            variant="outline" 
-            onClick={handleTestStorageConnection}
-            disabled={testingStorage}
-            className="border-cyan-500/30 text-cyan-400 hover:bg-cyan-500/10 hover:text-cyan-300"
-          >
-            {testingStorage ? (
-              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-            ) : (
-              <Database className="w-4 h-4 mr-2" />
-            )}
-            Test Storage Connection
           </Button>
           <Button
             variant="hero"

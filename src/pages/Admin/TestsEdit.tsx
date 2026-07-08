@@ -75,6 +75,7 @@ import { candidateService, Candidate } from "@/lib/candidate-service";
 import { apiClient } from "@/lib/api-client";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth-context";
+import { MaterialDatePickerDialog, MaterialTimePickerDialog } from "@/components/ui/material-pickers";
 
 interface CandidateInvitation {
   id: string;
@@ -261,6 +262,12 @@ export default function AdminTestsEdit() {
   const [unsavedScheduleDialogOpen, setUnsavedScheduleDialogOpen] = useState(false);
   const [pendingTab, setPendingTab] = useState<string | null>(null);
   const [savingSchedule, setSavingSchedule] = useState(false);
+
+  // Picker States
+  const [startDatePickerOpen, setStartDatePickerOpen] = useState(false);
+  const [startTimePickerOpen, setStartTimePickerOpen] = useState(false);
+  const [endDatePickerOpen, setEndDatePickerOpen] = useState(false);
+  const [endTimePickerOpen, setEndTimePickerOpen] = useState(false);
 
   // Reports States
   const [loadingReports, setLoadingReports] = useState(false);
@@ -1448,24 +1455,105 @@ To refer to the FAQ document, you can click on the HELP button which is present 
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Starting Time */}
                 <div className="space-y-2">
-                  <Label htmlFor="scheduleStartTime">Start Time *</Label>
-                  <Input
-                    id="scheduleStartTime"
-                    type="datetime-local"
-                    value={scheduleStartTime}
-                    onChange={(e) => setScheduleStartTime(e.target.value)}
-                  />
+                  <Label className="text-sm font-semibold">Starting time</Label>
+                  <p className="text-xs text-muted-foreground">This test would not be accessible before this.</p>
+                  <div className="flex gap-4 items-center mt-1">
+                    <div className="flex-1">
+                      <button
+                        type="button"
+                        onClick={() => setStartDatePickerOpen(true)}
+                        className="w-full flex items-center justify-between px-3 py-2 border rounded-md text-sm text-slate-700 bg-white hover:bg-slate-50 cursor-pointer h-10 select-none"
+                      >
+                        <span className="flex items-center gap-2">
+                          <Calendar className="w-4 h-4 text-slate-400" />
+                          {scheduleStartTime ? scheduleStartTime.split("T")[0] : "Select Date"}
+                        </span>
+                      </button>
+                      <MaterialDatePickerDialog
+                        isOpen={startDatePickerOpen}
+                        onClose={() => setStartDatePickerOpen(false)}
+                        value={scheduleStartTime ? scheduleStartTime.split("T")[0] : ""}
+                        onChange={(date) => {
+                          const time = scheduleStartTime && scheduleStartTime.includes("T") ? scheduleStartTime.split("T")[1] : "00:00";
+                          setScheduleStartTime(date ? `${date}T${time}` : "");
+                        }}
+                      />
+                    </div>
+                    <div className="flex-1">
+                      <button
+                        type="button"
+                        onClick={() => setStartTimePickerOpen(true)}
+                        className="w-full flex items-center justify-between px-3 py-2 border rounded-md text-sm text-slate-700 bg-white hover:bg-slate-50 cursor-pointer h-10 select-none"
+                      >
+                        <span className="flex items-center gap-2">
+                          <Clock className="w-4 h-4 text-slate-400" />
+                          {scheduleStartTime && scheduleStartTime.includes("T") ? scheduleStartTime.split("T")[1].slice(0, 5) : "Select Time"}
+                        </span>
+                      </button>
+                      <MaterialTimePickerDialog
+                        isOpen={startTimePickerOpen}
+                        onClose={() => setStartTimePickerOpen(false)}
+                        value={scheduleStartTime && scheduleStartTime.includes("T") ? scheduleStartTime.split("T")[1].slice(0, 5) : ""}
+                        onChange={(time) => {
+                          const date = scheduleStartTime ? scheduleStartTime.split("T")[0] : new Date().toISOString().split("T")[0];
+                          setScheduleStartTime(date ? `${date}T${time}` : "");
+                        }}
+                      />
+                    </div>
+                  </div>
                 </div>
+
+                {/* Ending Time */}
                 <div className="space-y-2">
-                  <Label htmlFor="scheduleEndTime">End Time *</Label>
-                  <Input
-                    id="scheduleEndTime"
-                    type="datetime-local"
-                    value={scheduleEndTime}
-                    onChange={(e) => setScheduleEndTime(e.target.value)}
-                  />
+                  <Label className="text-sm font-semibold">Ending time</Label>
+                  <p className="text-xs text-muted-foreground">This test would not be accessible after this.</p>
+                  <div className="flex gap-4 items-center mt-1">
+                    <div className="flex-1">
+                      <button
+                        type="button"
+                        onClick={() => setEndDatePickerOpen(true)}
+                        className="w-full flex items-center justify-between px-3 py-2 border rounded-md text-sm text-slate-700 bg-white hover:bg-slate-50 cursor-pointer h-10 select-none"
+                      >
+                        <span className="flex items-center gap-2">
+                          <Calendar className="w-4 h-4 text-slate-400" />
+                          {scheduleEndTime ? scheduleEndTime.split("T")[0] : "Select Date"}
+                        </span>
+                      </button>
+                      <MaterialDatePickerDialog
+                        isOpen={endDatePickerOpen}
+                        onClose={() => setEndDatePickerOpen(false)}
+                        value={scheduleEndTime ? scheduleEndTime.split("T")[0] : ""}
+                        onChange={(date) => {
+                          const time = scheduleEndTime && scheduleEndTime.includes("T") ? scheduleEndTime.split("T")[1] : "00:00";
+                          setScheduleEndTime(date ? `${date}T${time}` : "");
+                        }}
+                      />
+                    </div>
+                    <div className="flex-1">
+                      <button
+                        type="button"
+                        onClick={() => setEndTimePickerOpen(true)}
+                        className="w-full flex items-center justify-between px-3 py-2 border rounded-md text-sm text-slate-700 bg-white hover:bg-slate-50 cursor-pointer h-10 select-none"
+                      >
+                        <span className="flex items-center gap-2">
+                          <Clock className="w-4 h-4 text-slate-400" />
+                          {scheduleEndTime && scheduleEndTime.includes("T") ? scheduleEndTime.split("T")[1].slice(0, 5) : "Select Time"}
+                        </span>
+                      </button>
+                      <MaterialTimePickerDialog
+                        isOpen={endTimePickerOpen}
+                        onClose={() => setEndTimePickerOpen(false)}
+                        value={scheduleEndTime && scheduleEndTime.includes("T") ? scheduleEndTime.split("T")[1].slice(0, 5) : ""}
+                        onChange={(time) => {
+                          const date = scheduleEndTime ? scheduleEndTime.split("T")[0] : new Date().toISOString().split("T")[0];
+                          setScheduleEndTime(date ? `${date}T${time}` : "");
+                        }}
+                      />
+                    </div>
+                  </div>
                 </div>
               </div>
             </CardContent>
