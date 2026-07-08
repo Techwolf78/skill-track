@@ -1089,6 +1089,10 @@ export default function Reports() {
                               message: "",
                               result: null,
                             };
+                            const isSessionActive =
+                              (session.status as string) === "ACTIVE" ||
+                              (session.status as string) === "STARTED" ||
+                              (session.status as string) === "INACTIVE";
 
                             return (
                               <TableRow
@@ -1184,7 +1188,7 @@ export default function Reports() {
                                         }
                                         disabled={
                                           state.status === "POLLING" ||
-                                          session.status === "STARTED"
+                                          isSessionActive
                                         }
                                         className="h-8 text-xs border-primary/20 hover:bg-primary/5"
                                       >
@@ -1230,7 +1234,7 @@ export default function Reports() {
                                       }
                                       disabled={
                                         state.status === "POLLING" ||
-                                        session.status === "STARTED"
+                                        isSessionActive
                                       }
                                       className="h-8 text-xs text-muted-foreground hover:text-primary hover:bg-primary/5"
                                     >
