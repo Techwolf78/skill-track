@@ -660,9 +660,9 @@ export default function TestAccess() {
 
   const allChecksPassed =
     checks.browser === "success" &&
-    checks.camera === "success" &&
-    checks.mic === "success" &&
-    checks.screen === "success";
+    (!testData?.proctoring.webcamRequired || checks.camera === "success") &&
+    (!testData?.proctoring.microphoneRequired || checks.mic === "success") &&
+    (!testData?.proctoring.screenShareRequired || checks.screen === "success");
 
   const launchSecureTest = async () => {
     // 1. Enter Fullscreen Mode (Mandatory final step)

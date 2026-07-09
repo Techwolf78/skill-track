@@ -227,7 +227,7 @@ export default function ProctoringDashboard() {
         id: cand.candidateId,
         name: cand.candidateName,
         email: cand.email,
-        testStatus: cand.testStatus === "ACTIVE" ? "IN_PROGRESS" : cand.testStatus,
+        testStatus: (cand.testStatus === "ACTIVE" ? "IN_PROGRESS" : cand.testStatus) as TestStatus,
         proctoringMode: cand.proctoringMode,
         riskLevel: cand.riskLevel,
         violationsCount: cand.violationCount,
@@ -708,7 +708,7 @@ export default function ProctoringDashboard() {
   };
 
   return (
-    <div className="p-4 md:p-8 space-y-6 md:space-y-8 animate-fade-in w-full max-w-7xl mx-auto">
+    <div className="p-4 md:p-8 space-y-6 md:space-y-8 animate-fade-in w-full">
       {/* API Error Banner for Schedules */}
       {errorSchedules && (
         <div className="flex items-center justify-between gap-4 p-3 bg-red-500/10 border border-red-500/20 text-red-700 dark:text-red-400 rounded-lg text-xs md:text-sm shadow-sm">
