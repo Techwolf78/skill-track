@@ -309,7 +309,7 @@ export default function Reports() {
     }));
 
     try {
-      const response = await testService.calculateResultWithStatus(sid, cid);
+      const response = await testService.recalculateTestResult(sid);
       const statusCode = response.statusCode || response.status;
       if (statusCode === 202) {
         startPollingSession(sid);

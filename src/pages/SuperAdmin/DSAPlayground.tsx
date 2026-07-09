@@ -48,6 +48,7 @@ import { apiClient } from "@/lib/api-client";
 import { mapFriendlyError, QuestionMetadata, ProblemType } from "@/lib/judge0";
 import { useAuth } from "@/lib/auth-context";
 import { ROLES } from "@/lib/roles";
+import { mapBackendToFrontendLang } from "../../types/question";
 
 interface TestCaseUI {
   input: string;
@@ -238,31 +239,48 @@ export default function DSAPlayground() {
           explanation: tc.explanation,
         }));
 
+        // Map backend starterCode or languageTemplates to frontend-friendly keys
+        const processedStarterCode: Record<string, string> = {};
+        if (backendQuestion.starterCode) {
+          Object.entries(backendQuestion.starterCode).forEach(([lang, val]) => {
+            const frontendLang = mapBackendToFrontendLang(lang);
+            processedStarterCode[frontendLang] = val as string;
+          });
+        } else if (backendQuestion.languageTemplates) {
+          Object.entries(backendQuestion.languageTemplates).forEach(([lang, data]) => {
+            const frontendLang = mapBackendToFrontendLang(lang);
+            processedStarterCode[frontendLang] = (data as { template: string }).template || "";
+          });
+        }
+
         // Create code snippets
         codeSnippetsData = [
           {
-            code: getDefaultCode("python3", backendQuestion.prompt),
+            code: processedStarterCode["python3"] || getDefaultCode("python3", backendQuestion.prompt),
             lang: "Python 3",
             langSlug: "python3",
           },
           {
-            code: getDefaultCode("javascript", backendQuestion.prompt),
+            code: processedStarterCode["javascript"] || getDefaultCode("javascript", backendQuestion.prompt),
             lang: "JavaScript",
             langSlug: "javascript",
           },
           {
-            code: getDefaultCode("java", backendQuestion.prompt),
+            code: processedStarterCode["java"] || getDefaultCode("java", backendQuestion.prompt),
             lang: "Java",
             langSlug: "java",
           },
           {
-            code: getDefaultCode("cpp", backendQuestion.prompt),
+            code: processedStarterCode["cpp"] || getDefaultCode("cpp", backendQuestion.prompt),
             lang: "C++",
             langSlug: "cpp",
           },
         ];
 
-        setCode(codeSnippetsData[0].code);
+        // Find first available snippet from custom template or default to python3
+        const firstAvailableSnippet = codeSnippetsData.find(s => processedStarterCode[s.langSlug]) || codeSnippetsData[0];
+        setLanguage(firstAvailableSnippet.langSlug);
+        setCode(firstAvailableSnippet.code);
       }
 
       const questionData: QuestionUI = {
