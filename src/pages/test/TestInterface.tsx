@@ -23,7 +23,7 @@ import {
   Clock, ChevronLeft, ChevronRight, Flag, Send,
   AlertTriangle, CheckCircle, Play, Terminal, XCircle,
   Loader2, Save, FileText, Code2, Database, Lightbulb, Monitor,
-  Wifi, WifiOff
+  Wifi, WifiOff, RotateCcw
 } from "lucide-react";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import Editor from "@monaco-editor/react";
@@ -42,6 +42,8 @@ import { EnvironmentCheck } from "@/proctoring/components/EnvironmentCheck";
 import { Shield, ShieldAlert, ShieldCheck as ShieldCheckIcon, Camera } from "lucide-react";
 import { AnswerStore } from "@/lib/exam/answerStorage";
 
+import { mapBackendToFrontendLang } from "../../types/question";
+
 // Types
 interface Question {
   id: string;
@@ -54,6 +56,7 @@ interface Question {
   sampleOutput?: string;
   sampleExplanation?: string;
   codeTemplate?: Record<string, CodeTemplateEntry>;
+  starterCode?: Record<string, string>;
   difficulty?: string;
   constraints?: string;
   timeLimitSecs?: number;
@@ -74,7 +77,7 @@ interface RawPaperQuestion {
   coding?: {
     timeLimitSecs?: number;
     memoryLimitMB?: number;
-    starterCode?: Record<string, CodeTemplateEntry>;
+    starterCode?: Record<string, any>;
     difficulty?: string;
     constraints?: string;
     hints?: string[];
@@ -137,6 +140,11 @@ interface TestQuestion {
     sampleOutput?: string;
     sampleExplanation?: string;
     codeTemplate?: Record<string, CodeTemplateEntry>;
+    starterCode?: Record<string, string>;
+    coding?: {
+      starterCode?: Record<string, string>;
+      [key: string]: any;
+    };
     difficulty?: "EASY" | "MEDIUM" | "HARD" | string;
     constraints?: string;
     timeLimitSecs?: number;
@@ -471,6 +479,15 @@ useEffect(() => {
         
         console.log("🔍 Has code template?", hasCodeTemplate);
         
+        const rawStarterCode = tq.question?.coding?.starterCode || tq.question?.starterCode;
+        const processedStarterCode: Record<string, string> = {};
+        if (rawStarterCode) {
+          Object.entries(rawStarterCode).forEach(([lang, val]) => {
+            const frontendLang = mapBackendToFrontendLang(lang);
+            processedStarterCode[frontendLang] = val as string;
+          });
+        }
+
         return {
           id: tq.questionId,
           type: tq.question?.questionType || tq.question?.type || "MCQ",
@@ -482,6 +499,7 @@ useEffect(() => {
           sampleOutput: tq.question?.sampleOutput,
           sampleExplanation: tq.question?.sampleExplanation,
           codeTemplate: tq.question?.codeTemplate,
+          starterCode: processedStarterCode,
           difficulty: tq.question?.difficulty,
           constraints: tq.question?.constraints,
           timeLimitSecs: tq.question?.timeLimitSecs || tq.timeLimitSecs,
@@ -499,10 +517,9 @@ useEffect(() => {
 }, [test]);
 
 // Initialize code editor when question changes
-// Update the code editor initialization
 useEffect(() => {
   const currentQ = questions[currentIndex];
-  if (currentQ?.type === "CODING" && currentQ.codeTemplate && sessionId) {
+  if (currentQ?.type === "CODING" && (currentQ.starterCode || currentQ.codeTemplate) && sessionId) {
     console.log("🎯 Initializing code editor for language:", language);
     
     // 1. Check if there is an answer already set in local state (which holds the submitted code)
@@ -522,14 +539,21 @@ useEffect(() => {
     }
 
     // 3. Fallback to starter template
-    const template = currentQ.codeTemplate[language];
-    if (template?.code) {
+    const newTemplate = currentQ.starterCode?.[language];
+    const oldTemplate = currentQ.codeTemplate?.[language]?.code;
+    const templateCode = newTemplate !== undefined ? newTemplate : oldTemplate;
+
+    if (templateCode) {
       console.log("🎯 Setting code from template for", language);
-      setCode(template.code);
+      setCode(templateCode);
     } else {
       // Try to get first available language
-      const firstLang = Object.keys(currentQ.codeTemplate)[0];
-      if (firstLang && currentQ.codeTemplate[firstLang]?.code) {
+      const firstLang = Object.keys(currentQ.starterCode || currentQ.codeTemplate || {})[0];
+      const fallbackTemplate = currentQ.starterCode?.[firstLang] !== undefined
+        ? currentQ.starterCode[firstLang]
+        : currentQ.codeTemplate?.[firstLang]?.code;
+
+      if (firstLang && fallbackTemplate) {
         console.log("🎯 Falling back to first available language:", firstLang);
         setLanguage(firstLang as LanguageKey);
         
@@ -538,7 +562,7 @@ useEffect(() => {
         if (fallbackDraft !== null) {
           setCode(fallbackDraft);
         } else {
-          setCode(currentQ.codeTemplate[firstLang].code);
+          setCode(fallbackTemplate);
         }
       }
     }
@@ -1176,6 +1200,20 @@ useEffect(() => {
     }
   }, [questions, currentIndex, sessionId, language, code, answers, toast, isOnline, flushQuestionTiming]);
 
+  const handleResetCode = useCallback(() => {
+    const currentQ = questions[currentIndex];
+    if (currentQ) {
+      const newTemplate = currentQ.starterCode?.[language];
+      const oldTemplate = currentQ.codeTemplate?.[language]?.code;
+      const originalTemplate = newTemplate !== undefined ? newTemplate : oldTemplate;
+      if (originalTemplate) {
+        setCode(originalTemplate);
+        AnswerStore.saveDraft(sessionId || "demo-session", currentQ.id, language, originalTemplate);
+        toast({ title: "Reset", description: "Editor reset to starter template" });
+      }
+    }
+  }, [questions, currentIndex, language, sessionId, toast]);
+
   const handleMcqSelect = useCallback(async (questionId: string, value: string) => {
     const updatedAnswers = { ...answers, [questionId]: value };
     setAnswers(updatedAnswers);
@@ -1250,8 +1288,13 @@ useEffect(() => {
   // Get available languages from current question
   const availableLanguages = (() => {
     const currentQ = questions[currentIndex];
-    if (currentQ?.type === "CODING" && currentQ.codeTemplate) {
-      return Object.keys(currentQ.codeTemplate) as LanguageKey[];
+    if (currentQ?.type === "CODING") {
+      if (currentQ.starterCode && Object.keys(currentQ.starterCode).length > 0) {
+        return Object.keys(currentQ.starterCode) as LanguageKey[];
+      }
+      if (currentQ.codeTemplate && Object.keys(currentQ.codeTemplate).length > 0) {
+        return Object.keys(currentQ.codeTemplate) as LanguageKey[];
+      }
     }
     return ["python3", "javascript", "java", "cpp"] as LanguageKey[];
   })();
@@ -1625,6 +1668,16 @@ useEffect(() => {
                           >
                             {isSubmittingCode ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
                             Submit Solution
+                          </Button>
+                          <Button 
+                            size="sm" 
+                            variant="ghost"
+                            onClick={handleResetCode} 
+                            disabled={isRunning || isSubmittingCode}
+                            className="text-muted-foreground hover:text-foreground ml-auto"
+                          >
+                            <RotateCcw className="w-4 h-4 mr-2" />
+                            Reset Code
                           </Button>
                         </div>
 
