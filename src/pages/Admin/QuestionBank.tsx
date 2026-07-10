@@ -32,6 +32,7 @@ import {
   Zap,
   Terminal,
   Upload,
+  RotateCcw,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -98,6 +99,7 @@ export default function AdminQuestionBank() {
   const [domainFilter, setDomainFilter] = useState<DomainType>("ALL");
   const [cognitiveFilter, setCognitiveFilter] = useState<CognitiveLevelType>("ALL");
   const [formatFilter, setFormatFilter] = useState<QuestionFormatType>("ALL");
+  const [visibilityFilter, setVisibilityFilter] = useState<string>("ALL");
 
   const [currentPage, setCurrentPage] = useState(1);
   const ITEMS_PER_PAGE = 8;
@@ -155,7 +157,7 @@ export default function AdminQuestionBank() {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, activeTab, difficultyFilter, subjectFilter, domainFilter, cognitiveFilter, formatFilter]);
+  }, [searchTerm, activeTab, difficultyFilter, subjectFilter, domainFilter, cognitiveFilter, formatFilter, visibilityFilter]);
 
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [selectedQuestion, setSelectedQuestion] = useState<Question | null>(null);
@@ -344,8 +346,9 @@ export default function AdminQuestionBank() {
     const matchesDomain = domainFilter === "ALL" || question.domain === domainFilter;
     const matchesCognitive = cognitiveFilter === "ALL" || question.cognitiveLevel === cognitiveFilter;
     const matchesFormat = formatFilter === "ALL" || question.format === formatFilter;
+    const matchesVisibility = visibilityFilter === "ALL" || question.visibility === visibilityFilter;
     
-    return matchesTab && matchesSearch && matchesDifficulty && matchesSubject && matchesDomain && matchesCognitive && matchesFormat;
+    return matchesTab && matchesSearch && matchesDifficulty && matchesSubject && matchesDomain && matchesCognitive && matchesFormat && matchesVisibility;
   });
 
   const totalPages = Math.ceil(filteredQuestions.length / ITEMS_PER_PAGE);
@@ -367,7 +370,6 @@ export default function AdminQuestionBank() {
         <div>
           <div className="flex items-center gap-2">
             <h1 className="text-3xl font-heading font-bold">Question Bank</h1>
-            <Badge className="bg-primary/10 text-primary border-primary/20 text-xs">V2 Enterprise</Badge>
           </div>
           <p className="text-muted-foreground mt-1 text-sm">
             Administer and calibrate multi-domain questions for Engineering, MBA, BBA, and Corporate placement drives.
@@ -444,93 +446,118 @@ export default function AdminQuestionBank() {
 
         <TabsContent value={activeTab} className="space-y-4 mt-0">
           {/* Advanced Multi-Factor Filters Row using native styles */}
-          <div className="flex items-center gap-4 flex-wrap bg-card p-4 rounded-xl border">
-            <div className="relative flex-1 min-w-[280px]">
+          <div className="flex items-center gap-4 flex-wrap bg-card p-4 rounded-xl border w-full">
+            {/* Search Input */}
+            <div className="relative flex-[1.5] min-w-[200px]">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <Input
-                placeholder="Search by title, prompt keyword, or tags..."
+                placeholder="Search questions..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
+                className="pl-10 h-10 rounded-md w-full"
               />
             </div>
             
             {/* Subject Selector */}
-            <Select value={subjectFilter} onValueChange={setSubjectFilter}>
-              <SelectTrigger className="w-44">
-                <SelectValue placeholder="Subject" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Subjects</SelectItem>
-                {subjects.map((subject) => (
-                  <SelectItem key={subject.id} value={subject.id}>
-                    {subject.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <div className="flex-1 min-w-[140px]">
+              <Select value={subjectFilter} onValueChange={setSubjectFilter}>
+                <SelectTrigger className="w-full h-10 rounded-md">
+                  <SelectValue placeholder="Subject" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Subjects</SelectItem>
+                  {subjects.map((subject) => (
+                    <SelectItem key={subject.id} value={subject.id}>
+                      {subject.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
 
             {/* Cognitive Level Selector (Bloom's Taxonomy) */}
-            <Select value={cognitiveFilter} onValueChange={(v) => setCognitiveFilter(v as CognitiveLevelType)}>
-              <SelectTrigger className="w-44">
-                <SelectValue placeholder="Bloom's Level" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="ALL">All Cognitive Levels</SelectItem>
-                <SelectItem value="REMEMBER">Remember</SelectItem>
-                <SelectItem value="UNDERSTAND">Understand</SelectItem>
-                <SelectItem value="APPLY">Apply</SelectItem>
-                <SelectItem value="ANALYZE">Analyze</SelectItem>
-                <SelectItem value="EVALUATE">Evaluate</SelectItem>
-                <SelectItem value="CREATE">Create</SelectItem>
-              </SelectContent>
-            </Select>
+            <div className="flex-1 min-w-[140px]">
+              <Select value={cognitiveFilter} onValueChange={(v) => setCognitiveFilter(v as CognitiveLevelType)}>
+                <SelectTrigger className="w-full h-10 rounded-md">
+                  <SelectValue placeholder="Bloom's Level" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ALL">All Cognitive Levels</SelectItem>
+                  <SelectItem value="REMEMBER">Remember</SelectItem>
+                  <SelectItem value="UNDERSTAND">Understand</SelectItem>
+                  <SelectItem value="APPLY">Apply</SelectItem>
+                  <SelectItem value="ANALYZE">Analyze</SelectItem>
+                  <SelectItem value="EVALUATE">Evaluate</SelectItem>
+                  <SelectItem value="CREATE">Create</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
 
             {/* Format Selector */}
-            <Select value={formatFilter} onValueChange={(v) => setFormatFilter(v as QuestionFormatType)}>
-              <SelectTrigger className="w-44">
-                <SelectValue placeholder="Question Format" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="ALL">All Formats</SelectItem>
-                <SelectItem value="MCQ">Standard MCQ</SelectItem>
-                <SelectItem value="CODING">Standard Coding</SelectItem>
-                <SelectItem value="SQL">SQL Sandbox</SelectItem>
-                <SelectItem value="SPREADSHEET">Excel Simulation</SelectItem>
-                <SelectItem value="SJT">Situational Judgment</SelectItem>
-                <SelectItem value="SUBJECTIVE">Subjective Rubric</SelectItem>
-              </SelectContent>
-            </Select>
+            <div className="flex-1 min-w-[145px]">
+              <Select value={formatFilter} onValueChange={(v) => setFormatFilter(v as QuestionFormatType)}>
+                <SelectTrigger className="w-full h-10 rounded-md">
+                  <SelectValue placeholder="Question Format" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ALL">All Formats</SelectItem>
+                  <SelectItem value="MCQ">Standard MCQ</SelectItem>
+                  <SelectItem value="CODING">Standard Coding</SelectItem>
+                  <SelectItem value="SQL">SQL Sandbox</SelectItem>
+                  <SelectItem value="SPREADSHEET">Excel Simulation</SelectItem>
+                  <SelectItem value="SJT">Situational Judgment</SelectItem>
+                  <SelectItem value="SUBJECTIVE">Subjective Rubric</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
 
             {/* Difficulty Selector */}
-            <Select value={difficultyFilter} onValueChange={setDifficultyFilter}>
-              <SelectTrigger className="w-36">
-                <SelectValue placeholder="Difficulty" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="ALL">All Levels</SelectItem>
-                <SelectItem value="EASY">Easy</SelectItem>
-                <SelectItem value="MEDIUM">Medium</SelectItem>
-                <SelectItem value="HARD">Hard</SelectItem>
-              </SelectContent>
-            </Select>
+            <div className="flex-[0.8] min-w-[110px]">
+              <Select value={difficultyFilter} onValueChange={setDifficultyFilter}>
+                <SelectTrigger className="w-full h-10 rounded-md">
+                  <SelectValue placeholder="Difficulty" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ALL">All Levels</SelectItem>
+                  <SelectItem value="EASY">Easy</SelectItem>
+                  <SelectItem value="MEDIUM">Medium</SelectItem>
+                  <SelectItem value="HARD">Hard</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
 
-            {(searchTerm || difficultyFilter !== "ALL" || subjectFilter !== "all" || domainFilter !== "ALL" || cognitiveFilter !== "ALL" || formatFilter !== "ALL") && (
-              <Button 
-                variant="ghost" 
-                onClick={() => {
-                  setSearchTerm("");
-                  setDifficultyFilter("ALL");
-                  setSubjectFilter("all");
-                  setDomainFilter("ALL");
-                  setCognitiveFilter("ALL");
-                  setFormatFilter("ALL");
-                }}
-                className="text-xs text-muted-foreground hover:text-foreground"
-              >
-                Reset Filters
-              </Button>
-            )}
+            {/* Visibility Selector */}
+            <div className="flex-[0.8] min-w-[110px]">
+              <Select value={visibilityFilter} onValueChange={setVisibilityFilter}>
+                <SelectTrigger className="w-full h-10 rounded-md">
+                  <SelectValue placeholder="Visibility" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ALL">All Visibility</SelectItem>
+                  <SelectItem value="ORG_OWNED">Org Owned</SelectItem>
+                  <SelectItem value="PUBLIC">Public</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Reset Filters button - Icon button positioned right next to Visibility filter */}
+            <Button 
+              variant="outline" 
+              size="icon"
+              onClick={() => {
+                setSearchTerm("");
+                setDifficultyFilter("ALL");
+                setSubjectFilter("all");
+                setDomainFilter("ALL");
+                setCognitiveFilter("ALL");
+                setFormatFilter("ALL");
+                setVisibilityFilter("ALL");
+              }}
+              className="h-10 w-10 text-muted-foreground hover:text-foreground hover:bg-accent transition-all rounded-md flex-shrink-0 flex items-center justify-center"
+              title="Reset Filters"
+            >
+              <RotateCcw className="w-4 h-4" />
+            </Button>
           </div>
 
           {/* Calibrated Questions Table using native colors */}

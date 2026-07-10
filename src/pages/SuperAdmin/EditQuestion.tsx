@@ -224,6 +224,7 @@ export default function EditQuestion() {
   const { toast } = useToast();
   const { user } = useAuth();
   const isSuperAdmin = user?.role === ROLES.SUPERADMIN;
+  const isAuthorisedForPublic = isSuperAdmin;
   const backRoute = isSuperAdmin ? "/superadmin/questions" : "/admin/questions";
 
   const [loading, setLoading] = useState(true);
@@ -967,43 +968,22 @@ export default function EditQuestion() {
 
     setSaving(true);
     try {
-      const questionData: UpdateQuestionRequest & {
-        question_type?: string;
-        type?: string;
-        signatureMetadata?: any;
-        languageTemplates?: any;
-      } = {
+      const questionData: any = {
         questionType: questionType,
-        question_type: questionType, // Sent to workaround potential Jackson snake-case mapping issues
-        type: questionType, // Extra fallback
         prompt: prompt,
         subject_id: selectedSubject,
         topic_id: selectedTopic || undefined,
         subtopic_id: selectedSubtopic || undefined,
         marks: marks,
-        title: title || undefined,
         difficulty: difficulty,
         visibility: visibility,
-        constraints: constraints || undefined,
-        memoryLimitMb: memoryLimitMb,
-        timeLimitSecs: timeLimitSecs,
-        sampleExplanation: sampleExplanation || undefined,
-        hints: hints.filter((h) => h.trim() !== ""),
-        tags: tags.filter((t) => t.trim() !== ""),
-        examples: testCases
-          .filter((tc) => tc.sample)
-          .map((tc) => ({
-            input: tc.input,
-            output: tc.expectedOutput,
-            explanation: tc.explanation || "",
-          })),
         // Extended Enterprise Metadata
-        domain: domain || undefined,
-        cognitiveLevel: cognitiveLevel || undefined,
-        status: status,
-        p_value: pValue ? parseFloat(pValue) : undefined,
-        discrimination_index: discriminationIndex ? parseFloat(discriminationIndex) : undefined,
-        avg_time_seconds: avgTimeSeconds ? parseInt(avgTimeSeconds, 10) : undefined,
+        domain: undefined,
+        cognitiveLevel: undefined,
+        status: undefined,
+        p_value: undefined,
+        discrimination_index: undefined,
+        avg_time_seconds: undefined,
       };
 
       if (questionType === "MCQ") {
@@ -1037,15 +1017,28 @@ export default function EditQuestion() {
               displayOrder: 4,
             },
           ];
-        } else if (mcqSubType === "FILL_IN_THE_BLANK") {
-          questionData.correctAnswer = correctAnswer;
-          questionData.mcqOptions = mcqOptions;
         } else {
           questionData.mcqOptions = mcqOptions;
         }
       }
 
       if (questionType === "CODING") {
+        questionData.title = title || undefined;
+        questionData.constraints = constraints || undefined;
+        questionData.memoryLimitMb = memoryLimitMb;
+        questionData.timeLimitSecs = timeLimitSecs;
+        questionData.sampleExplanation = sampleExplanation || undefined;
+        questionData.hints = hints.filter((h) => h.trim() !== "");
+        questionData.tags = tags.filter((t) => t.trim() !== "");
+
+        questionData.examples = testCases
+          .filter((tc) => tc.sample)
+          .map((tc) => ({
+            input: tc.input,
+            output: tc.expectedOutput,
+            explanation: tc.explanation || "",
+          }));
+
         // Filter out empty code templates
         const filteredTemplate: Record<string, CodeTemplateEntry> = {};
         if (codeTemplate.python3?.code?.trim())
@@ -1566,14 +1559,14 @@ export default function EditQuestion() {
                       onValueChange={(val: "PUBLIC" | "ORG_OWNED") =>
                         setVisibility(val)
                       }
-                      disabled={!isSuperAdmin}
+                      disabled={!isAuthorisedForPublic}
                     >
                       <SelectTrigger>
                         <SelectValue placeholder="Select visibility" />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="ORG_OWNED">Org Owned</SelectItem>
-                        {isSuperAdmin && (
+                        {isAuthorisedForPublic && (
                           <SelectItem value="PUBLIC">Public</SelectItem>
                         )}
                       </SelectContent>

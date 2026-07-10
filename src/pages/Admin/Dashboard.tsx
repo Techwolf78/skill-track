@@ -1,9 +1,90 @@
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Plus } from "lucide-react";
+import { Plus, UserPlus, Loader2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "@/lib/auth-context";
+import { userService } from "@/lib/user-service";
+import { useToast } from "@/hooks/use-toast";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import axios from "axios";
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const { toast } = useToast();
+
+  const [isAddUserOpen, setIsAddUserOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [formData, setFormData] = useState({
+    name: "",
+    email: "",
+    phoneNumber: "",
+    password: "",
+  });
+
+  const handleCreateUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const orgId = user?.organisationData?.id;
+
+    if (!orgId) {
+      toast({
+        title: "Error",
+        description: "Your account is not associated with any organization.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!formData.name || !formData.email) {
+      toast({
+        title: "Validation Error",
+        description: "Full Name and Email are required fields.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      await userService.createUser(
+        {
+          name: formData.name,
+          email: formData.email,
+          password: formData.password || "Temp@123", // default temp password
+          phoneNumber: formData.phoneNumber,
+          organisation_id: orgId,
+        },
+        "ADMIN", // role is always ADMIN on the admin side
+      );
+
+      toast({
+        title: "User Created",
+        description: `${formData.name} has been added as an Admin successfully.`,
+      });
+
+      setIsAddUserOpen(false);
+      setFormData({
+        name: "",
+        email: "",
+        phoneNumber: "",
+        password: "",
+      });
+    } catch (error: unknown) {
+      let errorMessage = "Failed to create user.";
+      if (axios.isAxiosError(error)) {
+        errorMessage = error.response?.data?.message || error.message;
+      }
+      toast({
+        title: "Error",
+        description: errorMessage,
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   return (
     <div className="p-8 space-y-6 animate-fade-in">
@@ -16,6 +97,14 @@ export default function AdminDashboard() {
           </p>
         </div>
         <div className="flex items-center gap-3">
+          <Button
+            variant="outline"
+            className="h-11 rounded-md"
+            onClick={() => setIsAddUserOpen(true)}
+          >
+            <UserPlus className="w-4 h-4 mr-2" />
+            Add User
+          </Button>
           <Button
             variant="hero"
             className="shadow-lg shadow-primary/20 hover:shadow-primary/30 transition-all duration-300 group h-11 rounded-md"
@@ -34,6 +123,89 @@ export default function AdminDashboard() {
           Dashboard analytics, activity feeds, and performance indicators are coming soon.
         </p>
       </div>
+
+      {/* Add User Dialog */}
+      <Dialog open={isAddUserOpen} onOpenChange={setIsAddUserOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Add User</DialogTitle>
+            <DialogDescription>
+              Create a new administrator account for your organization.
+            </DialogDescription>
+          </DialogHeader>
+
+          <form onSubmit={handleCreateUser} className="space-y-4 py-2">
+            <div className="space-y-1">
+              <Label htmlFor="name">Full Name</Label>
+              <Input
+                id="name"
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                placeholder="John Doe"
+                required
+              />
+            </div>
+
+            <div className="space-y-1">
+              <Label htmlFor="email">Email</Label>
+              <Input
+                id="email"
+                type="email"
+                value={formData.email}
+                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                placeholder="john@example.com"
+                required
+              />
+            </div>
+
+            <div className="space-y-1">
+              <Label htmlFor="phoneNumber">Phone Number</Label>
+              <Input
+                id="phoneNumber"
+                value={formData.phoneNumber}
+                onChange={(e) => setFormData({ ...formData, phoneNumber: e.target.value })}
+                placeholder="+91..."
+              />
+            </div>
+
+            <div className="space-y-1">
+              <Label htmlFor="password">Temporary Password</Label>
+              <Input
+                id="password"
+                type="password"
+                value={formData.password}
+                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                placeholder="Leave blank for default"
+              />
+            </div>
+
+            <div className="flex justify-end gap-3 pt-4 border-t">
+              <Button
+                type="button"
+                variant="outline"
+                disabled={isSubmitting}
+                onClick={() => setIsAddUserOpen(false)}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                variant="hero"
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Creating...
+                  </>
+                ) : (
+                  "Create User"
+                )}
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
