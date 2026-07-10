@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
+import { apiClient } from "@/lib/api-client";
+import { useQuery } from "@tanstack/react-query";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -49,6 +51,7 @@ import {
   RefreshCw,
   Users,
   X,
+  Building2,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Test } from "@/lib/test-service";
@@ -58,6 +61,7 @@ import {
   useCreateTestMutation,
   useDeleteTestMutation,
   useUpdateTestMutation,
+  useTestSchedulesQuery,
 } from "@/hooks/use-query-hooks";
 
 export default function AdminTests() {
@@ -66,7 +70,52 @@ export default function AdminTests() {
   const { user } = useAuth();
   const [searchTerm, setSearchTerm] = useState("");
 
-  const { data: allTests = [], isLoading: loading, refetch } = useTestsQuery();
+  const { data: allTests = [], isLoading: testsLoading, refetch: refetchTests } = useTestsQuery();
+  const { data: schedules = [], refetch: refetchSchedules } = useTestSchedulesQuery();
+  const { data: invitations = [], isLoading: invitationsLoading, refetch: refetchInvitations } = useQuery<any[]>({
+    queryKey: ["all-candidate-invitations"],
+    queryFn: async () => {
+      const res = await apiClient.get("/candidate-invitations?size=1000");
+      const data = res.data?.data ?? res.data;
+      if (Array.isArray(data)) return data;
+      if (data && typeof data === "object" && Array.isArray(data.content)) return data.content;
+      return [];
+    }
+  });
+
+  const loading = testsLoading || invitationsLoading;
+
+  const refetch = useCallback(() => {
+    refetchTests();
+    refetchSchedules();
+    refetchInvitations();
+  }, [refetchTests, refetchSchedules, refetchInvitations]);
+
+  // Map testId to candidates count
+  const testTakersCountMap = useMemo(() => {
+    const counts: Record<string, number> = {};
+    
+    // Map scheduleId to testId
+    const scheduleToTestMap: Record<string, string> = {};
+    schedules.forEach((schedule) => {
+      if (schedule.id && schedule.testId) {
+        scheduleToTestMap[schedule.id] = schedule.testId;
+      }
+    });
+
+    // Count invitations per test
+    invitations.forEach((invitation) => {
+      const scheduleId = invitation.scheduleId || invitation.schedule?.id;
+      if (scheduleId) {
+        const testId = scheduleToTestMap[scheduleId];
+        if (testId) {
+          counts[testId] = (counts[testId] || 0) + 1;
+        }
+      }
+    });
+
+    return counts;
+  }, [schedules, invitations]);
 
   const tests = useMemo(() => {
     let list: Test[] = [];
@@ -340,31 +389,20 @@ export default function AdminTests() {
   ];
 
   return (
-    <div className="space-y-6 animate-fade-in">
-      {/* Controls Row: Tabs (Left), Search (Center), Actions (Right) */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-        {/* Left: Tab Navigation */}
-        <div className="shrink-0">
-          <h2 className="text-xl font-semibold text-slate-800">All Tests ({tests.length})</h2>
+    <div className="p-8 space-y-6 animate-fade-in">
+      {/* Header Section */}
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 pb-4 border-b">
+        <div className="space-y-2">
+          <h1 className="text-3xl font-heading font-bold text-slate-900">Tests</h1>
+          <p className="text-muted-foreground text-sm">
+            Manage and calibrate multi-domain tests for Engineering, MBA, BBA, and Corporate placement drives.
+          </p>
         </div>
-
-        {/* Center: Search Bar */}
-        <div className="relative flex-1 max-w-md w-full md:mx-4">
-          <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 z-10" />
-          <Input
-            placeholder="Search tests by name or description..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10 h-11 bg-white border-slate-200 focus:border-primary/50 transition-all w-full"
-          />
-        </div>
-
-        {/* Right: Actions */}
         <div className="flex gap-2 shrink-0">
           <Button
             variant="outline"
             onClick={() => refetch()}
-            className="h-11 border-slate-200"
+            className="h-11 border-slate-200 rounded-md"
           >
             <RefreshCw className="w-4 h-4 mr-2" />
             Refresh
@@ -372,7 +410,7 @@ export default function AdminTests() {
           <Button
             variant="hero"
             onClick={() => setIsCreateDialogOpen(true)}
-            className="shadow-lg shadow-primary/20 hover:shadow-primary/30 transition-all duration-300 group h-11"
+            className="shadow-lg shadow-primary/20 hover:shadow-primary/30 transition-all duration-300 group h-11 rounded-md"
           >
             <Plus className="w-4 h-4 mr-2 group-hover:rotate-90 transition-transform duration-300" />
             Create New Test
@@ -380,211 +418,191 @@ export default function AdminTests() {
         </div>
       </div>
 
-      {/* Tests Table */}
-      <Card className="overflow-hidden border-0 shadow-lg">
-        <div className="rounded-xl overflow-hidden">
-          <Table>
-            <TableHeader className="bg-slate-50/75 backdrop-blur-sm border-b border-slate-100">
-              <TableRow>
-                <TableHead className="font-semibold text-slate-700">
-                  Test Info
-                </TableHead>
-
-                <TableHead className="font-semibold text-slate-700 text-center">
-                  Proctoring
-                </TableHead>
-                <TableHead className="font-semibold text-slate-700 text-center">
-                  Questions
-                </TableHead>
-                <TableHead className="font-semibold text-slate-700 text-center">
-                  Duration
-                </TableHead>
-                <TableHead className="font-semibold text-slate-700 text-center">
-                  Difficulty
-                </TableHead>
-                <TableHead className="font-semibold text-slate-700 text-right">
-                  Actions
-                </TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {loading ? (
-                <TableRow>
-                  <TableCell colSpan={6} className="text-center py-16">
-                    <div className="flex flex-col items-center gap-3">
-                      <Loader2 className="w-8 h-8 animate-spin text-primary" />
-                      <p className="text-sm text-muted-foreground">
-                        Loading tests...
-                      </p>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ) : filteredTests.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={6} className="text-center py-16">
-                    <div className="flex flex-col items-center gap-3">
-                      <FileQuestion className="w-12 h-12 text-muted-foreground/50" />
-                      <div>
-                        <p className="text-muted-foreground font-medium">
-                          No tests found
-                        </p>
-                        <p className="text-sm text-muted-foreground/70 mt-1">
-                          {searchTerm
-                            ? "Try a different search term"
-                            : "Create your first test to get started"}
-                        </p>
-                      </div>
-                      {!searchTerm && activeFilter === "all" && (
-                        <Button
-                          variant="outline"
-                          onClick={() => setIsCreateDialogOpen(true)}
-                          className="mt-2"
-                        >
-                          <Plus className="w-4 h-4 mr-2" />
-                          Create Test
-                        </Button>
-                      )}
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ) : (
-                filteredTests.map((test, index) => (
-                  <TableRow
-                    key={test.id}
-                    className="hover:bg-slate-50/80 transition-colors group animate-fade-in-up"
-                    style={{ animationDelay: `${index * 0.02}s` }}
-                  >
-                    <TableCell>
-                      <div>
-                        <p className="font-semibold text-slate-800">
-                          {test.title}
-                        </p>
-                        {test.description && (
-                          <p className="text-sm text-muted-foreground line-clamp-1 mt-0.5">
-                            {test.description}
-                          </p>
-                        )}
-                      </div>
-                    </TableCell>
-
-                    <TableCell className="text-center">
-                      {getProctoringModeBadge(test.proctoringMode)}
-                    </TableCell>
-                    <TableCell className="text-center">
-                      <div className="flex items-center justify-center gap-1.5">
-                        <FileQuestion className="w-4 h-4 text-muted-foreground" />
-                        <span className="font-medium">
-                          {test.questions?.length ||
-                            test.testQuestions?.length ||
-                            0}
-                        </span>
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-center">
-                      <div className="flex items-center justify-center gap-1.5">
-                        <Clock className="w-4 h-4 text-muted-foreground" />
-                        <span className="font-medium">
-                          {test.durationMins}m
-                        </span>
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-center">
-                      <div className="flex items-center justify-center gap-1.5">
-                        <Target className="w-4 h-4 text-muted-foreground" />
-                        <span className="capitalize font-medium">
-                          {test.difficulty?.toLowerCase() || "medium"}
-                        </span>
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <DropdownMenu
-                        open={openDropdownId === test.id}
-                        onOpenChange={(open) => {
-                          if (open) {
-                            setOpenDropdownId(test.id);
-                          } else {
-                            setOpenDropdownId(null);
-                          }
-                        }}
-                      >
-                        <DropdownMenuTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="text-muted-foreground hover:text-orange-600 hover:bg-orange-50/40 dark:hover:bg-orange-950/10"
-                          >
-                            {openDropdownId === test.id ? (
-                              <X className="w-4 h-4" />
-                            ) : (
-                              <MoreVertical className="w-4 h-4" />
-                            )}
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-48">
-
-                          <DropdownMenuItem
-                            onClick={() =>
-                              navigate(`/admin/tests/edit/${test.id}`)
-                            }
-                          >
-                            <Edit className="w-4 h-4 mr-2" />
-                            Edit Test
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onClick={() =>
-                              navigate(`/admin/tests/edit/${test.id}?tab=reports`)
-                            }
-                          >
-                            <TrendingUp className="w-4 h-4 mr-2 text-indigo-600" />
-                            View Reports
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onClick={() => handleDuplicate(test)}
-                          >
-                            <Copy className="w-4 h-4 mr-2" />
-                            Duplicate Test
-                          </DropdownMenuItem>
-
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem
-                            className="text-primary"
-                            onClick={() =>
-                              navigate(`/admin/tests/edit/${test.id}`, {
-                                state: { activeTab: "settings" },
-                              })
-                            }
-                          >
-                            <Calendar className="w-4 h-4 mr-2" />
-                            Schedule Test
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            className="text-primary"
-                            onClick={() =>
-                              navigate(`/admin/tests/edit/${test.id}`, {
-                                state: { activeTab: "invite" },
-                              })
-                            }
-                          >
-                            <Users className="w-4 h-4 mr-2" />
-                            Invite Candidates
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            className="text-destructive"
-                            onClick={() => handleDelete(test.id)}
-                          >
-                            <Trash2 className="w-4 h-4 mr-2" />
-                            Delete Test
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
+      {/* Unified Search & Tests Container */}
+      <div className="border border-slate-200 bg-white rounded-md overflow-hidden shadow-sm">
+        {/* Top Row: Integrated Search Bar */}
+        <div className="relative border-b border-slate-200 flex items-center bg-slate-50">
+          <SearchIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+          <Input
+            placeholder="Search for a test..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-12 pr-4 h-14 w-full bg-transparent border-0 focus-visible:ring-0 focus-visible:ring-offset-0 shadow-none rounded-none text-base placeholder:text-slate-400"
+          />
         </div>
-      </Card>
+
+        {/* Tests List / Rows */}
+        <div className="divide-y divide-slate-100">
+          {loading ? (
+            <div className="p-16 flex flex-col items-center justify-center">
+              <Loader2 className="w-8 h-8 animate-spin text-primary" />
+              <p className="text-sm text-slate-500 mt-3">Loading tests...</p>
+            </div>
+          ) : filteredTests.length === 0 ? (
+            <div className="p-16 flex flex-col items-center justify-center gap-3">
+              <FileQuestion className="w-12 h-12 text-slate-300" />
+              <div className="text-center">
+                <p className="text-slate-600 font-medium">No tests found</p>
+                <p className="text-sm text-slate-400 mt-1">
+                  {searchTerm ? "Try a different search term" : "Create your first test to get started"}
+                </p>
+              </div>
+              {!searchTerm && activeFilter === "all" && (
+                <Button variant="outline" onClick={() => setIsCreateDialogOpen(true)} className="mt-2 rounded-md">
+                  <Plus className="w-4 h-4 mr-2" />
+                  Create Test
+                </Button>
+              )}
+            </div>
+          ) : (
+            filteredTests.map((test) => (
+              <div
+                key={test.id}
+                className="p-6 flex flex-col md:flex-row md:items-center md:justify-between gap-4 hover:bg-slate-50/50 transition-colors"
+              >
+                {/* Left side info */}
+                <div className="space-y-2.5 flex-1">
+                  <div className="flex items-center gap-3">
+                    <h3 className="font-semibold text-slate-800 text-lg group-hover:text-primary transition-colors">
+                      {test.title}
+                    </h3>
+                  </div>
+                  {/* Inline list of icons and text */}
+                  <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-xs text-muted-foreground">
+                    <span className="flex items-center gap-1.5">
+                      <FileQuestion className="w-4 h-4 text-slate-400" />
+                      {test.questions?.length || test.testQuestions?.length || 0} questions
+                    </span>
+                    <span className="flex items-center gap-1.5">
+                      <Clock className="w-4 h-4 text-slate-400" />
+                      {test.durationMins} minutes
+                    </span>
+                    <span className="flex items-center gap-1.5">
+                      <Users className="w-4 h-4 text-slate-400" />
+                      {testTakersCountMap[test.id] || 0} candidates
+                    </span>
+                    <span className="flex items-center gap-1.5">
+                      <Target className="w-4 h-4 text-slate-400" />
+                      <span className="capitalize">{test.difficulty?.toLowerCase() || "medium"}</span>
+                    </span>
+                    <span className="flex items-center gap-1.5">
+                      <Building2 className="w-4 h-4 text-slate-400" />
+                      {test.organisation?.name || user?.organisationData?.name || "Your Organisation"}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Right side actions */}
+                <div className="flex items-center gap-2 shrink-0 md:self-center self-end">
+                  {/* Invite Button (User with Plus icon) */}
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() =>
+                      navigate(`/admin/tests/edit/${test.id}`, {
+                        state: { activeTab: "invite" },
+                      })
+                    }
+                    title="Invite Candidates"
+                    className="text-slate-500 hover:text-primary hover:bg-slate-50 rounded-md"
+                  >
+                    <Users className="w-5 h-5" />
+                  </Button>
+                  
+                  {/* Reports Button (Bar chart icon / TrendingUp) */}
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() =>
+                      navigate(`/admin/tests/edit/${test.id}?tab=reports`)
+                    }
+                    title="View Reports"
+                    className="text-slate-500 hover:text-primary hover:bg-slate-50 rounded-md"
+                  >
+                    <TrendingUp className="w-5 h-5 text-indigo-600" />
+                  </Button>
+
+                  {/* Dropdown Menu for all actions */}
+                  <DropdownMenu
+                    open={openDropdownId === test.id}
+                    onOpenChange={(open) => {
+                      if (open) {
+                        setOpenDropdownId(test.id);
+                      } else {
+                        setOpenDropdownId(null);
+                      }
+                    }}
+                  >
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="text-slate-500 hover:text-primary hover:bg-slate-50 rounded-md"
+                      >
+                        {openDropdownId === test.id ? (
+                          <X className="w-5 h-5" />
+                        ) : (
+                          <MoreVertical className="w-5 h-5" />
+                        )}
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-48">
+                      <DropdownMenuItem
+                        onClick={() => navigate(`/admin/tests/edit/${test.id}`)}
+                      >
+                        <Edit className="w-4 h-4 mr-2" />
+                        Edit Test
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() =>
+                          navigate(`/admin/tests/edit/${test.id}?tab=reports`)
+                        }
+                      >
+                        <TrendingUp className="w-4 h-4 mr-2 text-indigo-600" />
+                        View Reports
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => handleDuplicate(test)}>
+                        <Copy className="w-4 h-4 mr-2" />
+                        Duplicate Test
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem
+                        className="text-primary"
+                        onClick={() =>
+                          navigate(`/admin/tests/edit/${test.id}`, {
+                            state: { activeTab: "settings" },
+                          })
+                        }
+                      >
+                        <Calendar className="w-4 h-4 mr-2" />
+                        Schedule Test
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        className="text-primary"
+                        onClick={() =>
+                          navigate(`/admin/tests/edit/${test.id}`, {
+                            state: { activeTab: "invite" },
+                          })
+                        }
+                      >
+                        <Users className="w-4 h-4 mr-2" />
+                        Invite Candidates
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        className="text-destructive"
+                        onClick={() => handleDelete(test.id)}
+                      >
+                        <Trash2 className="w-4 h-4 mr-2" />
+                        Delete Test
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
 
       {/* Create Test Modal */}
       <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>

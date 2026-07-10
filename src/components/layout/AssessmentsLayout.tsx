@@ -5,8 +5,13 @@ import { ClipboardList, CalendarDays, UserPlus } from "lucide-react";
 export function AssessmentsLayout() {
   const location = useLocation();
   const isAdmin = location.pathname.startsWith("/admin");
-  const prefix = isAdmin ? "/admin" : "/superadmin";
-  const schedulePath = isAdmin ? `${prefix}/schedules` : `${prefix}/test-schedules`;
+
+  if (isAdmin) {
+    return <Outlet />;
+  }
+
+  const prefix = "/superadmin";
+  const schedulePath = `${prefix}/test-schedules`;
 
   const tabs = [
     {

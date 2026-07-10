@@ -6,8 +6,8 @@ import {
   FileQuestion,
   ClipboardList,
   LogOut,
-  ChevronLeft,
-  ChevronRight,
+  PanelLeftOpen,
+  PanelLeftClose,
   ShieldAlert,
 } from "lucide-react";
 import { useState } from "react";
@@ -17,14 +17,14 @@ import { authService } from "@/lib/auth-service";
 
 const navItems = [
   { icon: LayoutDashboard, label: "Dashboard", path: "/admin", end: true },
-  { icon: Users, label: "Candidates", path: "/admin/candidates" },
-  { icon: FileQuestion, label: "Question Bank", path: "/admin/questions" },
   { 
     icon: ClipboardList, 
     label: "Tests", 
     path: "/admin/tests",
     matchPaths: ["/admin/tests", "/admin/schedules", "/admin/invitations"]
   },
+  { icon: Users, label: "Candidates", path: "/admin/candidates" },
+  { icon: FileQuestion, label: "Question Bank", path: "/admin/questions" },
   { icon: ShieldAlert, label: "Proctoring", path: "/admin/proctoring" },
 ];
 
@@ -52,23 +52,35 @@ export function AdminSidebar() {
         collapsed ? "w-20" : "w-64"
       )}
     >
-      {/* Logo */}
-      <div className="flex items-center gap-3 px-6 py-6 border-b border-sidebar-border">
-        <div className="w-10 h-10 rounded-xl bg-gradient-primary flex items-center justify-center shadow-primary">
-          <span className="text-xl font-bold text-primary-foreground">R</span>
-        </div>
-        {!collapsed && (
-          <>
-            <span className="font-heading font-bold text-xl text-sidebar-foreground">
-              RxOne
-            </span>
-            {user?.organisationData && (
-              <div className="ml-auto text-xs bg-sidebar-accent/50 px-2 py-1 rounded">
-                {user.organisationData.name}
-              </div>
-            )}
-          </>
+      {/* Logo / Header */}
+      <div className={cn(
+        "flex px-6 py-6 border-b border-sidebar-border",
+        collapsed ? "flex-col items-center gap-4" : "items-center justify-between"
+      )}>
+        {collapsed ? (
+          <span className="font-heading font-extrabold text-2xl text-sidebar-foreground select-none">
+            Rx
+          </span>
+        ) : (
+          <span className="font-heading font-extrabold text-2xl text-sidebar-foreground select-none">
+            RxOne
+          </span>
         )}
+        
+        {/* Toggle Button */}
+        <button
+          onClick={() => setCollapsed(!collapsed)}
+          className={cn(
+            "h-8 w-8 text-sidebar-foreground border border-sidebar-border rounded-md flex items-center justify-center hover:opacity-80 transition-opacity bg-transparent focus:outline-none",
+            collapsed ? "mt-1" : ""
+          )}
+        >
+          {collapsed ? (
+            <PanelLeftOpen className="w-4 h-4" />
+          ) : (
+            <PanelLeftClose className="w-4 h-4" />
+          )}
+        </button>
       </div>
 
       {/* Navigation */}
@@ -94,25 +106,17 @@ export function AdminSidebar() {
       </nav>
 
       {/* Bottom section */}
-      <div className="p-3 border-t border-sidebar-border space-y-2">
+      <div className="p-3 border-t border-sidebar-border">
         <Button
           variant="ghost"
           onClick={handleLogout}
           className={cn(
-            "w-full justify-start text-sidebar-foreground hover:text-destructive hover:bg-destructive/10",
+            "w-full justify-start text-sidebar-foreground hover:text-destructive hover:bg-destructive/10 rounded-md",
             collapsed && "justify-center px-0"
           )}
         >
           <LogOut className="w-5 h-5" />
           {!collapsed ? <span className="ml-3">Logout</span> : null}
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => setCollapsed(!collapsed)}
-          className="w-full text-sidebar-foreground"
-        >
-          {collapsed ? <ChevronRight className="w-5 h-5" /> : <ChevronLeft className="w-5 h-5" />}
         </Button>
       </div>
     </aside>
