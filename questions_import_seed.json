@@ -1,0 +1,478 @@
+[
+  {
+    "questionType": "MCQ",
+    "prompt": "Which data structure uses the LIFO (Last In First Out) principle?",
+    "marks": 2,
+    "subject_id": "344b0b0c-7789-472d-ad92-e99c91ffce22",
+    "topic_id": "19707983-51a8-4400-8506-9a80b5920ed3",
+    "difficulty": "EASY",
+    "visibility": "ORG_OWNED",
+    "mcqType": "SINGLE_CORRECT",
+    "multipleCorrect": false,
+    "shuffleOptions": true,
+    "mcqOptions": [
+      { "text": "Queue", "isCorrect": false },
+      { "text": "Stack", "isCorrect": true },
+      { "text": "Linked List", "isCorrect": false },
+      { "text": "Hash Map", "isCorrect": false }
+    ]
+  },
+  {
+    "questionType": "MCQ",
+    "prompt": "What is the worst-case time complexity of sorting an array using QuickSort?",
+    "marks": 2,
+    "subject_id": "344b0b0c-7789-472d-ad92-e99c91ffce22",
+    "topic_id": "19707983-51a8-4400-8506-9a80b5920ed3",
+    "difficulty": "EASY",
+    "visibility": "ORG_OWNED",
+    "mcqType": "SINGLE_CORRECT",
+    "multipleCorrect": false,
+    "shuffleOptions": true,
+    "mcqOptions": [
+      { "text": "O(n log n)", "isCorrect": false },
+      { "text": "O(n^2)", "isCorrect": true },
+      { "text": "O(n)", "isCorrect": false },
+      { "text": "O(log n)", "isCorrect": false }
+    ]
+  },
+  {
+    "questionType": "MCQ",
+    "prompt": "Which of the following are NP-Complete problems? (Select all that apply)",
+    "marks": 4,
+    "subject_id": "344b0b0c-7789-472d-ad92-e99c91ffce22",
+    "topic_id": "19707983-51a8-4400-8506-9a80b5920ed3",
+    "difficulty": "HARD",
+    "visibility": "ORG_OWNED",
+    "mcqType": "MULTIPLE_CORRECT",
+    "multipleCorrect": true,
+    "shuffleOptions": true,
+    "mcqOptions": [
+      { "text": "Travelling Salesman Problem", "isCorrect": true },
+      { "text": "Boolean Satisfiability Problem (SAT)", "isCorrect": true },
+      { "text": "Single Source Shortest Path (Dijkstra)", "isCorrect": false },
+      { "text": "Merge Sort", "isCorrect": false }
+    ]
+  },
+  {
+    "questionType": "MCQ",
+    "prompt": "What is the time complexity of searching for an element in a balanced Binary Search Tree (BST)?",
+    "marks": 2,
+    "subject_id": "344b0b0c-7789-472d-ad92-e99c91ffce22",
+    "topic_id": "19707983-51a8-4400-8506-9a80b5920ed3",
+    "difficulty": "EASY",
+    "visibility": "ORG_OWNED",
+    "mcqType": "SINGLE_CORRECT",
+    "multipleCorrect": false,
+    "shuffleOptions": true,
+    "mcqOptions": [
+      { "text": "O(n)", "isCorrect": false },
+      { "text": "O(log n)", "isCorrect": true },
+      { "text": "O(n log n)", "isCorrect": false },
+      { "text": "O(1)", "isCorrect": false }
+    ]
+  },
+  {
+    "questionType": "MCQ",
+    "prompt": "Which of the following sorting algorithms are stable? (Select all that apply)",
+    "marks": 3,
+    "subject_id": "344b0b0c-7789-472d-ad92-e99c91ffce22",
+    "topic_id": "19707983-51a8-4400-8506-9a80b5920ed3",
+    "difficulty": "MEDIUM",
+    "visibility": "ORG_OWNED",
+    "mcqType": "MULTIPLE_CORRECT",
+    "multipleCorrect": true,
+    "shuffleOptions": true,
+    "mcqOptions": [
+      { "text": "Merge Sort", "isCorrect": true },
+      { "text": "Bubble Sort", "isCorrect": true },
+      { "text": "Quick Sort", "isCorrect": false },
+      { "text": "Heap Sort", "isCorrect": false }
+    ]
+  },
+  {
+    "questionType": "MCQ",
+    "prompt": "What data structure is typically used to implement Breadth-First Search (BFS) on a graph?",
+    "marks": 2,
+    "subject_id": "344b0b0c-7789-472d-ad92-e99c91ffce22",
+    "topic_id": "19707983-51a8-4400-8506-9a80b5920ed3",
+    "difficulty": "EASY",
+    "visibility": "ORG_OWNED",
+    "mcqType": "SINGLE_CORRECT",
+    "multipleCorrect": false,
+    "shuffleOptions": true,
+    "mcqOptions": [
+      { "text": "Stack", "isCorrect": false },
+      { "text": "Queue", "isCorrect": true },
+      { "text": "Heap", "isCorrect": false },
+      { "text": "Binary Tree", "isCorrect": false }
+    ]
+  },
+  {
+    "questionType": "MCQ",
+    "prompt": "Which of the following algorithm paradigms does Floyd-Warshall all-pairs shortest path algorithm belong to?",
+    "marks": 2,
+    "subject_id": "344b0b0c-7789-472d-ad92-e99c91ffce22",
+    "topic_id": "19707983-51a8-4400-8506-9a80b5920ed3",
+    "difficulty": "MEDIUM",
+    "visibility": "ORG_OWNED",
+    "mcqType": "SINGLE_CORRECT",
+    "multipleCorrect": false,
+    "shuffleOptions": true,
+    "mcqOptions": [
+      { "text": "Greedy Approach", "isCorrect": false },
+      { "text": "Divide and Conquer", "isCorrect": false },
+      { "text": "Dynamic Programming", "isCorrect": true },
+      { "text": "Backtracking", "isCorrect": false }
+    ]
+  },
+  {
+    "questionType": "MCQ",
+    "prompt": "What is the primary advantage of a Hash Table compared to an Array?",
+    "marks": 2,
+    "subject_id": "344b0b0c-7789-472d-ad92-e99c91ffce22",
+    "topic_id": "19707983-51a8-4400-8506-9a80b5920ed3",
+    "difficulty": "EASY",
+    "visibility": "ORG_OWNED",
+    "mcqType": "SINGLE_CORRECT",
+    "multipleCorrect": false,
+    "shuffleOptions": true,
+    "mcqOptions": [
+      { "text": "Ordered storage of keys", "isCorrect": false },
+      { "text": "O(1) average time complexity for search, insert, and delete operations", "isCorrect": true },
+      { "text": "Lower memory utilization", "isCorrect": false },
+      { "text": "Guaranteed O(1) worst-case search performance", "isCorrect": false }
+    ]
+  },
+  {
+    "questionType": "MCQ",
+    "prompt": "Which of the following options are self-balancing binary search trees? (Select all that apply)",
+    "marks": 3,
+    "subject_id": "344b0b0c-7789-472d-ad92-e99c91ffce22",
+    "topic_id": "19707983-51a8-4400-8506-9a80b5920ed3",
+    "difficulty": "MEDIUM",
+    "visibility": "ORG_OWNED",
+    "mcqType": "MULTIPLE_CORRECT",
+    "multipleCorrect": true,
+    "shuffleOptions": true,
+    "mcqOptions": [
+      { "text": "AVL Tree", "isCorrect": true },
+      { "text": "Red-Black Tree", "isCorrect": true },
+      { "text": "Min-Heap", "isCorrect": false },
+      { "text": "Trie", "isCorrect": false }
+    ]
+  },
+  {
+    "questionType": "MCQ",
+    "prompt": "In a max-heap containing n elements, what is the time complexity of extracting the maximum element?",
+    "marks": 2,
+    "subject_id": "344b0b0c-7789-472d-ad92-e99c91ffce22",
+    "topic_id": "19707983-51a8-4400-8506-9a80b5920ed3",
+    "difficulty": "MEDIUM",
+    "visibility": "ORG_OWNED",
+    "mcqType": "SINGLE_CORRECT",
+    "multipleCorrect": false,
+    "shuffleOptions": true,
+    "mcqOptions": [
+      { "text": "O(1)", "isCorrect": false },
+      { "text": "O(log n)", "isCorrect": true },
+      { "text": "O(n)", "isCorrect": false },
+      { "text": "O(n log n)", "isCorrect": false }
+    ]
+  },
+  {
+    "questionType": "MCQ",
+    "prompt": "Which graph representation is best suited for sparse graphs (graphs with few edges)?",
+    "marks": 2,
+    "subject_id": "344b0b0c-7789-472d-ad92-e99c91ffce22",
+    "topic_id": "19707983-51a8-4400-8506-9a80b5920ed3",
+    "difficulty": "EASY",
+    "visibility": "ORG_OWNED",
+    "mcqType": "SINGLE_CORRECT",
+    "multipleCorrect": false,
+    "shuffleOptions": true,
+    "mcqOptions": [
+      { "text": "Adjacency Matrix", "isCorrect": false },
+      { "text": "Adjacency List", "isCorrect": true },
+      { "text": "Incidence Matrix", "isCorrect": false },
+      { "text": "Edge List Only", "isCorrect": false }
+    ]
+  },
+  {
+    "questionType": "MCQ",
+    "prompt": "Which of the following statements about Dynamic Programming are true? (Select all that apply)",
+    "marks": 4,
+    "subject_id": "344b0b0c-7789-472d-ad92-e99c91ffce22",
+    "topic_id": "19707983-51a8-4400-8506-9a80b5920ed3",
+    "difficulty": "HARD",
+    "visibility": "ORG_OWNED",
+    "mcqType": "MULTIPLE_CORRECT",
+    "multipleCorrect": true,
+    "shuffleOptions": true,
+    "mcqOptions": [
+      { "text": "Requires the problem to have optimal substructure property", "isCorrect": true },
+      { "text": "Requires the problem to have overlapping subproblems property", "isCorrect": true },
+      { "text": "Always runs faster than greedy algorithms", "isCorrect": false },
+      { "text": "Cannot be implemented recursively", "isCorrect": false }
+    ]
+  },
+  {
+    "questionType": "MCQ",
+    "prompt": "What is the auxiliary space complexity of Merge Sort in its standard array implementation?",
+    "marks": 2,
+    "subject_id": "344b0b0c-7789-472d-ad92-e99c91ffce22",
+    "topic_id": "19707983-51a8-4400-8506-9a80b5920ed3",
+    "difficulty": "MEDIUM",
+    "visibility": "ORG_OWNED",
+    "mcqType": "SINGLE_CORRECT",
+    "multipleCorrect": false,
+    "shuffleOptions": true,
+    "mcqOptions": [
+      { "text": "O(1)", "isCorrect": false },
+      { "text": "O(log n)", "isCorrect": false },
+      { "text": "O(n)", "isCorrect": true },
+      { "text": "O(n^2)", "isCorrect": false }
+    ]
+  },
+  {
+    "questionType": "MCQ",
+    "prompt": "Which data structure is used internally by the system call stack during recursive function executions?",
+    "marks": 2,
+    "subject_id": "344b0b0c-7789-472d-ad92-e99c91ffce22",
+    "topic_id": "19707983-51a8-4400-8506-9a80b5920ed3",
+    "difficulty": "EASY",
+    "visibility": "ORG_OWNED",
+    "mcqType": "SINGLE_CORRECT",
+    "multipleCorrect": false,
+    "shuffleOptions": true,
+    "mcqOptions": [
+      { "text": "Queue", "isCorrect": false },
+      { "text": "Stack", "isCorrect": true },
+      { "text": "Heap", "isCorrect": false },
+      { "text": "Binary Search Tree", "isCorrect": false }
+    ]
+  },
+  {
+    "questionType": "MCQ",
+    "prompt": "What is the traversal order of a Binary Tree where we visit the Left subtree first, then the Right subtree, and finally the Root node?",
+    "marks": 2,
+    "subject_id": "344b0b0c-7789-472d-ad92-e99c91ffce22",
+    "topic_id": "19707983-51a8-4400-8506-9a80b5920ed3",
+    "difficulty": "EASY",
+    "visibility": "ORG_OWNED",
+    "mcqType": "SINGLE_CORRECT",
+    "multipleCorrect": false,
+    "shuffleOptions": true,
+    "mcqOptions": [
+      { "text": "Pre-order", "isCorrect": false },
+      { "text": "In-order", "isCorrect": false },
+      { "text": "Post-order", "isCorrect": true },
+      { "text": "Level-order", "isCorrect": false }
+    ]
+  },
+  {
+    "questionType": "CODING",
+    "title": "Two Sum",
+    "prompt": "Given an array of integers `nums` and an integer `target`, return indices of the two numbers such that they add up to `target`.",
+    "constraints": "2 <= nums.length <= 10^4\n-10^9 <= nums[i] <= 10^9\n-10^9 <= target <= 10^9",
+    "marks": 10,
+    "subject_id": "344b0b0c-7789-472d-ad92-e99c91ffce22",
+    "topic_id": "19707983-51a8-4400-8506-9a80b5920ed3",
+    "difficulty": "EASY",
+    "visibility": "ORG_OWNED",
+    "memoryLimitMb": 256,
+    "timeLimitSecs": 2,
+    "sampleExplanation": "Given nums = [2, 7, 11, 15], target = 9. Because nums[0] + nums[1] == 9, return [0, 1].",
+    "comparisonMode": "EXACT",
+    "languageTemplates": {
+      "java": {
+        "code": "import java.util.*;\n\npublic class Solution {\n    public int[] twoSum(int[] nums, int target) {\n        Map<Integer, Integer> map = new HashMap<>();\n        for (int i = 0; i < nums.length; i++) {\n            int complement = target - nums[i];\n            if (map.containsKey(complement)) {\n                return new int[] { map.get(complement), i };\n            }\n            map.put(nums[i], i);\n        }\n        return new int[] {};\n    }\n}"
+      },
+      "python": {
+        "code": "class Solution:\n    def twoSum(self, nums: list[int], target: int) -> list[int]:\n        hashmap = {}\n        for i, num in enumerate(nums):\n            complement = target - num\n            if complement in hashmap:\n                return [hashmap[complement], i]\n            hashmap[num] = i\n        return []"
+      }
+    },
+    "signatureMetadata": {
+      "functionName": "twoSum",
+      "returnType": "int[]",
+      "parameters": [
+        { "name": "nums", "type": "int[]" },
+        { "name": "target", "type": "int" }
+      ]
+    },
+    "examples": [
+      {
+        "input": "[2,7,11,15]\n9",
+        "output": "[0,1]",
+        "explanation": "nums[0] + nums[1] = 2 + 7 = 9"
+      }
+    ],
+    "hints": [
+      "Use a hash map to look up complements in O(1) time."
+    ],
+    "tags": ["Array", "Hash Table"]
+  },
+  {
+    "questionType": "CODING",
+    "title": "Reverse String",
+    "prompt": "Write a function that reverses a string. The input string is given as an array of characters `s`.",
+    "constraints": "1 <= s.length <= 10^5",
+    "marks": 5,
+    "subject_id": "344b0b0c-7789-472d-ad92-e99c91ffce22",
+    "topic_id": "19707983-51a8-4400-8506-9a80b5920ed3",
+    "difficulty": "EASY",
+    "visibility": "ORG_OWNED",
+    "memoryLimitMb": 256,
+    "timeLimitSecs": 2,
+    "sampleExplanation": "Given s = ['h','e','l','l','o'], reverse it in-place to return ['o','l','l','e','h'].",
+    "comparisonMode": "EXACT",
+    "languageTemplates": {
+      "java": {
+        "code": "public class Solution {\n    public void reverseString(char[] s) {\n        int left = 0, right = s.length - 1;\n        while (left < right) {\n            char temp = s[left];\n            s[left] = s[right];\n            s[right] = temp;\n            left++;\n            right--;\n        }\n    }\n}"
+      },
+      "python": {
+        "code": "class Solution:\n    def reverseString(self, s: list[str]) -> None:\n        left, right = 0, len(s) - 1\n        while left < right:\n            s[left], s[right] = s[right], s[left]\n            left += 1\n            right -= 1"
+      }
+    },
+    "signatureMetadata": {
+      "functionName": "reverseString",
+      "returnType": "void",
+      "parameters": [
+        { "name": "s", "type": "char[]" }
+      ]
+    },
+    "examples": [
+      {
+        "input": "[\"h\",\"e\",\"l\",\"l\",\"o\"]",
+        "output": "[\"o\",\"l\",\"l\",\"e\",\"h\"]",
+        "explanation": "The array is reversed in-place."
+      }
+    ],
+    "hints": [
+      "Use two pointers approach."
+    ],
+    "tags": ["Two Pointers", "String"]
+  },
+  {
+    "questionType": "CODING",
+    "title": "Palindrome Number",
+    "prompt": "Given an integer `x`, return `true` if `x` is a palindrome, and `false` otherwise.",
+    "constraints": "-2^31 <= x <= 2^31 - 1",
+    "marks": 5,
+    "subject_id": "344b0b0c-7789-472d-ad92-e99c91ffce22",
+    "topic_id": "19707983-51a8-4400-8506-9a80b5920ed3",
+    "difficulty": "EASY",
+    "visibility": "ORG_OWNED",
+    "memoryLimitMb": 256,
+    "timeLimitSecs": 2,
+    "sampleExplanation": "121 reads as 121 from left to right and right to left, so returns true.",
+    "comparisonMode": "EXACT",
+    "languageTemplates": {
+      "java": {
+        "code": "public class Solution {\n    public boolean isPalindrome(int x) {\n        if (x < 0 || (x % 10 == 0 && x != 0)) return false;\n        int revertedNumber = 0;\n        while (x > revertedNumber) {\n            revertedNumber = revertedNumber * 10 + x % 10;\n            x /= 10;\n        }\n        return x == revertedNumber || x == revertedNumber / 10;\n    }\n}"
+      },
+      "python": {
+        "code": "class Solution:\n    def isPalindrome(self, x: int) -> bool:\n        if x < 0 or (x % 10 == 0 and x != 0):\n            return False\n        reverted = 0\n        while x > reverted:\n            reverted = reverted * 10 + x % 10\n            x //= 10\n        return x == reverted or x == reverted // 10"
+      }
+    },
+    "signatureMetadata": {
+      "functionName": "isPalindrome",
+      "returnType": "boolean",
+      "parameters": [
+        { "name": "x", "type": "int" }
+      ]
+    },
+    "examples": [
+      {
+        "input": "121",
+        "output": "true",
+        "explanation": "121 reads 121 forward and backward."
+      }
+    ],
+    "hints": [
+      "Try to reverse the integer mathematically without converting to a string."
+    ],
+    "tags": ["Math"]
+  },
+  {
+    "questionType": "CODING",
+    "title": "Valid Parentheses",
+    "prompt": "Given a string `s` containing just the characters '(', ')', '{', '}', '[' and ']', determine if the input string is valid.",
+    "constraints": "1 <= s.length <= 10^4",
+    "marks": 10,
+    "subject_id": "344b0b0c-7789-472d-ad92-e99c91ffce22",
+    "topic_id": "19707983-51a8-4400-8506-9a80b5920ed3",
+    "difficulty": "MEDIUM",
+    "visibility": "ORG_OWNED",
+    "memoryLimitMb": 256,
+    "timeLimitSecs": 2,
+    "sampleExplanation": "Input: s = \"()[]{}\" -> Output: true.",
+    "comparisonMode": "EXACT",
+    "languageTemplates": {
+      "java": {
+        "code": "import java.util.*;\n\npublic class Solution {\n    public boolean isValid(String s) {\n        Stack<Character> stack = new Stack<>();\n        for (char c : s.toCharArray()) {\n            if (c == '(') stack.push(')');\n            else if (c == '{') stack.push('}');\n            else if (c == '[') stack.push(']');\n            else if (stack.isEmpty() || stack.pop() != c) return false;\n        }\n        return stack.isEmpty();\n    }\n}"
+      },
+      "python": {
+        "code": "class Solution:\n    def isValid(self, s: str) -> bool:\n        stack = []\n        mapping = {\")\": \"(\", \"}\": \"{\", \"]\": \"[\"}\n        for char in s:\n            if char in mapping:\n                top_element = stack.pop() if stack else '#'\n                if mapping[char] != top_element:\n                    return False\n            else:\n                stack.append(char)\n        return not stack"
+      }
+    },
+    "signatureMetadata": {
+      "functionName": "isValid",
+      "returnType": "boolean",
+      "parameters": [
+        { "name": "s", "type": "String" }
+      ]
+    },
+    "examples": [
+      {
+        "input": "\"()[]{}\"",
+        "output": "true",
+        "explanation": "Brackets match correctly."
+      }
+    ],
+    "hints": [
+      "Use stack data structure."
+    ],
+    "tags": ["Stack", "String"]
+  },
+  {
+    "questionType": "CODING",
+    "title": "Fibonacci Number",
+    "prompt": "Calculate the N-th Fibonacci number. F(0) = 0, F(1) = 1, F(N) = F(N-1) + F(N-2) for N > 1.",
+    "constraints": "0 <= n <= 30",
+    "marks": 5,
+    "subject_id": "344b0b0c-7789-472d-ad92-e99c91ffce22",
+    "topic_id": "19707983-51a8-4400-8506-9a80b5920ed3",
+    "difficulty": "EASY",
+    "visibility": "ORG_OWNED",
+    "memoryLimitMb": 256,
+    "timeLimitSecs": 2,
+    "sampleExplanation": "F(2) = F(1) + F(0) = 1 + 0 = 1.",
+    "comparisonMode": "EXACT",
+    "languageTemplates": {
+      "java": {
+        "code": "public class Solution {\n    public int fib(int n) {\n        if (n <= 1) return n;\n        int a = 0, b = 1;\n        for (int i = 2; i <= n; i++) {\n            int temp = a + b;\n            a = b;\n            b = temp;\n        }\n        return b;\n    }\n}"
+      },
+      "python": {
+        "code": "class Solution:\n    def fib(self, n: int) -> int:\n        if n <= 1:\n            return n\n        a, b = 0, 1\n        for _ in range(2, n + 1):\n            a, b = b, a + b\n        return b"
+      }
+    },
+    "signatureMetadata": {
+      "functionName": "fib",
+      "returnType": "int",
+      "parameters": [
+        { "name": "n", "type": "int" }
+      ]
+    },
+    "examples": [
+      {
+        "input": "2",
+        "output": "1",
+        "explanation": "F(2) = 1"
+      }
+    ],
+    "hints": [
+      "Can be solved in O(n) time and O(1) space."
+    ],
+    "tags": ["Dynamic Programming", "Math"]
+  }
+]

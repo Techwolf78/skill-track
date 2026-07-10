@@ -677,6 +677,11 @@ export const testService = {
     return unwrapResponse(response);
   },
 
+  bulkCreateQuestions: async (dtos: CreateQuestionRequest[]): Promise<Question[]> => {
+    const response = await apiClient.post<Question[]>("/questions/bulk", dtos);
+    return unwrapArrayResponse(response);
+  },
+
   updateQuestion: async (
     id: string,
     dto: UpdateQuestionRequest,

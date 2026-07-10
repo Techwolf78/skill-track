@@ -31,6 +31,7 @@ import {
   UserCheck,
   Zap,
   Terminal,
+  Upload,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -62,6 +63,7 @@ import {
   useQuestionsQuery,
   useSubjectsQuery,
   useDeleteQuestionMutation,
+  useBulkCreateQuestionsMutation,
 } from "@/hooks/use-query-hooks";
 import { QuestionPreview } from "../SuperAdmin/QuestionPreview";
 
@@ -163,6 +165,93 @@ export default function AdminQuestionBank() {
   const [previewOpen, setPreviewOpen] = useState(false);
 
   const deleteQuestionMutation = useDeleteQuestionMutation();
+  const bulkCreateMutation = useBulkCreateQuestionsMutation();
+
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
+  const [importJsonText, setImportJsonText] = useState("");
+  const [importing, setImporting] = useState(false);
+
+  const handleImportSubmit = async () => {
+    if (!importJsonText.trim()) {
+      toast({
+        title: "Validation Error",
+        description: "Please enter JSON content or upload a JSON file first.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      const parsed = JSON.parse(importJsonText);
+      const questionsArray = Array.isArray(parsed) ? parsed : [parsed];
+
+      // Quick validation and formatting helper
+      for (const q of questionsArray) {
+        if (!q.subject_id && !q.subjectId) {
+          throw new Error("Each question must contain a subject_id or subjectId");
+        }
+        if (!q.questionType) {
+          throw new Error("Each question must contain a questionType ('MCQ' or 'CODING')");
+        }
+        if (!q.prompt) {
+          throw new Error("Each question must contain a prompt");
+        }
+        if (q.questionType === "MCQ") {
+          if (!q.mcqType) q.mcqType = "SINGLE_CORRECT";
+          if (q.multipleCorrect === undefined) q.multipleCorrect = false;
+          if (q.shuffleOptions === undefined) q.shuffleOptions = false;
+        }
+        if (q.questionType === "CODING") {
+          if (!q.title) q.title = q.prompt.slice(0, 30) || "Coding Challenge";
+          if (!q.languageTemplates) q.languageTemplates = {};
+          if (!q.signatureMetadata) q.signatureMetadata = {};
+        }
+        // Normalise fields for backend
+        if (q.subjectId && !q.subject_id) q.subject_id = q.subjectId;
+        if (!q.subjectId && q.subject_id) q.subjectId = q.subject_id;
+        if (q.topicId && !q.topic_id) q.topic_id = q.topicId;
+        if (!q.topicId && q.topic_id) q.topicId = q.topic_id;
+        if (q.subtopicId && !q.subtopic_id) q.subtopic_id = q.subtopicId;
+        if (!q.subtopicId && q.subtopic_id) q.subtopicId = q.subtopic_id;
+        if (q.visibility === undefined) q.visibility = "ORG_OWNED";
+      }
+
+      setImporting(true);
+      await bulkCreateMutation.mutateAsync(questionsArray);
+      toast({
+        title: "Success",
+        description: `Successfully imported ${questionsArray.length} questions.`,
+      });
+      setImportDialogOpen(false);
+      setImportJsonText("");
+    } catch (err: any) {
+      toast({
+        title: "Import Failed",
+        description: err.message || "Invalid JSON format or backend error.",
+        variant: "destructive",
+      });
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const result = event.target?.result;
+      if (typeof result === "string") {
+        setImportJsonText(result);
+        toast({
+          title: "File loaded",
+          description: "JSON content loaded successfully. You can review or click Import to save.",
+        });
+      }
+    };
+    reader.readAsText(file);
+  };
 
   const handleDeleteClick = (question: Question) => {
     setSelectedQuestion(question);
@@ -285,6 +374,10 @@ export default function AdminQuestionBank() {
           </p>
         </div>
         <div className="flex items-center gap-3">
+          <Button variant="outline" onClick={() => setImportDialogOpen(true)}>
+            <Upload className="w-4 h-4 mr-2" />
+            Import Questions
+          </Button>
           <Button variant="hero" onClick={handleAdd}>
             <Plus className="w-4 h-4 mr-2" />
             Add Question
@@ -813,6 +906,84 @@ export default function AdminQuestionBank() {
         open={previewOpen}
         onOpenChange={setPreviewOpen}
       />
+
+      {/* Import Questions Dialog */}
+      <Dialog open={importDialogOpen} onOpenChange={setImportDialogOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Import Questions in Bulk</DialogTitle>
+            <DialogDescription>
+              Upload a JSON file or paste a JSON array of questions to create multiple questions at once.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            <div>
+              <label className="block text-sm font-medium mb-1">Select JSON File</label>
+              <Input
+                type="file"
+                accept=".json"
+                onChange={handleFileChange}
+                className="cursor-pointer"
+              />
+            </div>
+
+            <div className="flex items-center my-2">
+              <div className="border-t border-border flex-grow"></div>
+              <span className="px-3 text-xs text-muted-foreground uppercase font-semibold">Or Paste JSON Content</span>
+              <div className="border-t border-border flex-grow"></div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium mb-1">JSON Array</label>
+              <textarea
+                value={importJsonText}
+                onChange={(e) => setImportJsonText(e.target.value)}
+                placeholder={`[\n  {\n    "questionType": "MCQ",\n    "prompt": "What is the capital of France?",\n    "marks": 2,\n    "subject_id": "subject-uuid-here",\n    "difficulty": "EASY",\n    "mcqOptions": [\n      {"text": "Paris", "isCorrect": true},\n      {"text": "London", "isCorrect": false}\n    ]\n  }\n]`}
+                rows={10}
+                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 font-mono"
+              />
+            </div>
+
+            <div className="bg-muted/50 p-3 rounded-lg border text-xs text-muted-foreground space-y-1">
+              <p className="font-semibold text-foreground">Schema Requirements:</p>
+              <ul className="list-disc pl-4 space-y-0.5">
+                <li>Must be a JSON array <code>[...]</code> or a single JSON object <code>{"{...}"}</code>.</li>
+                <li>`subject_id` (or `subjectId`), `questionType` ("MCQ" or "CODING"), and `prompt` are required.</li>
+                <li>For MCQ, specify `mcqOptions` list with `text` and `isCorrect` fields.</li>
+                <li>For CODING, specify `title` and optionally `languageTemplates`, `signatureMetadata`, `examples`.</li>
+              </ul>
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-3 pt-4 border-t">
+            <Button
+              variant="outline"
+              disabled={importing}
+              onClick={() => {
+                setImportDialogOpen(false);
+                setImportJsonText("");
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="hero"
+              disabled={importing}
+              onClick={handleImportSubmit}
+            >
+              {importing ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Importing...
+                </>
+              ) : (
+                "Import Questions"
+              )}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

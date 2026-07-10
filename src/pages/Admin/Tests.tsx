@@ -458,10 +458,10 @@ export default function AdminTests() {
             filteredTests.map((test) => (
               <div
                 key={test.id}
-                className="p-6 flex flex-col md:flex-row md:items-center md:justify-between gap-4 hover:bg-slate-50/50 transition-colors"
+                className="py-4 px-6 flex flex-col md:flex-row md:items-center md:justify-between gap-4 hover:bg-slate-50/50 transition-colors"
               >
                 {/* Left side info */}
-                <div className="space-y-2.5 flex-1">
+                <div className="space-y-1 flex-1">
                   <div className="flex items-center gap-3">
                     <h3 className="font-semibold text-slate-800 text-lg group-hover:text-primary transition-colors">
                       {test.title}

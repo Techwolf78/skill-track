@@ -291,6 +291,16 @@ export function useCreateQuestionMutation() {
   });
 }
 
+export function useBulkCreateQuestionsMutation() {
+  const queryClient = useQueryClient();
+  return useMutation<Question[], Error, CreateQuestionRequest[]>({
+    mutationFn: testService.bulkCreateQuestions,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["questions"] });
+    },
+  });
+}
+
 export function useUpdateQuestionMutation() {
   const queryClient = useQueryClient();
   return useMutation<Question, Error, { id: string; dto: UpdateQuestionRequest }>({
