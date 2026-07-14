@@ -386,6 +386,7 @@ export interface Test {
   testSchedules?: TestScheduleExtended[];
   isActive?: boolean;
   organisationId?: string;
+  organisation?: Organisation;
   // Proctoring Settings
   proctoringMode?: ProctoringMode;
   enableTabSwitchTracking?: boolean;

@@ -160,7 +160,7 @@ interface ReportEvidence {
 }
 
 interface EnrichedTestQuestion extends TestQuestion {
-  question?: Question & { type?: string; avgTimeSeconds?: number; avg_time_seconds?: number };
+  question?: Question & { type?: string; avgTimeSeconds?: number; avg_time_seconds?: number; options?: any[] };
 }
 
 const getProctoringPreset = (mode: ProctoringMode) => {
@@ -1293,13 +1293,15 @@ export default function AdminTestsEdit() {
       );
       const detailData = detailRes.data?.data ?? detailRes.data;
 
-      const [paperRes, resumeRes] = await Promise.all([
+      const [paperRes, resumeRes, timingsRes] = await Promise.all([
         apiClient.get(`/test-sessions/${scoreData.sessionId}/paper`),
         apiClient.get(`/test-sessions/${scoreData.sessionId}/resume`),
+        apiClient.get(`/test-sessions/${scoreData.sessionId}/question-timings`),
       ]);
 
       const paperData = paperRes.data?.data || paperRes.data;
       const resumeData = resumeRes.data?.data || resumeRes.data;
+      const timingsList = timingsRes.data?.data || timingsRes.data || [];
 
       const questionsList = paperData?.paper?.questions || [];
       const submissionsList = resumeData?.submissions || [];
@@ -1331,6 +1333,7 @@ export default function AdminTestsEdit() {
       // Metadata Table
       autoTable(doc, {
         startY: 36,
+        margin: { left: 14, right: 14 },
         head: [[{ content: 'CANDIDATE METADATA & SESSION INFORMATION', colSpan: 4, styles: { halign: 'left', fillColor: [30, 41, 59], fontStyle: 'bold' } }]],
         body: [
           [
@@ -1359,13 +1362,7 @@ export default function AdminTestsEdit() {
           ]
         ],
         theme: 'grid',
-        styles: { fontSize: 8.5, cellPadding: 4.5 },
-        columnStyles: {
-          0: { cellWidth: 35 },
-          1: { cellWidth: 65 },
-          2: { cellWidth: 35 },
-          3: { cellWidth: 65 }
-        }
+        styles: { fontSize: 8.5, cellPadding: 4.5, lineColor: [100, 116, 139], lineWidth: 0.5 }
       });
 
       // Warnings Timeline Table
@@ -1379,6 +1376,7 @@ export default function AdminTestsEdit() {
 
       autoTable(doc, {
         startY: (doc as JsPDFWithAutoTable).lastAutoTable.finalY + 8,
+        margin: { left: 14, right: 14 },
         head: [
           [{ content: 'PROCTORING WARNINGS TIMELINE', colSpan: 4, styles: { halign: 'left', fillColor: [30, 41, 59], fontStyle: 'bold' } }],
           ['Time', 'Event Type', 'Severity', 'Description']
@@ -1386,19 +1384,13 @@ export default function AdminTestsEdit() {
         body: violationsBody.length > 0 ? violationsBody : [['-', 'No proctoring violations recorded during this session.', '-', '-']],
         theme: 'striped',
         headStyles: { fillColor: [71, 85, 105], textColor: [255, 255, 255], fontStyle: 'bold' },
-        styles: { fontSize: 8, cellPadding: 4 },
-        columnStyles: {
-          0: { cellWidth: 25 },
-          1: { cellWidth: 40 },
-          2: { cellWidth: 25 },
-          3: { cellWidth: 92 }
-        }
+        styles: { fontSize: 8, cellPadding: 4, lineColor: [100, 116, 139], lineWidth: 0.5 }
       });
 
       // Section Separator Label
       doc.setFont("helvetica", "bold");
       doc.setFontSize(11);
-      doc.setTextColor(30, 41, 59);
+      doc.setTextColor(30, 41, 59); // Slate header
       doc.text("QUESTIONS & SUBMISSIONS DETAILS", 14, (doc as JsPDFWithAutoTable).lastAutoTable.finalY + 10);
 
       // Question Cards using autoTables
@@ -1407,7 +1399,7 @@ export default function AdminTestsEdit() {
         const sub = submissionsList.find((s: { questionId: string; answerText?: string; selectedOptionIds?: string[] }) => s.questionId === questionId);
         const isCoding = q.type === "CODING";
 
-        // Build exact selected ID set — prefer structured selectedOptionIds, fall back to parsing raw answerText JSON
+        // Build exact selected ID set
         let selectedIds = new Set<string>();
         if (sub?.selectedOptionIds && Array.isArray(sub.selectedOptionIds)) {
           selectedIds = new Set(sub.selectedOptionIds.map(String));
@@ -1415,42 +1407,105 @@ export default function AdminTestsEdit() {
           try {
             const parsed = JSON.parse(sub.answerText);
             if (Array.isArray(parsed)) parsed.forEach((id: string) => selectedIds.add(String(id)));
-          } catch { /* raw text, leave selectedIds empty */ }
+          } catch { /* raw text */ }
         }
 
-        let submissionText = selectedIds.size === 0 ? (sub?.answerText || "No submission") : "";
-        if (!isCoding) {
+        // Fetch true correct options list
+        const enrichedTQ = questionsData.find(tq => tq.questionId === questionId);
+        const enrichedQuestion = enrichedTQ?.question;
+        const correctOptions = enrichedQuestion?.options || enrichedQuestion?.mcqOptions || [];
+
+        // Calculate time spent telemetry
+        const timeItem = timingsList.find((t: { questionId: string }) => t.questionId === questionId);
+        const activeSeconds = timeItem?.activeSeconds || 0;
+        const minutes = Math.floor(activeSeconds / 60);
+        const seconds = activeSeconds % 60;
+        const timeSpentText = minutes > 0 ? `${minutes}m ${seconds}s` : `${seconds}s`;
+
+        // Build structured body rows
+        const bodyRows: any[] = [
+          [{ content: `Question:\n${q.prompt || ""}`, colSpan: 3, styles: { textColor: [15, 23, 42], fontStyle: 'bold', fillColor: [248, 250, 252], fontSize: 9 } }]
+        ];
+
+        if (isCoding) {
+          bodyRows.push([{
+            content: `Submitted Code:\n${sub?.answerText || "No submission"}`,
+            colSpan: 3,
+            styles: { fontStyle: 'normal', fillColor: [248, 250, 252], textColor: [15, 23, 42] }
+          }]);
+        } else {
           const optionsList = q.options || q.mcqOptions || [];
-          if (optionsList.length > 0) {
-            submissionText = optionsList.map((opt: { id: string; text: string; isCorrect: boolean }) => {
-              const isSelected = selectedIds.has(opt.id);
-              const statusLabel = isSelected && opt.isCorrect
-                ? "[SELECTED & CORRECT]"
-                : isSelected
-                  ? "[SELECTED - INCORRECT]"
-                  : opt.isCorrect
-                    ? "[CORRECT ANSWER]"
-                    : "";
-              return `${opt.text} ${statusLabel}`.trim();
-            }).join("\n");
-          }
+          optionsList.forEach((opt: { id: string; text: string; isCorrect: boolean }, oIdx: number) => {
+            const optionLetter = String.fromCharCode(65 + oIdx);
+            const correctOpt = correctOptions.find(co => co.id === opt.id || co.text === opt.text);
+            const isOptionCorrect = correctOpt ? correctOpt.isCorrect : opt.isCorrect;
+            const isSelected = selectedIds.has(opt.id);
+
+            const statusLabel = isSelected && isOptionCorrect
+              ? "[SELECTED & CORRECT]"
+              : isSelected
+                ? "[SELECTED - INCORRECT]"
+                : isOptionCorrect
+                  ? "[CORRECT ANSWER]"
+                  : "";
+
+            const rowText = `${optionLetter}. ${opt.text} ${statusLabel}`.trim();
+
+            let cellStyle = { textColor: [30, 41, 59], fontStyle: 'normal', fillColor: [255, 255, 255] };
+            if (isSelected && isOptionCorrect) {
+              cellStyle = { textColor: [16, 185, 129], fontStyle: 'bold', fillColor: [240, 253, 250] }; // matrix green bg/fg
+            } else if (isSelected) {
+              cellStyle = { textColor: [239, 68, 68], fontStyle: 'bold', fillColor: [254, 242, 242] }; // soft red bg/fg
+            } else if (isOptionCorrect) {
+              cellStyle = { textColor: [16, 185, 129], fontStyle: 'bold', fillColor: [255, 255, 255] }; // correct option marker
+            }
+
+            bodyRows.push([{ content: rowText, colSpan: 3, styles: cellStyle }]);
+          });
         }
 
         autoTable(doc, {
-        startY: idx === 0 ? (doc as JsPDFWithAutoTable).lastAutoTable.finalY + 14 : (doc as JsPDFWithAutoTable).lastAutoTable.finalY + 8,
+          pageBreak: 'avoid', // Keep entire card grouped to prevent hanging rows
+          startY: idx === 0 ? (doc as JsPDFWithAutoTable).lastAutoTable.finalY + 16 : (doc as JsPDFWithAutoTable).lastAutoTable.finalY + 12,
+          margin: { left: 14, right: 14 },
           head: [[
-            { content: `QUESTION ${idx + 1}: ${q.coding?.title || q.prompt || "Question"}`, styles: { halign: 'left', fillColor: [30, 41, 59], textColor: [255, 255, 255], fontStyle: 'bold' } },
-            { content: q.type || 'MCQ', styles: { halign: 'right', fillColor: [30, 41, 59], textColor: [255, 255, 255], fontStyle: 'bold' } }
+            { content: `Q${idx + 1}`, styles: { halign: 'center', fillColor: [30, 41, 59], textColor: [255, 255, 255], fontStyle: 'bold', lineColor: [100, 116, 139], lineWidth: 0.5 } },
+            { content: "", styles: { fillColor: [255, 255, 255], lineWidth: 0 } },
+            { content: "", styles: { fillColor: [255, 255, 255], lineWidth: 0 } }
           ]],
-          body: [
-            [{ content: `Prompt:\n${q.prompt || ""}`, colSpan: 2, styles: { textColor: [51, 65, 85], fontStyle: 'normal' } }],
-            [{ content: `Submitted Answer:\n${submissionText}`, colSpan: 2, styles: { fontStyle: isCoding ? 'normal' : 'bold', fillColor: [248, 250, 252], textColor: isCoding ? [15, 23, 42] : [79, 70, 229] } }]
-          ],
+          body: bodyRows,
           theme: 'grid',
-          styles: { fontSize: 8, cellPadding: 4.5 },
+          styles: { fontSize: 8, cellPadding: 4.5, lineColor: [100, 116, 139], lineWidth: 0.5 },
           columnStyles: {
-            0: { cellWidth: 150 },
-            1: { cellWidth: 32 }
+            0: { cellWidth: 15 }, // Q1, Q2 etc.
+            1: { cellWidth: 42 }, // Time Spent box (slightly wider to fit slant nicely)
+            2: { cellWidth: 125 } // Empty space on the right
+          },
+          didDrawCell: (data) => {
+            if (data.row.section === 'head' && data.column.index === 1) {
+              const cell = data.cell;
+              const h = cell.height;
+              
+              // Draw custom 45-degree slanted polygon using two triangles for universal jsPDF support
+              doc.setFillColor(30, 41, 59);
+              doc.setDrawColor(30, 41, 59); // Match draw color to fill color to hide diagonal seam
+              doc.triangle(cell.x, cell.y, cell.x + cell.width - h, cell.y, cell.x, cell.y + h, 'FD');
+              doc.triangle(cell.x + cell.width - h, cell.y, cell.x + cell.width, cell.y + h, cell.x, cell.y + h, 'FD');
+              
+              // Draw slate borders around the slanted cell
+              doc.setDrawColor(100, 116, 139);
+              doc.setLineWidth(0.5);
+              doc.line(cell.x, cell.y, cell.x, cell.y + h); // left vertical
+              doc.line(cell.x, cell.y + h, cell.x + cell.width, cell.y + h); // bottom horizontal
+              doc.line(cell.x, cell.y, cell.x + cell.width - h, cell.y); // top horizontal
+              doc.line(cell.x + cell.width - h, cell.y, cell.x + cell.width, cell.y + h); // slanted right edge
+              
+              // Draw text centered within the shape
+              doc.setTextColor(255, 255, 255);
+              doc.setFont("helvetica", "bold");
+              doc.setFontSize(7.5);
+              doc.text(`Time Spent: ${timeSpentText}`, cell.x + 2, cell.y + (h / 2) + 1.5);
+            }
           }
         });
       });
