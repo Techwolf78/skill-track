@@ -1,6 +1,6 @@
 import { apiClient } from "./api-client";
 import { BaseResponse } from "./auth-service";
-import { SignatureMetadata, LanguageTemplates } from "../types/question";
+import { SignatureMetadata, LanguageTemplates, mapFrontendToBackendLang } from "../types/question";
 
 export type ProctoringMode = "NONE" | "LOW" | "MEDIUM" | "HIGH" | "CUSTOM";
 
@@ -525,6 +525,15 @@ const unwrapArrayResponse = <T>(response: {
 };
 
 
+// ==================== Error Types ====================
+export class CodeExecutionTimeoutError extends Error {
+  constructor(message = "Code execution timed out. Please try running your code again.") {
+    super(message);
+    this.name = "CodeExecutionTimeoutError";
+    Object.setPrototypeOf(this, CodeExecutionTimeoutError.prototype);
+  }
+}
+
 // ==================== Service ====================
 export const testService = {
   // ==================== Subject APIs ====================
@@ -758,13 +767,51 @@ export const testService = {
 
   // ==================== Code Execution APIs ====================
   executeCode: async (request: CodeExecutionRequest): Promise<TestCaseResult[]> => {
-    const response = await apiClient.post<TestCaseResult[]>("/api/code/execute/run", request);
-    console.log(response);
-    return unwrapArrayResponse(response);
+    const payload = {
+      ...request,
+      language: mapFrontendToBackendLang(request.language),
+    };
+    const submitResponse = await apiClient.post<BaseResponse<string>>("/api/code/execute/run", payload);
+    const runGroupId = unwrapResponse(submitResponse);
+
+    const maxTimeoutMs = 30000;
+    const startTime = Date.now();
+    let currentDelay = 300;
+
+    while (Date.now() - startTime < maxTimeoutMs) {
+      await new Promise((resolve) => setTimeout(resolve, currentDelay));
+
+      const pollResponse = await apiClient.get<BaseResponse<TestCaseResult[] | null>>(
+        `/api/code/execute/run/${runGroupId}`
+      );
+
+      if (pollResponse.status === 200) {
+        const results = unwrapResponse(pollResponse);
+        if (results !== null) {
+          return results.map((tc) => ({
+            ...tc,
+            passed: tc.status === "ACCEPTED",
+          }));
+        }
+      }
+
+      if (pollResponse.status === 202) {
+        currentDelay = Math.min(currentDelay * 2, 2000);
+        continue;
+      }
+
+      throw new Error(`Unexpected polling server response: ${pollResponse.status}`);
+    }
+
+    throw new CodeExecutionTimeoutError();
   },
 
   submitCode: async (request: CodeExecutionRequest): Promise<string> => {
-    const response = await apiClient.post<string>("/api/code/execute/submit", request);
+    const payload = {
+      ...request,
+      language: mapFrontendToBackendLang(request.language),
+    };
+    const response = await apiClient.post<string>("/api/code/execute/submit", payload);
     return unwrapResponse(response);
   },
 
