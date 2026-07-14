@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { useProctoring } from "../ProctoringProvider";
+import { useProctoring } from "@/proctoring/ProctoringProvider";
 import { AlertCircle, AlertTriangle, Info } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Violation } from "../../types/proctoring.types";

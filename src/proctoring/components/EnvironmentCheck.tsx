@@ -12,7 +12,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
-import { useProctoring } from "../ProctoringProvider";
+import { useProctoring } from "@/proctoring/ProctoringProvider";
 
 interface CheckState {
   camera: "pending" | "success" | "error";

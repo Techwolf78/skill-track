@@ -65,12 +65,13 @@ async retryWithBackoff<T>(
 
   async syncToBackend(): Promise<number | null> {
     const violations = this.getAll();
-    if (violations.length === 0) return null;
+    const unsynced = violations.filter(v => !(v as any).synced);
+    if (unsynced.length === 0) return this.getScore();
     
     try {
       const response = await this.retryWithBackoff(async () => {
         return await apiClient.post(`/test-sessions/${this.sessionId}/violations/batch`, {
-          violations: violations.map(v => this.mapToBackendPayload(v)),
+          violations: unsynced.map(v => this.mapToBackendPayload(v)),
         });
       });
       const updated = violations.map(v => ({ ...v, synced: true }));

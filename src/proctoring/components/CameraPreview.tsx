@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { useProctoring } from "../ProctoringProvider";
+import { useProctoring } from "@/proctoring/ProctoringProvider";
 import { Maximize2, Minimize2, Video, VideoOff } from "lucide-react";
 import { cn } from "@/lib/utils";
 

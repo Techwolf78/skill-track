@@ -5,7 +5,6 @@ import { useCameraMonitor } from "./hooks/useCameraMonitor";
 import { useTabMonitor } from "./hooks/useTabMonitor";
 import { useDevToolsDetector } from "./hooks/useDevToolsDetector";
 import { useAudioMonitor } from "./hooks/useAudioMonitor";
-import { ObjectDetector } from "./ai/objectDetector";
 import { LLMBehaviorAnalyzer } from "./ai/llmDetector";
 import { UploadQueue } from "./uploadQueue";
 
@@ -105,7 +104,6 @@ export const ProctoringProvider: React.FC<{
   });
 
   const store = useRef(new ViolationStore(sessionId));
-  const objectDetector = useRef(new ObjectDetector());
   const behaviorAnalyzer = useRef(new LLMBehaviorAnalyzer());
   const uploadQueue = useRef(new UploadQueue(sessionId));
 
@@ -161,32 +159,7 @@ export const ProctoringProvider: React.FC<{
   useDevToolsDetector(state.isProctoringActive && config.devtools, () => addViolation("DEVTOOLS_OPEN"));
   useAudioMonitor(state.isProctoringActive && config.audio, handleViolation);
 
-  // Periodic Object Detection with Dynamic Degradation
-  useEffect(() => {
-    if (!state.isProctoringActive || !config.objectDetection || !videoRef.current) return;
-    let checkInterval = 5000;
-    let timeoutId: NodeJS.Timeout;
-    const runObjectDetection = async () => {
-      if (!state.isProctoringActive || !config.objectDetection) return;
-      if (videoRef.current) {
-        try {
-          const t0 = performance.now();
-          const suspicious = await objectDetector.current.detect(videoRef.current);
-          const duration = performance.now() - t0;
-          if (duration > 3000) checkInterval = 60000;
-          else if (duration > 1500) checkInterval = 30000;
-          else if (duration > 800) checkInterval = 15000;
-          else checkInterval = 5000;
-          if (suspicious.length > 0) addViolation("BACKGROUND_OBJECT", { objects: suspicious.map(s => s.class) });
-        } catch (e) { console.error("Object detection error:", e); }
-      }
-      if (state.isProctoringActive && config.objectDetection) {
-        timeoutId = setTimeout(runObjectDetection, checkInterval);
-      }
-    };
-    timeoutId = setTimeout(runObjectDetection, checkInterval);
-    return () => clearTimeout(timeoutId);
-  }, [state.isProctoringActive, config.objectDetection, addViolation, videoRef]);
+
 
   // Periodic behavior analysis
   useEffect(() => {
@@ -245,7 +218,6 @@ export const ProctoringProvider: React.FC<{
       violations: store.current.getAll(),
       trustScore: store.current.getScore(),
     }));
-    objectDetector.current.init();
     behaviorAnalyzer.current.init();
   }, [sessionId]);
 

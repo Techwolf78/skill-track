@@ -1,31 +1,26 @@
 import { useEffect, useRef, useState, useCallback } from "react";
-import * as faceDetection from "@tensorflow-models/face-detection";
-import "@tensorflow/tfjs-core";
+import * as tf from "@tensorflow/tfjs-core";
 import "@tensorflow/tfjs-backend-webgl";
-import "@mediapipe/face_mesh";
+import * as blazeface from "@tensorflow-models/blazeface";
 
 export function useCameraMonitor(
   isActive: boolean, 
   onViolation: (type: "MULTI_FACE" | "LOOK_AWAY", metadata: Record<string, unknown>) => void
 ) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
-  const [detector, setDetector] = useState<faceDetection.FaceDetector | null>(null);
+  const [detector, setDetector] = useState<blazeface.BlazeFaceModel | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isInitializing, setIsInitializing] = useState(false);
 
   const initDetector = useCallback(async () => {
     try {
       setIsInitializing(true);
-      const model = faceDetection.SupportedModels.MediaPipeFaceDetector;
-      const detectorConfig: faceDetection.MediaPipeFaceDetectorTfjsModelConfig = {
-        runtime: "tfjs",
-        maxFaces: 5,
-        modelType: "short"
-      };
-      const newDetector = await faceDetection.createDetector(model, detectorConfig);
+      await tf.ready();
+      await tf.setBackend("webgl");
+      const newDetector = await blazeface.load();
       setDetector(newDetector);
     } catch (err) {
-      console.error("Failed to initialize face detector:", err);
+      console.error("Failed to initialize blazeface detector:", err);
       setError("Failed to initialize face detector");
     } finally {
       setIsInitializing(false);
@@ -70,7 +65,7 @@ export function useCameraMonitor(
     let timeoutId: NodeJS.Timeout;
     let lastViolationTime = 0;
     const VIOLATION_COOLDOWN = 3000; // 3 seconds
-    let detectionInterval = 5000; // 5.0 seconds (increased from 1.5s to prevent UI lag on lower-end devices)
+    const detectionInterval = 1000; // 1.0 second (locked for high frequency/immediate results)
 
     const detect = async () => {
       if (!videoRef.current || videoRef.current.paused || videoRef.current.ended) {
@@ -79,40 +74,20 @@ export function useCameraMonitor(
       }
 
       try {
-        const t0 = performance.now();
-        const faces = await detector.estimateFaces(videoRef.current);
-        const t1 = performance.now();
-        const duration = t1 - t0;
-
-        if (duration > 3000) {
-          console.warn(`⚠️ Face detection took ${duration.toFixed(2)}ms. Critical delay, degrading interval to 30s.`);
-          detectionInterval = 30000;
-        } else if (duration > 1500) {
-          console.warn(`⚠️ Face detection took ${duration.toFixed(2)}ms. Major delay, degrading interval to 20s.`);
-          detectionInterval = 20000;
-        } else if (duration > 800) {
-          console.warn(`⚠️ Face detection took ${duration.toFixed(2)}ms. Moderate delay, degrading interval to 10s.`);
-          detectionInterval = 10000;
-        } else if (duration > 300) {
-          console.warn(`⚠️ Face detection took ${duration.toFixed(2)}ms. Slight delay, degrading interval to 4s.`);
-          detectionInterval = 4000;
-        } else {
-          detectionInterval = 5000; // Normal speed
-        }
-
+        const predictions = await detector.estimateFaces(videoRef.current, false);
         const now = Date.now();
 
         if (now - lastViolationTime > VIOLATION_COOLDOWN) {
-          if (faces.length > 1) {
-            onViolation("MULTI_FACE", { count: faces.length });
+          if (predictions.length > 1) {
+            onViolation("MULTI_FACE", { count: predictions.length });
             lastViolationTime = now;
-          } else if (faces.length === 0) {
+          } else if (predictions.length === 0) {
             onViolation("LOOK_AWAY", { message: "No face detected" });
             lastViolationTime = now;
           }
         }
       } catch (err) {
-        console.error("Face detection error:", err);
+        console.error("BlazeFace detection error:", err);
       }
 
       if (isActive) {

@@ -487,7 +487,7 @@ export default function TestAccess() {
           screenShareRequired:              test?.screenShareRequired              ?? isHigh,
           faceNotVisibleDetectionEnabled:   test?.faceNotVisibleDetectionEnabled   ?? isMedHigh,
           multipleFaceDetectionEnabled:     test?.multipleFaceDetectionEnabled     ?? isMedHigh,
-          suspiciousAudioDetectionEnabled:  test?.suspiciousAudioDetectionEnabled  ?? isLow,
+          suspiciousAudioDetectionEnabled:  test?.suspiciousAudioDetectionEnabled  ?? isHigh,
           objectDetectionEnabled:           test?.objectDetectionEnabled           ?? isMedHigh,
           devtoolsDetectionEnabled:         test?.devtoolsDetectionEnabled         ?? isHigh,
           periodicSnapshotsEnabled:         test?.periodicSnapshotsEnabled         ?? isMedHigh,

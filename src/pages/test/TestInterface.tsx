@@ -336,6 +336,23 @@ function TestInterfaceContent({ testId, sessionId, navigate, toast }: { testId?:
       const sessionResponse = await apiClient.get(`/test-sessions/${sessionId}/resume`);
       const sessionData = sessionResponse.data?.data || sessionResponse.data;
       console.log("✅ STEP 2: Session Data:", sessionData);
+
+      const hasUnsynced = AnswerStore.getOfflineQueue(sessionId).length > 0;
+
+      if (
+        sessionData.status === "SUBMITTED" ||
+        sessionData.status === "TERMINATED" ||
+        sessionData.status === "EVALUATED" ||
+        ((sessionData.status === "AUTO_SUBMITTED" || sessionData.status === "EXPIRED") && !hasUnsynced)
+      ) {
+        console.log("⚠️ Session is already completed/submitted. Redirecting to results.");
+        toast({
+          title: "Session Closed",
+          description: "This test session has already been completed.",
+        });
+        navigate(`/test/${sessionData.testId || testId}/results?session=${sessionId}`);
+        return;
+      }
       
       const normalizedSession: TestSession = {
         id: sessionData.sessionId || sessionData.id,
@@ -1805,19 +1822,21 @@ useEffect(() => {
               <AlertTriangle className="w-4 h-4 text-yellow-500" />
               Submit Test?
             </AlertDialogTitle>
-            <AlertDialogDescription className="space-y-2">
-              <p>You have answered {Object.keys(answers).length} out of {questions.length} questions.</p>
-              {Object.keys(answers).length < questions.length && (
-                <p className="text-yellow-600 font-medium">
-                  ⚠️ You have {questions.length - Object.keys(answers).length} unanswered questions.
-                </p>
-              )}
-              {flagged.size > 0 && (
-                <p className="text-yellow-600">
-                  📌 You have {flagged.size} question(s) flagged for review.
-                </p>
-              )}
-              <p className="text-sm text-muted-foreground mt-2">This action cannot be undone.</p>
+            <AlertDialogDescription className="space-y-2" asChild>
+              <div className="space-y-2 text-sm text-muted-foreground">
+                <div>You have answered {Object.keys(answers).length} out of {questions.length} questions.</div>
+                {Object.keys(answers).length < questions.length && (
+                  <div className="text-yellow-600 font-medium">
+                    ⚠️ You have {questions.length - Object.keys(answers).length} unanswered questions.
+                  </div>
+                )}
+                {flagged.size > 0 && (
+                  <div className="text-yellow-600">
+                    📌 You have {flagged.size} question(s) flagged for review.
+                  </div>
+                )}
+                <div className="mt-2">This action cannot be undone.</div>
+              </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
