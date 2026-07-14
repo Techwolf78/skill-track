@@ -1,6 +1,6 @@
 import { apiClient } from "./api-client";
 import { BaseResponse } from "./auth-service";
-import { SignatureMetadata, LanguageTemplates } from "../types/question";
+import { SignatureMetadata, LanguageTemplates, mapFrontendToBackendLang } from "../types/question";
 
 export type ProctoringMode = "NONE" | "LOW" | "MEDIUM" | "HIGH" | "CUSTOM";
 
@@ -767,7 +767,11 @@ export const testService = {
 
   // ==================== Code Execution APIs ====================
   executeCode: async (request: CodeExecutionRequest): Promise<TestCaseResult[]> => {
-    const submitResponse = await apiClient.post<BaseResponse<string>>("/api/code/execute/run", request);
+    const payload = {
+      ...request,
+      language: mapFrontendToBackendLang(request.language),
+    };
+    const submitResponse = await apiClient.post<BaseResponse<string>>("/api/code/execute/run", payload);
     const runGroupId = unwrapResponse(submitResponse);
 
     const maxTimeoutMs = 30000;
@@ -803,7 +807,11 @@ export const testService = {
   },
 
   submitCode: async (request: CodeExecutionRequest): Promise<string> => {
-    const response = await apiClient.post<string>("/api/code/execute/submit", request);
+    const payload = {
+      ...request,
+      language: mapFrontendToBackendLang(request.language),
+    };
+    const response = await apiClient.post<string>("/api/code/execute/submit", payload);
     return unwrapResponse(response);
   },
 

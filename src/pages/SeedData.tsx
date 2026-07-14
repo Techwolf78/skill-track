@@ -220,41 +220,8 @@ export default function SeedData() {
       }
       await delay(200);
 
-      // Resolve Org 2 (TechWolf Industries)
-      try {
-        const org2 = await organisationService.createOrganisation({ name: "TechWolf Industries" });
-        techWolfOrgId = org2.id;
-        addLog(`✅ Created Partner Organisation: "TechWolf Industries" [ID: ${techWolfOrgId}]`, "success");
-      } catch (e) {
-        addLog(`⚠️ TechWolf creation skipped/failed. Resolving fallback.`, "warning");
-        await delay(200);
-        try {
-          const existing = await organisationService.getOrganisations();
-          techWolfOrgId = existing.find(o => o.name.toLowerCase().includes("techwolf"))?.id || gryphonOrgId;
-          addLog(`✅ Resolved TechWolf ID: ${techWolfOrgId}`, "success");
-        } catch (err) {
-          techWolfOrgId = gryphonOrgId;
-        }
-      }
-      await delay(200);
-
-      // Resolve Org 3 (DoSelect University)
-      try {
-        const org3 = await organisationService.createOrganisation({ name: "DoSelect University" });
-        doSelectOrgId = org3.id;
-        addLog(`✅ Created Partner Organisation: "DoSelect University" [ID: ${doSelectOrgId}]`, "success");
-      } catch (e) {
-        addLog(`⚠️ DoSelect creation skipped/failed. Resolving fallback.`, "warning");
-        await delay(200);
-        try {
-          const existing = await organisationService.getOrganisations();
-          doSelectOrgId = existing.find(o => o.name.toLowerCase().includes("doselect"))?.id || gryphonOrgId;
-          addLog(`✅ Resolved DoSelect ID: ${doSelectOrgId}`, "success");
-        } catch (err) {
-          doSelectOrgId = gryphonOrgId;
-        }
-      }
-      await delay(200);
+      techWolfOrgId = gryphonOrgId;
+      doSelectOrgId = gryphonOrgId;
 
       updateStepStatus("org", "completed");
 
@@ -999,31 +966,31 @@ export default function SeedData() {
       setProgress(75);
       addLog("Seeding Test Cases for Coding Questions...", "info");
 
-      const codingTestCasesMap: Record<number, Array<{ input: string, expectedOutput: string, sample: boolean, weight: number, explanation: string }>> = {
+            const codingTestCasesMap: Record<number, Array<{ input: string, expectedOutput: string, sample: boolean, weight: number, explanation: string }>> = {
         0: [ // Two Sum
-          { input: "4\n2 7 11 15\n9", expectedOutput: "0 1", sample: true, weight: 30, explanation: "Standard positive array sum" },
-          { input: "3\n3 2 4\n6", expectedOutput: "1 2", sample: false, weight: 40, explanation: "Complement is second element" },
-          { input: "2\n3 3\n6", expectedOutput: "0 1", sample: false, weight: 30, explanation: "Elements are identical values" },
+          { input: "[[2,7,11,15],9]", expectedOutput: "[0,1]", sample: true, weight: 30, explanation: "Standard positive array sum" },
+          { input: "[[3,2,4],6]", expectedOutput: "[1,2]", sample: false, weight: 40, explanation: "Complement is second element" },
+          { input: "[[3,3],6]", expectedOutput: "[0,1]", sample: false, weight: 30, explanation: "Elements are identical values" },
         ],
         1: [ // Reverse String
-          { input: "hello", expectedOutput: "olleh", sample: true, weight: 30, explanation: "Regular word" },
-          { input: "RxOne", expectedOutput: "enOxR", sample: false, weight: 40, explanation: "Casing check" },
-          { input: "development", expectedOutput: "tnempoleved", sample: false, weight: 30, explanation: "Longer word" },
+          { input: "[[\"h\",\"e\",\"l\",\"l\",\"o\"]]", expectedOutput: "[\"o\",\"l\",\"l\",\"e\",\"h\"]", sample: true, weight: 30, explanation: "Regular word" },
+          { input: "[[\"R\",\"x\",\"O\",\"n\",\"e\"]]", expectedOutput: "[\"e\",\"n\",\"O\",\"x\",\"R\"]", sample: false, weight: 40, explanation: "Casing check" },
+          { input: "[[\"d\",\"e\",\"v\"]]", expectedOutput: "[\"v\",\"e\",\"d\"]", sample: false, weight: 30, explanation: "Short word" },
         ],
-        2: [ // Check Prime
-          { input: "7", expectedOutput: "PRIME", sample: true, weight: 30, explanation: "Basic Prime" },
-          { input: "4", expectedOutput: "NOT PRIME", sample: false, weight: 40, explanation: "Even composite number" },
-          { input: "1000000007", expectedOutput: "PRIME", sample: false, weight: 30, explanation: "Large prime integer test" },
+        2: [ // Palindrome Number
+          { input: "[121]", expectedOutput: "true", sample: true, weight: 30, explanation: "Basic Palindrome" },
+          { input: "[-121]", expectedOutput: "false", sample: false, weight: 40, explanation: "Negative number" },
+          { input: "[10]", expectedOutput: "false", sample: false, weight: 30, explanation: "Ends with zero" },
         ],
         3: [ // Valid Parentheses
-          { input: "()", expectedOutput: "VALID", sample: true, weight: 30, explanation: "Basic pair" },
-          { input: "()[]{}", expectedOutput: "VALID", sample: false, weight: 40, explanation: "Consecutive valid pairs" },
-          { input: "(]", expectedOutput: "INVALID", sample: false, weight: 30, explanation: "Mismatched pair" },
+          { input: "[\"()\"]", expectedOutput: "true", sample: true, weight: 30, explanation: "Basic pair" },
+          { input: "[\"()[]{}\"]", expectedOutput: "true", sample: false, weight: 40, explanation: "Consecutive valid pairs" },
+          { input: "[\"(]\"]", expectedOutput: "false", sample: false, weight: 30, explanation: "Mismatched pair" },
         ],
-        4: [ // Climbing Stairs
-          { input: "2", expectedOutput: "2", sample: true, weight: 30, explanation: "2 steps check" },
-          { input: "3", expectedOutput: "3", sample: false, weight: 40, explanation: "3 steps check" },
-          { input: "5", expectedOutput: "8", sample: false, weight: 30, explanation: "5 steps check" },
+        4: [ // Fibonacci Number
+          { input: "[2]", expectedOutput: "1", sample: true, weight: 30, explanation: "2 steps check" },
+          { input: "[5]", expectedOutput: "5", sample: false, weight: 40, explanation: "5 steps check" },
+          { input: "[10]", expectedOutput: "55", sample: false, weight: 30, explanation: "10 steps check" }
         ]
       };
 

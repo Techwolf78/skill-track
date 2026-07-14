@@ -72,6 +72,11 @@ describe("testService.executeCode", () => {
 
     const executePromise = testService.executeCode(payload);
 
+    expect(apiClient.post).toHaveBeenCalledWith("/api/code/execute/run", {
+      ...payload,
+      language: "python",
+    });
+
     // Initial delay is 300ms
     await vi.advanceTimersByTimeAsync(300);
     expect(apiClient.get).toHaveBeenCalledTimes(1);
