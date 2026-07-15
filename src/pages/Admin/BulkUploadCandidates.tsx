@@ -230,8 +230,7 @@ export function BulkUploadCandidates({ open, onOpenChange, onSuccess, isSuperAdm
       const err = error as { response?: { data?: { message?: string } }; message?: string };
       const errorMessage = err.response?.data?.message || err.message || "Failed to upload candidates";
       setError(errorMessage);
-      
-      toast({ title: "Upload Failed", description: errorMessage, variant: "destructive" });
+      console.error("Bulk upload failed:", errorMessage);
     } finally {
       setUploading(false);
     }

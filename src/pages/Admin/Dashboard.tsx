@@ -29,20 +29,12 @@ export default function AdminDashboard() {
     const orgId = user?.organisationData?.id;
 
     if (!orgId) {
-      toast({
-        title: "Error",
-        description: "Your account is not associated with any organization.",
-        variant: "destructive",
-      });
+      console.error("Error: Your account is not associated with any organization.");
       return;
     }
 
     if (!formData.name || !formData.email) {
-      toast({
-        title: "Validation Error",
-        description: "Full Name and Email are required fields.",
-        variant: "destructive",
-      });
+      console.error("Validation Error: Full Name and Email are required fields.");
       return;
     }
 
@@ -76,11 +68,7 @@ export default function AdminDashboard() {
       if (axios.isAxiosError(error)) {
         errorMessage = error.response?.data?.message || error.message;
       }
-      toast({
-        title: "Error",
-        description: errorMessage,
-        variant: "destructive",
-      });
+      console.error("Failed to create user:", errorMessage);
     } finally {
       setIsSubmitting(false);
     }

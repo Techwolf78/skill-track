@@ -175,11 +175,7 @@ export default function AdminQuestionBank() {
 
   const handleImportSubmit = async () => {
     if (!importJsonText.trim()) {
-      toast({
-        title: "Validation Error",
-        description: "Please enter JSON content or upload a JSON file first.",
-        variant: "destructive",
-      });
+      console.error("Validation Error: Please enter JSON content or upload a JSON file first.");
       return;
     }
 
@@ -227,11 +223,7 @@ export default function AdminQuestionBank() {
       setImportDialogOpen(false);
       setImportJsonText("");
     } catch (err: any) {
-      toast({
-        title: "Import Failed",
-        description: err.message || "Invalid JSON format or backend error.",
-        variant: "destructive",
-      });
+      console.error("Import Failed:", err.message || err);
     } finally {
       setImporting(false);
     }
@@ -283,11 +275,7 @@ export default function AdminQuestionBank() {
       });
     } catch (error) {
       const err = error as { response?: { data?: { message?: string } } } & Error;
-      toast({
-        title: "Error",
-        description: err.response?.data?.message || "Failed to delete question",
-        variant: "destructive",
-      });
+      console.error("Failed to delete question:", err.response?.data?.message || err.message || err);
     } finally {
       setDeleting(false);
       setDeleteDialogOpen(false);

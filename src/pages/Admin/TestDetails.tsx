@@ -89,11 +89,6 @@ export default function AdminTestDetails() {
       }
     } catch (error: unknown) {
       console.error("Failed to fetch test details:", error);
-      toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : "Failed to load test details",
-        variant: "destructive",
-      });
     } finally {
       setLoading(false);
     }
@@ -131,11 +126,7 @@ export default function AdminTestDetails() {
       });
       navigate("/admin/tests");
     } catch (error: unknown) {
-      toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : "Failed to duplicate test",
-        variant: "destructive",
-      });
+      console.error("Failed to duplicate test:", error);
     }
   };
 

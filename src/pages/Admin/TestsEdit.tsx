@@ -541,16 +541,7 @@ To refer to the FAQ document, you can click on the HELP button which is present 
         maxCriticalViolations: data.maxCriticalViolations || 0,
       });
     } catch (error: unknown) {
-      const errorMessage =
-        error instanceof Error
-          ? error.message
-          : "Failed to load test. Please try again.";
       console.error("Failed to fetch test:", error);
-      toast({
-        title: "Error",
-        description: errorMessage,
-        variant: "destructive",
-      });
       navigate("/admin/tests");
     } finally {
       setLoading(false);
@@ -612,20 +603,12 @@ To refer to the FAQ document, you can click on the HELP button which is present 
 
   const handleSave = async () => {
     if (!formData.title?.trim()) {
-      toast({
-        title: "Validation Error",
-        description: "Test title is required.",
-        variant: "destructive",
-      });
+      console.error("Validation Error: Test title is required.");
       return;
     }
 
     if (formData.durationMins && formData.durationMins <= 0) {
-      toast({
-        title: "Validation Error",
-        description: "Duration must be greater than 0 minutes.",
-        variant: "destructive",
-      });
+      console.error("Validation Error: Duration must be greater than 0 minutes.");
       return;
     }
 
@@ -633,11 +616,7 @@ To refer to the FAQ document, you can click on the HELP button which is present 
       formData.passMark &&
       (formData.passMark < 0 || formData.passMark > 100)
     ) {
-      toast({
-        title: "Validation Error",
-        description: "Passing mark must be between 0 and 100.",
-        variant: "destructive",
-      });
+      console.error("Validation Error: Passing mark must be between 0 and 100.");
       return;
     }
 
@@ -645,11 +624,7 @@ To refer to the FAQ document, you can click on the HELP button which is present 
       const startDate = new Date(scheduleStartTime);
       const endDate = new Date(scheduleEndTime);
       if (endDate <= startDate) {
-        toast({
-          title: "Validation Error",
-          description: "Schedule end time must be after start time.",
-          variant: "destructive",
-        });
+        console.error("Validation Error: Schedule end time must be after start time.");
         return;
       }
     }
@@ -714,12 +689,6 @@ To refer to the FAQ document, you can click on the HELP button which is present 
       navigate("/admin/tests");
     } catch (error: unknown) {
       console.error("Failed to update test:", error);
-      toast({
-        title: "Error",
-        description:
-          error instanceof Error ? error.message : "Failed to update test. Please try again.",
-        variant: "destructive",
-      });
     } finally {
       setSaving(false);
     }
@@ -728,15 +697,15 @@ To refer to the FAQ document, you can click on the HELP button which is present 
   // Save only basic info fields (title, description, duration, difficulty, passMark, status, instructions) — stays on page
   const handleSaveBasicInfo = async () => {
     if (!formData.title?.trim()) {
-      toast({ title: "Validation Error", description: "Test title is required.", variant: "destructive" });
+      console.error("Validation Error: Test title is required.");
       return;
     }
     if (formData.durationMins && formData.durationMins <= 0) {
-      toast({ title: "Validation Error", description: "Duration must be greater than 0 minutes.", variant: "destructive" });
+      console.error("Validation Error: Duration must be greater than 0 minutes.");
       return;
     }
     if (formData.passMark && (formData.passMark < 0 || formData.passMark > 100)) {
-      toast({ title: "Validation Error", description: "Passing mark must be between 0 and 100.", variant: "destructive" });
+      console.error("Validation Error: Passing mark must be between 0 and 100.");
       return;
     }
     try {
@@ -774,7 +743,7 @@ To refer to the FAQ document, you can click on the HELP button which is present 
       setTest((prev) => prev ? { ...prev, title: formData.title!, description: formData.description, durationMins: formData.durationMins!, difficulty: formData.difficulty as "EASY" | "MEDIUM" | "HARD", passMark: formData.passMark!, status: formData.status as "DRAFT" | "PUBLISHED" | "ARCHIVED", instructions: formData.instructions } : prev);
       toast({ title: "Saved", description: "Basic information saved successfully." });
     } catch (error: unknown) {
-      toast({ title: "Error", description: error instanceof Error ? error.message : "Failed to save.", variant: "destructive" });
+      console.error("Failed to save:", error);
     } finally {
       setSaving(false);
     }
@@ -839,7 +808,7 @@ To refer to the FAQ document, you can click on the HELP button which is present 
       } : prev);
       toast({ title: "Saved", description: "Proctoring settings saved successfully." });
     } catch (error: unknown) {
-      toast({ title: "Error", description: error instanceof Error ? error.message : "Failed to save proctoring.", variant: "destructive" });
+      console.error("Failed to save proctoring:", error);
     } finally {
       setSaving(false);
     }
@@ -847,22 +816,14 @@ To refer to the FAQ document, you can click on the HELP button which is present 
 
   const handleSaveSchedule = async () => {
     if (!scheduleStartTime || !scheduleEndTime) {
-      toast({
-        title: "Validation Error",
-        description: "Both start time and end time are required.",
-        variant: "destructive",
-      });
+      console.error("Validation Error: Both start time and end time are required.");
       return false;
     }
 
     const startDate = new Date(scheduleStartTime);
     const endDate = new Date(scheduleEndTime);
     if (endDate <= startDate) {
-      toast({
-        title: "Validation Error",
-        description: "Schedule end time must be after start time.",
-        variant: "destructive",
-      });
+      console.error("Validation Error: Schedule end time must be after start time.");
       return false;
     }
 
@@ -916,11 +877,6 @@ To refer to the FAQ document, you can click on the HELP button which is present 
       return true;
     } catch (error: unknown) {
       console.error("Failed to save schedule:", error);
-      toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : "Failed to save schedule. Please try again.",
-        variant: "destructive",
-      });
       return false;
     } finally {
       setSavingSchedule(false);
@@ -979,12 +935,6 @@ To refer to the FAQ document, you can click on the HELP button which is present 
       navigate("/admin/tests");
     } catch (error: unknown) {
       console.error("Failed to delete test:", error);
-      toast({
-        title: "Error",
-        description:
-          error instanceof Error ? error.message : "Failed to delete test. Please try again.",
-        variant: "destructive",
-      });
     } finally {
       setDeleting(false);
       setDeleteDialogOpen(false);
@@ -1042,12 +992,6 @@ To refer to the FAQ document, you can click on the HELP button which is present 
       }
     } catch (error: unknown) {
       console.error("Failed to remove question:", error);
-      toast({
-        title: "Error",
-        description:
-          error instanceof Error ? error.message : "Failed to remove question. Please try again.",
-        variant: "destructive",
-      });
     } finally {
       setDeletingQuestion(false);
       setDeleteQuestionDialogOpen(false);
@@ -1177,11 +1121,6 @@ To refer to the FAQ document, you can click on the HELP button which is present 
       setCandidateResults(resultsMap);
     } catch (err) {
       console.error("Failed to load report data:", err);
-      toast({
-        title: "Error",
-        description: "Failed to load report data",
-        variant: "destructive",
-      });
     } finally {
       setLoadingReports(false);
     }
@@ -1239,11 +1178,6 @@ To refer to the FAQ document, you can click on the HELP button which is present 
       }
     } catch (err) {
       console.error("Failed to load advanced report details:", err);
-      toast({
-        title: "Error",
-        description: "Failed to load detailed submissions data.",
-        variant: "destructive",
-      });
     } finally {
       setLoadingAdvancedDetails(false);
     }
@@ -1268,11 +1202,6 @@ To refer to the FAQ document, you can click on the HELP button which is present 
       document.body.removeChild(link);
     } catch (err) {
       console.error("Failed to download scorecard:", err);
-      toast({
-        title: "Download Failed",
-        description: "Failed to generate or download the scorecard.",
-        variant: "destructive",
-      });
     }
   };
 
@@ -1294,11 +1223,7 @@ To refer to the FAQ document, you can click on the HELP button which is present 
 
       const scoreData = candidateResults[getReportCandidateKey(candidate)];
       if (!scoreData?.sessionId) {
-        toast({
-          title: "Download Failed",
-          description: "No active session found to build advanced report.",
-          variant: "destructive",
-        });
+        console.error("Download Failed: No active session found to build advanced report.");
         return;
       }
 
@@ -1533,30 +1458,17 @@ To refer to the FAQ document, you can click on the HELP button which is present 
       });
     } catch (err) {
       console.error("Failed to download advanced report:", err);
-      toast({
-        title: "Download Failed",
-        description: "Failed to download advanced report details.",
-        variant: "destructive",
-      });
     }
   };
 
   const handleInvite = async () => {
     if (!selectedSchedule) {
-      toast({
-        title: "Error",
-        description: "Please create a schedule for this test first.",
-        variant: "destructive",
-      });
+      console.error("Error: Please create a schedule for this test first.");
       return;
     }
 
     if (!selectedCandidate) {
-      toast({
-        title: "Error",
-        description: "No candidate selected",
-        variant: "destructive",
-      });
+      console.error("Error: No candidate selected");
       return;
     }
 
@@ -1578,12 +1490,6 @@ To refer to the FAQ document, you can click on the HELP button which is present 
       fetchInvitationsData();
     } catch (error) {
       console.error("Failed to send invitation:", error);
-      toast({
-        title: "Error",
-        description:
-          (error as { response?: { data?: { message?: string } } }).response?.data?.message || "Failed to send invitation",
-        variant: "destructive",
-      });
     } finally {
       setInviteSubmitting(false);
     }
@@ -1591,20 +1497,12 @@ To refer to the FAQ document, you can click on the HELP button which is present 
 
   const handleBulkInvite = async () => {
     if (!selectedSchedule) {
-      toast({
-        title: "Error",
-        description: "Please create a schedule for this test first.",
-        variant: "destructive",
-      });
+      console.error("Error: Please create a schedule for this test first.");
       return;
     }
 
     if (selectedCandidates.length === 0) {
-      toast({
-        title: "Error",
-        description: "No candidates selected",
-        variant: "destructive",
-      });
+      console.error("Error: No candidates selected");
       return;
     }
 

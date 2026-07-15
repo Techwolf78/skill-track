@@ -148,20 +148,12 @@ export default function AdminTests() {
 
   const handleCreateTestSubmit = async () => {
     if (!newTestName.trim()) {
-      toast({
-        title: "Validation Error",
-        description: "Test name is required.",
-        variant: "destructive",
-      });
+      console.error("Validation Error: Test name is required.");
       return;
     }
 
     if (newTestDuration <= 0) {
-      toast({
-        title: "Validation Error",
-        description: "Duration must be greater than 0 minutes.",
-        variant: "destructive",
-      });
+      console.error("Validation Error: Duration must be greater than 0 minutes.");
       return;
     }
 
@@ -190,12 +182,7 @@ export default function AdminTests() {
       navigate(`/admin/tests/edit/${newTest.id}`);
     } catch (error) {
       const err = error as { response?: { data?: { message?: string } } } & Error;
-      console.error("Failed to create test:", err);
-      toast({
-        title: "Error",
-        description: err.response?.data?.message || "Failed to create test",
-        variant: "destructive",
-      });
+      console.error("Failed to create test:", err.response?.data?.message || err.message || err);
     } finally {
       setCreating(false);
     }
@@ -217,12 +204,7 @@ export default function AdminTests() {
       });
     } catch (error) {
       const err = error as { response?: { data?: { message?: string } } } & Error;
-      console.error("Failed to update test status:", err);
-      toast({
-        title: "Error",
-        description: err.response?.data?.message || "Failed to update test status",
-        variant: "destructive",
-      });
+      console.error("Failed to update test status:", err.response?.data?.message || err.message || err);
     }
   };
 
@@ -275,13 +257,7 @@ export default function AdminTests() {
       });
     } catch (error) {
       const err = error as { response?: { data?: { message?: string } } } & Error;
-      console.error("Failed to duplicate test:", err);
-      toast({
-        title: "Error",
-        description:
-          err.response?.data?.message || "Failed to duplicate test",
-        variant: "destructive",
-      });
+      console.error("Failed to duplicate test:", err.response?.data?.message || err.message || err);
     }
   };
 
@@ -295,12 +271,7 @@ export default function AdminTests() {
         });
       } catch (error) {
         const err = error as { response?: { data?: { message?: string } } } & Error;
-        console.error("Failed to delete test:", err);
-        toast({
-          title: "Error",
-          description: err.response?.data?.message || "Failed to delete test",
-          variant: "destructive",
-        });
+        console.error("Failed to delete test:", err.response?.data?.message || err.message || err);
       }
     }
   };

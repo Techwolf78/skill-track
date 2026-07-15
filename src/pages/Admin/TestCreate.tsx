@@ -213,20 +213,12 @@ export default function AdminTestCreate() {
   const createTestAndContinue = async () => {
     const status = "PUBLISHED";
     if (!validateForm()) {
-      toast({
-        title: "Validation Error",
-        description: "Please fix the errors before publishing",
-        variant: "destructive",
-      });
+      console.error("Validation Error: Please fix the errors before publishing");
       return;
     }
 
     if (!formData.title?.trim()) {
-      toast({
-        title: "Validation Error",
-        description: "Test title is required",
-        variant: "destructive",
-      });
+      console.error("Validation Error: Test title is required");
       return;
     }
 
@@ -290,11 +282,7 @@ export default function AdminTestCreate() {
       navigate(`/admin/tests/${testId}/questions`);
     } catch (error: unknown) {
       const err = error as Error;
-      toast({
-        title: "Error",
-        description: err.message || "Failed to create test",
-        variant: "destructive",
-      });
+      console.error("Failed to create test:", err.message || err);
     } finally {
       setLoading(false);
     }

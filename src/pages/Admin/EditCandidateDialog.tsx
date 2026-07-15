@@ -76,12 +76,12 @@ export function EditCandidateDialog({ open, onOpenChange, candidate, onSuccess, 
 
   const handleSubmit = async () => {
     if (!formData.name.trim()) {
-      toast({ title: "Error", description: "Name is required", variant: "destructive" });
+      console.error("Validation Error: Name is required");
       return;
     }
 
     if (isSuperAdmin && !formData.organisationId) {
-      toast({ title: "Error", description: "Organisation is required", variant: "destructive" });
+      console.error("Validation Error: Organisation is required");
       return;
     }
 
@@ -120,12 +120,7 @@ export function EditCandidateDialog({ open, onOpenChange, candidate, onSuccess, 
       onSuccess();
       onOpenChange(false);
     } catch (error) {
-      console.error("Failed to update candidate:", error);
-      toast({
-        title: "Error",
-        description: (error as { response?: { data?: { message?: string } } }).response?.data?.message || "Failed to update candidate",
-        variant: "destructive",
-      });
+      console.error("Failed to update candidate:", (error as { response?: { data?: { message?: string } } }).response?.data?.message || error);
     } finally {
       setLoading(false);
     }

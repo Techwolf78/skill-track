@@ -313,7 +313,7 @@ export default function AdminCandidates() {
   const handleAddCandidate = async () => {
     setEmailError(null);
     if (!formData.name.trim()) {
-      toast({ title: "Validation Error", description: "Name is required", variant: "destructive" });
+      console.error("Validation Error: Name is required");
       return;
     }
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -322,14 +322,14 @@ export default function AdminCandidates() {
       return;
     }
     if (!formData.password.trim() || formData.password.length < 8) {
-      toast({ title: "Validation Error", description: "Password must be at least 8 characters", variant: "destructive" });
+      console.error("Validation Error: Password must be at least 8 characters");
       return;
     }
     if (!formData.organisationId && orgId) {
       formData.organisationId = orgId;
     }
     if (!formData.organisationId) {
-      toast({ title: "Validation Error", description: "Organisation ID is missing", variant: "destructive" });
+      console.error("Validation Error: Organisation ID is missing");
       return;
     }
 
@@ -353,11 +353,7 @@ export default function AdminCandidates() {
       });
     } catch (error) {
       const err = error as { response?: { data?: { message?: string } } };
-      toast({ 
-        title: "Error", 
-        description: err.response?.data?.message || "Failed to add candidate", 
-        variant: "destructive" 
-      });
+      console.error("Failed to add candidate:", err.response?.data?.message || err);
     } finally {
       setSubmitting(false);
     }
@@ -372,11 +368,7 @@ export default function AdminCandidates() {
       setIsDeleteDialogOpen(false);
     } catch (error) {
       const err = error as { response?: { data?: { message?: string } } };
-      toast({ 
-        title: "Delete Failed", 
-        description: err.response?.data?.message || "Failed to delete candidate. This action is restricted by the backend (e.g. if the candidate has active test sessions, submissions, or invitations).", 
-        variant: "destructive" 
-      });
+      console.error("Failed to delete candidate:", err.response?.data?.message || err);
     } finally {
       setDeleting(false);
     }
