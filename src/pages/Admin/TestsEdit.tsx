@@ -240,13 +240,15 @@ const getProctoringPreset = (mode: ProctoringMode) => {
   return defaults;
 };
 
-const DEFAULT_TEST_INSTRUCTIONS = `This is an online test.
-Please make sure that you are using the latest version of the browser. We recommend using Google Chrome.
-It's mandatory to disable all the browser extensions and enabled Add-ons or open the assessment in incognito mode.
-If you are solving a coding problem, you will either be required to choose a programming language from the options that have been enabled by the administrator or choose your preferred programming language in case no options have been enabled by the administrator. Note: In case you're solving coding problems: All inputs are from STDIN and output to STDOUT.
- If test mandates you to use the webcam, please provide the required permissions and access.
-To know the results, please contact the administrator.
-To refer to the FAQ document, you can click on the HELP button which is present in the top right corner of the test environment.`;
+const DEFAULT_TEST_INSTRUCTIONS = `1. This is an online test.
+2. Please make sure that you are using the latest version of the browser. We recommend using Google Chrome.
+3. It's mandatory to disable all the browser extensions and enabled Add-ons or open the assessment in incognito mode.
+4. If you are solving a coding problem, you will either be required to choose a programming language from the options that have been enabled by the administrator or choose your preferred programming language in case no options have been enabled by the administrator. Note: In case you're solving coding problems: All inputs are from STDIN and output to STDOUT.
+5. If test mandates you to use the webcam, please provide the required permissions and access.
+6. To know the results, please contact the administrator.
+7. To refer to the FAQ document, you can click on the HELP button which is present in the top right corner of the test environment.
+
+Best wishes for your assessment!`;
 
 export default function AdminTestsEdit() {
   const { id } = useParams<{ id: string }>();
@@ -502,9 +504,21 @@ export default function AdminTestsEdit() {
         difficulty: data.difficulty,
         passMark: data.passMark,
         status: data.status,
-        instructions: data.instructions?.general ? data.instructions : {
-          general: DEFAULT_TEST_INSTRUCTIONS
-        },
+        instructions: (() => {
+          const general = (data.instructions?.general as string || "").trim();
+          const oldDefaultTrimmed = `This is an online test.
+Please make sure that you are using the latest version of the browser. We recommend using Google Chrome.
+It's mandatory to disable all the browser extensions and enabled Add-ons or open the assessment in incognito mode.
+If you are solving a coding problem, you will either be required to choose a programming language from the options that have been enabled by the administrator or choose your preferred programming language in case no options have been enabled by the administrator. Note: In case you're solving coding problems: All inputs are from STDIN and output to STDOUT.
+ If test mandates you to use the webcam, please provide the required permissions and access.
+To know the results, please contact the administrator.
+To refer to the FAQ document, you can click on the HELP button which is present in the top right corner of the test environment.`.trim();
+
+          if (!general || general === oldDefaultTrimmed) {
+            return { general: DEFAULT_TEST_INSTRUCTIONS };
+          }
+          return data.instructions;
+        })(),
         proctoringMode: data.proctoringMode || "NONE",
         enableTabSwitchTracking: data.enableTabSwitchTracking || false,
         blockCopyPaste: data.blockCopyPaste || false,

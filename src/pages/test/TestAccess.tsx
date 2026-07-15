@@ -59,6 +59,7 @@ interface TestData {
   endTime: string;
   token: string;
   proctoring: ProctoringFlags;
+  instructions?: Record<string, unknown>;
 }
 
 interface CandidateInvitation {
@@ -497,6 +498,7 @@ export default function TestAccess() {
           maxWarningsAllowed:               test?.maxWarningsAllowed               ?? (mode === "NONE" ? 0 : 3),
           maxCriticalViolationsAllowed:     test?.maxCriticalViolationsAllowed     ?? (isHigh ? 1 : 2),
         },
+        instructions: test?.instructions,
       });
 
       setError(null);
@@ -955,31 +957,35 @@ export default function TestAccess() {
             <div className="flex-1 py-4 animate-in fade-in duration-300">
               
               {currentStep === "welcome" && (
-                <div className="space-y-4">
+                <div className="space-y-6">
                   <div className="flex items-center gap-3">
                     <h3 className="text-xl font-bold">Assessment Guidelines Overview</h3>
-                    <ProctoringBadge mode={testData.proctoring.proctoringMode} />
                   </div>
-                  <p className="text-sm text-muted-foreground leading-relaxed">
-                    You have been invited to take the <strong>{testData.testTitle}</strong>.
-                    This test is conducted in a secure browser environment using automated monitoring utilities.
-                    Please ensure you are in a quiet, private space with a stable internet connection.
-                  </p>
 
-                  <div className="bg-muted/30 border rounded-xl p-4 space-y-3">
-                    <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">What to expect during onboarding:</h4>
-                    <ul className="text-xs space-y-2 text-muted-foreground list-disc list-inside">
-                      {testData.proctoring.proctoringMode === "NONE" ? (
-                        <li>This assessment runs without proctoring. No hardware permissions will be requested.</li>
-                      ) : (
-                        <>
-                          {testData.proctoring.webcamRequired ? <li>We will request webcam access for identity verification.</li> : null}
-                          {testData.proctoring.microphoneRequired ? <li>Microphone access is required for audio monitoring.</li> : null}
-                          {testData.proctoring.screenShareRequired ? <li>You must share your entire screen for the duration of the test.</li> : null}
-                          <li>Once checked, you will declare consent and launch the test in fullscreen.</li>
-                        </>
-                      )}
-                    </ul>
+                  <div className="text-sm md:text-base leading-relaxed text-muted-foreground whitespace-pre-line font-sans max-h-[450px] overflow-y-auto pr-2 bg-muted/20 border rounded-xl p-5 shadow-sm">
+                    {(() => {
+                      const general = ((testData.instructions as Record<string, unknown> | undefined)?.general as string || "").trim();
+                      const oldDefaultTrimmed = `This is an online test.
+Please make sure that you are using the latest version of the browser. We recommend using Google Chrome.
+It's mandatory to disable all the browser extensions and enabled Add-ons or open the assessment in incognito mode.
+If you are solving a coding problem, you will either be required to choose a programming language from the options that have been enabled by the administrator or choose your preferred programming language in case no options have been enabled by the administrator. Note: In case you're solving coding problems: All inputs are from STDIN and output to STDOUT.
+ If test mandates you to use the webcam, please provide the required permissions and access.
+To know the results, please contact the administrator.
+To refer to the FAQ document, you can click on the HELP button which is present in the top right corner of the test environment.`.trim();
+
+                      if (!general || general === oldDefaultTrimmed) {
+                        return `1. This is an online test.
+2. Please make sure that you are using the latest version of the browser. We recommend using Google Chrome.
+3. It's mandatory to disable all the browser extensions and enabled Add-ons or open the assessment in incognito mode.
+4. If you are solving a coding problem, you will either be required to choose a programming language from the options that have been enabled by the administrator or choose your preferred programming language in case no options have been enabled by the administrator. Note: In case you're solving coding problems: All inputs are from STDIN and output to STDOUT.
+5. If test mandates you to use the webcam, please provide the required permissions and access.
+6. To know the results, please contact the administrator.
+7. To refer to the FAQ document, you can click on the HELP button which is present in the top right corner of the test environment.
+
+Best wishes for your assessment!`;
+                      }
+                      return ((testData.instructions as Record<string, unknown> | undefined)?.general as string);
+                    })()}
                   </div>
 
                   <Button
