@@ -267,7 +267,7 @@ export default function QuickManageSubjects({
               </Button>
             </form>
 
-            <ScrollArea className="flex-1 border rounded-md p-4 bg-muted/20">
+            <ScrollArea className="h-[350px] border rounded-md p-4 bg-muted/20">
               {subjectsLoading ? (
                 <div className="flex items-center justify-center py-8">
                   <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
@@ -387,7 +387,7 @@ export default function QuickManageSubjects({
               </Button>
             </form>
 
-            <ScrollArea className="flex-1 border rounded-md p-4 bg-muted/20">
+            <ScrollArea className="h-[350px] border rounded-md p-4 bg-muted/20">
               {!selectedSubjectId ? (
                 <div className="text-center py-8 text-sm text-muted-foreground">
                   Please select a subject to view and manage topics.
@@ -531,7 +531,7 @@ export default function QuickManageSubjects({
               </Button>
             </form>
 
-            <ScrollArea className="flex-1 border rounded-md p-4 bg-muted/20">
+            <ScrollArea className="h-[350px] border rounded-md p-4 bg-muted/20">
               {!selectedTopicId ? (
                 <div className="text-center py-8 text-sm text-muted-foreground">
                   Please select a topic to view and manage subtopics.
