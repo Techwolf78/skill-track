@@ -176,10 +176,12 @@ export default function AdminTestCreate() {
   };
 
   const handleNumberChange = (name: string, value: string) => {
-    const numValue = parseInt(value, 10);
+    const cleanValue = value.replace(/\D/g, "");
+    const finalValue = cleanValue === "0" ? "0" : cleanValue.replace(/^0+/, "");
+    const numValue = parseInt(finalValue, 10);
     setFormData((prev) => ({
       ...prev,
-      [name]: isNaN(numValue) ? 0 : numValue,
+      [name]: isNaN(numValue) ? "" : numValue,
     }));
     if (errors[name]) {
       setErrors((prev) => ({ ...prev, [name]: "" }));
@@ -365,7 +367,9 @@ export default function AdminTestCreate() {
                   <Label htmlFor="durationMins">Duration (Mins)</Label>
                   <Input
                     id="durationMins"
-                    type="number"
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
                     value={formData.durationMins}
                     onChange={(e) => handleNumberChange("durationMins", e.target.value)}
                   />
@@ -395,7 +399,9 @@ export default function AdminTestCreate() {
                   <Label htmlFor="passMark">Pass Mark (%)</Label>
                   <Input
                     id="passMark"
-                    type="number"
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
                     value={formData.passMark}
                     onChange={(e) => handleNumberChange("passMark", e.target.value)}
                   />
@@ -515,19 +521,7 @@ export default function AdminTestCreate() {
                       </div>
                     </div>
 
-                    <div className="space-y-2 max-w-xs">
-                      <Label htmlFor="maxWarnings">Max warnings allowed</Label>
-                      <Input
-                        id="maxWarnings"
-                        type="number"
-                        value={formData.maxWarnings}
-                        onChange={(e) =>
-                          handleNumberChange("maxWarnings", e.target.value)
-                        }
-                        disabled={formData.proctoringMode !== "CUSTOM"}
-                        min="0"
-                      />
-                    </div>
+
                   </div>
 
                   {/* Category 2: Webcam & Audio Monitoring */}
@@ -607,22 +601,7 @@ export default function AdminTestCreate() {
                           </Label>
                         </div>
 
-                        <div className="flex items-center space-x-2">
-                          <Checkbox
-                            id="detectObjects"
-                            checked={formData.detectObjects}
-                            onCheckedChange={(checked) =>
-                              handleCheckboxChange("detectObjects", !!checked)
-                            }
-                            disabled={formData.proctoringMode !== "CUSTOM"}
-                          />
-                          <Label
-                            htmlFor="detectObjects"
-                            className="text-sm font-normal cursor-pointer"
-                          >
-                            Detect objects (phone/book/etc.)
-                          </Label>
-                        </div>
+
 
                         <div className="flex items-center space-x-2">
                           <Checkbox
@@ -754,45 +733,10 @@ export default function AdminTestCreate() {
                           </Label>
                         </div>
 
-                        <div className="flex items-center space-x-2">
-                          <Checkbox
-                            id="autoSubmitOnCriticalViolations"
-                            checked={formData.autoSubmitOnCriticalViolations}
-                            onCheckedChange={(checked) =>
-                              handleCheckboxChange(
-                                "autoSubmitOnCriticalViolations",
-                                !!checked
-                              )
-                            }
-                            disabled={formData.proctoringMode !== "CUSTOM"}
-                          />
-                          <Label
-                            htmlFor="autoSubmitOnCriticalViolations"
-                            className="text-sm font-normal cursor-pointer"
-                          >
-                            Auto-submit after critical violations
-                          </Label>
-                        </div>
+
                       </div>
 
-                      <div className="space-y-2 max-w-xs">
-                        <Label htmlFor="maxCriticalViolations">
-                          Max critical violations allowed
-                        </Label>
-                        <Input
-                          id="maxCriticalViolations"
-                          type="number"
-                          value={formData.maxCriticalViolations}
-                          onChange={(e) =>
-                            handleNumberChange(
-                              "maxCriticalViolations",
-                              e.target.value
-                            )
-                          }
-                          disabled={formData.proctoringMode !== "CUSTOM"}
-                          min="0"
-                        />
-                      </div>
+
                     </div>
                   )}
                 </div>

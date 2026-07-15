@@ -13,22 +13,25 @@ export const ViolationToast: React.FC = () => {
     if (violations.length > 0) {
       const newViolation = violations[violations.length - 1];
       
-      // Add new violation to display list
-      setActiveViolations(prev => {
-        // Keep only unique violations and limit to last 3 active
-        const exists = prev.find(v => v.id === newViolation.id);
-        if (exists) return prev;
-        return [...prev, newViolation].slice(-3);
-      });
+      // Only show toast if this is the absolute first occurrence of this violation type
+      const firstIndexOfType = violations.findIndex(v => v.type === newViolation.type);
+      const isFirstOccurrence = violations[firstIndexOfType]?.id === newViolation.id;
 
-      // Remove after 6 seconds
-      const timer = setTimeout(() => {
-        setActiveViolations(prev => prev.filter(v => v.id !== newViolation.id));
-      }, 6000);
-
-      return () => clearTimeout(timer);
+      if (isFirstOccurrence) {
+        // Add new violation to display list
+        setActiveViolations(prev => {
+          // Keep only unique violations and limit to last 3 active
+          const exists = prev.find(v => v.id === newViolation.id);
+          if (exists) return prev;
+          return [...prev, newViolation].slice(-3);
+        });
+      }
     }
   }, [violations]);
+
+  const handleDismiss = (id: string) => {
+    setActiveViolations(prev => prev.filter(v => v.id !== id));
+  };
   
   if (activeViolations.length === 0) return null;
 
@@ -43,7 +46,7 @@ export const ViolationToast: React.FC = () => {
             exit={{ opacity: 0, x: 20, scale: 0.9, transition: { duration: 0.2 } }}
             layout
           >
-            <ViolationItem violation={violation} />
+            <ViolationItem violation={violation} onDismiss={() => handleDismiss(violation.id)} />
           </motion.div>
         ))}
       </AnimatePresence>
@@ -51,7 +54,14 @@ export const ViolationToast: React.FC = () => {
   );
 };
 
-const ViolationItem: React.FC<{ violation: Violation }> = ({ violation }) => {
+const ViolationItem: React.FC<{ violation: Violation; onDismiss: () => void }> = ({ violation, onDismiss }) => {
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      onDismiss();
+    }, 6000);
+    return () => clearTimeout(timer);
+  }, [onDismiss]);
+
   const severityColors = {
     LOW: "border-blue-500 bg-blue-50 text-blue-900 dark:bg-blue-950 dark:text-blue-100",
     MEDIUM: "border-yellow-500 bg-yellow-50 text-yellow-900 dark:bg-yellow-950 dark:text-yellow-100",
@@ -68,7 +78,7 @@ const ViolationItem: React.FC<{ violation: Violation }> = ({ violation }) => {
 
   return (
     <div className={cn(
-      "flex items-start gap-2 p-2.5 rounded-md border shadow-md",
+      "flex items-start gap-2 p-2.5 rounded-md border shadow-md pointer-events-auto",
       severityColors[violation.severity]
     )}>
       <div className="mt-0.5">

@@ -442,8 +442,7 @@ export default function TestAccess() {
       const testId = invitation?.testId || schedule?.testId || decoded?.testId || decoded?.test_id;
       if (testId) {
         try {
-          const testResponse = await apiClient.get(`/tests/${testId}`);
-          test = testResponse.data?.data || testResponse.data;
+          test = await testService.getTestById(testId);
         } catch (testErr) {
           console.warn("Failed to fetch test details, continuing with defaults:", testErr);
         }
@@ -463,9 +462,9 @@ export default function TestAccess() {
 
       // For each flag: use the actual backend value if it came back (non-null), otherwise
       // derive a safe default from the resolved mode so NONE = everything off.
-      const isLow     = mode === "LOW" || mode === "MEDIUM" || mode === "HIGH" || mode === "CUSTOM";
-      const isMedHigh = mode === "MEDIUM" || mode === "HIGH" || mode === "CUSTOM";
-      const isHigh    = mode === "HIGH" || mode === "CUSTOM";
+      const isLow     = mode === "LOW" || mode === "MEDIUM" || mode === "HIGH";
+      const isMedHigh = mode === "MEDIUM" || mode === "HIGH";
+      const isHigh    = mode === "HIGH";
 
       setTestData({
         valid: true,
@@ -479,24 +478,24 @@ export default function TestAccess() {
         token: token,
         proctoring: {
           proctoringMode: mode,
-          tabSwitchTrackingEnabled:         test?.tabSwitchTrackingEnabled         ?? isLow,
-          copyPasteBlocked:                 test?.copyPasteBlocked                 ?? isLow,
-          rightClickBlocked:                test?.rightClickBlocked                ?? false,
-          fullscreenExitTrackingEnabled:    test?.fullscreenExitTrackingEnabled    ?? isLow,
-          webcamRequired:                   test?.webcamRequired                   ?? isMedHigh,
-          microphoneRequired:               test?.microphoneRequired               ?? isHigh,
-          screenShareRequired:              test?.screenShareRequired              ?? isHigh,
-          faceNotVisibleDetectionEnabled:   test?.faceNotVisibleDetectionEnabled   ?? isMedHigh,
-          multipleFaceDetectionEnabled:     test?.multipleFaceDetectionEnabled     ?? isMedHigh,
-          suspiciousAudioDetectionEnabled:  test?.suspiciousAudioDetectionEnabled  ?? isHigh,
-          objectDetectionEnabled:           test?.objectDetectionEnabled           ?? isMedHigh,
-          devtoolsDetectionEnabled:         test?.devtoolsDetectionEnabled         ?? isHigh,
-          periodicSnapshotsEnabled:         test?.periodicSnapshotsEnabled         ?? isMedHigh,
-          evidenceCaptureEnabled:           test?.evidenceCaptureEnabled           ?? isMedHigh,
-          liveProctoringEnabled:            test?.liveProctoringEnabled            ?? isMedHigh,
-          autoSubmitOnCriticalViolation:    test?.autoSubmitOnCriticalViolation    ?? isLow,
-          maxWarningsAllowed:               test?.maxWarningsAllowed               ?? (mode === "NONE" ? 0 : 3),
-          maxCriticalViolationsAllowed:     test?.maxCriticalViolationsAllowed     ?? (isHigh ? 1 : 2),
+          tabSwitchTrackingEnabled:         test?.enableTabSwitchTracking         ?? isLow,
+          copyPasteBlocked:                 test?.blockCopyPaste                 ?? isLow,
+          rightClickBlocked:                test?.blockRightClick                ?? false,
+          fullscreenExitTrackingEnabled:    test?.warnOnFullscreenExit    ?? isLow,
+          webcamRequired:                   test?.requireWebcam                   ?? isMedHigh,
+          microphoneRequired:               test?.requireMicrophone               ?? isHigh,
+          screenShareRequired:              test?.requireScreenShare              ?? isHigh,
+          faceNotVisibleDetectionEnabled:   test?.detectFaceNotVisible   ?? isMedHigh,
+          multipleFaceDetectionEnabled:     test?.detectMultipleFaces     ?? isMedHigh,
+          suspiciousAudioDetectionEnabled:  test?.detectSuspiciousAudio  ?? isHigh,
+          objectDetectionEnabled:           false, // Removed object detection
+          devtoolsDetectionEnabled:         test?.detectDevTools         ?? isHigh,
+          periodicSnapshotsEnabled:         test?.periodicSnapshots         ?? isMedHigh,
+          evidenceCaptureEnabled:           test?.evidenceCapture           ?? isMedHigh,
+          liveProctoringEnabled:            test?.enableLiveProctoring            ?? isMedHigh,
+          autoSubmitOnCriticalViolation:    false, // Disabled auto submit
+          maxWarningsAllowed:               test?.maxWarnings               ?? (mode === "NONE" ? 0 : 3),
+          maxCriticalViolationsAllowed:     test?.maxCriticalViolations     ?? (isHigh ? 1 : 2),
         },
         instructions: test?.instructions,
       });
@@ -1266,13 +1265,11 @@ Best wishes for your assessment!`;
                     {testData.proctoring.microphoneRequired ? <RuleBadge icon={<Mic className="w-3.5 h-3.5" />} text="Microphone Monitoring" active /> : null}
                     {testData.proctoring.screenShareRequired ? <RuleBadge icon={<Monitor className="w-3.5 h-3.5" />} text="Screen Share Required" active /> : null}
                     {testData.proctoring.multipleFaceDetectionEnabled ? <RuleBadge icon={<UserCheck className="w-3.5 h-3.5" />} text="Multiple Face Detection" active /> : null}
-                    {testData.proctoring.objectDetectionEnabled ? <RuleBadge icon={<Search className="w-3.5 h-3.5" />} text="Object Detection (AI)" active /> : null}
                     {testData.proctoring.devtoolsDetectionEnabled ? <RuleBadge icon={<Shield className="w-3.5 h-3.5" />} text="DevTools Detection" active /> : null}
                     {testData.proctoring.proctoringMode === "NONE" && (
                       <p className="text-[10px] text-muted-foreground italic">No monitoring active for this assessment.</p>
                     )}
                   </div>
-                  <p className="text-[10px] text-muted-foreground pt-1">Max warnings: <strong>{testData.proctoring.maxWarningsAllowed}</strong></p>
                 </div>
               </CardContent>
               <CardFooter className="bg-muted/20 border-t py-4 text-center">

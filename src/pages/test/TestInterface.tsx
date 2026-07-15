@@ -215,6 +215,7 @@ export default function TestInterface() {
 function TestInterfaceContent({ testId, sessionId, navigate, toast }: { testId?: string; sessionId?: string; navigate: (path: string) => void; toast: (props: { title?: string; description?: string; variant?: "default" | "destructive" }) => void }) {
   const { violations, trustScore, isProctoringActive, startProctoring, syncViolations, flushEvidence, videoRef } = useProctoring();
   const lastWarnedCountRef = useRef(0);
+  const hasWarnedFullscreenRef = useRef(false);
 
   const [saveStatus, setSaveStatus] = useState<"Saving..." | "Saved" | "Offline" | "Failed">("Saved");
   const saveVersionsRef = useRef<Record<string, number>>({});
@@ -759,7 +760,8 @@ useEffect(() => {
   useEffect(() => {
     let timer: NodeJS.Timeout;
     if (isProctoringActive && !isFullscreen) {
-      if (fullscreenTimer === 10) {
+      if (fullscreenTimer === 10 && !hasWarnedFullscreenRef.current) {
+        hasWarnedFullscreenRef.current = true;
         toast({
           title: "Fullscreen Required",
           description: "Please return to fullscreen mode immediately.",
@@ -770,7 +772,7 @@ useEffect(() => {
         setFullscreenTimer(prev => {
           if (prev <= 1) {
             clearInterval(timer);
-            handleAutoSubmit(); // Auto-submit if timer hits 0
+            // Stopped auto-submit from proctoring violations
             return 0;
           }
           return prev - 1;
@@ -780,7 +782,7 @@ useEffect(() => {
       setFullscreenTimer(10);
     }
     return () => clearInterval(timer);
-  }, [isProctoringActive, isFullscreen, toast, handleAutoSubmit, fullscreenTimer]);
+  }, [isProctoringActive, isFullscreen, toast, fullscreenTimer]);
 
   // Feature 1: Clipboard & Keyboard Interception
   useEffect(() => {
@@ -912,22 +914,16 @@ useEffect(() => {
 
     if (count > lastWarnedCountRef.current) {
       lastWarnedCountRef.current = count;
-      if (count >= 3) {
-        toast({
-          title: "Test Auto-Submitted",
-          description: "You have exceeded the maximum of 3 allowed tab switches.",
-          variant: "destructive"
-        });
-        submitTest();
-      } else {
+      // Only show toast warning for the absolute first tab switch violation
+      if (count === 1) {
         toast({
           title: "Security Violation",
-          description: `Warning: Tab switch detected (${count}/3). Reaching 3 switches will auto-submit your test.`,
+          description: "Warning: Tab switch detected. Please focus on the test.",
           variant: "destructive"
         });
       }
     }
-  }, [violations, isProctoringActive, submitTest, toast]);
+  }, [violations, isProctoringActive, toast]);
 
   // Timer effect
   useEffect(() => {
@@ -1377,15 +1373,12 @@ useEffect(() => {
             </div>
             <h2 className="text-2xl font-bold mb-2">FULLSCREEN EXITED</h2>
             <p className="text-muted-foreground mb-6 text-sm">
-              You must be in fullscreen mode to continue the test. The test will be auto-submitted in:
+              You must be in fullscreen mode to continue the test. Please return to fullscreen to resume.
             </p>
-            <div className="text-6xl font-black text-destructive mb-8 tabular-nums">
-              {fullscreenTimer}s
-            </div>
             <Button 
               size="lg" 
               variant="destructive" 
-              className="w-full h-14 text-xl font-bold shadow-lg hover:shadow-destructive/20 transition-all hover:scale-105"
+              className="w-full h-14 text-xl font-bold shadow-lg hover:shadow-destructive/20 transition-all hover:scale-105 mb-4"
               onClick={enterFullscreen}
             >
               Go Fullscreen Now

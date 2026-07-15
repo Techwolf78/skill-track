@@ -520,25 +520,25 @@ To refer to the FAQ document, you can click on the HELP button which is present 
           return data.instructions;
         })(),
         proctoringMode: data.proctoringMode || "NONE",
-        enableTabSwitchTracking: data.enableTabSwitchTracking || false,
-        blockCopyPaste: data.blockCopyPaste || false,
-        blockRightClick: data.blockRightClick || false,
-        warnOnFullscreenExit: data.warnOnFullscreenExit || false,
-        maxWarnings: data.maxWarnings || 0,
-        requireWebcam: data.requireWebcam || false,
-        detectFaceNotVisible: data.detectFaceNotVisible || false,
-        detectMultipleFaces: data.detectMultipleFaces || false,
-        detectSuspiciousAudio: data.detectSuspiciousAudio || false,
-        detectObjects: data.detectObjects || false,
-        periodicSnapshots: data.periodicSnapshots || false,
-        evidenceCapture: data.evidenceCapture || false,
-        requireMicrophone: data.requireMicrophone || false,
-        requireScreenShare: data.requireScreenShare || false,
-        detectDevTools: data.detectDevTools || false,
-        detectScreenShareStop: data.detectScreenShareStop || false,
-        enableLiveProctoring: data.enableLiveProctoring || false,
-        autoSubmitOnCriticalViolations: data.autoSubmitOnCriticalViolations || false,
-        maxCriticalViolations: data.maxCriticalViolations || 0,
+        enableTabSwitchTracking: (data.proctoringMode || "NONE") === "CUSTOM" ? (data.enableTabSwitchTracking || false) : getProctoringPreset(data.proctoringMode || "NONE").enableTabSwitchTracking,
+        blockCopyPaste: (data.proctoringMode || "NONE") === "CUSTOM" ? (data.blockCopyPaste || false) : getProctoringPreset(data.proctoringMode || "NONE").blockCopyPaste,
+        blockRightClick: (data.proctoringMode || "NONE") === "CUSTOM" ? (data.blockRightClick || false) : getProctoringPreset(data.proctoringMode || "NONE").blockRightClick,
+        warnOnFullscreenExit: (data.proctoringMode || "NONE") === "CUSTOM" ? (data.warnOnFullscreenExit || false) : getProctoringPreset(data.proctoringMode || "NONE").warnOnFullscreenExit,
+        maxWarnings: (data.proctoringMode || "NONE") === "CUSTOM" ? (data.maxWarnings || 0) : getProctoringPreset(data.proctoringMode || "NONE").maxWarnings,
+        requireWebcam: (data.proctoringMode || "NONE") === "CUSTOM" ? (data.requireWebcam || false) : getProctoringPreset(data.proctoringMode || "NONE").requireWebcam,
+        detectFaceNotVisible: (data.proctoringMode || "NONE") === "CUSTOM" ? (data.detectFaceNotVisible || false) : getProctoringPreset(data.proctoringMode || "NONE").detectFaceNotVisible,
+        detectMultipleFaces: (data.proctoringMode || "NONE") === "CUSTOM" ? (data.detectMultipleFaces || false) : getProctoringPreset(data.proctoringMode || "NONE").detectMultipleFaces,
+        detectSuspiciousAudio: (data.proctoringMode || "NONE") === "CUSTOM" ? (data.detectSuspiciousAudio || false) : getProctoringPreset(data.proctoringMode || "NONE").detectSuspiciousAudio,
+        detectObjects: (data.proctoringMode || "NONE") === "CUSTOM" ? (data.detectObjects || false) : getProctoringPreset(data.proctoringMode || "NONE").detectObjects,
+        periodicSnapshots: (data.proctoringMode || "NONE") === "CUSTOM" ? (data.periodicSnapshots || false) : getProctoringPreset(data.proctoringMode || "NONE").periodicSnapshots,
+        evidenceCapture: (data.proctoringMode || "NONE") === "CUSTOM" ? (data.evidenceCapture || false) : getProctoringPreset(data.proctoringMode || "NONE").evidenceCapture,
+        requireMicrophone: (data.proctoringMode || "NONE") === "CUSTOM" ? (data.requireMicrophone || false) : getProctoringPreset(data.proctoringMode || "NONE").requireMicrophone,
+        requireScreenShare: (data.proctoringMode || "NONE") === "CUSTOM" ? (data.requireScreenShare || false) : getProctoringPreset(data.proctoringMode || "NONE").requireScreenShare,
+        detectDevTools: (data.proctoringMode || "NONE") === "CUSTOM" ? (data.detectDevTools || false) : getProctoringPreset(data.proctoringMode || "NONE").detectDevTools,
+        detectScreenShareStop: (data.proctoringMode || "NONE") === "CUSTOM" ? (data.detectScreenShareStop || false) : getProctoringPreset(data.proctoringMode || "NONE").detectScreenShareStop,
+        enableLiveProctoring: (data.proctoringMode || "NONE") === "CUSTOM" ? (data.enableLiveProctoring || false) : getProctoringPreset(data.proctoringMode || "NONE").enableLiveProctoring,
+        autoSubmitOnCriticalViolations: (data.proctoringMode || "NONE") === "CUSTOM" ? (data.autoSubmitOnCriticalViolations || false) : getProctoringPreset(data.proctoringMode || "NONE").autoSubmitOnCriticalViolations,
+        maxCriticalViolations: (data.proctoringMode || "NONE") === "CUSTOM" ? (data.maxCriticalViolations || 0) : getProctoringPreset(data.proctoringMode || "NONE").maxCriticalViolations,
       });
     } catch (error: unknown) {
       console.error("Failed to fetch test:", error);
@@ -753,7 +753,7 @@ To refer to the FAQ document, you can click on the HELP button which is present 
   const handleSaveProctoring = async () => {
     try {
       setSaving(true);
-      await testService.updateTest(id!, {
+      const payload = {
         title: formData.title,
         description: formData.description,
         durationMins: formData.durationMins,
@@ -781,7 +781,12 @@ To refer to the FAQ document, you can click on the HELP button which is present 
         enableLiveProctoring: formData.enableLiveProctoring || false,
         autoSubmitOnCriticalViolations: formData.autoSubmitOnCriticalViolations || false,
         maxCriticalViolations: formData.maxCriticalViolations || 0,
-      });
+      };
+
+      console.log("[Admin/TestsEdit] Saving proctoring settings. Payload:", payload);
+      const res = await testService.updateTest(id!, payload);
+      console.log("[Admin/TestsEdit] Save proctoring response:", res);
+
       // Sync local test state so dirty-check resets
       setTest((prev) => prev ? {
         ...prev,
@@ -808,7 +813,7 @@ To refer to the FAQ document, you can click on the HELP button which is present 
       } : prev);
       toast({ title: "Saved", description: "Proctoring settings saved successfully." });
     } catch (error: unknown) {
-      console.error("Failed to save proctoring:", error);
+      console.error("[Admin/TestsEdit] Failed to save proctoring:", error);
     } finally {
       setSaving(false);
     }
@@ -2168,19 +2173,7 @@ To refer to the FAQ document, you can click on the HELP button which is present 
                       </div>
                     </div>
 
-                    <div className="space-y-2 max-w-xs">
-                      <Label htmlFor="maxWarnings">Max warnings allowed</Label>
-                      <Input
-                        id="maxWarnings"
-                        type="number"
-                        value={formData.maxWarnings}
-                        onChange={(e) =>
-                          handleNumberChange("maxWarnings", e.target.value)
-                        }
-                        disabled={formData.proctoringMode !== "CUSTOM"}
-                        min="0"
-                      />
-                    </div>
+
                   </div>
 
                   {/* Category 2: Webcam & Audio Monitoring */}
@@ -2260,22 +2253,7 @@ To refer to the FAQ document, you can click on the HELP button which is present 
                           </Label>
                         </div>
 
-                        <div className="flex items-center space-x-2">
-                          <Checkbox
-                            id="detectObjects"
-                            checked={formData.detectObjects}
-                            onCheckedChange={(checked) =>
-                              handleCheckboxChange("detectObjects", !!checked)
-                            }
-                            disabled={formData.proctoringMode !== "CUSTOM"}
-                          />
-                          <Label
-                            htmlFor="detectObjects"
-                            className="text-sm font-normal cursor-pointer"
-                          >
-                            Detect objects (phone/book/etc.)
-                          </Label>
-                        </div>
+
 
                         <div className="flex items-center space-x-2">
                           <Checkbox
@@ -2407,45 +2385,10 @@ To refer to the FAQ document, you can click on the HELP button which is present 
                           </Label>
                         </div>
 
-                        <div className="flex items-center space-x-2">
-                          <Checkbox
-                            id="autoSubmitOnCriticalViolations"
-                            checked={formData.autoSubmitOnCriticalViolations}
-                            onCheckedChange={(checked) =>
-                              handleCheckboxChange(
-                                "autoSubmitOnCriticalViolations",
-                                !!checked
-                              )
-                            }
-                            disabled={formData.proctoringMode !== "CUSTOM"}
-                          />
-                          <Label
-                            htmlFor="autoSubmitOnCriticalViolations"
-                            className="text-sm font-normal cursor-pointer"
-                          >
-                            Auto-submit after critical violations
-                          </Label>
-                        </div>
+
                       </div>
 
-                      <div className="space-y-2 max-w-xs">
-                        <Label htmlFor="maxCriticalViolations">
-                          Max critical violations allowed
-                        </Label>
-                        <Input
-                          id="maxCriticalViolations"
-                          type="number"
-                          value={formData.maxCriticalViolations}
-                          onChange={(e) =>
-                            handleNumberChange(
-                              "maxCriticalViolations",
-                              e.target.value
-                            )
-                          }
-                          disabled={formData.proctoringMode !== "CUSTOM"}
-                          min="0"
-                        />
-                      </div>
+
                     </div>
                   )}
                 </div>

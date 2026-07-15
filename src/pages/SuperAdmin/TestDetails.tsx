@@ -641,10 +641,7 @@ export default function TestDetails() {
                         {test.warnOnFullscreenExit ? "Enabled" : "Disabled"}
                       </Badge>
                     </div>
-                    <div className="flex items-center justify-between py-2 border-b border-slate-100 dark:border-slate-800 text-sm">
-                      <span className="text-muted-foreground">Max Warnings</span>
-                      <span className="font-semibold">{test.maxWarnings ?? 0}</span>
-                    </div>
+
                   </div>
                   
                   <div className="space-y-1">
@@ -673,12 +670,7 @@ export default function TestDetails() {
                         {test.detectSuspiciousAudio ? "Enabled" : "Disabled"}
                       </Badge>
                     </div>
-                    <div className="flex items-center justify-between py-2 border-b border-slate-100 dark:border-slate-800 text-sm">
-                      <span className="text-muted-foreground">Detect Objects</span>
-                      <Badge variant={test.detectObjects ? "default" : "outline"} className={test.detectObjects ? "bg-emerald-500/10 text-emerald-600 border-emerald-200" : "text-slate-400 border-slate-200"}>
-                        {test.detectObjects ? "Enabled" : "Disabled"}
-                      </Badge>
-                    </div>
+
                     <div className="flex items-center justify-between py-2 border-b border-slate-100 dark:border-slate-800 text-sm">
                       <span className="text-muted-foreground">Periodic Snapshots</span>
                       <Badge variant={test.periodicSnapshots ? "default" : "outline"} className={test.periodicSnapshots ? "bg-emerald-500/10 text-emerald-600 border-emerald-200" : "text-slate-400 border-slate-200"}>
@@ -729,16 +721,8 @@ export default function TestDetails() {
                             {test.enableLiveProctoring ? "Enabled" : "Disabled"}
                           </Badge>
                         </div>
-                        <div className="flex items-center justify-between py-2 border-b border-slate-100 dark:border-slate-800 text-sm">
-                          <span className="text-muted-foreground">Auto Submit on Critical Violations</span>
-                          <Badge variant={test.autoSubmitOnCriticalViolations ? "default" : "outline"} className={test.autoSubmitOnCriticalViolations ? "bg-emerald-500/10 text-emerald-600 border-emerald-200" : "text-slate-400 border-slate-200"}>
-                            {test.autoSubmitOnCriticalViolations ? "Enabled" : "Disabled"}
-                          </Badge>
-                        </div>
-                        <div className="flex items-center justify-between py-2 text-sm">
-                          <span className="text-muted-foreground">Max Critical Violations</span>
-                          <span className="font-semibold">{test.maxCriticalViolations ?? 0}</span>
-                        </div>
+
+
                       </div>
                     </div>
                   </div>

@@ -284,6 +284,26 @@ export default function Students() {
     return matchesSearch && matchesOrg;
   });
 
+  // Fetch tests count (from insights) for each candidate on mount / when candidates change
+  useEffect(() => {
+    if (!candidates || candidates.length === 0) return;
+    candidates.forEach(async (candidate) => {
+      // Avoid duplicate fetches if we already have a value in map
+      if (testsCountMap[candidate.id] !== undefined) return;
+      try {
+        const response = await apiClient.get(`/candidates/${candidate.id}/insights`);
+        const data = response.data?.data ?? response.data;
+        if (data && typeof data.totalTests === "number") {
+          setTestsCountMap(prev => ({ ...prev, [candidate.id]: data.totalTests }));
+        } else {
+          setTestsCountMap(prev => ({ ...prev, [candidate.id]: 0 }));
+        }
+      } catch (err) {
+        setTestsCountMap(prev => ({ ...prev, [candidate.id]: 0 }));
+      }
+    });
+  }, [candidates]);
+
   const handleAddCandidate = async () => {
     setEmailError(null);
     if (!formData.name.trim()) {

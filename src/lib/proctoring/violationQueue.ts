@@ -37,12 +37,13 @@ export const buildViolationPayload = (
   })),
 });
 
-const VIOLATION_WEIGHTS: Record<ViolationType, number> = {
+const VIOLATION_WEIGHTS: Record<ViolationType | "LOOK_AWAY", number> = {
   TAB_SWITCH: 10,
   EXTENDED_TAB_SWITCH: 20,
   FACE_ABSENT: 5,
   MULTIPLE_PERSONS: 15,
   FULLSCREEN_EXIT: 10,
+  LOOK_AWAY: 1,
 };
 
 /**
@@ -51,7 +52,7 @@ const VIOLATION_WEIGHTS: Record<ViolationType, number> = {
  */
 export const computeTrustScore = (violations: QueuedViolation[]): number => {
   const deducted = violations.reduce(
-    (total, v) => total + (VIOLATION_WEIGHTS[v.type] ?? 5),
+    (total, v) => total + (VIOLATION_WEIGHTS[v.type as ViolationType] ?? (v.type === "LOOK_AWAY" ? 1 : 5)),
     0
   );
   return Math.max(0, 100 - deducted);

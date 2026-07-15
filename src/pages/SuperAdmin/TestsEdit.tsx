@@ -897,19 +897,7 @@ export default function TestsEdit() {
                       </div>
                     </div>
 
-                    <div className="space-y-2 max-w-xs">
-                      <Label htmlFor="maxWarnings">Max warnings allowed</Label>
-                      <Input
-                        id="maxWarnings"
-                        type="number"
-                        value={formData.maxWarnings}
-                        onChange={(e) =>
-                          handleNumberChange("maxWarnings", e.target.value)
-                        }
-                        disabled={formData.proctoringMode !== "CUSTOM"}
-                        min="0"
-                      />
-                    </div>
+
                   </div>
 
                   {/* Category 2: Webcam & Audio Monitoring */}
@@ -989,22 +977,7 @@ export default function TestsEdit() {
                           </Label>
                         </div>
 
-                        <div className="flex items-center space-x-2">
-                          <Checkbox
-                            id="detectObjects"
-                            checked={formData.detectObjects}
-                            onCheckedChange={(checked) =>
-                              handleCheckboxChange("detectObjects", !!checked)
-                            }
-                            disabled={formData.proctoringMode !== "CUSTOM"}
-                          />
-                          <Label
-                            htmlFor="detectObjects"
-                            className="text-sm font-normal cursor-pointer"
-                          >
-                            Detect objects (phone/book/etc.)
-                          </Label>
-                        </div>
+
 
                         <div className="flex items-center space-x-2">
                           <Checkbox
@@ -1136,45 +1109,10 @@ export default function TestsEdit() {
                           </Label>
                         </div>
 
-                        <div className="flex items-center space-x-2">
-                          <Checkbox
-                            id="autoSubmitOnCriticalViolations"
-                            checked={formData.autoSubmitOnCriticalViolations}
-                            onCheckedChange={(checked) =>
-                              handleCheckboxChange(
-                                "autoSubmitOnCriticalViolations",
-                                !!checked
-                              )
-                            }
-                            disabled={formData.proctoringMode !== "CUSTOM"}
-                          />
-                          <Label
-                            htmlFor="autoSubmitOnCriticalViolations"
-                            className="text-sm font-normal cursor-pointer"
-                          >
-                            Auto-submit after critical violations
-                          </Label>
-                        </div>
+
                       </div>
 
-                      <div className="space-y-2 max-w-xs">
-                        <Label htmlFor="maxCriticalViolations">
-                          Max critical violations allowed
-                        </Label>
-                        <Input
-                          id="maxCriticalViolations"
-                          type="number"
-                          value={formData.maxCriticalViolations}
-                          onChange={(e) =>
-                            handleNumberChange(
-                              "maxCriticalViolations",
-                              e.target.value
-                            )
-                          }
-                          disabled={formData.proctoringMode !== "CUSTOM"}
-                          min="0"
-                        />
-                      </div>
+
                     </div>
                   )}
                 </div>

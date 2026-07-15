@@ -869,6 +869,14 @@ export const testService = {
       requireMicrophone: (d.microphoneRequired ?? d.requireMicrophone ?? false) as boolean,
       requireScreenShare: (d.screenShareRequired ?? d.requireScreenShare ?? false) as boolean,
       maxCriticalViolations: (d.maxCriticalViolationsAllowed ?? d.maxCriticalViolations ?? 0) as number,
+      detectFaceNotVisible: (d.detectFaceNotVisible ?? false) as boolean,
+      detectMultipleFaces: (d.detectMultipleFaces ?? false) as boolean,
+      detectSuspiciousAudio: (d.detectSuspiciousAudio ?? false) as boolean,
+      periodicSnapshots: (d.periodicSnapshots ?? false) as boolean,
+      evidenceCapture: (d.evidenceCapture ?? false) as boolean,
+      detectDevTools: (d.detectDevTools ?? false) as boolean,
+      detectScreenShareStop: (d.detectScreenShareStop ?? false) as boolean,
+      enableLiveProctoring: (d.enableLiveProctoring ?? false) as boolean,
     };
   },
 
@@ -884,6 +892,14 @@ export const testService = {
     if (data.requireMicrophone !== undefined) payload.microphoneRequired = data.requireMicrophone;
     if (data.requireScreenShare !== undefined) payload.screenShareRequired = data.requireScreenShare;
     if (data.maxCriticalViolations !== undefined) payload.maxCriticalViolationsAllowed = data.maxCriticalViolations;
+    if (data.detectFaceNotVisible !== undefined) payload.detectFaceNotVisible = data.detectFaceNotVisible;
+    if (data.detectMultipleFaces !== undefined) payload.detectMultipleFaces = data.detectMultipleFaces;
+    if (data.detectSuspiciousAudio !== undefined) payload.detectSuspiciousAudio = data.detectSuspiciousAudio;
+    if (data.periodicSnapshots !== undefined) payload.periodicSnapshots = data.periodicSnapshots;
+    if (data.evidenceCapture !== undefined) payload.evidenceCapture = data.evidenceCapture;
+    if (data.detectDevTools !== undefined) payload.detectDevTools = data.detectDevTools;
+    if (data.detectScreenShareStop !== undefined) payload.detectScreenShareStop = data.detectScreenShareStop;
+    if (data.enableLiveProctoring !== undefined) payload.enableLiveProctoring = data.enableLiveProctoring;
     return payload;
   },
 

@@ -234,9 +234,11 @@ export default function AdminCandidates() {
   const orgId = user?.organisationData?.id || userExtra?.organisationId;
 
   // Filter candidates that belong to the current admin's organisation
-  const candidates = orgId
-    ? unfilteredCandidates.filter(c => c.organisation?.id === orgId)
-    : unfilteredCandidates;
+  const candidates = React.useMemo(() => {
+    return orgId
+      ? unfilteredCandidates.filter(c => c.organisation?.id === orgId)
+      : unfilteredCandidates;
+  }, [unfilteredCandidates, orgId]);
 
   const adminOrgName = user?.organisationData?.name || 
                        userExtra?.organisationName || 
@@ -250,6 +252,26 @@ export default function AdminCandidates() {
       candidate.user.phoneNumber?.toLowerCase().includes(searchTerm.toLowerCase())
     );
   });
+
+  // Fetch tests count (from insights) for each candidate on mount / when candidates change
+  useEffect(() => {
+    if (!candidates || candidates.length === 0) return;
+    candidates.forEach(async (candidate) => {
+      // Avoid duplicate fetches if we already have a value in map
+      if (testsCountMap[candidate.id] !== undefined) return;
+      try {
+        const response = await apiClient.get(`/candidates/${candidate.id}/insights`);
+        const data = response.data?.data ?? response.data;
+        if (data && typeof data.totalTests === "number") {
+          setTestsCountMap(prev => ({ ...prev, [candidate.id]: data.totalTests }));
+        } else {
+          setTestsCountMap(prev => ({ ...prev, [candidate.id]: 0 }));
+        }
+      } catch (err) {
+        setTestsCountMap(prev => ({ ...prev, [candidate.id]: 0 }));
+      }
+    });
+  }, [candidates]);
 
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isBulkUploadOpen, setIsBulkUploadOpen] = useState(false);

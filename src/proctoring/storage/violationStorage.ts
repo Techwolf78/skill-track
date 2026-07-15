@@ -141,11 +141,15 @@ async retryWithBackoff<T>(
     
     for (const v of violations) {
       if (!v.resolved) {
-        switch (v.severity) {
-          case "LOW": score -= 2; break;
-          case "MEDIUM": score -= 5; break;
-          case "HIGH": score -= 10; break;
-          case "CRITICAL": score -= 20; break;
+        if (v.type === "LOOK_AWAY") {
+          score -= 1;
+        } else {
+          switch (v.severity) {
+            case "LOW": score -= 2; break;
+            case "MEDIUM": score -= 5; break;
+            case "HIGH": score -= 10; break;
+            case "CRITICAL": score -= 20; break;
+          }
         }
       }
     }
