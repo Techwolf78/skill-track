@@ -70,10 +70,12 @@ import {
   TrendingUp,
   RefreshCw,
   Eye,
+  Upload,
 } from "lucide-react";
 import { testService, Test, CreateTestRequest, TestQuestion, Question, ProctoringMode, TestScheduleExtended } from "@/lib/test-service";
 import { candidateService, Candidate } from "@/lib/candidate-service";
 import { apiClient } from "@/lib/api-client";
+import { BulkUploadCandidates } from "./BulkUploadCandidates";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 
@@ -256,6 +258,9 @@ export default function AdminTestsEdit() {
   const location = useLocation();
   const { toast } = useToast();
   const { user } = useAuth();
+  const userExtra = user as { organisationId?: string; organisationName?: string } | null;
+  const orgId = user?.organisationData?.id || userExtra?.organisationId;
+  const adminOrgName = user?.organisationData?.name || userExtra?.organisationName || "Your Organisation";
 
   const formatDuration = (secs: unknown) => {
     const s = Number(secs);
@@ -301,7 +306,25 @@ export default function AdminTestsEdit() {
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [invitations, setInvitations] = useState<CandidateInvitation[]>([]);
   const [inviteSearchTerm, setInviteSearchTerm] = useState("");
-  const [inviteTab, setInviteTab] = useState<"available" | "invited" | "all">("available");
+  const [inviteTab, setInviteTab] = useState<"available" | "invited" | "all">("all");
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [isBulkUploadOpen, setIsBulkUploadOpen] = useState(false);
+  const [candidateFormData, setCandidateFormData] = useState({
+    name: "",
+    email: "",
+    password: "",
+    phoneNumber: "",
+    organisationId: "",
+    extraFields: {
+      college: "",
+      course: "",
+      year: "",
+      skills: "",
+      city: "",
+    },
+  });
+  const [candidateSubmitting, setCandidateSubmitting] = useState(false);
+  const [candidateEmailError, setCandidateEmailError] = useState<string | null>(null);
   const [selectedSchedule, setSelectedSchedule] = useState<string>("");
   const [selectedScheduleData, setSelectedScheduleData] = useState<TestScheduleExtended | null>(null);
   const [isInviteDialogOpen, setIsInviteDialogOpen] = useState(false);
@@ -1500,6 +1523,65 @@ To refer to the FAQ document, you can click on the HELP button which is present 
     }
   };
 
+  useEffect(() => {
+    if (isAddDialogOpen && orgId) {
+      setCandidateFormData(prev => ({
+        ...prev,
+        organisationId: orgId,
+      }));
+    }
+  }, [isAddDialogOpen, orgId]);
+
+  const handleAddCandidate = async () => {
+    setCandidateEmailError(null);
+    if (!candidateFormData.name.trim()) {
+      console.error("Validation Error: Name is required");
+      return;
+    }
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(candidateFormData.email)) {
+      setCandidateEmailError("Invalid email format");
+      return;
+    }
+    if (!candidateFormData.password.trim() || candidateFormData.password.length < 8) {
+      console.error("Validation Error: Password must be at least 8 characters");
+      return;
+    }
+    if (!candidateFormData.organisationId && orgId) {
+      candidateFormData.organisationId = orgId;
+    }
+    if (!candidateFormData.organisationId) {
+      console.error("Validation Error: Organisation ID is missing");
+      return;
+    }
+
+    setCandidateSubmitting(true);
+    try {
+      const extraFields: Record<string, string> = {};
+      Object.entries(candidateFormData.extraFields).forEach(([key, value]) => {
+        if (value) extraFields[key] = value;
+      });
+
+      await candidateService.createCandidate({
+        ...candidateFormData,
+        extraFields: Object.keys(extraFields).length > 0 ? extraFields : undefined,
+      });
+
+      toast({ title: "Success", description: "Candidate added successfully" });
+      setIsAddDialogOpen(false);
+      setCandidateFormData({
+        name: "", email: "", password: "", phoneNumber: "", organisationId: orgId || "",
+        extraFields: { college: "", course: "", year: "", skills: "", city: "" }
+      });
+      fetchInvitationsData();
+    } catch (error) {
+      const err = error as { response?: { data?: { message?: string } } };
+      console.error("Failed to add candidate:", err.response?.data?.message || err);
+    } finally {
+      setCandidateSubmitting(false);
+    }
+  };
+
   const handleBulkInvite = async () => {
     if (!selectedSchedule) {
       console.error("Error: Please create a schedule for this test first.");
@@ -2418,20 +2500,28 @@ To refer to the FAQ document, you can click on the HELP button which is present 
                   Invite students or candidates to take this specific assessment
                 </CardDescription>
               </div>
-              {selectedCandidates.length > 0 && selectedSchedule && (
-                <Button
-                  onClick={handleBulkInvite}
-                  disabled={inviteSubmitting}
-                  className="gap-2 shrink-0"
-                >
-                  {inviteSubmitting ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <Send className="w-4 h-4" />
-                  )}
-                  Invite Selected ({selectedCandidates.length})
+              <div className="flex items-center gap-3 shrink-0">
+                <Button variant="outline" onClick={() => setIsBulkUploadOpen(true)}>
+                  <Upload className="w-4 h-4 mr-2" />Bulk Upload
                 </Button>
-              )}
+                <Button variant="hero" onClick={() => setIsAddDialogOpen(true)}>
+                  <Plus className="w-4 h-4 mr-2" />Add Candidate
+                </Button>
+                {selectedCandidates.length > 0 && selectedSchedule && (
+                  <Button
+                    onClick={handleBulkInvite}
+                    disabled={inviteSubmitting}
+                    className="gap-2"
+                  >
+                    {inviteSubmitting ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Send className="w-4 h-4" />
+                    )}
+                    Invite Selected ({selectedCandidates.length})
+                  </Button>
+                )}
+              </div>
             </CardHeader>
             <CardContent className="space-y-6">
               {!selectedSchedule ? (
@@ -2463,19 +2553,6 @@ To refer to the FAQ document, you can click on the HELP button which is present 
                         className="pl-10 w-full"
                       />
                     </div>
-                    <Tabs value={inviteTab} onValueChange={(value) => setInviteTab(value as "available" | "invited" | "all")}>
-                      <TabsList className="bg-muted/40 border border-border p-1">
-                        <TabsTrigger value="available" className="text-xs">
-                          Available ({inviteCounts.available})
-                        </TabsTrigger>
-                        <TabsTrigger value="invited" className="text-xs">
-                          Invited ({inviteCounts.invited})
-                        </TabsTrigger>
-                        <TabsTrigger value="all" className="text-xs">
-                          All ({inviteCounts.all})
-                        </TabsTrigger>
-                      </TabsList>
-                    </Tabs>
                   </div>
 
                   {/* Candidates Table */}
@@ -3228,6 +3305,66 @@ To refer to the FAQ document, you can click on the HELP button which is present 
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Add New Candidate</DialogTitle>
+            <DialogDescription>Create a new candidate record in {adminOrgName}.</DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-6 py-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Full Name*</label>
+                <Input placeholder="John Doe" value={candidateFormData.name} onChange={(e) => setCandidateFormData({ ...candidateFormData, name: e.target.value })} />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Email Address*</label>
+                <Input type="email" placeholder="john@example.com" value={candidateFormData.email} onChange={(e) => setCandidateFormData({ ...candidateFormData, email: e.target.value })} />
+                {candidateEmailError ? <p className="text-xs text-destructive">{candidateEmailError}</p> : null}
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Password*</label>
+                <Input type="password" value={candidateFormData.password} onChange={(e) => setCandidateFormData({ ...candidateFormData, password: e.target.value })} />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Phone Number</label>
+                <Input placeholder="+91 1234567890" value={candidateFormData.phoneNumber} onChange={(e) => setCandidateFormData({ ...candidateFormData, phoneNumber: e.target.value })} />
+              </div>
+            </div>
+            <div className="space-y-4 border-t pt-4">
+              <h4 className="font-medium text-sm">Additional Information</h4>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">College</label>
+                  <Input value={candidateFormData.extraFields.college} onChange={(e) => setCandidateFormData({ ...candidateFormData, extraFields: { ...candidateFormData.extraFields, college: e.target.value } })} />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Course</label>
+                  <Input value={candidateFormData.extraFields.course} onChange={(e) => setCandidateFormData({ ...candidateFormData, extraFields: { ...candidateFormData.extraFields, course: e.target.value } })} />
+                </div>
+              </div>
+            </div>
+            <div className="flex justify-end gap-3 mt-4">
+              <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>Cancel</Button>
+              <Button variant="hero" onClick={handleAddCandidate} disabled={candidateSubmitting}>
+                {candidateSubmitting ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Plus className="w-4 h-4 mr-2" />}
+                Add Candidate
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {isBulkUploadOpen && (
+        <BulkUploadCandidates 
+          open={isBulkUploadOpen} 
+          onOpenChange={setIsBulkUploadOpen} 
+          onSuccess={fetchInvitationsData} 
+        />
+      )}
     </div>
   );
 }
