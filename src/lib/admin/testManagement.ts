@@ -16,6 +16,7 @@ export interface TestPayload {
 export const isValidTestPayload = (
   payload: Partial<TestPayload>
 ): boolean => {
+  if (!payload) return false;
   if (!payload.title || payload.title.trim() === "") return false;
   if (!payload.durationMins || payload.durationMins <= 0) return false;
   if (payload.passMark == null || payload.passMark < 0 || payload.passMark > 100) return false;
@@ -30,7 +31,7 @@ const DIFFICULTY_LABELS: Record<Difficulty, string> = {
 
 /** Returns a human-readable label for a difficulty enum value. */
 export const getDifficultyLabel = (difficulty: Difficulty): string =>
-  DIFFICULTY_LABELS[difficulty];
+  DIFFICULTY_LABELS[difficulty] || difficulty;
 
 /** Filters a test list by active/inactive publishing status. */
 export const filterTestsByStatus = (

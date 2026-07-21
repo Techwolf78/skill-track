@@ -28,6 +28,19 @@ describe("Admin Test Management Logic", () => {
       expect(isValidTestPayload({ title: "Test", durationMins: 60, passMark: 110 })).toBe(false);
       expect(isValidTestPayload({ title: "Test", durationMins: 60, passMark: -1 })).toBe(false);
     });
+
+    it("should return true for boundary passMark values (exactly 0 or 100)", () => {
+      expect(isValidTestPayload({ title: "Boundary Test 1", durationMins: 45, passMark: 0 })).toBe(true);
+      expect(isValidTestPayload({ title: "Boundary Test 2", durationMins: 45, passMark: 100 })).toBe(true);
+    });
+
+    it("should handle null or undefined payloads gracefully (boundary/validation check)", () => {
+      // @ts-expect-error
+      expect(isValidTestPayload(null)).toBe(false);
+      // @ts-expect-error
+      expect(isValidTestPayload(undefined)).toBe(false);
+      expect(isValidTestPayload({})).toBe(false);
+    });
   });
 
   describe("getDifficultyLabel", () => {
@@ -41,6 +54,10 @@ describe("Admin Test Management Logic", () => {
 
     it("should return human-readable label for HARD", () => {
       expect(getDifficultyLabel("HARD")).toBe("Hard");
+    });
+
+    it("should return HUMAN difficulty string for unsupported labels gracefully", () => {
+      expect(getDifficultyLabel("UNKNOWN_LEVEL")).toBe("UNKNOWN_LEVEL");
     });
   });
 
@@ -61,5 +78,11 @@ describe("Admin Test Management Logic", () => {
       expect(result.length).toBe(1);
       expect(result[0].id).toBe("t2");
     });
+
+    it("should return empty array when filtering empty list", () => {
+      const result = filterTestsByStatus([], true);
+      expect(result.length).toBe(0);
+    });
   });
 });
+
