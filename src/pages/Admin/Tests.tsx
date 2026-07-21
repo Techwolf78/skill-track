@@ -70,17 +70,27 @@ export default function AdminTests() {
   const { user } = useAuth();
   const [searchTerm, setSearchTerm] = useState("");
 
-  const { data: allTests = [], isLoading: testsLoading, refetch: refetchTests } = useTestsQuery();
-  const { data: schedules = [], refetch: refetchSchedules } = useTestSchedulesQuery();
-  const { data: invitations = [], isLoading: invitationsLoading, refetch: refetchInvitations } = useQuery<any[]>({
+  const {
+    data: allTests = [],
+    isLoading: testsLoading,
+    refetch: refetchTests,
+  } = useTestsQuery();
+  const { data: schedules = [], refetch: refetchSchedules } =
+    useTestSchedulesQuery();
+  const {
+    data: invitations = [],
+    isLoading: invitationsLoading,
+    refetch: refetchInvitations,
+  } = useQuery<any[]>({
     queryKey: ["all-candidate-invitations"],
     queryFn: async () => {
       const res = await apiClient.get("/candidate-invitations?size=1000");
       const data = res.data?.data ?? res.data;
       if (Array.isArray(data)) return data;
-      if (data && typeof data === "object" && Array.isArray(data.content)) return data.content;
+      if (data && typeof data === "object" && Array.isArray(data.content))
+        return data.content;
       return [];
-    }
+    },
   });
 
   const loading = testsLoading || invitationsLoading;
@@ -94,7 +104,7 @@ export default function AdminTests() {
   // Map testId to candidates count
   const testTakersCountMap = useMemo(() => {
     const counts: Record<string, number> = {};
-    
+
     // Map scheduleId to testId
     const scheduleToTestMap: Record<string, string> = {};
     schedules.forEach((schedule) => {
@@ -153,7 +163,9 @@ export default function AdminTests() {
     }
 
     if (newTestDuration <= 0) {
-      console.error("Validation Error: Duration must be greater than 0 minutes.");
+      console.error(
+        "Validation Error: Duration must be greater than 0 minutes.",
+      );
       return;
     }
 
@@ -181,8 +193,13 @@ export default function AdminTests() {
       // Route directly to edit page
       navigate(`/admin/tests/edit/${newTest.id}`);
     } catch (error) {
-      const err = error as { response?: { data?: { message?: string } } } & Error;
-      console.error("Failed to create test:", err.response?.data?.message || err.message || err);
+      const err = error as {
+        response?: { data?: { message?: string } };
+      } & Error;
+      console.error(
+        "Failed to create test:",
+        err.response?.data?.message || err.message || err,
+      );
     } finally {
       setCreating(false);
     }
@@ -203,8 +220,13 @@ export default function AdminTests() {
         description: successMessage,
       });
     } catch (error) {
-      const err = error as { response?: { data?: { message?: string } } } & Error;
-      console.error("Failed to update test status:", err.response?.data?.message || err.message || err);
+      const err = error as {
+        response?: { data?: { message?: string } };
+      } & Error;
+      console.error(
+        "Failed to update test status:",
+        err.response?.data?.message || err.message || err,
+      );
     }
   };
 
@@ -256,8 +278,13 @@ export default function AdminTests() {
         description: "The test has been duplicated successfully.",
       });
     } catch (error) {
-      const err = error as { response?: { data?: { message?: string } } } & Error;
-      console.error("Failed to duplicate test:", err.response?.data?.message || err.message || err);
+      const err = error as {
+        response?: { data?: { message?: string } };
+      } & Error;
+      console.error(
+        "Failed to duplicate test:",
+        err.response?.data?.message || err.message || err,
+      );
     }
   };
 
@@ -270,8 +297,13 @@ export default function AdminTests() {
           description: "Test deleted successfully",
         });
       } catch (error) {
-        const err = error as { response?: { data?: { message?: string } } } & Error;
-        console.error("Failed to delete test:", err.response?.data?.message || err.message || err);
+        const err = error as {
+          response?: { data?: { message?: string } };
+        } & Error;
+        console.error(
+          "Failed to delete test:",
+          err.response?.data?.message || err.message || err,
+        );
       }
     }
   };
@@ -339,11 +371,23 @@ export default function AdminTests() {
   const getProctoringModeBadge = (mode?: string) => {
     switch (mode) {
       case "LOW":
-        return <Badge className="bg-blue-500/10 text-blue-600 border-blue-200">Low</Badge>;
+        return (
+          <Badge className="bg-blue-500/10 text-blue-600 border-blue-200">
+            Low
+          </Badge>
+        );
       case "MEDIUM":
-        return <Badge className="bg-amber-500/10 text-amber-600 border-amber-200">Medium</Badge>;
+        return (
+          <Badge className="bg-amber-500/10 text-amber-600 border-amber-200">
+            Medium
+          </Badge>
+        );
       case "HIGH":
-        return <Badge className="bg-rose-500/10 text-rose-600 border-rose-200">High</Badge>;
+        return (
+          <Badge className="bg-rose-500/10 text-rose-600 border-rose-200">
+            High
+          </Badge>
+        );
       default:
         return <Badge variant="outline">None</Badge>;
     }
@@ -364,9 +408,12 @@ export default function AdminTests() {
       {/* Header Section */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 pb-4 border-b">
         <div className="space-y-2">
-          <h1 className="text-3xl font-heading font-bold text-slate-900">Tests</h1>
+          <h1 className="text-3xl font-heading font-bold text-slate-900">
+            Tests
+          </h1>
           <p className="text-muted-foreground text-sm">
-            Manage and calibrate multi-domain tests for Engineering, MBA, BBA, and Corporate placement drives.
+            Manage and calibrate multi-domain tests for Engineering, MBA, BBA,
+            and Corporate placement drives.
           </p>
         </div>
         <div className="flex gap-2 shrink-0">
@@ -415,11 +462,17 @@ export default function AdminTests() {
               <div className="text-center">
                 <p className="text-slate-600 font-medium">No tests found</p>
                 <p className="text-sm text-slate-400 mt-1">
-                  {searchTerm ? "Try a different search term" : "Create your first test to get started"}
+                  {searchTerm
+                    ? "Try a different search term"
+                    : "Create your first test to get started"}
                 </p>
               </div>
               {!searchTerm && activeFilter === "all" && (
-                <Button variant="outline" onClick={() => setIsCreateDialogOpen(true)} className="mt-2 rounded-md">
+                <Button
+                  variant="outline"
+                  onClick={() => setIsCreateDialogOpen(true)}
+                  className="mt-2 rounded-md"
+                >
                   <Plus className="w-4 h-4 mr-2" />
                   Create Test
                 </Button>
@@ -442,7 +495,10 @@ export default function AdminTests() {
                   <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-xs text-muted-foreground">
                     <span className="flex items-center gap-1.5">
                       <FileQuestion className="w-4 h-4 text-slate-400" />
-                      {test.questions?.length || test.testQuestions?.length || 0} questions
+                      {test.questions?.length ||
+                        test.testQuestions?.length ||
+                        0}{" "}
+                      questions
                     </span>
                     <span className="flex items-center gap-1.5">
                       <Clock className="w-4 h-4 text-slate-400" />
@@ -454,11 +510,15 @@ export default function AdminTests() {
                     </span>
                     <span className="flex items-center gap-1.5">
                       <Target className="w-4 h-4 text-slate-400" />
-                      <span className="capitalize">{test.difficulty?.toLowerCase() || "medium"}</span>
+                      <span className="capitalize">
+                        {test.difficulty?.toLowerCase() || "medium"}
+                      </span>
                     </span>
                     <span className="flex items-center gap-1.5">
                       <Building2 className="w-4 h-4 text-slate-400" />
-                      {test.organisation?.name || user?.organisationData?.name || "Your Organisation"}
+                      {test.organisation?.name ||
+                        user?.organisationData?.name ||
+                        "Your Organisation"}
                     </span>
                   </div>
                 </div>
@@ -479,7 +539,7 @@ export default function AdminTests() {
                   >
                     <Users className="w-5 h-5" />
                   </Button>
-                  
+
                   {/* Reports Button (Bar chart icon / TrendingUp) */}
                   <Button
                     variant="ghost"
@@ -601,12 +661,17 @@ export default function AdminTests() {
                 type="number"
                 min="1"
                 value={newTestDuration}
-                onChange={(e) => setNewTestDuration(parseInt(e.target.value) || 0)}
+                onChange={(e) =>
+                  setNewTestDuration(parseInt(e.target.value) || 0)
+                }
               />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
+            <Button
+              variant="outline"
+              onClick={() => setIsCreateDialogOpen(false)}
+            >
               Cancel
             </Button>
             <Button onClick={handleCreateTestSubmit} disabled={creating}>

@@ -436,7 +436,8 @@ function TestInterfaceContent({ testId, sessionId, navigate, toast }: { testId?:
                 if (Array.isArray(parsed)) {
                   recoveredAnswers[sub.questionId] = parsed[0] || "";
                 } else if (parsed && typeof parsed === "object") {
-                  recoveredAnswers[sub.questionId] = (parsed as any).value || (parsed as any).selectedOptionIds?.[0] || "";
+                  const p = parsed as { value?: string; selectedOptionIds?: string[] };
+                  recoveredAnswers[sub.questionId] = p.value || p.selectedOptionIds?.[0] || "";
                 } else {
                   recoveredAnswers[sub.questionId] = parsed;
                 }
@@ -1178,10 +1179,12 @@ useEffect(() => {
     }
 
     try {
+      const version = getNextSaveVersion(currentQ.id);
       await apiClient.post("/submissions", {
         sessionId: sessionId,
         questionId: currentQ.id,
-        selectedOptionIds: [currentAnswer]
+        selectedOptionIds: [currentAnswer],
+        saveVersion: version
       });
       AnswerStore.saveAnswer(sessionId, currentQ.id, currentAnswer);
       toast({ title: "Saved", description: "Answer saved successfully" });
@@ -1211,7 +1214,7 @@ useEffect(() => {
     } finally {
       setIsSubmittingCode(false);
     }
-  }, [questions, currentIndex, sessionId, language, code, answers, toast, isOnline, flushQuestionTiming]);
+  }, [questions, currentIndex, sessionId, language, code, answers, toast, isOnline, flushQuestionTiming, getNextSaveVersion]);
 
   const handleResetCode = useCallback(() => {
     const currentQ = questions[currentIndex];
