@@ -296,7 +296,8 @@ function TestInterfaceContent({ testId, sessionId, navigate, toast }: { testId?:
   const [isRunning, setIsRunning] = useState(false);
   const [isSubmittingCode, setIsSubmittingCode] = useState(false);
   const [output, setOutput] = useState<{ type: 'success' | 'error', message: string } | null>(null);
-  const [testCaseResults, setTestCaseResults] = useState<Record<string, unknown>[]>([]);
+  const [testCaseResults, setTestCaseResults] = useState<Record<string, any>[]>([]);
+  const [selectedTestCaseIdx, setSelectedTestCaseIdx] = useState<number | null>(null);
   const [submissionPhase, setSubmissionPhase] = useState<"idle" | "running" | "result">("idle");
 
   // Fullscreen enforcement
@@ -926,7 +927,7 @@ useEffect(() => {
     }
   }, [violations, isProctoringActive, toast]);
 
-  // Timer effect
+  // Local countdown timer
   useEffect(() => {
     if (timeLeft <= 0 || !sessionId) return;
     
@@ -944,6 +945,28 @@ useEffect(() => {
     return () => clearInterval(timer);
   }, [timeLeft, sessionId, handleAutoSubmit]);
 
+  // Periodic server timer synchronization to prevent clock tampering
+  useEffect(() => {
+    if (!sessionId) return;
+
+    const syncInterval = setInterval(async () => {
+      if (!navigator.onLine) return;
+      try {
+        const sessionResponse = await apiClient.get(`/test-sessions/${sessionId}/resume`);
+        const sessionData = sessionResponse.data?.data || sessionResponse.data;
+        const remainingSeconds = sessionData.remainingSeconds || sessionData.remainingTimeSecs || 0;
+        if (remainingSeconds > 0) {
+          setTimeLeft(remainingSeconds);
+        }
+      } catch (err) {
+        console.warn("Failed to sync timer with server:", err);
+      }
+    }, 60000); // sync every 60 seconds
+
+    return () => clearInterval(syncInterval);
+  }, [sessionId]);
+
+
   const handleRunCode = useCallback(async () => {
     if (questions.length === 0) return;
     const currentQ = questions[currentIndex];
@@ -953,6 +976,7 @@ useEffect(() => {
     setSubmissionPhase("running");
     setOutput(null);
     setTestCaseResults([]);
+    setSelectedTestCaseIdx(null);
 
     try {
       const resultsArray = await testService.executeCode({
@@ -1695,33 +1719,92 @@ useEffect(() => {
                         </div>
 
                         {(output || testCaseResults.length > 0) && (
-                          <div className="border-t bg-black/5">
-                            <div className="p-4 space-y-3">
+                          <div className="border-t bg-card border-border overflow-hidden">
+                            <div className="p-4 space-y-4">
                               {output && (
                                 <div className={cn(
-                                  "p-3 rounded-lg text-sm font-mono",
+                                  "p-3 rounded-lg text-sm font-mono flex items-start gap-2",
                                   output.type === 'success' 
-                                    ? "bg-green-500/10 text-green-600 border border-green-500/20" 
-                                    : "bg-red-500/10 text-red-600 border border-red-500/20"
+                                    ? "bg-green-500/10 text-green-400 border border-green-500/20" 
+                                    : "bg-red-500/10 text-red-400 border border-red-500/20"
                                 )}>
-                                  {output.type === 'success' ? <CheckCircle className="w-4 h-4 inline mr-2" /> : <XCircle className="w-4 h-4 inline mr-2" />}
-                                  {output.message}
+                                  {output.type === 'success' ? (
+                                    <CheckCircle className="w-4 h-4 text-green-400 mt-0.5 flex-shrink-0" />
+                                  ) : (
+                                    <XCircle className="w-4 h-4 text-red-400 mt-0.5 flex-shrink-0" />
+                                  )}
+                                  <div className="whitespace-pre-wrap">{output.message}</div>
                                 </div>
                               )}
                               {testCaseResults.length > 0 && (
-                                <div>
-                                  <div className="text-xs font-semibold text-muted-foreground mb-2">Test Cases:</div>
+                                <div className="space-y-3">
+                                  <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Test Cases (Click to view details):</div>
                                   <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                                     {testCaseResults.map((tc, idx) => (
-                                      <div key={idx} className={cn(
-                                        "p-2 rounded-lg text-center text-xs font-mono",
-                                        tc.passed ? "bg-green-500/10 text-green-600 border border-green-500/20" : "bg-red-500/10 text-red-600 border border-red-500/20"
-                                      )}>
-                                        <div>Case {idx + 1}</div>
-                                        <div>{tc.passed ? "✓ Passed" : "✗ Failed"}</div>
-                                      </div>
+                                      <button
+                                        key={idx}
+                                        onClick={() => setSelectedTestCaseIdx(prev => prev === idx ? null : idx)}
+                                        className={cn(
+                                          "p-2.5 rounded-lg text-center text-xs font-mono border transition-all flex flex-col items-center justify-center gap-1",
+                                          tc.passed 
+                                            ? "bg-green-500/5 hover:bg-green-500/10 text-green-400 border-green-500/20" 
+                                            : "bg-red-500/5 hover:bg-red-500/10 text-red-400 border-red-500/20",
+                                          selectedTestCaseIdx === idx && "ring-2 ring-primary"
+                                        )}
+                                      >
+                                        <div className="font-bold">Case {idx + 1}</div>
+                                        <div className="text-[10px]">{tc.passed ? "✓ Passed" : "✗ Failed"}</div>
+                                      </button>
                                     ))}
                                   </div>
+
+                                  {selectedTestCaseIdx !== null && testCaseResults[selectedTestCaseIdx] && (() => {
+                                    const tc = testCaseResults[selectedTestCaseIdx];
+                                    return (
+                                      <div className="rounded-lg border bg-black/25 p-4 space-y-3 text-xs font-mono animate-in fade-in slide-in-from-bottom-2 duration-200">
+                                        <div className="flex justify-between items-center border-b border-border/40 pb-2">
+                                          <div className="font-bold text-primary">Case {selectedTestCaseIdx + 1} Execution Details</div>
+                                          <div className="flex gap-3 text-[10px] text-muted-foreground">
+                                            {tc.execTimeMs !== undefined && (
+                                              <div>Runtime: <span className="text-foreground">{tc.execTimeMs}ms</span></div>
+                                            )}
+                                            {tc.memoryKb !== undefined && (
+                                              <div>Memory: <span className="text-foreground">{(tc.memoryKb / 1024).toFixed(2)}MB</span></div>
+                                            )}
+                                          </div>
+                                        </div>
+
+                                        <div className="grid md:grid-cols-2 gap-3">
+                                          {tc.input && (
+                                            <div className="space-y-1">
+                                              <div className="text-[10px] text-muted-foreground uppercase">Stdin:</div>
+                                              <pre className="p-2 rounded bg-muted/30 border text-[11px] overflow-x-auto whitespace-pre-wrap">{tc.input}</pre>
+                                            </div>
+                                          )}
+                                          {tc.expectedOutput && (
+                                            <div className="space-y-1">
+                                              <div className="text-[10px] text-muted-foreground uppercase">Expected Output:</div>
+                                              <pre className="p-2 rounded bg-muted/30 border text-[11px] overflow-x-auto whitespace-pre-wrap">{tc.expectedOutput}</pre>
+                                            </div>
+                                          )}
+                                        </div>
+
+                                        {(tc.actualOutput || tc.stdout) && (
+                                          <div className="space-y-1">
+                                            <div className="text-[10px] text-muted-foreground uppercase font-semibold">Stdout / Output:</div>
+                                            <pre className="p-2.5 rounded bg-muted/40 border text-[11px] overflow-x-auto whitespace-pre-wrap text-foreground">{tc.actualOutput || tc.stdout}</pre>
+                                          </div>
+                                        )}
+
+                                        {(tc.stderr || tc.compileOutput) && (
+                                          <div className="space-y-1">
+                                            <div className="text-[10px] text-red-400 uppercase font-semibold">Diagnostics / Error Logs:</div>
+                                            <pre className="p-2.5 rounded bg-red-950/20 border border-red-500/20 text-[11px] overflow-x-auto whitespace-pre-wrap text-red-300">{tc.stderr || tc.compileOutput}</pre>
+                                          </div>
+                                        )}
+                                      </div>
+                                    );
+                                  })()}
                                 </div>
                               )}
                             </div>
