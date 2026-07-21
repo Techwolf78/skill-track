@@ -70,6 +70,17 @@ interface CandidateInvitation {
   token?: string;
 }
 
+interface TestSession {
+  id: string;
+  testId: string;
+  candidateId: string;
+  status: "ACTIVE" | "SUBMITTED" | "AUTO_SUBMITTED" | "FLAGGED" | "TERMINATED" | "INACTIVE" | "EVALUATED";
+  startedAt: string;
+  endedAt?: string;
+  remainingTimeSecs: number;
+  answers?: Record<string, unknown>;
+}
+
 interface TestSchedule {
   id: string;
   testId?: string;
@@ -100,6 +111,7 @@ interface TestAssessment {
   autoSubmitOnCriticalViolation?: boolean;
   maxWarningsAllowed?: number;
   maxCriticalViolationsAllowed?: number;
+  instructions?: Record<string, unknown>;
 }
 
 interface CheckState {
@@ -120,7 +132,8 @@ export default function TestAccess() {
   const [testData, setTestData] = useState<TestData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isMobile, setIsMobile] = useState(false);
-  
+  const [isLaunching, setIsLaunching] = useState(false);
+
   // Wizard state
   const [currentStep, setCurrentStep] = useState<WizardStep>("welcome");
   const [isVerifying, setIsVerifying] = useState(false);
@@ -478,24 +491,24 @@ export default function TestAccess() {
         token: token,
         proctoring: {
           proctoringMode: mode,
-          tabSwitchTrackingEnabled:         test?.enableTabSwitchTracking         ?? isLow,
-          copyPasteBlocked:                 test?.blockCopyPaste                 ?? isLow,
-          rightClickBlocked:                test?.blockRightClick                ?? false,
-          fullscreenExitTrackingEnabled:    test?.warnOnFullscreenExit    ?? isLow,
-          webcamRequired:                   test?.requireWebcam                   ?? isMedHigh,
-          microphoneRequired:               test?.requireMicrophone               ?? isHigh,
-          screenShareRequired:              test?.requireScreenShare              ?? isHigh,
-          faceNotVisibleDetectionEnabled:   test?.detectFaceNotVisible   ?? isMedHigh,
-          multipleFaceDetectionEnabled:     test?.detectMultipleFaces     ?? isMedHigh,
-          suspiciousAudioDetectionEnabled:  test?.detectSuspiciousAudio  ?? isHigh,
+          tabSwitchTrackingEnabled:         test?.tabSwitchTrackingEnabled         ?? isLow,
+          copyPasteBlocked:                 test?.copyPasteBlocked                 ?? isLow,
+          rightClickBlocked:                test?.rightClickBlocked                ?? false,
+          fullscreenExitTrackingEnabled:    test?.fullscreenExitTrackingEnabled    ?? isLow,
+          webcamRequired:                   test?.webcamRequired                   ?? isMedHigh,
+          microphoneRequired:               test?.microphoneRequired               ?? isHigh,
+          screenShareRequired:              test?.screenShareRequired              ?? isHigh,
+          faceNotVisibleDetectionEnabled:   test?.faceNotVisibleDetectionEnabled   ?? isMedHigh,
+          multipleFaceDetectionEnabled:     test?.multipleFaceDetectionEnabled     ?? isMedHigh,
+          suspiciousAudioDetectionEnabled:  test?.suspiciousAudioDetectionEnabled  ?? isHigh,
           objectDetectionEnabled:           false, // Removed object detection
-          devtoolsDetectionEnabled:         test?.detectDevTools         ?? isHigh,
-          periodicSnapshotsEnabled:         test?.periodicSnapshots         ?? isMedHigh,
-          evidenceCaptureEnabled:           test?.evidenceCapture           ?? isMedHigh,
-          liveProctoringEnabled:            test?.enableLiveProctoring            ?? isMedHigh,
+          devtoolsDetectionEnabled:         test?.devtoolsDetectionEnabled         ?? isHigh,
+          periodicSnapshotsEnabled:         test?.periodicSnapshotsEnabled         ?? isMedHigh,
+          evidenceCaptureEnabled:           test?.evidenceCaptureEnabled           ?? isMedHigh,
+          liveProctoringEnabled:            test?.liveProctoringEnabled            ?? isMedHigh,
           autoSubmitOnCriticalViolation:    false, // Disabled auto submit
-          maxWarningsAllowed:               test?.maxWarnings               ?? (mode === "NONE" ? 0 : 3),
-          maxCriticalViolationsAllowed:     test?.maxCriticalViolations     ?? (isHigh ? 1 : 2),
+          maxWarningsAllowed:               test?.maxWarningsAllowed               ?? (mode === "NONE" ? 0 : 3),
+          maxCriticalViolationsAllowed:     test?.maxCriticalViolationsAllowed     ?? (isHigh ? 1 : 2),
         },
         instructions: test?.instructions,
       });
@@ -666,6 +679,9 @@ export default function TestAccess() {
     (!testData?.proctoring.screenShareRequired || checks.screen === "success");
 
   const launchSecureTest = async () => {
+    if (isLaunching) return; // concurrency guard — prevent double-click
+    setIsLaunching(true);
+
     // 1. Enter Fullscreen Mode (Mandatory final step)
     try {
       if (!document.fullscreenElement) {
@@ -678,6 +694,7 @@ export default function TestAccess() {
         description: "Please enable fullscreen mode to secure the exam environment.", 
         variant: "destructive" 
       });
+      setIsLaunching(false);
       return;
     }
 
@@ -704,6 +721,7 @@ export default function TestAccess() {
         description: startErr.response?.data?.message || "Failed to launch session",
         variant: "destructive",
       });
+      setIsLaunching(false);
     }
   };
 
@@ -1212,10 +1230,11 @@ Best wishes for your assessment!`;
                     </Button>
                     <Button 
                       onClick={launchSecureTest}
+                      disabled={isLaunching}
                       className="flex-1 h-14 text-lg font-black bg-green-600 hover:bg-green-700 text-white shadow-xl shadow-green-600/10 gap-2 active:scale-[0.98] transition-all"
                     >
-                      <Play className="w-5 h-5 fill-current" />
-                      ENTER FULLSCREEN & START TEST
+                      {isLaunching ? <Loader2 className="w-5 h-5 animate-spin" /> : <Play className="w-5 h-5 fill-current" />}
+                      {isLaunching ? "LAUNCHING..." : "ENTER FULLSCREEN & START TEST"}
                     </Button>
                   </div>
                 </div>

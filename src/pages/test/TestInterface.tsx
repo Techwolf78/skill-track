@@ -77,7 +77,7 @@ interface RawPaperQuestion {
   coding?: {
     timeLimitSecs?: number;
     memoryLimitMB?: number;
-    starterCode?: Record<string, any>;
+    starterCode?: Record<string, CodeTemplateEntry>;
     difficulty?: string;
     constraints?: string;
     hints?: string[];
@@ -105,7 +105,7 @@ interface TestSession {
   id: string;
   testId: string;
   candidateId: string;
-  status: "ACTIVE" | "SUBMITTED" | "EXPIRED";
+  status: "ACTIVE" | "SUBMITTED" | "AUTO_SUBMITTED" | "FLAGGED" | "TERMINATED" | "INACTIVE" | "EVALUATED";
   startedAt: string;
   endedAt?: string;
   remainingTimeSecs: number;
@@ -143,7 +143,7 @@ interface TestQuestion {
     starterCode?: Record<string, string>;
     coding?: {
       starterCode?: Record<string, string>;
-      [key: string]: any;
+      [key: string]: unknown;
     };
     difficulty?: "EASY" | "MEDIUM" | "HARD" | string;
     constraints?: string;
@@ -296,7 +296,7 @@ function TestInterfaceContent({ testId, sessionId, navigate, toast }: { testId?:
   const [isRunning, setIsRunning] = useState(false);
   const [isSubmittingCode, setIsSubmittingCode] = useState(false);
   const [output, setOutput] = useState<{ type: 'success' | 'error', message: string } | null>(null);
-  const [testCaseResults, setTestCaseResults] = useState<Record<string, any>[]>([]);
+  const [testCaseResults, setTestCaseResults] = useState<TestCaseResult[]>([]);
   const [selectedTestCaseIdx, setSelectedTestCaseIdx] = useState<number | null>(null);
   const [submissionPhase, setSubmissionPhase] = useState<"idle" | "running" | "result">("idle");
 
