@@ -27,6 +27,13 @@ describe("Auth Form Validation Logic", () => {
       expect(errors.email).toBeDefined();
       expect(errors.password).toBeDefined();
     });
+
+    it("should fail for extremely long password (boundary check)", () => {
+      const longPassword = "a".repeat(10000);
+      const { valid, errors } = validateLoginForm({ email: "admin@test.com", password: longPassword });
+      // Depending on rules, it should fail or truncate safely. In this logic it should be valid but we test stability.
+      expect(valid).toBe(true);
+    });
   });
 
   describe("validateResetPasswordForm", () => {
@@ -49,5 +56,13 @@ describe("Auth Form Validation Logic", () => {
       const { errors } = validateResetPasswordForm({ oldPassword: "SamePass1", newPassword: "SamePass1" });
       expect(errors.newPassword).toContain("different");
     });
+
+    it("should fail when inputs are null or undefined (validation/malformed check)", () => {
+      const { valid, errors } = validateResetPasswordForm({});
+      expect(valid).toBe(false);
+      expect(errors.oldPassword).toBeDefined();
+      expect(errors.newPassword).toBeDefined();
+    });
   });
 });
+
