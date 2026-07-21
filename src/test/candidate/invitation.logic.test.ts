@@ -23,6 +23,13 @@ describe("Candidate Invitation Logic", () => {
     it("should return false for CANCELLED invitations", () => {
       expect(isInvitationUsable("CANCELLED")).toBe(false);
     });
+
+    it("should return false for unknown/malformed statuses (boundary case)", () => {
+      expect(isInvitationUsable("")).toBe(false);
+      expect(isInvitationUsable("UNKNOWN_STATUS")).toBe(false);
+      // @ts-expect-error - testing runtime robustness for null/undefined values
+      expect(isInvitationUsable(null)).toBe(false);
+    });
   });
 
   describe("getInvitationErrorMessage", () => {
@@ -41,6 +48,10 @@ describe("Candidate Invitation Logic", () => {
     it("should return correct message for CANCELLED status", () => {
       expect(getInvitationErrorMessage("CANCELLED")).toContain("cancelled");
     });
+
+    it("should return null for unknown statuses", () => {
+      expect(getInvitationErrorMessage("SOME_UNKNOWN_STATUS" as any)).toBeNull();
+    });
   });
 
   describe("buildStartSessionPayload", () => {
@@ -48,6 +59,12 @@ describe("Candidate Invitation Logic", () => {
       const payload = buildStartSessionPayload("inv-uuid-1", "192.168.1.1");
       expect(payload.invitationId).toBe("inv-uuid-1");
       expect(payload.ipAddress).toBe("192.168.1.1");
+    });
+
+    it("should handle empty or null parameters gracefully (boundary check)", () => {
+      const payload = buildStartSessionPayload("", "");
+      expect(payload.invitationId).toBe("");
+      expect(payload.ipAddress).toBe("");
     });
   });
 
@@ -63,5 +80,17 @@ describe("Candidate Invitation Logic", () => {
     it("should reject a non-UUID token string", () => {
       expect(isValidUUID("my-invite-token-abc")).toBe(false);
     });
+
+    it("should reject extremely long strings (boundary check)", () => {
+      expect(isValidUUID("a".repeat(1000))).toBe(false);
+    });
+
+    it("should reject null/undefined values gracefully", () => {
+      // @ts-expect-error - testing runtime robustness
+      expect(isValidUUID(null)).toBe(false);
+      // @ts-expect-error - testing runtime robustness
+      expect(isValidUUID(undefined)).toBe(false);
+    });
   });
 });
+
