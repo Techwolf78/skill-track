@@ -123,20 +123,20 @@ describe("AnswerStore", () => {
         sessionId,
         questionId: "q1",
         selectedOptionIds: [3],
+        saveVersion: 0,
       });
-      expect(testService.submitCode).toHaveBeenCalledWith({
+      expect(apiClient.post).toHaveBeenCalledWith("/submissions", {
         sessionId,
         questionId: "q2",
+        answerText: "let a = 1;",
         language: "typescript",
-        sourceCode: "let a = 1;",
+        saveVersion: 0,
       });
 
       // Verify progress callback calls
       expect(onProgress).toHaveBeenCalledTimes(2);
       expect(onProgress).toHaveBeenNthCalledWith(1, "q1", true, null);
       expect(onProgress).toHaveBeenNthCalledWith(2, "q2", true, {
-        submissionId: "submission-id-999",
-        status: "PENDING",
         code: "let a = 1;",
         language: "typescript",
       });

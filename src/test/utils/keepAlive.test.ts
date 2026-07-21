@@ -42,7 +42,10 @@ describe("initKeepAlive", () => {
     await vi.advanceTimersByTimeAsync(1000);
 
     expect(apiClient.get).toHaveBeenCalledWith(
-      expect.stringContaining("/subjects?_cb=bootstrap-")
+      expect.stringContaining("/subjects?_cb=bootstrap-"),
+      expect.objectContaining({
+        headers: { "X-Keep-Alive": "true" },
+      })
     );
   });
 
