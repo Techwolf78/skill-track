@@ -652,6 +652,7 @@ useEffect(() => {
 
 
   const submitTest = useCallback(async () => {
+    if (submitting) return;
     if (!sessionId) {
       navigate(`/test/${testId}/results`);
       return;
