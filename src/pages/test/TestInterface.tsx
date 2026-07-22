@@ -213,7 +213,7 @@ export default function TestInterface() {
 }
 
 function TestInterfaceContent({ testId, sessionId, navigate, toast }: { testId?: string; sessionId?: string; navigate: (path: string) => void; toast: (props: { title?: string; description?: string; variant?: "default" | "destructive" }) => void }) {
-  const { violations, trustScore, isProctoringActive, startProctoring, syncViolations, flushEvidence, videoRef } = useProctoring();
+  const { violations, trustScore, isProctoringActive, startProctoring, syncViolations, flushEvidence, videoRef, config } = useProctoring();
   const lastWarnedCountRef = useRef(0);
   const hasWarnedFullscreenRef = useRef(false);
 
@@ -761,7 +761,7 @@ useEffect(() => {
 
   useEffect(() => {
     let timer: NodeJS.Timeout;
-    if (isProctoringActive && !isFullscreen) {
+    if (isProctoringActive && config?.fullscreenExitTracking && !isFullscreen) {
       if (fullscreenTimer === 10 && !hasWarnedFullscreenRef.current) {
         hasWarnedFullscreenRef.current = true;
         toast({
@@ -784,18 +784,19 @@ useEffect(() => {
       setFullscreenTimer(10);
     }
     return () => clearInterval(timer);
-  }, [isProctoringActive, isFullscreen, toast, fullscreenTimer]);
+  }, [isProctoringActive, isFullscreen, toast, fullscreenTimer, config?.fullscreenExitTracking]);
 
-  // Feature 1: Clipboard & Keyboard Interception
   useEffect(() => {
     if (!isProctoringActive) return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
       // DevTools keys
       if (
-        e.key === "F12" ||
-        (e.ctrlKey && e.shiftKey && (e.key === "I" || e.key === "i" || e.key === "J" || e.key === "j" || e.key === "C" || e.key === "c")) ||
-        (e.metaKey && e.altKey && (e.key === "I" || e.key === "i"))
+        config?.devtools && (
+          e.key === "F12" ||
+          (e.ctrlKey && e.shiftKey && (e.key === "I" || e.key === "i" || e.key === "J" || e.key === "j" || e.key === "C" || e.key === "c")) ||
+          (e.metaKey && e.altKey && (e.key === "I" || e.key === "i"))
+        )
       ) {
         e.preventDefault();
         toast({
@@ -807,7 +808,10 @@ useEffect(() => {
       }
 
       // Copy/Paste/Cut shortcuts
-      if ((e.ctrlKey || e.metaKey) && (e.key === "c" || e.key === "C" || e.key === "v" || e.key === "V" || e.key === "x" || e.key === "X")) {
+      if (
+        config?.copyPasteBlocked &&
+        (e.ctrlKey || e.metaKey) && (e.key === "c" || e.key === "C" || e.key === "v" || e.key === "V" || e.key === "x" || e.key === "X")
+      ) {
         e.preventDefault();
         toast({
           title: "Blocked Shortcut",
@@ -830,25 +834,31 @@ useEffect(() => {
     };
 
     const handleCopy = (e: ClipboardEvent) => {
-      e.preventDefault();
-      toast({
-        title: "Copy Blocked",
-        description: "Exfiltrating test contents is not permitted.",
-        variant: "destructive"
-      });
+      if (config?.copyPasteBlocked) {
+        e.preventDefault();
+        toast({
+          title: "Copy Blocked",
+          description: "Exfiltrating test contents is not permitted.",
+          variant: "destructive"
+        });
+      }
     };
 
     const handlePaste = (e: ClipboardEvent) => {
-      e.preventDefault();
-      toast({
-        title: "Paste Blocked",
-        description: "Pasting text into the editor is disabled.",
-        variant: "destructive"
-      });
+      if (config?.copyPasteBlocked) {
+        e.preventDefault();
+        toast({
+          title: "Paste Blocked",
+          description: "Pasting text into the editor is disabled.",
+          variant: "destructive"
+        });
+      }
     };
 
     const handleContextMenu = (e: MouseEvent) => {
-      e.preventDefault();
+      if (config?.rightClickBlocked) {
+        e.preventDefault();
+      }
     };
 
     window.addEventListener("keydown", handleKeyDown, true);
@@ -862,7 +872,7 @@ useEffect(() => {
       document.removeEventListener("paste", handlePaste, true);
       document.removeEventListener("contextmenu", handleContextMenu, true);
     };
-  }, [isProctoringActive, toast]);
+  }, [isProctoringActive, toast, config?.devtools, config?.copyPasteBlocked, config?.rightClickBlocked]);
 
   // Network Status Monitoring & Auto-syncing
   useEffect(() => {
@@ -1281,12 +1291,23 @@ useEffect(() => {
         selectedOptionIds: [value],
         saveVersion: version
       });
-    } catch (error) {
+    } catch (error: unknown) {
       console.error("Auto-save MCQ error:", error);
-      AnswerStore.queueOfflineSubmission(sessionId, questionId, "MCQ", { value, saveVersion: version });
-      setUnsyncedCount(AnswerStore.getOfflineQueue(sessionId).length);
+      const axiosErr = error as { response?: { status: number; data?: { message?: string } } };
+      if (axiosErr.response?.status === 400 && axiosErr.response?.data?.message?.includes("expired")) {
+        AnswerStore.clearSession(sessionId);
+        toast({
+          title: "Session Expired",
+          description: "Your session duration has expired.",
+          variant: "destructive"
+        });
+        navigate(`/test/${testId}/results?session=${sessionId}`);
+      } else {
+        AnswerStore.queueOfflineSubmission(sessionId, questionId, "MCQ", { value, saveVersion: version });
+        setUnsyncedCount(AnswerStore.getOfflineQueue(sessionId).length);
+      }
     }
-  }, [answers, sessionId, isOnline, flushQuestionTiming, getNextSaveVersion]);
+  }, [answers, sessionId, isOnline, flushQuestionTiming, getNextSaveVersion, navigate, testId, toast]);
 
 
   const formatTime = (seconds: number) => {
@@ -1392,7 +1413,7 @@ useEffect(() => {
   return (
     <div className="min-h-screen bg-background flex flex-col relative">
       {/* Fullscreen Enforcement Overlay */}
-      {!isFullscreen && isProctoringActive && (
+      {!isFullscreen && isProctoringActive && config?.fullscreenExitTracking && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-md">
           <div className="bg-background p-8 rounded-xl border-2 border-destructive shadow-2xl text-center max-w-md animate-in zoom-in duration-300">
             <div className="mx-auto mb-6 w-20 h-20 rounded-full bg-destructive/10 flex items-center justify-center animate-pulse">
