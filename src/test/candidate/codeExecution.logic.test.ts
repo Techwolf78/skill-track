@@ -88,4 +88,33 @@ describe("Code Execution Logic", () => {
       expect(out.message).toContain("1/3");
     });
   });
+
+  describe("Validation Failures and Boundary Cases", () => {
+    it("should handle empty or undefined test cases in mapTestCaseResults", () => {
+      expect(mapTestCaseResults([])).toEqual([]);
+      // Boundary check on null/empty attributes
+      const results = mapTestCaseResults([{ status: undefined as unknown as SubmissionStatus }]);
+      expect(results[0].passed).toBe(false);
+    });
+
+    it("should handle extremely large test case counts in buildRunOutputMessage", () => {
+      const largeCases = Array.from({ length: 10000 }, () => ({ passed: true }));
+      const out = buildRunOutputMessage(largeCases);
+      expect(out.type).toBe("success");
+      expect(out.message).toContain("10000 test cases passed");
+    });
+  });
+
+  describe("Security Sanitization", () => {
+    it("should sanitize or cleanly print potentially injected status strings safely", () => {
+      const scriptInjectedStatus = "<script>alert('hack')</script>" as SubmissionStatus;
+      const out = buildSubmitOutputMessage({
+        status: scriptInjectedStatus,
+        testCasesPassed: 0,
+        testCasesTotal: 1
+      });
+      expect(out.type).toBe("error");
+      expect(out.message).toContain("<script>alert('hack')</script>");
+    });
+  });
 });
