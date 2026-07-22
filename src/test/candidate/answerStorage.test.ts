@@ -157,6 +157,48 @@ describe("AnswerStore", () => {
       expect(onProgress).toHaveBeenCalledWith("q1", false);
       expect(AnswerStore.getOfflineQueue(sessionId).length).toBe(1);
     });
+
+    it("should handle validation failures (e.g. invalid questionId, null queueing) gracefully", () => {
+      // Test queueing with empty payload/id
+      const sub = AnswerStore.queueOfflineSubmission(sessionId, "", "MCQ", null);
+      expect(sub.questionId).toBe("");
+      expect(sub.payload).toBeNull();
+      expect(AnswerStore.getOfflineQueue(sessionId).length).toBe(1);
+    });
+
+    it("should handle boundary cases (extreme payload sizes and multi-select formats)", async () => {
+      vi.mocked(apiClient.post).mockResolvedValue({ data: { success: true } });
+      
+      const complexPayload = {
+        selectedOptionIds: Array.from({ length: 1000 }, (_, i) => i),
+        notes: "a".repeat(10000)
+      };
+      
+      AnswerStore.queueOfflineSubmission(sessionId, "q-boundary", "MCQ", complexPayload);
+      const success = await AnswerStore.syncOfflineQueue(sessionId);
+      expect(success).toBe(true);
+      expect(AnswerStore.getOfflineQueue(sessionId).length).toBe(0);
+    });
+
+    it("should recover and trigger window reload / clear session when sync fails with an expired session error", async () => {
+      const reloadMock = vi.fn();
+      vi.stubGlobal("location", { reload: reloadMock });
+
+      const expiredError = {
+        response: {
+          status: 400,
+          data: { message: "session has expired" }
+        }
+      };
+      vi.mocked(apiClient.post).mockRejectedValue(expiredError);
+
+      AnswerStore.queueOfflineSubmission(sessionId, "q1", "MCQ", 3);
+      const success = await AnswerStore.syncOfflineQueue(sessionId);
+
+      expect(success).toBe(false);
+      expect(reloadMock).toHaveBeenCalled();
+      expect(AnswerStore.getOfflineQueue(sessionId).length).toBe(0); // cleared
+    });
   });
 
   describe("Clear Session", () => {
