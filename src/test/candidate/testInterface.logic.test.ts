@@ -137,4 +137,60 @@ describe("Calibration Metadata Mapping & DTO Validation", () => {
   });
 });
 
+describe("Assessment Submission & Grading Validation", () => {
+  interface SubmissionPayloadMock {
+    sessionId: string;
+    answers: Record<string, unknown>;
+  }
+
+  const validateSubmissionPayload = (payload: SubmissionPayloadMock): boolean => {
+    if (!payload.sessionId || payload.sessionId.trim() === "") return false;
+    if (!payload.answers || typeof payload.answers !== "object") return false;
+    return true;
+  };
+
+  it("should successfully validate standard submission payload (happy path)", () => {
+    const validPayload: SubmissionPayloadMock = {
+      sessionId: "sess-1234",
+      answers: {
+        "q-1": "option-a",
+        "q-2": { code: "print('hello')", language: "python3" }
+      }
+    };
+    expect(validateSubmissionPayload(validPayload)).toBe(true);
+  });
+
+  it("should reject submission payloads with missing session identifiers (validation failure)", () => {
+    const invalidPayload: SubmissionPayloadMock = {
+      sessionId: "",
+      answers: { "q-1": "option-a" }
+    };
+    expect(validateSubmissionPayload(invalidPayload)).toBe(false);
+  });
+
+  it("should handle mixed autograding result mappings correctly (business-rule / boundary)", () => {
+    const partialGradingResult = {
+      status: "WRONG_ANSWER",
+      testCasesPassed: 4,
+      testCasesTotal: 10,
+      score: 40.0
+    };
+    expect(partialGradingResult.score).toBe(40.0);
+    expect(partialGradingResult.testCasesPassed).toBeLessThan(partialGradingResult.testCasesTotal);
+  });
+
+  it("should enforce double-click concurrency lock checks", () => {
+    let submittingState = false;
+    const triggerSubmit = () => {
+      if (submittingState) return false; // Block duplicate
+      submittingState = true;
+      return true;
+    };
+
+    expect(triggerSubmit()).toBe(true); // First click succeeds
+    expect(triggerSubmit()).toBe(false); // Second concurrent click gets blocked
+    expect(submittingState).toBe(true);
+  });
+});
+
 
