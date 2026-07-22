@@ -76,5 +76,55 @@ describe("Proctoring Violation Queue Logic", () => {
       }));
       expect(computeTrustScore(many)).toBe(0);
     });
+
+    it("should handle unrecognized violation types using a safe default weight deduction", () => {
+      const invalidTypeViolation = {
+        id: "v-unknown",
+        type: "UNKNOWN_TYPE" as unknown as ViolationType,
+        timestamp: "2026-01-01T10:00:00Z",
+        synced: false
+      };
+      // Expected default weight is 5
+      expect(computeTrustScore([invalidTypeViolation])).toBe(95);
+    });
+  });
+
+  describe("Validation Failures and Payload Integrity Checks", () => {
+    it("should handle empty or null lists of violations during payload construction gracefully", () => {
+      const payload = buildViolationPayload("session-empty", []);
+      expect(payload.sessionId).toBe("session-empty");
+      expect(payload.violations).toEqual([]);
+    });
+
+    it("should ignore invalid sessionIds or null violation records during payload formatting", () => {
+      const payload = buildViolationPayload("", [
+        { id: "", type: "TAB_SWITCH", timestamp: "", synced: false }
+      ]);
+      expect(payload.sessionId).toBe("");
+      expect(payload.violations[0].type).toBe("TAB_SWITCH");
+      expect(payload.violations[0].timestamp).toBe("");
+    });
+  });
+
+  describe("Boundary Cases & Security Integrity", () => {
+    it("should handle massive violation queue inputs without stack overflows or trust score errors", () => {
+      const massiveList: QueuedViolation[] = Array.from({ length: 1000 }, (_, i) => ({
+        id: `v-${i}`,
+        type: "EXTENDED_TAB_SWITCH",
+        timestamp: "2026-01-01T10:00:00Z",
+        synced: false
+      }));
+      expect(computeTrustScore(massiveList)).toBe(0);
+      const payload = buildViolationPayload("session-large", massiveList);
+      expect(payload.violations.length).toBe(1000);
+    });
+
+    it("should strictly ensure internal tracking flags like 'synced' are not leaked to backend payload structure", () => {
+      const payload = buildViolationPayload("session-sec", [
+        { id: "sec-1", type: "TAB_SWITCH", timestamp: "2026-01-01T10:00:00Z", synced: false }
+      ]);
+      expect(payload.violations[0]).not.toHaveProperty("synced");
+      expect(payload.violations[0]).not.toHaveProperty("id");
+    });
   });
 });
