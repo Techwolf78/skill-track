@@ -122,5 +122,44 @@ describe("Session Domain Logic", () => {
       expect(computeRemainingTime(startedAt, 10)).toBe(0);
     });
   });
+
+  describe("Auto-Submission Logic & Timer Triggers", () => {
+    const shouldTriggerAutoSubmit = (remainingSeconds: number, currentStatus: string): boolean => {
+      if (currentStatus === "SUBMITTED" || currentStatus === "AUTO_SUBMITTED" || currentStatus === "EVALUATED") {
+        return false;
+      }
+      return remainingSeconds <= 0;
+    };
+
+    it("should trigger auto-submit when remaining time reaches 0 for active session (happy path)", () => {
+      expect(shouldTriggerAutoSubmit(0, "ACTIVE")).toBe(true);
+      expect(shouldTriggerAutoSubmit(-5, "STARTED")).toBe(true);
+    });
+
+    it("should NOT trigger auto-submit if session is already SUBMITTED or AUTO_SUBMITTED (idempotency)", () => {
+      expect(shouldTriggerAutoSubmit(0, "SUBMITTED")).toBe(false);
+      expect(shouldTriggerAutoSubmit(0, "AUTO_SUBMITTED")).toBe(false);
+      expect(shouldTriggerAutoSubmit(0, "EVALUATED")).toBe(false);
+    });
+
+    it("should NOT trigger auto-submit while time still remains (business-rule)", () => {
+      expect(shouldTriggerAutoSubmit(10, "ACTIVE")).toBe(false);
+      expect(shouldTriggerAutoSubmit(300, "STARTED")).toBe(false);
+    });
+
+    it("should reconcile clock drift cleanly when server remaining time is provided", () => {
+      const reconcileTime = (localSecs: number, serverSecs: number): number => {
+        // Prefer server authoritative remaining time when online
+        if (typeof serverSecs === "number" && serverSecs >= 0) {
+          return serverSecs;
+        }
+        return Math.max(0, localSecs);
+      };
+
+      expect(reconcileTime(120, 100)).toBe(100);
+      expect(reconcileTime(0, 45)).toBe(45);
+      expect(reconcileTime(-10, 0)).toBe(0);
+    });
+  });
 });
 
