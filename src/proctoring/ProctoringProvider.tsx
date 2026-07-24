@@ -15,6 +15,7 @@ interface ProctoringContextType extends ProctoringState {
   videoRef: React.RefObject<HTMLVideoElement | null>;
   syncViolations: () => Promise<number | null>;
   flushEvidence: () => Promise<void>;
+  config: ProctoringConfigDto;
 }
 
 const ProctoringContext = createContext<ProctoringContextType | undefined>(undefined);
@@ -31,6 +32,18 @@ export interface ProctoringConfigDto {
   snapshotIntervalSecs: number;
   periodicSnapshots: boolean;
   violationThresholds: Record<string, number>;
+  copyPasteBlocked?: boolean;
+  rightClickBlocked?: boolean;
+  fullscreenExitTracking?: boolean;
+  faceNotVisibleDetection?: boolean;
+  multipleFaceDetection?: boolean;
+  suspiciousAudioDetection?: boolean;
+  screenShareStopDetection?: boolean;
+  evidenceCapture?: boolean;
+  liveProctoring?: boolean;
+  autoSubmitOnCriticalViolation?: boolean;
+  maxWarningsAllowed?: number;
+  maxCriticalViolationsAllowed?: number;
 }
 
 /**
@@ -255,6 +268,7 @@ export const ProctoringProvider: React.FC<{
       videoRef,
       syncViolations,
       flushEvidence,
+      config,
     }}>
       {children}
     </ProctoringContext.Provider>

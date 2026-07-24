@@ -13,11 +13,14 @@ import {
   CheckCircle2,
   Eye,
   EyeOff,
+  Loader2,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { authService } from "@/lib/auth-service";
 import { getRedirectPathForRole } from "@/lib/auth-utils";
 import { useAuth } from "@/lib/auth-context";
+import { validateLoginForm } from "@/lib/auth/formValidation";
+import { cn } from "@/lib/utils";
 
 const features = [
   "MCQ & Coding Assessments",
@@ -53,6 +56,7 @@ export default function Login() {
 
   const handleAdminLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isLoading) return;
     setIsLoading(true);
     try {
       const response = await authService.login({
@@ -106,6 +110,7 @@ export default function Login() {
 
   const handleStudentAccess = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isLoading) return;
     setIsLoading(true);
     try {
       const response = await authService.login({
@@ -277,11 +282,17 @@ export default function Login() {
                     id="adminEmail"
                     type="email"
                     placeholder="admin@company.com"
-                    className="h-12"
+                    className={cn(
+                      "h-12",
+                      adminEmail && validateLoginForm({ email: adminEmail }).errors.email && "border-red-500 focus-visible:ring-red-500"
+                    )}
                     value={adminEmail}
                     onChange={(event) => setAdminEmail(event.target.value)}
                     required
                   />
+                  {adminEmail && validateLoginForm({ email: adminEmail }).errors.email && (
+                    <p className="text-xs text-red-500 font-medium">Please enter a valid email address (e.g. user@domain.com)</p>
+                  )}
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="adminPassword">Password</Label>
@@ -324,7 +335,14 @@ export default function Login() {
                   className="w-full"
                   disabled={isLoading}
                 >
-                  {isLoading ? "Signing in..." : "Sign in as Admin"}
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Signing in...
+                    </>
+                  ) : (
+                    "Sign in as Admin"
+                  )}
                 </Button>
                 {showColdStartMessage && (
                   <p className="text-center text-xs text-amber-500 animate-pulse mt-2">
@@ -355,11 +373,17 @@ export default function Login() {
                     id="studentEmail"
                     type="email"
                     placeholder="candidate@email.com"
-                    className="h-12"
+                    className={cn(
+                      "h-12",
+                      studentEmail && validateLoginForm({ email: studentEmail }).errors.email && "border-red-500 focus-visible:ring-red-500"
+                    )}
                     value={studentEmail}
                     onChange={(event) => setStudentEmail(event.target.value)}
                     required
                   />
+                  {studentEmail && validateLoginForm({ email: studentEmail }).errors.email && (
+                    <p className="text-xs text-red-500 font-medium">Please enter a valid email address (e.g. user@domain.com)</p>
+                  )}
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="studentPassword">Password</Label>
@@ -393,7 +417,14 @@ export default function Login() {
                   className="w-full"
                   disabled={isLoading}
                 >
-                  {isLoading ? "Signing in..." : "Sign in as Candidate"}
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Signing in...
+                    </>
+                  ) : (
+                    "Sign in as Candidate"
+                  )}
                 </Button>
                 {showColdStartMessage && (
                   <p className="text-center text-xs text-amber-500 animate-pulse mt-2">

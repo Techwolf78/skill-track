@@ -11,6 +11,7 @@ import { toast } from "sonner";
 export default function Settings() {
   const [showCurrent, setShowCurrent] = useState(false);
   const [showNew, setShowNew] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
 
   const [passwordForm, setPasswordForm] = useState({
     current: "",
@@ -128,13 +129,23 @@ export default function Settings() {
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="confirm">Confirm New Password</Label>
-                  <Input 
-                    id="confirm" 
-                    type="password" 
-                    value={passwordForm.confirm}
-                    onChange={(e) => setPasswordForm({ ...passwordForm, confirm: e.target.value })}
-                    required
-                  />
+                  <div className="relative">
+                    <Input 
+                      id="confirm" 
+                      type={showConfirm ? "text" : "password"} 
+                      value={passwordForm.confirm}
+                      onChange={(e) => setPasswordForm({ ...passwordForm, confirm: e.target.value })}
+                      className="pr-10"
+                      required
+                    />
+                    <button 
+                      type="button" 
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                      onClick={() => setShowConfirm(!showConfirm)}
+                    >
+                      {showConfirm ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
                 </div>
               </CardContent>
               <CardFooter className="border-t border-border/40 p-6 flex justify-end">
