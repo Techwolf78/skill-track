@@ -90,6 +90,7 @@ const App = () => (
               <Route path="/login" element={<Login />} />
               <Route path="/unauthorized" element={<NotFound />} />
               <Route path="/seed-data" element={<SeedData />} />
+              <Route path="/seed" element={<SeedData />} />
               {/* SuperAdmin Routes (SUPERADMIN role only) */}
               <Route
                 path="/superadmin"

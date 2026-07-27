@@ -17,6 +17,7 @@ import { userService } from "@/lib/user-service";
 import { testService, CreateQuestionRequest, Question } from "@/lib/test-service";
 import { candidateService } from "@/lib/candidate-service";
 import { apiClient } from "@/lib/api-client";
+import { useAuthStore } from "@/lib/auth-store";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
@@ -57,6 +58,7 @@ export default function SeedData() {
   const [isSeedingCompleted, setIsSeedingCompleted] = useState(false);
   const [seedEmail, setSeedEmail] = useState("superadmin@gryphonacademy.co.in");
   const [seedPassword, setSeedPassword] = useState("password123");
+  const [dataSet, setDataSet] = useState<"A" | "B" | "C" | "D">("A");
 
   const consoleEndRef = useRef<HTMLDivElement>(null);
 
@@ -73,6 +75,7 @@ export default function SeedData() {
     { id: "tests", name: "Build & Publish Assessments", description: "Creating 3 active, ready-to-test assessments", status: "idle" },
     { id: "schedules", name: "Generate Test Schedules", description: "Creating active calendar schedule pipelines", status: "idle" },
     { id: "invitations", name: "Invite Candidates & Get Tokens", description: "Assigning candidates to schedules & retrieving links", status: "idle" },
+    { id: "sessions", name: "Start Candidate Test Sessions", description: "Initializing test sessions for Reports & Proctoring Dashboards", status: "idle" },
   ]);
 
   // Scroll console to bottom when new logs appear
@@ -160,27 +163,30 @@ export default function SeedData() {
     const testIds: string[] = [];
     const scheduleIds: string[] = [];
 
+    const prefix = `[Set ${dataSet}] `;
+    const emailTag = dataSet.toLowerCase();
+
     const candidatesList = [
-      { name: "Ajay Pawar", email: "ajay@gryphonacademy.co.in", org: "gryphon" },
-      { name: "John Doe", email: "john.doe@gryphonacademy.co.in", org: "gryphon" },
-      { name: "Jane Smith", email: "jane.smith@gryphonacademy.co.in", org: "gryphon" },
-      { name: "Alice Johnson", email: "alice.johnson@gryphonacademy.co.in", org: "gryphon" },
-      { name: "Bob Miller", email: "bob.miller@gryphonacademy.co.in", org: "gryphon" },
-      { name: "Charlie Davis", email: "charlie.davis@gryphonacademy.co.in", org: "gryphon" },
-      { name: "David Wilson", email: "david.wilson@gryphonacademy.co.in", org: "gryphon" },
-      { name: "Emily Taylor", email: "emily.taylor@gryphonacademy.co.in", org: "gryphon" },
-      { name: "Frank Harris", email: "frank.harris@gryphonacademy.co.in", org: "gryphon" },
-      { name: "Grace Clark", email: "grace.clark@gryphonacademy.co.in", org: "gryphon" },
-      { name: "Henry Lewis", email: "henry.lewis@gryphonacademy.co.in", org: "gryphon" },
-      { name: "Ivy Young", email: "ivy.young@gryphonacademy.co.in", org: "gryphon" },
-      { name: "Jack King", email: "jack.king@gryphonacademy.co.in", org: "gryphon" },
-      { name: "Karen Green", email: "karen.green@gryphonacademy.co.in", org: "gryphon" },
-      { name: "Leo Wright", email: "leo.wright@gryphonacademy.co.in", org: "gryphon" },
-      { name: "Mia Scott", email: "mia.scott@gryphonacademy.co.in", org: "gryphon" },
-      { name: "Nathan Adams", email: "nathan.adams@gryphonacademy.co.in", org: "gryphon" },
-      { name: "Olivia Baker", email: "olivia.baker@gryphonacademy.co.in", org: "gryphon" },
-      { name: "Peter Carter", email: "peter.carter@gryphonacademy.co.in", org: "gryphon" },
-      { name: "Quinn Mitchell", email: "quinn.mitchell@gryphonacademy.co.in", org: "gryphon" },
+      { name: `Ajay Pawar (${dataSet})`, email: `ajay.${emailTag}@gryphonacademy.co.in`, org: "gryphon" },
+      { name: `John Doe (${dataSet})`, email: `john.doe.${emailTag}@gryphonacademy.co.in`, org: "gryphon" },
+      { name: `Jane Smith (${dataSet})`, email: `jane.smith.${emailTag}@gryphonacademy.co.in`, org: "gryphon" },
+      { name: `Alice Johnson (${dataSet})`, email: `alice.johnson.${emailTag}@gryphonacademy.co.in`, org: "gryphon" },
+      { name: `Bob Miller (${dataSet})`, email: `bob.miller.${emailTag}@gryphonacademy.co.in`, org: "gryphon" },
+      { name: `Charlie Davis (${dataSet})`, email: `charlie.davis.${emailTag}@gryphonacademy.co.in`, org: "gryphon" },
+      { name: `David Wilson (${dataSet})`, email: `david.wilson.${emailTag}@gryphonacademy.co.in`, org: "gryphon" },
+      { name: `Emily Taylor (${dataSet})`, email: `emily.taylor.${emailTag}@gryphonacademy.co.in`, org: "gryphon" },
+      { name: `Frank Harris (${dataSet})`, email: `frank.harris.${emailTag}@gryphonacademy.co.in`, org: "gryphon" },
+      { name: `Grace Clark (${dataSet})`, email: `grace.clark.${emailTag}@gryphonacademy.co.in`, org: "gryphon" },
+      { name: `Henry Lewis (${dataSet})`, email: `henry.lewis.${emailTag}@gryphonacademy.co.in`, org: "gryphon" },
+      { name: `Ivy Young (${dataSet})`, email: `ivy.young.${emailTag}@gryphonacademy.co.in`, org: "gryphon" },
+      { name: `Jack King (${dataSet})`, email: `jack.king.${emailTag}@gryphonacademy.co.in`, org: "gryphon" },
+      { name: `Karen Green (${dataSet})`, email: `karen.green.${emailTag}@gryphonacademy.co.in`, org: "gryphon" },
+      { name: `Leo Wright (${dataSet})`, email: `leo.wright.${emailTag}@gryphonacademy.co.in`, org: "gryphon" },
+      { name: `Mia Scott (${dataSet})`, email: `mia.scott.${emailTag}@gryphonacademy.co.in`, org: "gryphon" },
+      { name: `Nathan Adams (${dataSet})`, email: `nathan.adams.${emailTag}@gryphonacademy.co.in`, org: "gryphon" },
+      { name: `Olivia Baker (${dataSet})`, email: `olivia.baker.${emailTag}@gryphonacademy.co.in`, org: "gryphon" },
+      { name: `Peter Carter (${dataSet})`, email: `peter.carter.${emailTag}@gryphonacademy.co.in`, org: "gryphon" },
+      { name: `Quinn Mitchell (${dataSet})`, email: `quinn.mitchell.${emailTag}@gryphonacademy.co.in`, org: "gryphon" },
     ];
 
     try {
@@ -1027,8 +1033,8 @@ export default function SeedData() {
 
       const testAssessments = [
         {
-          title: "Full Stack Engineer Assessment",
-          description: "Comprehensive review of React foundations and core arrays algorithms.",
+          title: `${prefix}Full Stack Engineer Assessment`,
+          description: `Comprehensive review of React foundations and core arrays algorithms (${prefix.trim()}).`,
           durationMins: 45,
           difficulty: "EASY" as const,
           passMark: 40,
@@ -1036,8 +1042,8 @@ export default function SeedData() {
           questionIndexes: [0, 3, 4, 8, 10] // 4 MCQs, 1 Coding (Two Sum)
         },
         {
-          title: "Problem Solving & DSA Challenge",
-          description: "Core algorithms evaluations on String manipulations and Dynamic programming.",
+          title: `${prefix}Problem Solving & DSA Challenge`,
+          description: `Core algorithms evaluations on String manipulations and Dynamic programming (${prefix.trim()}).`,
           durationMins: 60,
           difficulty: "MEDIUM" as const,
           passMark: 50,
@@ -1045,8 +1051,8 @@ export default function SeedData() {
           questionIndexes: [1, 2, 5, 7, 11, 14] // 4 MCQs, 2 Coding (String, Prime)
         },
         {
-          title: "Advanced Systems Engineer Assessment",
-          description: "Rigorous test covering OS semaphores, Database isolations, stacks, and stairs DP.",
+          title: `${prefix}Advanced Systems Engineer Assessment`,
+          description: `Rigorous test covering OS semaphores, Database isolations, stacks, and stairs DP (${prefix.trim()}).`,
           durationMins: 90,
           difficulty: "HARD" as const,
           passMark: 60,
@@ -1128,28 +1134,30 @@ export default function SeedData() {
 
       let dbSchedules: Array<{ id: string; testId: string }> = [];
       try {
-        dbSchedules = await testService.getAllTestSchedules();
+        const schedRes = await apiClient.get("/test-schedules?size=1000");
+        dbSchedules = schedRes.data?.data?.content || schedRes.data?.data || schedRes.data || [];
       } catch (e) {
         addLog("⚠️ Failed to load existing test schedules.", "warning");
       }
       await delay(200);
 
       for (const tId of testIds) {
-        try {
-          const schedule = await testService.createTestSchedule({
-            testId: tId,
-            startTime: startTime,
-            endTime: endTime,
-            maxCandidates: 100
-          });
-          scheduleIds.push(schedule.id);
-          addLog(`📅 Schedule Activated: [ID: ${schedule.id}] for Test: ${tId}`, "success");
-        } catch (e) {
-          const found = dbSchedules.find(s => s.testId === tId);
-          if (found) {
-            scheduleIds.push(found.id);
-            addLog(`⚠️ Schedule for Test ID ${tId} already active. Reused ID: ${found.id}`, "warning");
-          } else {
+        // Reuse existing schedule if one already exists for this test
+        const existingSchedule = dbSchedules.find(s => s.testId === tId);
+        if (existingSchedule) {
+          scheduleIds.push(existingSchedule.id);
+          addLog(`⚠️ Schedule for Test ID ${tId} already active. Reusing ID: ${existingSchedule.id}`, "warning");
+        } else {
+          try {
+            const schedule = await testService.createTestSchedule({
+              testId: tId,
+              startTime: startTime,
+              endTime: endTime,
+              maxCandidates: 100
+            });
+            scheduleIds.push(schedule.id);
+            addLog(`📅 Schedule Activated: [ID: ${schedule.id}] for Test: ${tId}`, "success");
+          } catch (e) {
             addLog(`⚠️ Skipping Schedule error for Test ID ${tId}. Automatically moving to next stage.`, "warning");
           }
         }
@@ -1168,15 +1176,21 @@ export default function SeedData() {
 
       const newSeededCandidates: SeededCandidate[] = [];
       const testNames = [
-        "Full Stack Engineer Assessment",
-        "Problem Solving & DSA Challenge",
-        "Advanced Systems Engineer Assessment"
+        `${prefix}Full Stack Engineer Assessment`,
+        `${prefix}Problem Solving & DSA Challenge`,
+        `${prefix}Advanced Systems Engineer Assessment`
       ];
+
+      // Pre-fetch candidate invitations to prevent duplicates
+      let existingInvs: Array<{ candidateId: string; scheduleId: string }> = [];
+      try {
+        const invCheckRes = await apiClient.get("/candidate-invitations?size=1000");
+        existingInvs = invCheckRes.data?.data?.content || invCheckRes.data?.data || invCheckRes.data || [];
+      } catch { /* ignore fallback */ }
 
       // Mapped pool distributions
       for (let i = 0; i < candidateIds.length; i++) {
         const cId = candidateIds[i];
-        const cEmail = candidatesList[i]?.email || `candidate-${i}@gryphonacademy.co.in`;
         const cName = candidatesList[i]?.name || `Candidate ${i}`;
         
         let scheduleIdx = 0;
@@ -1187,14 +1201,19 @@ export default function SeedData() {
         const tTitle = testNames[scheduleIdx];
 
         if (schedId) {
-          try {
-            await apiClient.post("/candidate-invitations", {
-              scheduleId: schedId,
-              candidateId: cId
-            });
-            addLog(`📨 Invited candidate "${cName}" to "${tTitle}"`, "info");
-          } catch (invError) {
-            addLog(`⚠️ Invitation skipped/already exists for candidate: "${cName}"`, "warning");
+          const alreadyInvited = existingInvs.some(inv => inv.candidateId === cId && inv.scheduleId === schedId);
+          if (alreadyInvited) {
+            addLog(`⚠️ Candidate "${cName}" already invited to "${tTitle}". Skipping duplicate.`, "warning");
+          } else {
+            try {
+              await apiClient.post("/candidate-invitations", {
+                scheduleId: schedId,
+                candidateId: cId
+              });
+              addLog(`📨 Invited candidate "${cName}" to "${tTitle}"`, "info");
+            } catch {
+              addLog(`⚠️ Candidate "${cName}" is already invited to schedule. Proceeding...`, "warning");
+            }
           }
           await delay(200);
         }
@@ -1258,6 +1277,45 @@ export default function SeedData() {
       addLog(`✨ Sandbox ready! Onboarded ${newSeededCandidates.length} clickable sandbox testing links.`, "success");
       updateStepStatus("invitations", "completed");
 
+      // ----------------------------------------------------
+      // STEP 12: START CANDIDATE TEST SESSIONS
+      // ----------------------------------------------------
+      setCurrentStepIndex(11);
+      updateStepStatus("sessions", "running");
+      setProgress(98);
+      addLog("Starting Test Sessions for candidates to populate Reports & Proctoring Dashboards...", "info");
+
+      // Pre-fetch existing sessions to prevent redundant session starts
+      let existingSessionInvIds: string[] = [];
+      try {
+        const sessCheckRes = await apiClient.get("/test-sessions?size=1000");
+        const sessList = sessCheckRes.data?.data?.content || sessCheckRes.data?.data || sessCheckRes.data || [];
+        if (Array.isArray(sessList)) {
+          existingSessionInvIds = sessList.map((s: { invitationId?: string; invitation?: { id?: string } }) => s.invitationId || s.invitation?.id || "");
+        }
+      } catch { /* ignore fallback */ }
+
+      let sessionCount = 0;
+      for (const inv of listInv) {
+        if (existingSessionInvIds.includes(inv.id)) {
+          addLog(`⚠️ Session already active for invitation ${inv.id.substring(0, 8)}. Skipping duplicate.`, "warning");
+        } else {
+          try {
+            await apiClient.post("/test-sessions/start", {
+              invitationId: inv.id,
+              ipAddress: "127.0.0.1"
+            });
+            sessionCount++;
+            addLog(`🚀 Started test session for invitation ${inv.id.substring(0, 8)}...`, "info");
+          } catch (sessErr) {
+            // Session may already be started/active
+          }
+        }
+        await delay(100);
+      }
+      addLog(`✅ Verified/Initialized ${sessionCount} live candidate test sessions for Reports & Proctoring!`, "success");
+      updateStepStatus("sessions", "completed");
+
       // Complete Seeding
       setProgress(100);
       setIsSeedingCompleted(true);
@@ -1267,15 +1325,16 @@ export default function SeedData() {
       addLog(`   Password: ${seedPassword || "password123"}`, "info");
       addLog("🎉 Seeder has auto-configured authentication state. Click 'Go to Dashboard' to log in!", "success");
 
-      // Force save authenticated Super Admin state so dashboard opens instantly
+      // Force save authenticated Super Admin state so React Auth Store and dashboard open instantly
       if (superadminToken) {
-        localStorage.setItem("token", superadminToken);
-        localStorage.setItem("user", JSON.stringify({
+        const adminUserData = {
+          id: "00000000-0000-0000-0000-000000000001",
           name: "Super Admin",
           email: seedEmail || "superadmin@gryphonacademy.co.in",
           role: "SUPERADMIN",
           organisationId: gryphonOrgId
-        }));
+        };
+        useAuthStore.getState().login(superadminToken, adminUserData);
       }
 
       toast({
@@ -1297,6 +1356,105 @@ export default function SeedData() {
         title: "Seeding Fault",
         description: err.response?.data?.message || err.message || "Seeder fault.",
         variant: "destructive"
+      });
+    } finally {
+      setIsSeeding(false);
+    }
+  };
+
+  // Standalone Purge / Reset Database Action with SuperAdmin Authentication
+  const handlePurgeDatabase = async () => {
+    if (isSeeding) return;
+    setIsSeeding(true);
+    addLog("🔐 Authenticating Super Admin to acquire authorization token for purge...", "info");
+    
+    let tokenToUse = localStorage.getItem("token") || "";
+
+    try {
+      // Step A: Authenticate to get valid JWT token
+      if (seedEmail && seedPassword) {
+        try {
+          const authData = await authService.login({
+            email: seedEmail,
+            password: seedPassword,
+          });
+          tokenToUse = authData.accessToken;
+          useAuthStore.getState().login(tokenToUse, authData.user);
+          addLog(`✅ Super Admin authentication successful (${seedEmail}). Token acquired!`, "success");
+        } catch (loginErr: unknown) {
+          const err = loginErr as { response?: { data?: { message?: string } }; message?: string };
+          addLog(`⚠️ Auth warning for ${seedEmail}: ${err.response?.data?.message || err.message}`, "warning");
+        }
+      }
+
+      // Fallback auth
+      if (!tokenToUse) {
+        try {
+          const authData = await authService.login({
+            email: "superadmin@gryphonacademy.co.in",
+            password: "password123",
+          });
+          tokenToUse = authData.accessToken;
+          useAuthStore.getState().login(tokenToUse, authData.user);
+          addLog("✅ Master Super Admin authenticated. Token acquired!", "success");
+        } catch {
+          addLog("⚠️ Using existing session token...", "info");
+        }
+      }
+
+      addLog("🧹 Purging active test sessions, candidate invitations & test schedules...", "warning");
+
+      // 1. Purge Test Sessions first
+      try {
+        const sessRes = await apiClient.get("/test-sessions?size=1000");
+        const sessList = sessRes.data?.data?.content || sessRes.data?.data || sessRes.data || [];
+        if (Array.isArray(sessList)) {
+          for (const sess of sessList) {
+            if (sess.id) {
+              try { await apiClient.delete(`/test-sessions/${sess.id}`); } catch { /* ignore */ }
+            }
+          }
+          addLog(`🧹 Purged ${sessList.length} test sessions.`, "info");
+        }
+      } catch {
+        // sessions endpoint query fallback
+      }
+
+      // 2. Purge Candidate Invitations
+      const invRes = await apiClient.get("/candidate-invitations?size=1000");
+      const invList = invRes.data?.data?.content || invRes.data?.data || invRes.data || [];
+      if (Array.isArray(invList)) {
+        for (const inv of invList) {
+          if (inv.id) {
+            try { await apiClient.delete(`/candidate-invitations/${inv.id}`); } catch { /* ignore */ }
+          }
+        }
+        addLog(`🧹 Successfully purged ${invList.length} candidate invitations.`, "success");
+      }
+
+      // 3. Purge Test Schedules
+      const schedRes = await apiClient.get("/test-schedules?size=1000");
+      const schedList = schedRes.data?.data?.content || schedRes.data?.data || schedRes.data || [];
+      if (Array.isArray(schedList)) {
+        for (const s of schedList) {
+          if (s.id) {
+            try { await apiClient.delete(`/test-schedules/${s.id}`); } catch { /* ignore */ }
+          }
+        }
+        addLog(`🧹 Successfully purged ${schedList.length} test schedules.`, "success");
+      }
+
+      toast({
+        title: "Seed Data Reset Complete",
+        description: "Authenticated & purged all test schedules and candidate invitations.",
+      });
+    } catch (e: unknown) {
+      const err = e as { message?: string };
+      addLog(`❌ Purge operation failed: ${err.message}`, "error");
+      toast({
+        title: "Purge Failed",
+        description: err.message || "Failed to purge database data.",
+        variant: "destructive",
       });
     } finally {
       setIsSeeding(false);
@@ -1395,6 +1553,30 @@ export default function SeedData() {
 
                 <div className="space-y-3 p-4 bg-slate-950/40 rounded-xl border border-slate-800/40">
                   <div className="flex items-center gap-2 text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                    <Database className="w-4 h-4 text-accent" />
+                    <span>Select Seed Data Target Set</span>
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="seed-dataset" className="text-slate-400 text-xs font-medium">
+                      Data Batch / Set Profile
+                    </Label>
+                    <select
+                      id="seed-dataset"
+                      value={dataSet}
+                      onChange={(e) => setDataSet(e.target.value as "A" | "B" | "C" | "D")}
+                      disabled={isSeeding}
+                      className="w-full h-9 bg-slate-950/80 border border-slate-800 rounded-md text-slate-200 text-xs px-3 focus:outline-none focus:ring-1 focus:ring-primary"
+                    >
+                      <option value="A">Set A — Baseline Engineer Cohort</option>
+                      <option value="B">Set B — Batch 2 Candidate Pool</option>
+                      <option value="C">Set C — Full-Stack Evaluation Set</option>
+                      <option value="D">Set D — Systems & Performance Cohort</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="space-y-3 p-4 bg-slate-950/40 rounded-xl border border-slate-800/40">
+                  <div className="flex items-center gap-2 text-xs font-semibold text-slate-400 uppercase tracking-wider">
                     <Lock className="w-4 h-4 text-primary" />
                     <span>System Credentials (to authenticate seeder)</span>
                   </div>
@@ -1431,24 +1613,37 @@ export default function SeedData() {
                 </div>
 
                 {!isSeedingCompleted ? (
-                  <Button
-                    onClick={handleSeedDatabase}
-                    disabled={isSeeding}
-                    size="lg"
-                    className="w-full bg-gradient-primary text-white hover:opacity-90 font-bold transition-all shadow-primary h-12 flex items-center justify-center gap-2"
-                  >
-                    {isSeeding ? (
-                      <>
-                        <Loader2 className="w-5 h-5 animate-spin" />
-                        Seeding Environment...
-                      </>
-                    ) : (
-                      <>
-                        <Play className="w-5 h-5 fill-current" />
-                        Begin Vast Bulk Seed
-                      </>
-                    )}
-                  </Button>
+                  <div className="space-y-3">
+                    <Button
+                      onClick={handleSeedDatabase}
+                      disabled={isSeeding}
+                      size="lg"
+                      className="w-full bg-gradient-primary text-white hover:opacity-90 font-bold transition-all shadow-primary h-12 flex items-center justify-center gap-2"
+                    >
+                      {isSeeding ? (
+                        <>
+                          <Loader2 className="w-5 h-5 animate-spin" />
+                          Seeding Environment...
+                        </>
+                      ) : (
+                        <>
+                          <Play className="w-5 h-5 fill-current" />
+                          Begin Bulk Seed
+                        </>
+                      )}
+                    </Button>
+
+                    <Button
+                      onClick={handlePurgeDatabase}
+                      disabled={isSeeding}
+                      variant="outline"
+                      size="sm"
+                      className="w-full border-rose-800/50 bg-rose-950/20 hover:bg-rose-950/40 text-rose-300 hover:text-rose-100 flex items-center justify-center gap-2"
+                    >
+                      <XCircle className="w-4 h-4 text-rose-400" />
+                      Purge Schedules & Invitations
+                    </Button>
+                  </div>
                 ) : (
                   <Button
                     onClick={() => navigate("/superadmin")}
