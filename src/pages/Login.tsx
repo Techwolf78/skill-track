@@ -157,8 +157,8 @@ export default function Login() {
   };
 
   const fillStudentCredentials = () => {
-    setStudentEmail("deepgryphon@gmail.com");
-    setStudentPassword("");
+    setStudentEmail("candidate@email.com");
+    setStudentPassword("candidate123");
   };
 
   return (
