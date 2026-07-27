@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useProctoring } from "@/proctoring/ProctoringProvider";
-import { AlertCircle, AlertTriangle, Info } from "lucide-react";
+import { AlertCircle, AlertTriangle, Info, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Violation } from "../../types/proctoring.types";
 import { motion, AnimatePresence } from "framer-motion";
@@ -29,9 +29,9 @@ export const ViolationToast: React.FC = () => {
     }
   }, [violations]);
 
-  const handleDismiss = (id: string) => {
+  const handleDismiss = useCallback((id: string) => {
     setActiveViolations(prev => prev.filter(v => v.id !== id));
-  };
+  }, []);
   
   if (activeViolations.length === 0) return null;
 
@@ -58,9 +58,9 @@ const ViolationItem: React.FC<{ violation: Violation; onDismiss: () => void }> =
   useEffect(() => {
     const timer = setTimeout(() => {
       onDismiss();
-    }, 6000);
+    }, 4000);
     return () => clearTimeout(timer);
-  }, [onDismiss]);
+  }, [violation.id, onDismiss]);
 
   const severityColors = {
     LOW: "border-blue-500 bg-blue-50 text-blue-900 dark:bg-blue-950 dark:text-blue-100",
@@ -78,20 +78,27 @@ const ViolationItem: React.FC<{ violation: Violation; onDismiss: () => void }> =
 
   return (
     <div className={cn(
-      "flex items-start gap-2 p-2.5 rounded-md border shadow-md pointer-events-auto",
+      "flex items-start gap-2 p-2.5 rounded-md border shadow-md pointer-events-auto relative group",
       severityColors[violation.severity]
     )}>
       <div className="mt-0.5">
         {severityIcons[violation.severity]}
       </div>
-      <div className="flex-1">
+      <div className="flex-1 pr-4">
         <h4 className="text-[10px] font-bold leading-none mb-1">
-          {violation.type.replace("_", " ")}
+          {violation.type.replace(/_/g, " ")}
         </h4>
         <p className="text-[8px] opacity-80 leading-tight">
           {new Date(violation.timestamp).toLocaleTimeString()} - {violation.severity} severity
         </p>
       </div>
+      <button
+        onClick={onDismiss}
+        className="absolute top-1.5 right-1.5 p-0.5 rounded opacity-60 hover:opacity-100 transition-opacity"
+        aria-label="Dismiss warning"
+      >
+        <X className="h-3 w-3" />
+      </button>
     </div>
   );
 };

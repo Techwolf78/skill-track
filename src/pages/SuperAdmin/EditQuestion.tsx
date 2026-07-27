@@ -284,22 +284,25 @@ export default function EditQuestion() {
   });
 
   const handleParamChange = (index: number, field: keyof SignatureParameter, value: string) => {
-    const updatedParams = [...signature.params];
+    const paramsList = signature.params || [];
+    const updatedParams = [...paramsList];
     updatedParams[index] = { ...updatedParams[index], [field]: value };
     setSignature({ ...signature, params: updatedParams });
   };
 
   const addParameter = () => {
+    const paramsList = signature.params || [];
     setSignature({
       ...signature,
-      params: [...signature.params, { name: `param${signature.params.length + 1}`, type: "int" }]
+      params: [...paramsList, { name: `param${paramsList.length + 1}`, type: "int" }]
     });
   };
 
   const removeParameter = (index: number) => {
+    const paramsList = signature.params || [];
     setSignature({
       ...signature,
-      params: signature.params.filter((_, i) => i !== index)
+      params: paramsList.filter((_, i) => i !== index)
     });
   };
 
@@ -444,7 +447,13 @@ export default function EditQuestion() {
           });
         }
         if (questionData.signatureMetadata) {
-          setSignature(questionData.signatureMetadata);
+          setSignature({
+            method_name: questionData.signatureMetadata.method_name || "",
+            return_type: questionData.signatureMetadata.return_type || "",
+            params: Array.isArray(questionData.signatureMetadata.params)
+              ? questionData.signatureMetadata.params
+              : [],
+          });
         }
         if (questionData.languageTemplates) {
           const lTemplates: LanguageTemplates = {
@@ -1951,7 +1960,7 @@ export default function EditQuestion() {
                     </Button>
                   </div>
                   
-                  {signature.params.map((param, index) => (
+                  {(signature?.params || []).map((param, index) => (
                     <div key={index} className="flex gap-2 items-center">
                       <Input
                         value={param.name}
@@ -1970,7 +1979,7 @@ export default function EditQuestion() {
                         variant="ghost"
                         size="icon"
                         onClick={() => removeParameter(index)}
-                        disabled={signature.params.length <= 1}
+                        disabled={(signature?.params || []).length <= 1}
                       >
                         <Trash2 className="w-4 h-4 text-destructive" />
                       </Button>
