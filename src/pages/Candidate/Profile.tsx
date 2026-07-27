@@ -29,17 +29,24 @@ export default function Profile() {
   const realPhone: string = storedUser?.phoneNumber || "";
 
   const [formData, setFormData] = useState({
-    name: realName,
-    email: realEmail,
-    phone: realPhone,
-    location: "",
-    university: "",
-    degree: "",
-    gradYear: "",
-    cgpa: ""
+    name: realName || "Candidate",
+    email: realEmail || "gorodoro@gmail.com",
+    phone: realPhone || "+91 98765 43210",
+    location: "Pune, Maharashtra, India",
+    university: "Gryphon Academy of Technology",
+    degree: "B.Tech Computer Science & Engineering",
+    gradYear: "2026",
+    cgpa: "8.9 / 10.0"
   });
 
-  const [skills, setSkills] = useState<string[]>([]);
+  const [skills, setSkills] = useState<string[]>([
+    "React.js",
+    "Node.js",
+    "Data Structures & Algorithms",
+    "TypeScript",
+    "PostgreSQL",
+    "System Design"
+  ]);
   const [newSkill, setNewSkill] = useState("");
   const [resume, setResume] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
