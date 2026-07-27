@@ -92,9 +92,6 @@ export function CandidateLayout() {
               >
                 <item.icon className={cn("w-5 h-5 flex-shrink-0 transition-transform duration-200 group-hover:scale-110", collapsed && "mx-auto")} />
                 {!collapsed ? <span className="font-medium text-sm">{item.label}</span> : null}
-                {active && !collapsed && (
-                  <span className="absolute right-3 w-1.5 h-1.5 rounded-full bg-white animate-ping" />
-                )}
               </NavLink>
             );
           })}
