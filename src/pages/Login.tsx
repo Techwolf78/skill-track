@@ -157,8 +157,8 @@ export default function Login() {
   };
 
   const fillStudentCredentials = () => {
-    setStudentEmail("ajay.a@gryphonacademy.co.in");
-    setStudentPassword("password123");
+    setStudentEmail("gorodoro@gmail.com");
+    setStudentPassword("12345678");
   };
 
   return (
@@ -372,7 +372,7 @@ export default function Login() {
                   <Input
                     id="studentEmail"
                     type="email"
-                    placeholder="candidate@email.com"
+                    placeholder="gorodoro@gmail.com"
                     className={cn(
                       "h-12",
                       studentEmail && validateLoginForm({ email: studentEmail }).errors.email && "border-red-500 focus-visible:ring-red-500"
