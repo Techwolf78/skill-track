@@ -157,8 +157,8 @@ export default function Login() {
   };
 
   const fillStudentCredentials = () => {
-    setStudentEmail("candidate@email.com");
-    setStudentPassword("candidate123");
+    setStudentEmail("ajay.a@gryphonacademy.co.in");
+    setStudentPassword("password123");
   };
 
   return (
