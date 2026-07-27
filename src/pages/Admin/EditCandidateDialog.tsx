@@ -24,6 +24,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
+import { CustomFieldsSection, CustomFieldItem } from "@/components/candidates/CustomFieldsSection";
+
 interface EditCandidateDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -35,15 +37,11 @@ interface EditCandidateDialogProps {
 export function EditCandidateDialog({ open, onOpenChange, candidate, onSuccess, isSuperAdmin }: EditCandidateDialogProps) {
   const [loading, setLoading] = useState(false);
   const [organisations, setOrganisations] = useState<OrganisationResponse[]>([]);
+  const [customFields, setCustomFields] = useState<CustomFieldItem[]>([]);
   const [formData, setFormData] = useState({
     name: "",
     phoneNumber: "",
     organisationId: "",
-    college: "",
-    course: "",
-    year: "",
-    city: "",
-    skills: "",
   });
   const { toast } = useToast();
 
@@ -63,14 +61,22 @@ export function EditCandidateDialog({ open, onOpenChange, candidate, onSuccess, 
         name: candidate.user.name || "",
         phoneNumber: candidate.user.phoneNumber || "",
         organisationId: candidate.organisation?.id || "",
-        college: (candidate.extraFields?.college as string) || "",
-        course: (candidate.extraFields?.course as string) || "",
-        year: (candidate.extraFields?.year as string) || "",
-        city: (candidate.extraFields?.city as string) || "",
-        skills: Array.isArray(candidate.extraFields?.skills) 
-          ? (candidate.extraFields?.skills as string[]).join(", ")
-          : (candidate.extraFields?.skills as string) || "",
       });
+
+      const loadedCustomFields: CustomFieldItem[] = [];
+      if (candidate.extraFields) {
+        Object.entries(candidate.extraFields).forEach(([k, v]) => {
+          if (v !== undefined && v !== null) {
+            const valStr = Array.isArray(v) ? v.join(", ") : String(v);
+            loadedCustomFields.push({
+              id: "cf_" + Math.random().toString(36).substring(2, 9),
+              key: k,
+              value: valStr,
+            });
+          }
+        });
+      }
+      setCustomFields(loadedCustomFields);
     }
   }, [candidate]);
 
@@ -89,14 +95,14 @@ export function EditCandidateDialog({ open, onOpenChange, candidate, onSuccess, 
 
     setLoading(true);
     try {
-      // Prepare extra fields
+      // Prepare extra fields from customFields
       const extraFields: Record<string, unknown> = {};
-      if (formData.college) extraFields.college = formData.college;
-      if (formData.course) extraFields.course = formData.course;
-      if (formData.year) extraFields.year = formData.year;
-      if (formData.city) extraFields.city = formData.city;
-      if (formData.skills) {
-        extraFields.skills = formData.skills.split(",").map(s => s.trim());
+      for (const item of customFields) {
+        const k = item.key.trim();
+        const v = item.value.trim();
+        if (k && v) {
+          extraFields[k] = v;
+        }
       }
 
       const payload: {
@@ -107,7 +113,7 @@ export function EditCandidateDialog({ open, onOpenChange, candidate, onSuccess, 
       } = {
         name: formData.name,
         phoneNumber: formData.phoneNumber || undefined,
-        extraFields: Object.keys(extraFields).length > 0 ? extraFields : undefined,
+        extraFields,
       };
 
       if (isSuperAdmin) {
@@ -191,51 +197,9 @@ export function EditCandidateDialog({ open, onOpenChange, candidate, onSuccess, 
             </div>
           </div>
 
-          {/* Additional Information */}
-          <div className="space-y-3 pt-2">
-            <h3 className="text-sm font-semibold text-primary">Additional Information</h3>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label>College</Label>
-                <Input
-                  placeholder="e.g., Pune University"
-                  value={formData.college}
-                  onChange={(e) => setFormData({ ...formData, college: e.target.value })}
-                />
-              </div>
-              <div>
-                <Label>Course</Label>
-                <Input
-                  placeholder="e.g., MCA"
-                  value={formData.course}
-                  onChange={(e) => setFormData({ ...formData, course: e.target.value })}
-                />
-              </div>
-              <div>
-                <Label>Year</Label>
-                <Input
-                  placeholder="e.g., Final Year"
-                  value={formData.year}
-                  onChange={(e) => setFormData({ ...formData, year: e.target.value })}
-                />
-              </div>
-              <div>
-                <Label>City</Label>
-                <Input
-                  placeholder="e.g., Pune"
-                  value={formData.city}
-                  onChange={(e) => setFormData({ ...formData, city: e.target.value })}
-                />
-              </div>
-              <div className="col-span-2">
-                <Label>Skills (comma separated)</Label>
-                <Input
-                  placeholder="e.g., Java, Spring Boot, React"
-                  value={formData.skills}
-                  onChange={(e) => setFormData({ ...formData, skills: e.target.value })}
-                />
-              </div>
-            </div>
+          {/* Custom Fields */}
+          <div>
+            <CustomFieldsSection customFields={customFields} onChange={setCustomFields} />
           </div>
         </div>
 

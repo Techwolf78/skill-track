@@ -154,24 +154,18 @@ const handleAddQuestions = async () => {
       defaultMarks
     });
 
-    // Add each question individually (since no bulk endpoint)
+    // Add each question individually, using its default marks from the question bank
     for (const questionId of selectedQuestions) {
       try {
         const currentOrderIndex = orderIndex++;
-        const requestData = {
-          testId: id!,
-          questionId: questionId,
-          orderIndex: currentOrderIndex,
-          marks: defaultMarks,
-        };
-        
-        console.log("Adding question:", requestData);
-        
+        const targetQ = questions.find((q) => q.id === questionId);
+        const questionMarks = targetQ?.marks ?? 1;
+
         const response = await testService.addQuestionToTest(
           id!,
           questionId,
           currentOrderIndex,
-          defaultMarks
+          questionMarks
         );
         
         console.log("Question added successfully:", response);
@@ -403,11 +397,13 @@ const handleAddQuestions = async () => {
                 {paginatedQuestions.map((question) => (
                   <div
                     key={question.id}
-                    className="flex items-start gap-4 p-4 border rounded-lg hover:bg-muted/50 transition-colors"
+                    onClick={() => handleQuestionSelect(question.id)}
+                    className="flex items-start gap-4 p-4 border rounded-lg hover:bg-muted/50 transition-colors cursor-pointer"
                   >
                     <Checkbox
                       checked={selectedQuestions.has(question.id)}
                       onCheckedChange={() => handleQuestionSelect(question.id)}
+                      onClick={(e) => e.stopPropagation()}
                     />
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-2 flex-wrap">
@@ -493,46 +489,30 @@ const handleAddQuestions = async () => {
         </CardContent>
       </Card>
 
-      {/* Selected Summary with Marks and Time Limit */}
+      {/* Selected Summary */}
       {selectedQuestions.size > 0 && (
         <div className="fixed bottom-6 right-6 bg-primary text-primary-foreground rounded-lg shadow-lg p-4">
-          <div className="space-y-3">
-            <div className="flex items-center gap-4">
-              <div>
-                <p className="font-semibold">
-                  {selectedQuestions.size} Question(s) Selected
-                </p>
-                <p className="text-xs opacity-80">
-                  Configure marks
-                </p>
-              </div>
+          <div className="flex items-center gap-4">
+            <div>
+              <p className="font-semibold">
+                {selectedQuestions.size} Question(s) Selected
+              </p>
+              <p className="text-xs opacity-80">
+                Preserves marks from Question Bank
+              </p>
             </div>
-            <div className="flex gap-2">
-              <div className="flex items-center gap-2">
-                <Label className="text-xs text-white/80">Marks:</Label>
-                <Input
-                  type="number"
-                  value={defaultMarks}
-                  onChange={(e) =>
-                    setDefaultMarks(parseInt(e.target.value) || 0)
-                  }
-                  className="w-20 h-8 text-sm bg-white/10 text-white border-white/20"
-                  min={1}
-                />
-              </div>
-              <Button
-                size="default"
-                variant="secondary"
-                onClick={handleAddQuestions}
-                disabled={adding}
-              >
-                {adding ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  "Add Selected"
-                )}
-              </Button>
-            </div>
+            <Button
+              size="default"
+              variant="secondary"
+              onClick={handleAddQuestions}
+              disabled={adding}
+            >
+              {adding ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                "Add Selected"
+              )}
+            </Button>
           </div>
         </div>
       )}

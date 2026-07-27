@@ -142,7 +142,7 @@ export interface CreateQuestionRequest {
   examples?: Array<{ input: string; output: string; explanation?: string }>;
   visibility?: "PUBLIC" | "ORG_OWNED";
   // Extended Enterprise Metadata
-  domain?: "ENGINEERING" | "BUSINESS" | "APTITUDE" | "CORPORATE";
+  domain?: "ENGINEERING" | "BUSINESS" | "APTITUDE" | "CORPORATE" | "VERBAL_ABILITY";
   cognitiveLevel?: "REMEMBER" | "UNDERSTAND" | "APPLY" | "ANALYZE" | "EVALUATE" | "CREATE";
   p_value?: number;
   discrimination_index?: number;
@@ -181,7 +181,7 @@ export interface UpdateQuestionRequest {
   examples?: Array<{ input: string; output: string; explanation?: string }>;
   visibility?: "PUBLIC" | "ORG_OWNED";
   // Extended Enterprise Metadata
-  domain?: "ENGINEERING" | "BUSINESS" | "APTITUDE" | "CORPORATE";
+  domain?: "ENGINEERING" | "BUSINESS" | "APTITUDE" | "CORPORATE" | "VERBAL_ABILITY";
   cognitiveLevel?: "REMEMBER" | "UNDERSTAND" | "APPLY" | "ANALYZE" | "EVALUATE" | "CREATE";
   p_value?: number;
   discrimination_index?: number;
@@ -336,7 +336,7 @@ export interface Question {
   visibility?: "PUBLIC" | "ORG_OWNED";
   organisationId?: string;
   // Extended Enterprise Metadata
-  domain?: "ENGINEERING" | "BUSINESS" | "APTITUDE" | "CORPORATE";
+  domain?: "ENGINEERING" | "BUSINESS" | "APTITUDE" | "CORPORATE" | "VERBAL_ABILITY";
   cognitiveLevel?: "REMEMBER" | "UNDERSTAND" | "APPLY" | "ANALYZE" | "EVALUATE" | "CREATE";
   p_value?: number;
   discrimination_index?: number;

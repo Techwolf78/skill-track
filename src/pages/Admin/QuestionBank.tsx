@@ -75,7 +75,7 @@ const difficultyColors: Record<string, string> = {
   EXPERT: "bg-purple-500/10 text-purple-500 border-purple-500/20",
 };
 
-type DomainType = "ALL" | "ENGINEERING" | "BUSINESS" | "APTITUDE" | "CORPORATE";
+type DomainType = "ALL" | "ENGINEERING" | "BUSINESS" | "APTITUDE" | "CORPORATE" | "VERBAL_ABILITY";
 type CognitiveLevelType = "ALL" | "REMEMBER" | "UNDERSTAND" | "APPLY" | "ANALYZE" | "EVALUATE" | "CREATE";
 type QuestionFormatType = "ALL" | "MCQ" | "CODING" | "SQL" | "SPREADSHEET" | "SJT" | "SUBJECTIVE";
 
@@ -376,13 +376,14 @@ export default function AdminQuestionBank() {
       </div>
 
       {/* Domain Quick Filters using native colors */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
         {[
           { id: "ALL", label: "All Domains", count: allQuestions.length, icon: <FolderOpen className="w-4 h-4" /> },
           { id: "ENGINEERING", label: "Engineering (CS/IT)", count: allQuestions.filter(q => q.domain === "ENGINEERING").length, icon: <Code className="w-4 h-4" /> },
           { id: "BUSINESS", label: "MBA / BBA", count: allQuestions.filter(q => q.domain === "BUSINESS").length, icon: <FileSpreadsheet className="w-4 h-4" /> },
           { id: "APTITUDE", label: "Aptitude & Core", count: allQuestions.filter(q => q.domain === "APTITUDE").length, icon: <Brain className="w-4 h-4" /> },
           { id: "CORPORATE", label: "Corporate SJT", count: allQuestions.filter(q => q.domain === "CORPORATE").length, icon: <UserCheck className="w-4 h-4" /> },
+          { id: "VERBAL_ABILITY", label: "Verbal & Communication", count: allQuestions.filter(q => q.domain === "VERBAL_ABILITY").length, icon: <Brain className="w-4 h-4" /> },
         ].map((domain) => (
           <Card 
             key={domain.id} 

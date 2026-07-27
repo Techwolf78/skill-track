@@ -33,6 +33,7 @@ import {
   Brain,
   MessageSquare,
 } from "lucide-react";
+import { CustomFieldsSection, CustomFieldItem } from "@/components/candidates/CustomFieldsSection";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -304,6 +305,8 @@ export default function Students() {
     });
   }, [candidates]);
 
+  const [customFields, setCustomFields] = useState<CustomFieldItem[]>([]);
+
   const handleAddCandidate = async () => {
     setEmailError(null);
     if (!formData.name.trim()) {
@@ -328,8 +331,13 @@ export default function Students() {
     try {
       const extraFields: Record<string, string> = {};
       Object.entries(formData.extraFields).forEach(([key, value]) => {
-        if (value) extraFields[key] = value;
+        if (value && value.trim()) extraFields[key] = value.trim();
       });
+      for (const cf of customFields) {
+        if (cf.key.trim() && cf.value.trim()) {
+          extraFields[cf.key.trim()] = cf.value.trim();
+        }
+      }
 
       await createCandidateMutation.mutateAsync({
         ...formData,
@@ -338,6 +346,7 @@ export default function Students() {
 
       toast({ title: "Success", description: "Candidate added successfully" });
       setIsAddDialogOpen(false);
+      setCustomFields([]);
       setFormData({
         name: "", email: "", password: "", phoneNumber: "", organisationId: "",
         extraFields: { college: "", course: "", year: "", skills: "", city: "" }
@@ -572,6 +581,7 @@ export default function Students() {
                   <Input value={formData.extraFields.course} onChange={(e) => setFormData({ ...formData, extraFields: { ...formData.extraFields, course: e.target.value } })} />
                 </div>
               </div>
+              <CustomFieldsSection customFields={customFields} onChange={setCustomFields} />
             </div>
             <div className="flex justify-end gap-3 mt-4">
               <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>Cancel</Button>

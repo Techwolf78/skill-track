@@ -154,7 +154,7 @@ export function BulkUploadCandidates({ open, onOpenChange, onSuccess, isSuperAdm
       "Pune University",
       "MCA",
       "Final Year",
-      "Java, Spring Boot, React"
+      "\"Java, Spring Boot, React\""
     ];
     
     const csvContent = [headers.join(","), sampleRow.join(",")].join("\n");
@@ -182,11 +182,6 @@ export function BulkUploadCandidates({ open, onOpenChange, onSuccess, isSuperAdm
 
     const effectiveOrgId = getOrganisationId();
 
-    if (!effectiveOrgId) {
-      setError(isSuperAdmin ? "Please select an organisation" : "Unable to determine your organisation. Please contact support.");
-      return;
-    }
-
     setUploading(true);
     setProgress(0);
     setError(null);
@@ -202,10 +197,11 @@ export function BulkUploadCandidates({ open, onOpenChange, onSuccess, isSuperAdm
     }, 500);
 
     try {
-      const transformedFile = await transformCSV(file, effectiveOrgId);
       const formData = new FormData();
-      formData.append("file", transformedFile);
-      formData.append("organisationId", effectiveOrgId);
+      formData.append("file", file);
+      if (effectiveOrgId) {
+        formData.append("organisationId", effectiveOrgId);
+      }
 
       await apiClient.post("/candidates/bulk-upload", formData, {
         headers: { "Content-Type": "multipart/form-data" },

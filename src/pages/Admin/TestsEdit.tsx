@@ -38,6 +38,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { CustomFieldsSection, CustomFieldItem } from "@/components/candidates/CustomFieldsSection";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -1523,6 +1524,8 @@ To refer to the FAQ document, you can click on the HELP button which is present 
     }
   };
 
+  const [candidateCustomFields, setCandidateCustomFields] = useState<CustomFieldItem[]>([]);
+
   useEffect(() => {
     if (isAddDialogOpen && orgId) {
       setCandidateFormData(prev => ({
@@ -1559,8 +1562,13 @@ To refer to the FAQ document, you can click on the HELP button which is present 
     try {
       const extraFields: Record<string, string> = {};
       Object.entries(candidateFormData.extraFields).forEach(([key, value]) => {
-        if (value) extraFields[key] = value;
+        if (value && value.trim()) extraFields[key] = value.trim();
       });
+      for (const cf of candidateCustomFields) {
+        if (cf.key.trim() && cf.value.trim()) {
+          extraFields[cf.key.trim()] = cf.value.trim();
+        }
+      }
 
       await candidateService.createCandidate({
         ...candidateFormData,
@@ -1569,6 +1577,7 @@ To refer to the FAQ document, you can click on the HELP button which is present 
 
       toast({ title: "Success", description: "Candidate added successfully" });
       setIsAddDialogOpen(false);
+      setCandidateCustomFields([]);
       setCandidateFormData({
         name: "", email: "", password: "", phoneNumber: "", organisationId: orgId || "",
         extraFields: { college: "", course: "", year: "", skills: "", city: "" }
@@ -3346,6 +3355,7 @@ To refer to the FAQ document, you can click on the HELP button which is present 
                   <Input value={candidateFormData.extraFields.course} onChange={(e) => setCandidateFormData({ ...candidateFormData, extraFields: { ...candidateFormData.extraFields, course: e.target.value } })} />
                 </div>
               </div>
+              <CustomFieldsSection customFields={candidateCustomFields} onChange={setCandidateCustomFields} />
             </div>
             <div className="flex justify-end gap-3 mt-4">
               <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>Cancel</Button>

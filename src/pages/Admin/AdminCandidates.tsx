@@ -29,7 +29,9 @@ import {
   ChevronLeft,
   ChevronRight,
   X,
+  Eye,
 } from "lucide-react";
+import { CustomFieldsSection, CustomFieldItem } from "@/components/candidates/CustomFieldsSection";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -73,8 +75,10 @@ function CandidateInsightsSection({ candidateId, onInsightsLoaded }: { candidate
           onInsightsLoaded(data.totalTests);
         }
       } catch (err: any) {
-        console.error("Failed to load insights:", err);
-        setError("No insights generated for this candidate yet.");
+        if (err?.response?.status !== 404) {
+          console.error("Failed to load insights:", err);
+        }
+        setError("No tests taken by candidate yet.");
       } finally {
         setLoading(false);
       }
@@ -253,23 +257,17 @@ export default function AdminCandidates() {
     );
   });
 
-  // Fetch tests count (from insights) for each candidate on mount / when candidates change
+  // Initialize candidate tests count map to 0
   useEffect(() => {
     if (!candidates || candidates.length === 0) return;
-    candidates.forEach(async (candidate) => {
-      // Avoid duplicate fetches if we already have a value in map
-      if (testsCountMap[candidate.id] !== undefined) return;
-      try {
-        const response = await apiClient.get(`/candidates/${candidate.id}/insights`);
-        const data = response.data?.data ?? response.data;
-        if (data && typeof data.totalTests === "number") {
-          setTestsCountMap(prev => ({ ...prev, [candidate.id]: data.totalTests }));
-        } else {
-          setTestsCountMap(prev => ({ ...prev, [candidate.id]: 0 }));
+    setTestsCountMap(prev => {
+      const next = { ...prev };
+      candidates.forEach(c => {
+        if (next[c.id] === undefined) {
+          next[c.id] = 0;
         }
-      } catch (err) {
-        setTestsCountMap(prev => ({ ...prev, [candidate.id]: 0 }));
-      }
+      });
+      return next;
     });
   }, [candidates]);
 
@@ -316,6 +314,8 @@ export default function AdminCandidates() {
     },
   });
 
+  const [customFields, setCustomFields] = useState<CustomFieldItem[]>([]);
+
   const { toast } = useToast();
 
   const createCandidateMutation = useCreateCandidateMutation();
@@ -359,8 +359,13 @@ export default function AdminCandidates() {
     try {
       const extraFields: Record<string, string> = {};
       Object.entries(formData.extraFields).forEach(([key, value]) => {
-        if (value) extraFields[key] = value;
+        if (value && value.trim()) extraFields[key] = value.trim();
       });
+      for (const cf of customFields) {
+        if (cf.key.trim() && cf.value.trim()) {
+          extraFields[cf.key.trim()] = cf.value.trim();
+        }
+      }
 
       await createCandidateMutation.mutateAsync({
         ...formData,
@@ -369,6 +374,7 @@ export default function AdminCandidates() {
 
       toast({ title: "Success", description: "Candidate added successfully" });
       setIsAddDialogOpen(false);
+      setCustomFields([]);
       setFormData({
         name: "", email: "", password: "", phoneNumber: "", organisationId: orgId || "",
         extraFields: { college: "", course: "", year: "", skills: "", city: "" }
@@ -406,7 +412,7 @@ export default function AdminCandidates() {
     if (entries.length === 0) return null;
     return (
       <div className="mt-3 pt-3 border-t border-border">
-        <p className="text-xs font-semibold text-muted-foreground mb-2">Additional Info:</p>
+        <p className="text-xs font-semibold text-muted-foreground mb-2">Custom Fields:</p>
         <div className="grid grid-cols-2 gap-2 text-xs">
           {entries.map(([key, value]) => (
             <div key={key}>
@@ -451,16 +457,15 @@ export default function AdminCandidates() {
             <TableRow className="bg-muted/50">
               <TableHead className="font-semibold">Candidate</TableHead>
               <TableHead className="font-semibold">Contact</TableHead>
-              <TableHead className="font-semibold">Organisation</TableHead>
               <TableHead className="font-semibold text-center">Tests</TableHead>
               <TableHead className="font-semibold text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {loading ? (
-              <TableRow><TableCell colSpan={5} className="text-center py-10"><Loader2 className="w-6 h-6 animate-spin mx-auto" /></TableCell></TableRow>
+              <TableRow><TableCell colSpan={4} className="text-center py-10"><Loader2 className="w-6 h-6 animate-spin mx-auto" /></TableCell></TableRow>
             ) : filteredCandidates.length === 0 ? (
-              <TableRow><TableCell colSpan={5} className="text-center py-10">No candidates found.</TableCell></TableRow>
+              <TableRow><TableCell colSpan={4} className="text-center py-10">No candidates found.</TableCell></TableRow>
             ) : filteredCandidates.map((candidate) => (
               <React.Fragment key={candidate.id}>
                 <TableRow className="hover:bg-muted/30 transition-colors cursor-pointer" onClick={() => setDetailsCandidate(candidate)}>
@@ -481,7 +486,6 @@ export default function AdminCandidates() {
                       <span className="flex items-center gap-1 text-xs text-muted-foreground"><Phone className="w-3 h-3" />{candidate.user.phoneNumber || "N/A"}</span>
                     </div>
                   </TableCell>
-                  <TableCell>{candidate.organisation.name}</TableCell>
                   <TableCell className="text-center font-medium">{testsCountMap[candidate.id] ?? 0}</TableCell>
                   <TableCell className="text-right">
                     <DropdownMenu>
@@ -489,6 +493,7 @@ export default function AdminCandidates() {
                         <Button variant="ghost" size="icon"><MoreVertical className="w-4 h-4" /></Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setDetailsCandidate(candidate); }}><Eye className="w-4 h-4 mr-2" />View Details</DropdownMenuItem>
                         <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setSelectedCandidate(candidate); setIsEditDialogOpen(true); }}><Edit2 className="w-4 h-4 mr-2" />Edit</DropdownMenuItem>
                         <DropdownMenuItem className="text-destructive" onClick={(e) => { e.stopPropagation(); setCandidateToDelete(candidate); setIsDeleteDialogOpen(true); }}><Trash2 className="w-4 h-4 mr-2" />Delete</DropdownMenuItem>
                       </DropdownMenuContent>
@@ -594,49 +599,41 @@ export default function AdminCandidates() {
             <DialogTitle>Add New Candidate</DialogTitle>
             <DialogDescription>Create a new candidate record in {adminOrgName}.</DialogDescription>
           </DialogHeader>
-          <div className="grid gap-6 py-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Full Name*</label>
-                <Input placeholder="John Doe" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} />
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Email Address*</label>
-                <Input type="email" placeholder="john@example.com" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} />
-                {emailError ? <p className="text-xs text-destructive">{emailError}</p> : null}
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Password*</label>
-                <Input type="password" value={formData.password} onChange={(e) => setFormData({ ...formData, password: e.target.value })} />
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Phone Number</label>
-                <Input placeholder="+91 1234567890" value={formData.phoneNumber} onChange={(e) => setFormData({ ...formData, phoneNumber: e.target.value })} />
-              </div>
-            </div>
-            <div className="space-y-4 border-t pt-4">
-              <h4 className="font-medium text-sm">Additional Information</h4>
+          <form onSubmit={(e) => { e.preventDefault(); handleAddCandidate(); }}>
+            <div className="grid gap-6 py-4">
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">College</label>
-                  <Input value={formData.extraFields.college} onChange={(e) => setFormData({ ...formData, extraFields: { ...formData.extraFields, college: e.target.value } })} />
+                  <label className="text-sm font-medium">Full Name*</label>
+                  <Input placeholder="John Doe" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Course</label>
-                  <Input value={formData.extraFields.course} onChange={(e) => setFormData({ ...formData, extraFields: { ...formData.extraFields, course: e.target.value } })} />
+                  <label className="text-sm font-medium">Email Address*</label>
+                  <Input type="email" placeholder="john@example.com" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} />
+                  {emailError ? <p className="text-xs text-destructive">{emailError}</p> : null}
                 </div>
               </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Password*</label>
+                  <Input type="password" value={formData.password} onChange={(e) => setFormData({ ...formData, password: e.target.value })} />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Phone Number</label>
+                  <Input placeholder="+91 1234567890" value={formData.phoneNumber} onChange={(e) => setFormData({ ...formData, phoneNumber: e.target.value })} />
+                </div>
+              </div>
+              <div>
+                <CustomFieldsSection customFields={customFields} onChange={setCustomFields} />
+              </div>
+              <div className="flex justify-end gap-3 mt-4">
+                <Button type="button" variant="outline" onClick={() => setIsAddDialogOpen(false)}>Cancel</Button>
+                <Button type="submit" variant="hero" disabled={submitting}>
+                  {submitting ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Plus className="w-4 h-4 mr-2" />}
+                  Add Candidate
+                </Button>
+              </div>
             </div>
-            <div className="flex justify-end gap-3 mt-4">
-              <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>Cancel</Button>
-              <Button variant="hero" onClick={handleAddCandidate} disabled={submitting}>
-                {submitting ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Plus className="w-4 h-4 mr-2" />}
-                Add Candidate
-              </Button>
-            </div>
-          </div>
+          </form>
         </DialogContent>
       </Dialog>
 

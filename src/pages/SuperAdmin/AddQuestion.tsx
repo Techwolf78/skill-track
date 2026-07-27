@@ -352,7 +352,7 @@ export default function AddQuestion() {
   ]);
 
   // Extended Enterprise Metadata States
-  const [domain, setDomain] = useState<"ENGINEERING" | "BUSINESS" | "APTITUDE" | "CORPORATE" | "">("");
+  const [domain, setDomain] = useState<"ENGINEERING" | "BUSINESS" | "APTITUDE" | "CORPORATE" | "VERBAL_ABILITY" | "">("");
   const [cognitiveLevel, setCognitiveLevel] = useState<"REMEMBER" | "UNDERSTAND" | "APPLY" | "ANALYZE" | "EVALUATE" | "CREATE" | "">("");
   const [status, setStatus] = useState<"ACTIVE" | "UNDER_REVIEW" | "QUARANTINED">("ACTIVE");
   const [pValue, setPValue] = useState<string>("");
@@ -1574,8 +1574,7 @@ export default function AddQuestion() {
             <CardContent className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="space-y-2">
-                  <Label>Domain (Stream)</Label>
-                  <Select value={domain || "none"} onValueChange={(val) => setDomain(val === "none" ? "" : (val as "ENGINEERING" | "BUSINESS" | "APTITUDE" | "CORPORATE" | ""))}>
+                  <Select value={domain || "none"} onValueChange={(val) => setDomain(val === "none" ? "" : (val as "ENGINEERING" | "BUSINESS" | "APTITUDE" | "CORPORATE" | "VERBAL_ABILITY" | ""))}>
                     <SelectTrigger>
                       <SelectValue placeholder="Select domain" />
                     </SelectTrigger>
@@ -1585,6 +1584,7 @@ export default function AddQuestion() {
                       <SelectItem value="BUSINESS">MBA / BBA (Business)</SelectItem>
                       <SelectItem value="APTITUDE">Aptitude & Core</SelectItem>
                       <SelectItem value="CORPORATE">Corporate SJT</SelectItem>
+                      <SelectItem value="VERBAL_ABILITY">Verbal Ability & Communication</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
