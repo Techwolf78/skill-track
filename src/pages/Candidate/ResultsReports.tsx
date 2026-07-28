@@ -91,7 +91,7 @@ export default function ResultsReports() {
           {
             session: {
               id: "demo-sess-1",
-              candidateId: candidate.id,
+              candidateId: effectiveCandidateId,
               testId: "demo-test-1",
               status: "EVALUATED",
               startedAt: new Date(Date.now() - 86400000 * 3).toISOString(),
@@ -102,7 +102,7 @@ export default function ResultsReports() {
               title: "Full-Stack React & Node.js Assessment",
               subjectId: "web-1",
               topicId: "react-1",
-              organisationId: candidate.organisationId,
+              organisationId: "demo-org-1",
               timeLimitMinutes: 60,
               totalMarks: 100,
               status: "PUBLISHED",
@@ -111,9 +111,9 @@ export default function ResultsReports() {
             },
             result: {
               sessionId: "demo-sess-1",
-              candidateId: candidate.id,
+              candidateId: effectiveCandidateId,
               testId: "demo-test-1",
-              candidateName: candidate.name,
+              candidateName: "goro doro",
               totalMarksObtained: 88,
               totalMarksPossible: 100,
               percentage: 88,
@@ -125,7 +125,7 @@ export default function ResultsReports() {
           {
             session: {
               id: "demo-sess-2",
-              candidateId: candidate.id,
+              candidateId: effectiveCandidateId,
               testId: "demo-test-2",
               status: "EVALUATED",
               startedAt: new Date(Date.now() - 86400000 * 7).toISOString(),
@@ -136,7 +136,7 @@ export default function ResultsReports() {
               title: "Data Structures & Algorithms Certification",
               subjectId: "dsa-1",
               topicId: "algo-1",
-              organisationId: candidate.organisationId,
+              organisationId: "demo-org-1",
               timeLimitMinutes: 45,
               totalMarks: 50,
               status: "PUBLISHED",
@@ -145,9 +145,9 @@ export default function ResultsReports() {
             },
             result: {
               sessionId: "demo-sess-2",
-              candidateId: candidate.id,
+              candidateId: effectiveCandidateId,
               testId: "demo-test-2",
-              candidateName: candidate.name,
+              candidateName: "goro doro",
               totalMarksObtained: 44,
               totalMarksPossible: 50,
               percentage: 88,
