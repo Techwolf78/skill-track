@@ -170,6 +170,12 @@ export default function TestAccess() {
   const [devOtp, setDevOtp] = useState<string | null>(null);
   const [isVerifyingOtp, setIsVerifyingOtp] = useState(false);
 
+  // Invitation public status (checked on mount — no auth needed)
+  const [invitationStatus, setInvitationStatus] = useState<{
+    scheduleExpired: boolean;
+    hasSubmittedSession: boolean;
+  } | null>(null);
+
   useEffect(() => {
     if (otpCooldown > 0) {
       const timer = setTimeout(() => setOtpCooldown(otpCooldown - 1), 1000);
@@ -204,13 +210,49 @@ export default function TestAccess() {
     const magicToken = searchParams.get("magicToken");
 
     if (id) {
-      if (magicToken) {
-        verifyMagicToken(magicToken);
-      } else if (token || isAuthenticated) {
-        validateToken();
-      } else {
-        setLoading(false);
-      }
+      // Always check public status first — shows expired/submitted card immediately
+      apiClient.get(`/candidate-invitations/${id}/status`)
+        .then(res => {
+          const s = res.data?.data || res.data;
+          const expired = !!s?.scheduleExpired;
+          const submitted = !!s?.hasSubmittedSession;
+
+          setInvitationStatus({
+            scheduleExpired: expired,
+            hasSubmittedSession: submitted,
+          });
+
+          // If the candidate has already submitted the test (regardless of whether schedule is expired or not)
+          if (submitted) {
+            setLoading(false);
+            return;
+          }
+
+          // If schedule is expired (and candidate hasn't submitted)
+          if (expired) {
+            setLoading(false);
+            return;
+          }
+
+          // Normal active test schedule → continue with existing auth flow
+          if (magicToken) {
+            verifyMagicToken(magicToken);
+          } else if (token || isAuthenticated) {
+            validateToken();
+          } else {
+            setLoading(false);
+          }
+        })
+        .catch(() => {
+          // If status endpoint fails, fall through to normal flow
+          if (magicToken) {
+            verifyMagicToken(magicToken);
+          } else if (token || isAuthenticated) {
+            validateToken();
+          } else {
+            setLoading(false);
+          }
+        });
     } else if (token && !id) {
       setError("This link is outdated. Please use the secure invitation link containing both ID and token.");
       setLoading(false);
@@ -237,6 +279,20 @@ export default function TestAccess() {
     }
   };
 
+  // Helper: login, then either redirect to results (if already submitted) or kick off normal validation
+  const handleAuthResponse = (authData: { accessToken: string; sessionId?: string; sessionStatus?: string; testId?: string }) => {
+    const decoded = parseJwt(authData.accessToken);
+    if (!decoded) throw new Error("Failed to parse authentication token.");
+    loginToContext(authData.accessToken, { id: decoded.id, name: decoded.name, email: decoded.sub, role: decoded.role });
+    // If backend tells us a completed session exists, go straight to results
+    if (authData.sessionId && authData.sessionStatus &&
+        ["SUBMITTED", "AUTO_SUBMITTED", "EVALUATED", "FLAGGED"].includes(authData.sessionStatus)) {
+      navigate(`/test/${authData.testId}/results?session=${authData.sessionId}&submitted=true`);
+      return;
+    }
+    validateToken();
+  };
+
   const verifyMagicToken = async (magicTokenStr: string) => {
     try {
       setLoading(true);
@@ -248,24 +304,9 @@ export default function TestAccess() {
       if (!authData || !authData.accessToken) {
         throw new Error("Authentication failed.");
       }
-      const decoded = parseJwt(authData.accessToken);
-      if (decoded) {
-        const userData = {
-          id: decoded.id,
-          name: decoded.name,
-          email: decoded.sub,
-          role: decoded.role,
-        };
-        loginToContext(authData.accessToken, userData);
-        window.history.replaceState({}, "", `/test/access/${id}`);
-        toast({
-          title: "Verification Successful",
-          description: "One-click magic link authenticated successfully.",
-        });
-        validateToken();
-      } else {
-        throw new Error("Failed to parse authentication token.");
-      }
+      window.history.replaceState({}, "", `/test/access/${id}`);
+      toast({ title: "Verification Successful", description: "One-click magic link authenticated successfully." });
+      handleAuthResponse(authData);
     } catch (err: unknown) {
       const errorVal = err as { response?: { data?: { message?: string } }; message?: string };
       console.error("Magic token verification failed:", err);
@@ -313,23 +354,8 @@ export default function TestAccess() {
       if (!authData || !authData.accessToken) {
         throw new Error("Authentication failed.");
       }
-      const decoded = parseJwt(authData.accessToken);
-      if (decoded) {
-        const userData = {
-          id: decoded.id,
-          name: decoded.name,
-          email: decoded.sub,
-          role: decoded.role,
-        };
-        loginToContext(authData.accessToken, userData);
-        toast({
-          title: "Verification Successful",
-          description: "Access code verified successfully.",
-        });
-        validateToken();
-      } else {
-        throw new Error("Failed to parse authentication token.");
-      }
+      toast({ title: "Verification Successful", description: "Access code verified successfully." });
+      handleAuthResponse(authData);
     } catch (err: unknown) {
       const errorVal = err as { response?: { data?: { message?: string } }; message?: string };
       console.error("OTP verification failed:", err);
@@ -705,10 +731,20 @@ export default function TestAccess() {
     try {
       const invitationId = testData?.invitationId || id || "";
       const session = await testService.startTestSession(invitationId, "0.0.0.0");
-      
+
+      // If session is already submitted (candidate already took this test), go to results
+      const sessStatus = String(session.status);
+      if (sessStatus === "SUBMITTED" || sessStatus === "AUTO_SUBMITTED" ||
+          sessStatus === "EVALUATED" || sessStatus === "FLAGGED") {
+        if (document.fullscreenElement) {
+          await document.exitFullscreen().catch(() => {});
+        }
+        navigate(`/test/${session.testId || testData?.testId}/results?session=${session.id}&submitted=true`);
+        return;
+      }
+
       // 4. Store a token indicating they completed checking environment
       sessionStorage.setItem(`env_checked_${session.id}`, "true");
-
       navigate(`/test/${session.testId || testData?.testId || "default-test-id"}/session/${session.id}`);
     } catch (error: unknown) {
       const startErr = error as { response?: { data?: { message?: string } }; message?: string };
@@ -758,6 +794,76 @@ export default function TestAccess() {
             ⏳ Backend is waking up... Cold start on Render free tier can take up to 50 seconds. Please wait.
           </p>
         )}
+      </div>
+    );
+  }
+
+  // Already submitted -> show submission confirmation immediately
+  if (invitationStatus?.hasSubmittedSession) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-950 p-4 relative overflow-hidden">
+        <div className="absolute inset-0 bg-[linear-gradient(to_right,#1e293b18_1px,transparent_1px),linear-gradient(to_bottom,#1e293b18_1px,transparent_1px)] bg-[size:28px_28px] pointer-events-none" />
+        <div className="absolute top-1/3 left-1/2 -translate-x-1/2 w-96 h-96 bg-emerald-500/5 rounded-full blur-3xl pointer-events-none" />
+        <Card className="max-w-md w-full border border-slate-800 bg-slate-900/80 backdrop-blur-md shadow-2xl overflow-hidden animate-in fade-in duration-300">
+          <div className="h-1 bg-gradient-to-r from-emerald-500 via-teal-400 to-cyan-500 w-full" />
+          <CardHeader className="text-center pt-10">
+            <div className="mx-auto mb-4 w-16 h-16 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center">
+              <CheckCircle2 className="w-8 h-8 text-emerald-400" />
+            </div>
+            <CardTitle className="text-2xl font-bold font-mono text-slate-100">Assessment Submitted</CardTitle>
+            <CardDescription className="text-slate-400 mt-2">
+              You have already completed and submitted this assessment. Your responses are securely recorded.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3 pb-4">
+            <div className="flex items-center gap-3 rounded-lg bg-slate-800/60 border border-slate-700/50 px-4 py-3">
+              <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
+              <span className="text-xs text-slate-300">All responses are securely stored and cannot be modified.</span>
+            </div>
+            <div className="flex items-center gap-3 rounded-lg bg-slate-800/60 border border-slate-700/50 px-4 py-3">
+              <Clock className="w-4 h-4 text-cyan-400 shrink-0" />
+              <span className="text-xs text-slate-300">Results will be shared by your administrator once evaluation is complete.</span>
+            </div>
+          </CardContent>
+          <CardFooter className="pb-8 flex justify-center">
+            <div className="w-full text-center p-3 rounded-lg bg-slate-800/80 border border-slate-700/60 font-mono text-xs text-slate-400">
+              You can close this tab now
+            </div>
+          </CardFooter>
+        </Card>
+      </div>
+    );
+  }
+
+  // Expired schedule + no session -> show test expired card immediately
+  if (invitationStatus?.scheduleExpired && !invitationStatus?.hasSubmittedSession) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-950 p-4 relative overflow-hidden">
+        <div className="absolute inset-0 bg-[linear-gradient(to_right,#1e293b18_1px,transparent_1px),linear-gradient(to_bottom,#1e293b18_1px,transparent_1px)] bg-[size:28px_28px] pointer-events-none" />
+        <div className="absolute top-1/3 left-1/2 -translate-x-1/2 w-96 h-96 bg-red-500/5 rounded-full blur-3xl pointer-events-none" />
+        <Card className="max-w-md w-full border border-slate-800 bg-slate-900/80 backdrop-blur-md shadow-2xl overflow-hidden animate-in fade-in duration-300">
+          <div className="h-1 bg-gradient-to-r from-red-500 via-rose-400 to-orange-400 w-full" />
+          <CardHeader className="text-center pt-10">
+            <div className="mx-auto mb-4 w-16 h-16 rounded-full bg-red-500/10 border border-red-500/20 flex items-center justify-center">
+              <AlertTriangle className="w-8 h-8 text-red-400" />
+            </div>
+            <CardTitle className="text-2xl font-bold font-mono text-slate-100">Assessment Expired</CardTitle>
+            <CardDescription className="text-slate-400 mt-2">
+              The window to take this assessment has passed. The schedule is no longer active.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="pb-4">
+            <div className="flex items-center gap-3 rounded-lg bg-slate-800/60 border border-slate-700/50 px-4 py-3">
+              <Clock className="w-4 h-4 text-slate-400 shrink-0" />
+              <span className="text-xs text-slate-400">Contact your administrator if you believe this is an error.</span>
+            </div>
+          </CardContent>
+          <CardFooter className="pb-8 flex justify-center">
+            <div className="w-full text-center p-3 rounded-lg bg-slate-800/80 border border-slate-700/60 font-mono text-xs text-slate-400">
+              You can close this tab now
+            </div>
+          </CardFooter>
+        </Card>
       </div>
     );
   }

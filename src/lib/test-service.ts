@@ -331,7 +331,7 @@ export interface Question {
   starterCode?: Record<string, string>;
   coding?: {
     starterCode?: Record<string, string>;
-    [key: string]: any;
+    [key: string]: unknown;
   };
   visibility?: "PUBLIC" | "ORG_OWNED";
   organisationId?: string;
@@ -470,7 +470,7 @@ export interface TestSession {
   testId: string;
   scheduleId?: string;
   candidateId: string;
-  status: "STARTED" | "SUBMITTED" | "EVALUATED" | "EXPIRED";
+  status: "ACTIVE" | "STARTED" | "PHOTO_PENDING" | "SUBMITTED" | "AUTO_SUBMITTED" | "EVALUATED" | "FLAGGED" | "TERMINATED" | "INACTIVE" | "EXPIRED";
   startedAt: string;
   submittedAt?: string;
   expiresAt: string;
@@ -1134,6 +1134,11 @@ export const testService = {
     return unwrapResponse(response);
   },
 
+  activateTestSession: async (sessionId: string): Promise<TestSession> => {
+    const response = await apiClient.post<TestSession>(`/test-sessions/${sessionId}/activate`);
+    return unwrapResponse(response);
+  },
+
   getAllSessions: async (): Promise<TestSession[]> => {
     const response = await apiClient.get<TestSession[]>("/test-sessions?size=1000");
     return unwrapArrayResponse(response);
@@ -1204,7 +1209,7 @@ export const testService = {
     };
   },
 
-  recalculateTestResult: async (sessionId: string): Promise<any> => {
+  recalculateTestResult: async (sessionId: string): Promise<unknown> => {
     const response = await apiClient.post(`/test-results/session/${sessionId}/recalculate`);
     return unwrapResponse(response);
   },

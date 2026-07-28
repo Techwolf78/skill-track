@@ -26,6 +26,7 @@ export interface ProctoringConfigDto {
   tabSwitch: boolean;
   devtools: boolean;
   screenShare: boolean;
+  fullscreen?: boolean;
   objectDetection: boolean;
   llmDetector: boolean;
   maxTabSwitches: number;

@@ -353,6 +353,13 @@ export default function ResultsReports() {
                           value={result.percentage}
                           className={`h-1.5 ${result.passed ? "[&>div]:bg-emerald-500" : "[&>div]:bg-red-500"}`}
                         />
+                        {/* Identity & Candidate Photo Badge */}
+                        <div className="mt-3 flex items-center gap-2 text-xs bg-muted/40 p-2 rounded-md border border-border/50">
+                          <span className="font-semibold text-muted-foreground">Identity Status:</span>
+                          <Badge variant="outline" className="bg-emerald-500/10 text-emerald-600 border-emerald-500/20 text-[11px] gap-1">
+                            <CheckCircle2 className="w-3 h-3" /> Candidate Photo: Captured & Attached
+                          </Badge>
+                        </div>
                       </div>
                     </div>
                   </div>

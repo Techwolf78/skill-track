@@ -29,6 +29,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import Editor from "@monaco-editor/react";
 import { apiClient } from "@/lib/api-client";
 import { testService, CodeTemplateEntry, TestCaseResult } from "@/lib/test-service";
+import { proctoringService } from "@/lib/proctoring-service";
 import { LANGUAGE_MAP, type LanguageKey, resolveStarterCode, getAvailableLanguages } from "@/lib/exam/languageMap";
 import { formatTime } from "@/lib/exam/formatTime";
 import { isTerminalStatus, mapTestCaseResults, buildSubmitOutputMessage, buildRunOutputMessage } from "@/lib/exam/codeExecution";
@@ -39,6 +40,7 @@ import { ProctoringProvider, useProctoring, ProctoringConfigDto } from "@/procto
 import { CameraPreview } from "@/proctoring/components/CameraPreview";
 import { ViolationToast } from "@/proctoring/components/ViolationToast";
 import { EnvironmentCheck } from "@/proctoring/components/EnvironmentCheck";
+import { IdentityVerification } from "@/proctoring/components/IdentityVerification";
 import { Shield, ShieldAlert, ShieldCheck as ShieldCheckIcon, Camera } from "lucide-react";
 import { AnswerStore } from "@/lib/exam/answerStorage";
 
@@ -160,24 +162,46 @@ export default function TestInterface() {
   const { testId, sessionId } = useParams();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const [checked, setChecked] = useState(() => {
+
+  const [identityVerified, setIdentityVerified] = useState(() => {
+    if (sessionId) {
+      return sessionStorage.getItem(`identity_verified_${sessionId}`) === "true";
+    }
+    return false;
+  });
+
+  const [envChecked, setEnvChecked] = useState(() => {
     if (sessionId) {
       return sessionStorage.getItem(`env_checked_${sessionId}`) === "true";
     }
     return false;
   });
+
   const [config, setConfig] = useState<ProctoringConfigDto | null>(null);
 
   useEffect(() => {
     if (!sessionId) return;
     apiClient.get(`/test-sessions/${sessionId}/proctoring-config`)
       .then(res => {
-        const data = res.data?.data || res.data;
+        const data: ProctoringConfigDto = res.data?.data || res.data;
         setConfig(data);
+
+        // Auto-skip Identity Photo Capture if camera is not enabled
+        if (!data.camera) {
+          setIdentityVerified(true);
+        }
+
+        // Auto-skip Environment Check if no hardware permissions/fullscreen are required
+        if (!data.camera && !data.audio && !data.screenShare && !data.fullscreen) {
+          testService.activateTestSession(sessionId).catch(err => {
+            console.error("Session activation error:", err);
+          });
+          setEnvChecked(true);
+        }
       })
       .catch(err => {
         console.error("Failed to load proctoring config, using safe defaults", err);
-        setConfig({
+        const defaultConfig: ProctoringConfigDto = {
           camera: false,
           audio: false,
           tabSwitch: true,
@@ -189,9 +213,34 @@ export default function TestInterface() {
           snapshotIntervalSecs: 20,
           periodicSnapshots: false,
           violationThresholds: { look_away: 3, multi_face: 2 }
-        });
+        };
+        setConfig(defaultConfig);
+        setIdentityVerified(true);
+        testService.activateTestSession(sessionId).catch(e => console.warn("Auto-activation error:", e));
+        setEnvChecked(true);
       });
   }, [sessionId]);
+
+  const handleIdentityComplete = () => {
+    if (sessionId) {
+      sessionStorage.setItem(`identity_verified_${sessionId}`, "true");
+    }
+    setIdentityVerified(true);
+  };
+
+  const handleEnvironmentComplete = async () => {
+    if (sessionId) {
+      try {
+        // Activate test session on backend (starts countdown timer)
+        await testService.activateTestSession(sessionId);
+        toast({ title: "Assessment Activated", description: "All checks passed. Assessment timer started!" });
+      } catch (err) {
+        console.error("Session activation error:", err);
+      }
+      sessionStorage.setItem(`env_checked_${sessionId}`, "true");
+    }
+    setEnvChecked(true);
+  };
 
   if (!config) {
     return (
@@ -203,8 +252,10 @@ export default function TestInterface() {
 
   return (
     <ProctoringProvider sessionId={sessionId || "demo-session"} config={config}>
-      {!checked ? (
-        <EnvironmentCheck onComplete={() => setChecked(true)} />
+      {!identityVerified ? (
+        <IdentityVerification sessionId={sessionId || ""} onComplete={handleIdentityComplete} />
+      ) : !envChecked ? (
+        <EnvironmentCheck config={config} onComplete={handleEnvironmentComplete} />
       ) : (
         <TestInterfaceContent testId={testId} sessionId={sessionId} navigate={navigate} toast={toast} />
       )}
@@ -741,7 +792,7 @@ useEffect(() => {
       setSubmitting(false);
       setShowSubmitDialog(false);
     }
-  }, [sessionId, answers, testId, navigate, toast, syncViolations, flushEvidence, questions, currentIndex, flushQuestionTiming]);
+  }, [sessionId, answers, testId, navigate, toast, syncViolations, flushEvidence, questions, currentIndex, flushQuestionTiming, submitting]);
 
   const handleAutoSubmit = useCallback(async () => {
     toast({

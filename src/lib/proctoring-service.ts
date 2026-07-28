@@ -96,5 +96,21 @@ export const proctoringService = {
       `/admin/sessions/${sessionId}/proctoring-summary?page=${page}&size=${size}`
     );
     return unwrapResponse(response);
+  },
+
+  presignEvidence: async (sessionId: string, evidenceType: string, violationType?: string): Promise<{ url: string; storagePath: string }> => {
+    const response = await apiClient.post<BaseResponse<{ url: string; storagePath: string }>>(
+      `/test-sessions/${sessionId}/evidence/presign`,
+      { evidenceType, violationType }
+    );
+    return unwrapResponse(response);
+  },
+
+  confirmEvidence: async (sessionId: string, storagePath: string, evidenceType: string, capturedAt: number, fileSizeBytes?: number): Promise<string> => {
+    const response = await apiClient.post<BaseResponse<string>>(
+      `/test-sessions/${sessionId}/evidence/confirm`,
+      { storagePath, evidenceType, capturedAt, fileSizeBytes }
+    );
+    return unwrapResponse(response);
   }
 };
