@@ -59,6 +59,15 @@ export interface BulkAddQuestionsRequest {
   defaultTimeLimitSecs: number;
 }
 
+export interface SaveAnswerResponse {
+  submissionId?: string;
+  questionId?: string;
+  answerHash?: string;
+  clientTimestamp?: number;
+  status?: string;
+  updatedAt?: string;
+}
+
 export interface CreateSubjectRequest {
   name: string;
 }
@@ -1154,6 +1163,18 @@ export const testService = {
       answers,
       submittedAt: new Date().toISOString(),
     });
+    return unwrapResponse(response);
+  },
+
+  saveQuestionAnswer: async (
+    sessionId: string,
+    questionId: string,
+    payload: { answerText: string; gradingLanguage?: string; clientTimestamp: number }
+  ): Promise<SaveAnswerResponse> => {
+    const response = await apiClient.put<SaveAnswerResponse>(
+      `/test-sessions/${sessionId}/questions/${questionId}/answer`,
+      payload
+    );
     return unwrapResponse(response);
   },
 

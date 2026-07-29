@@ -42,7 +42,7 @@ import { ViolationToast } from "@/proctoring/components/ViolationToast";
 import { EnvironmentCheck } from "@/proctoring/components/EnvironmentCheck";
 import { IdentityVerification } from "@/proctoring/components/IdentityVerification";
 import { Shield, ShieldAlert, ShieldCheck as ShieldCheckIcon, Camera } from "lucide-react";
-import { AnswerStore } from "@/lib/exam/answerStorage";
+import { AnswerStore, computeContentHash } from "@/lib/exam/answerStorage";
 
 import { mapBackendToFrontendLang } from "../../types/question";
 
@@ -308,6 +308,9 @@ function TestInterfaceContent({ testId, sessionId, navigate, toast }: { testId?:
   const [showSubmitDialog, setShowSubmitDialog] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
+  const lastSavedHashes = useRef<Record<string, string>>({});
+  const pendingAutoSaveFlushRef = useRef<(() => Promise<void>) | null>(null);
+
 
 
   const prevIndexRef = useRef(currentIndex);
@@ -339,6 +342,19 @@ function TestInterfaceContent({ testId, sessionId, navigate, toast }: { testId?:
       window.removeEventListener("focus", handleFocus);
     };
   }, [currentIndex, questions, flushQuestionTiming]);
+
+  const handleNavigateIndex = useCallback(async (targetIndex: number) => {
+    if (pendingAutoSaveFlushRef.current) {
+      const flushFn = pendingAutoSaveFlushRef.current;
+      pendingAutoSaveFlushRef.current = null;
+      try {
+        await flushFn();
+      } catch (err) {
+        console.warn("Failed to flush pending auto-save before navigation:", err);
+      }
+    }
+    setCurrentIndex(targetIndex);
+  }, []);
 
   
   // Code editor state
@@ -481,6 +497,11 @@ function TestInterfaceContent({ testId, sessionId, navigate, toast }: { testId?:
       const recoveredAnswers: Record<string, unknown> = {};
       if (sessionData.submissions && Array.isArray(sessionData.submissions)) {
         sessionData.submissions.forEach((sub: { questionId: string; answerText?: string; questionType?: string; gradingLanguage?: string }) => {
+          if (sub.answerText) {
+            computeContentHash(sub.answerText).then(hash => {
+              lastSavedHashes.current[sub.questionId] = hash;
+            });
+          }
           if (sub.questionType === "MCQ") {
             try {
               if (sub.answerText) {
@@ -651,24 +672,30 @@ useEffect(() => {
 
   setSaveStatus("Saving...");
 
-  const delayDebounceFn = setTimeout(async () => {
-    const version = getNextSaveVersion(currentQ.id);
+  const doSave = async () => {
+    const hash = await computeContentHash(code);
+    if (lastSavedHashes.current[currentQ.id] === hash) {
+      setSaveStatus("Saved");
+      return;
+    }
+
+    const clientTimestamp = Date.now();
 
     if (!navigator.onLine) {
       setSaveStatus("Offline");
-      AnswerStore.queueOfflineSubmission(sessionId, currentQ.id, "CODING", { code, language, saveVersion: version });
+      AnswerStore.queueOfflineSubmission(sessionId, currentQ.id, "CODING", { code, language }, clientTimestamp);
       setUnsyncedCount(AnswerStore.getOfflineQueue(sessionId).length);
+      lastSavedHashes.current[currentQ.id] = hash;
       return;
     }
 
     try {
-      await apiClient.post("/submissions", {
-        sessionId: sessionId,
-        questionId: currentQ.id,
+      await testService.saveQuestionAnswer(sessionId, currentQ.id, {
         answerText: code,
-        language: LANGUAGE_MAP[language]?.slug || "python3",
-        saveVersion: version
+        gradingLanguage: LANGUAGE_MAP[language]?.slug || "python3",
+        clientTimestamp
       });
+      lastSavedHashes.current[currentQ.id] = hash;
       setSaveStatus("Saved");
     } catch (err: unknown) {
       console.error("Autosave failed:", err);
@@ -682,13 +709,24 @@ useEffect(() => {
         });
         navigate(`/test/${testId}/results?session=${sessionId}`);
       } else {
+        AnswerStore.queueOfflineSubmission(sessionId, currentQ.id, "CODING", { code, language }, clientTimestamp);
+        setUnsyncedCount(AnswerStore.getOfflineQueue(sessionId).length);
         setSaveStatus("Failed");
       }
     }
+  };
+
+  pendingAutoSaveFlushRef.current = doSave;
+
+  const delayDebounceFn = setTimeout(async () => {
+    pendingAutoSaveFlushRef.current = null;
+    await doSave();
   }, 2500);
 
-  return () => clearTimeout(delayDebounceFn);
-}, [code, language, currentIndex, questions, sessionId, testId, navigate, toast, getNextSaveVersion]);
+  return () => {
+    clearTimeout(delayDebounceFn);
+  };
+}, [code, language, currentIndex, questions, sessionId, testId, navigate, toast]);
 
   // Set time left from session or test
   useEffect(() => {
@@ -1328,21 +1366,26 @@ useEffect(() => {
     // Flush current timing as this is an autosave event
     flushQuestionTiming(questionId);
 
-    const version = getNextSaveVersion(questionId);
+    const hash = await computeContentHash(value);
+    if (lastSavedHashes.current[questionId] === hash) {
+      return;
+    }
+
+    const clientTimestamp = Date.now();
 
     if (!isOnline) {
-      AnswerStore.queueOfflineSubmission(sessionId, questionId, "MCQ", { value, saveVersion: version });
+      AnswerStore.queueOfflineSubmission(sessionId, questionId, "MCQ", value, clientTimestamp);
       setUnsyncedCount(AnswerStore.getOfflineQueue(sessionId).length);
+      lastSavedHashes.current[questionId] = hash;
       return;
     }
 
     try {
-      await apiClient.post("/submissions", {
-        sessionId: sessionId,
-        questionId: questionId,
-        selectedOptionIds: [value],
-        saveVersion: version
+      await testService.saveQuestionAnswer(sessionId, questionId, {
+        answerText: value,
+        clientTimestamp
       });
+      lastSavedHashes.current[questionId] = hash;
     } catch (error: unknown) {
       console.error("Auto-save MCQ error:", error);
       const axiosErr = error as { response?: { status: number; data?: { message?: string } } };
@@ -1355,11 +1398,11 @@ useEffect(() => {
         });
         navigate(`/test/${testId}/results?session=${sessionId}`);
       } else {
-        AnswerStore.queueOfflineSubmission(sessionId, questionId, "MCQ", { value, saveVersion: version });
+        AnswerStore.queueOfflineSubmission(sessionId, questionId, "MCQ", value, clientTimestamp);
         setUnsyncedCount(AnswerStore.getOfflineQueue(sessionId).length);
       }
     }
-  }, [answers, sessionId, isOnline, flushQuestionTiming, getNextSaveVersion, navigate, testId, toast]);
+  }, [answers, sessionId, isOnline, flushQuestionTiming, navigate, testId, toast]);
 
 
   const formatTime = (seconds: number) => {
@@ -1902,7 +1945,7 @@ useEffect(() => {
                 return (
                   <button
                     key={q.id}
-                    onClick={() => setCurrentIndex(idx)}
+                    onClick={() => handleNavigateIndex(idx)}
                     className={cn(
                       "h-10 rounded-lg font-mono text-sm transition-all",
                       idx === currentIndex && "ring-2 ring-primary bg-primary text-white",
@@ -1923,7 +1966,7 @@ useEffect(() => {
               variant="outline" 
               className="flex-1" 
               disabled={currentIndex === 0} 
-              onClick={() => setCurrentIndex(prev => prev - 1)}
+              onClick={() => handleNavigateIndex(currentIndex - 1)}
             >
               <ChevronLeft className="w-4 h-4 mr-2" /> Prev
             </Button>
@@ -1931,7 +1974,7 @@ useEffect(() => {
               variant="outline" 
               className="flex-1" 
               disabled={currentIndex === questions.length - 1} 
-              onClick={() => setCurrentIndex(prev => prev + 1)}
+              onClick={() => handleNavigateIndex(currentIndex + 1)}
             >
               Next <ChevronRight className="w-4 h-4 ml-2" />
             </Button>
