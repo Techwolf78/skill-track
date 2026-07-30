@@ -68,21 +68,28 @@ async retryWithBackoff<T>(
     const unsynced = violations.filter(v => !(v as any).synced);
     if (unsynced.length === 0) return this.getScore();
     
-    try {
-      const response = await this.retryWithBackoff(async () => {
-        return await apiClient.post(`/test-sessions/${this.sessionId}/violations/batch`, {
-          violations: unsynced.map(v => this.mapToBackendPayload(v)),
+    let lastScore: number | null = null;
+    const chunkSize = 50;
+    
+    for (let i = 0; i < unsynced.length; i += chunkSize) {
+      const chunk = unsynced.slice(i, i + chunkSize);
+      try {
+        const response = await this.retryWithBackoff(async () => {
+          return await apiClient.post(`/test-sessions/${this.sessionId}/violations/batch`, {
+            violations: chunk.map(v => this.mapToBackendPayload(v)),
+          });
         });
-      });
-      const updated = violations.map(v => ({ ...v, synced: true }));
-      this.save(updated);
-      
-      const serverScore = response.data?.data?.score;
-      return typeof serverScore === "number" ? serverScore : null;
-    } catch (error) {
-      console.error("Failed to sync violations to backend after retries:", error);
-      return null;
+        const chunkIds = new Set(chunk.map(v => v.id));
+        const updated = this.getAll().map(v => chunkIds.has(v.id) ? { ...v, synced: true } : v);
+        this.save(updated);
+        
+        const serverScore = response.data?.data?.score;
+        if (typeof serverScore === "number") lastScore = serverScore;
+      } catch (error) {
+        console.error("Failed to sync violation batch chunk to backend:", error);
+      }
     }
+    return lastScore;
   }
 
   async syncSingleViolation(violation: Violation): Promise<number | null> {

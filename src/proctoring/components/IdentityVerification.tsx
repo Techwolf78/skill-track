@@ -300,7 +300,10 @@ export const IdentityVerification: React.FC<IdentityVerificationProps> = ({ sess
         try {
           await fetch(presignedUrl, {
             method: "PUT",
-            headers: { "Content-Type": "image/jpeg" },
+            headers: { 
+              "Content-Type": "image/jpeg",
+              "x-upsert": "true"
+            },
             body: capturedBlob,
           });
         } catch (putErr) {

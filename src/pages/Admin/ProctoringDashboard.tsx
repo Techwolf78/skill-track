@@ -62,6 +62,7 @@ import {
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiClient } from "@/lib/api-client";
+import { TestPhotoUploadModal } from "@/proctoring/components/TestPhotoUploadModal";
 
 // ==========================================
 // 7. TypeScript Types & Enums
@@ -96,6 +97,7 @@ export interface AssessmentSchedule {
 
 export interface ProctoringCandidate {
   id: string;
+  sessionId?: string;
   name: string;
   email: string;
   testStatus: TestStatus;
@@ -190,6 +192,9 @@ export default function ProctoringDashboard() {
     useState<CandidateProctoringDetail | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
+  // Test Photo Upload Modal State
+  const [showTestUploadModal, setShowTestUploadModal] = useState(false);
+
   // Fetch Schedules API
   const loadSchedules = useCallback(async () => {
     setLoadingSchedules(true);
@@ -223,8 +228,9 @@ export default function ProctoringDashboard() {
         `/api/admin/proctoring/assessment-schedules/${scheduleId}/candidates`,
       );
       const data = response.data?.data ?? response.data;
-      const mappedCandidates = Array.isArray(data) ? data.map((cand: { candidateId: string; candidateName: string; email: string; testStatus: string; proctoringMode: ProctoringMode; riskLevel: RiskLevel; violationCount: number; criticalViolationCount: number; lastActivityAt?: string; reviewStatus?: ReviewStatus }) => ({
+      const mappedCandidates = Array.isArray(data) ? data.map((cand: { candidateId: string; sessionId?: string; candidateName: string; email: string; testStatus: string; proctoringMode: ProctoringMode; riskLevel: RiskLevel; violationCount: number; criticalViolationCount: number; lastActivityAt?: string; reviewStatus?: ReviewStatus }) => ({
         id: cand.candidateId,
+        sessionId: cand.sessionId,
         name: cand.candidateName,
         email: cand.email,
         testStatus: (cand.testStatus === "ACTIVE" ? "IN_PROGRESS" : cand.testStatus) as TestStatus,
@@ -740,6 +746,15 @@ export default function ProctoringDashboard() {
           </p>
         </div>
         <div className="flex items-center gap-3 shrink-0">
+
+          <Button
+            variant="default"
+            onClick={() => setShowTestUploadModal(true)}
+            className="h-10 bg-indigo-600 hover:bg-indigo-700 text-white font-medium"
+          >
+            <Camera className="h-4 w-4 mr-2" />
+            Test Photo Upload
+          </Button>
 
           <Button
             variant="outline"
@@ -1538,6 +1553,14 @@ export default function ProctoringDashboard() {
           )}
         </SheetContent>
       </Sheet>
+      {/* Test Photo Upload & Supabase Diagnostics Modal */}
+      {showTestUploadModal && (
+        <TestPhotoUploadModal
+          isOpen={showTestUploadModal}
+          onClose={() => setShowTestUploadModal(false)}
+          sessionId={candidates[0]?.sessionId || candidates[0]?.id || "375840ee-0c05-4ba5-8db9-1299021c7508"}
+        />
+      )}
     </div>
   );
 }

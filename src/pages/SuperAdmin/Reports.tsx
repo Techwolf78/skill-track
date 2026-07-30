@@ -1077,6 +1077,7 @@ export default function Reports() {
                           <TableRow>
                             <TableHead>Candidate</TableHead>
                             <TableHead>Session ID</TableHead>
+                            <TableHead>Start Time</TableHead>
                             <TableHead>Session Status</TableHead>
                             <TableHead>Grading / Score</TableHead>
                             <TableHead className="text-right pr-6">
@@ -1101,6 +1102,10 @@ export default function Reports() {
                               (session.status as string) === "ACTIVE" ||
                               (session.status as string) === "STARTED" ||
                               (session.status as string) === "INACTIVE";
+
+                            const formattedStartedAt = session.startedAt
+                              ? new Date(session.startedAt).toLocaleString()
+                              : "N/A";
 
                             return (
                               <TableRow
@@ -1134,6 +1139,9 @@ export default function Reports() {
                                       )}
                                     </Button>
                                   </div>
+                                </TableCell>
+                                <TableCell className="text-xs font-medium text-muted-foreground">
+                                  {formattedStartedAt}
                                 </TableCell>
                                 <TableCell>
                                   <Badge

@@ -38,7 +38,10 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { CustomFieldsSection, CustomFieldItem } from "@/components/candidates/CustomFieldsSection";
+import {
+  CustomFieldsSection,
+  CustomFieldItem,
+} from "@/components/candidates/CustomFieldsSection";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -73,7 +76,15 @@ import {
   Eye,
   Upload,
 } from "lucide-react";
-import { testService, Test, CreateTestRequest, TestQuestion, Question, ProctoringMode, TestScheduleExtended } from "@/lib/test-service";
+import {
+  testService,
+  Test,
+  CreateTestRequest,
+  TestQuestion,
+  Question,
+  ProctoringMode,
+  TestScheduleExtended,
+} from "@/lib/test-service";
 import { candidateService, Candidate } from "@/lib/candidate-service";
 import { apiClient } from "@/lib/api-client";
 import { BulkUploadCandidates } from "./BulkUploadCandidates";
@@ -85,7 +96,10 @@ type JsPDFWithAutoTable = jsPDF & { lastAutoTable: { finalY: number } };
 
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth-context";
-import { MaterialDatePickerDialog, MaterialTimePickerDialog } from "@/components/ui/material-pickers";
+import {
+  MaterialDatePickerDialog,
+  MaterialTimePickerDialog,
+} from "@/components/ui/material-pickers";
 
 interface CandidateInvitation {
   id: string;
@@ -163,7 +177,12 @@ interface ReportEvidence {
 }
 
 interface EnrichedTestQuestion extends TestQuestion {
-  question?: Question & { type?: string; avgTimeSeconds?: number; avg_time_seconds?: number; options?: any[] };
+  question?: Question & {
+    type?: string;
+    avgTimeSeconds?: number;
+    avg_time_seconds?: number;
+    options?: any[];
+  };
 }
 
 const getProctoringPreset = (mode: ProctoringMode) => {
@@ -259,9 +278,15 @@ export default function AdminTestsEdit() {
   const location = useLocation();
   const { toast } = useToast();
   const { user } = useAuth();
-  const userExtra = user as { organisationId?: string; organisationName?: string } | null;
+  const userExtra = user as {
+    organisationId?: string;
+    organisationName?: string;
+  } | null;
   const orgId = user?.organisationData?.id || userExtra?.organisationId;
-  const adminOrgName = user?.organisationData?.name || userExtra?.organisationName || "Your Organisation";
+  const adminOrgName =
+    user?.organisationData?.name ||
+    userExtra?.organisationName ||
+    "Your Organisation";
 
   const formatDuration = (secs: unknown) => {
     const s = Number(secs);
@@ -284,8 +309,11 @@ export default function AdminTestsEdit() {
   const [deleting, setDeleting] = useState(false);
   const [deletingQuestion, setDeletingQuestion] = useState(false);
   const [test, setTest] = useState<Test | null>(null);
-  const [questionsData, setQuestionsData] = useState<EnrichedTestQuestion[]>([]);
-  const [selectedQuestion, setSelectedQuestion] = useState<EnrichedTestQuestion | null>(null);
+  const [questionsData, setQuestionsData] = useState<EnrichedTestQuestion[]>(
+    [],
+  );
+  const [selectedQuestion, setSelectedQuestion] =
+    useState<EnrichedTestQuestion | null>(null);
   const [activeTab, setActiveTab] = useState<string>(() => {
     const searchParams = new URLSearchParams(window.location.search);
     const tabParam = searchParams.get("tab");
@@ -307,7 +335,9 @@ export default function AdminTestsEdit() {
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [invitations, setInvitations] = useState<CandidateInvitation[]>([]);
   const [inviteSearchTerm, setInviteSearchTerm] = useState("");
-  const [inviteTab, setInviteTab] = useState<"available" | "invited" | "all">("all");
+  const [inviteTab, setInviteTab] = useState<"available" | "invited" | "all">(
+    "all",
+  );
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isBulkUploadOpen, setIsBulkUploadOpen] = useState(false);
   const [candidateFormData, setCandidateFormData] = useState({
@@ -325,11 +355,16 @@ export default function AdminTestsEdit() {
     },
   });
   const [candidateSubmitting, setCandidateSubmitting] = useState(false);
-  const [candidateEmailError, setCandidateEmailError] = useState<string | null>(null);
+  const [candidateEmailError, setCandidateEmailError] = useState<string | null>(
+    null,
+  );
   const [selectedSchedule, setSelectedSchedule] = useState<string>("");
-  const [selectedScheduleData, setSelectedScheduleData] = useState<TestScheduleExtended | null>(null);
+  const [selectedScheduleData, setSelectedScheduleData] =
+    useState<TestScheduleExtended | null>(null);
   const [isInviteDialogOpen, setIsInviteDialogOpen] = useState(false);
-  const [selectedCandidate, setSelectedCandidate] = useState<Candidate | null>(null);
+  const [selectedCandidate, setSelectedCandidate] = useState<Candidate | null>(
+    null,
+  );
   const [selectedCandidates, setSelectedCandidates] = useState<string[]>([]);
   const [inviteSubmitting, setInviteSubmitting] = useState(false);
   const [copiedToken, setCopiedToken] = useState<string | null>(null);
@@ -367,8 +402,10 @@ export default function AdminTestsEdit() {
   });
 
   // Form state
-  const [unsavedChangesDialogOpen, setUnsavedChangesDialogOpen] = useState(false);
-  const [unsavedScheduleDialogOpen, setUnsavedScheduleDialogOpen] = useState(false);
+  const [unsavedChangesDialogOpen, setUnsavedChangesDialogOpen] =
+    useState(false);
+  const [unsavedScheduleDialogOpen, setUnsavedScheduleDialogOpen] =
+    useState(false);
   const [pendingTab, setPendingTab] = useState<string | null>(null);
   const [savingSchedule, setSavingSchedule] = useState(false);
 
@@ -381,19 +418,29 @@ export default function AdminTestsEdit() {
   // Reports States
   const [loadingReports, setLoadingReports] = useState(false);
   const [reportScheduleId, setReportScheduleId] = useState<string>("all");
-  const [reportCandidates, setReportCandidates] = useState<ReportCandidate[]>([]);
-  const [reportSchedules, setReportSchedules] = useState<TestScheduleExtended[]>([]);
-  const [candidateResults, setCandidateResults] = useState<Record<string, CandidateResultEntry>>({});
-  const [selectedReportCandidate, setSelectedReportCandidate] = useState<ReportCandidate | null>(null);
-  const [reportCandidateDetails, setReportCandidateDetails] = useState<ReportCandidateDetails | null>(null);
+  const [reportCandidates, setReportCandidates] = useState<ReportCandidate[]>(
+    [],
+  );
+  const [reportSchedules, setReportSchedules] = useState<
+    TestScheduleExtended[]
+  >([]);
+  const [candidateResults, setCandidateResults] = useState<
+    Record<string, CandidateResultEntry>
+  >({});
+  const [selectedReportCandidate, setSelectedReportCandidate] =
+    useState<ReportCandidate | null>(null);
+  const [reportCandidateDetails, setReportCandidateDetails] =
+    useState<ReportCandidateDetails | null>(null);
   const [loadingAdvancedDetails, setLoadingAdvancedDetails] = useState(false);
-  const [candidatePaperSubmissions, setCandidatePaperSubmissions] = useState<Record<string, unknown>[]>([]);
+  const [candidatePaperSubmissions, setCandidatePaperSubmissions] = useState<
+    Record<string, unknown>[]
+  >([]);
   const [isAdvancedReportOpen, setIsAdvancedReportOpen] = useState(false);
 
   const displayedCandidates = useMemo(() => {
     // Only show candidates who actually appeared (status is not NOT_STARTED)
     const appeared = reportCandidates.filter(
-      (c) => c.testStatus && c.testStatus !== "NOT_STARTED"
+      (c) => c.testStatus && c.testStatus !== "NOT_STARTED",
     );
 
     if (!reportScheduleId || reportScheduleId === "all") {
@@ -402,15 +449,20 @@ export default function AdminTestsEdit() {
     return appeared.filter((c) => c.scheduleId === reportScheduleId);
   }, [reportCandidates, reportScheduleId]);
 
-  const getReportCandidateKey = (candidate: Pick<ReportCandidate, "candidateId" | "scheduleId">) =>
-    `${candidate.scheduleId || "no-schedule"}:${candidate.candidateId}`;
+  const getReportCandidateKey = (
+    candidate: Pick<ReportCandidate, "candidateId" | "scheduleId">,
+  ) => `${candidate.scheduleId || "no-schedule"}:${candidate.candidateId}`;
 
   const totalTestMarks = useMemo(() => {
-    const mappedQuestions = questionsData.length > 0
-      ? questionsData
-      : test?.testQuestions || test?.questions || [];
+    const mappedQuestions =
+      questionsData.length > 0
+        ? questionsData
+        : test?.testQuestions || test?.questions || [];
 
-    return mappedQuestions.reduce((sum, question) => sum + (Number(question.marks) || 0), 0);
+    return mappedQuestions.reduce(
+      (sum, question) => sum + (Number(question.marks) || 0),
+      0,
+    );
   }, [questionsData, test]);
 
   const isScheduleDirty = useMemo(() => {
@@ -422,15 +474,25 @@ export default function AdminTestsEdit() {
     };
 
     const testSchedules = test.testSchedules || [];
-    const activeOrFirst = testSchedules.find((s) => s.status === "SCHEDULED" || s.status === "LIVE") || testSchedules[0];
+    const activeOrFirst =
+      testSchedules.find(
+        (s) => s.status === "SCHEDULED" || s.status === "LIVE",
+      ) || testSchedules[0];
     const originalStart = getLocalISOTime(activeOrFirst?.startTime);
     const originalEnd = getLocalISOTime(activeOrFirst?.endTime);
 
     // Fall back to selectedScheduleData if available
-    const currentOrigStart = selectedScheduleData?.startTime ? getLocalISOTime(selectedScheduleData.startTime) : originalStart;
-    const currentOrigEnd = selectedScheduleData?.endTime ? getLocalISOTime(selectedScheduleData.endTime) : originalEnd;
+    const currentOrigStart = selectedScheduleData?.startTime
+      ? getLocalISOTime(selectedScheduleData.startTime)
+      : originalStart;
+    const currentOrigEnd = selectedScheduleData?.endTime
+      ? getLocalISOTime(selectedScheduleData.endTime)
+      : originalEnd;
 
-    return scheduleStartTime !== currentOrigStart || scheduleEndTime !== currentOrigEnd;
+    return (
+      scheduleStartTime !== currentOrigStart ||
+      scheduleEndTime !== currentOrigEnd
+    );
   }, [test, selectedScheduleData, scheduleStartTime, scheduleEndTime]);
 
   const isFormDirty = useMemo(() => {
@@ -441,36 +503,95 @@ export default function AdminTestsEdit() {
     if (formData.difficulty !== test.difficulty) return true;
     if (formData.passMark !== test.passMark) return true;
     if (formData.status !== test.status) return true;
-    if ((formData.proctoringMode || "NONE") !== (test.proctoringMode || "NONE")) return true;
-    
+    if ((formData.proctoringMode || "NONE") !== (test.proctoringMode || "NONE"))
+      return true;
+
     // Check instructions general text
-    const currentGeneral = (formData.instructions as Record<string, unknown> | undefined)?.general || "";
-    const originalGeneral = (test.instructions as Record<string, unknown> | undefined)?.general || DEFAULT_TEST_INSTRUCTIONS;
+    const currentGeneral =
+      (formData.instructions as Record<string, unknown> | undefined)?.general ||
+      "";
+    const originalGeneral =
+      (test.instructions as Record<string, unknown> | undefined)?.general ||
+      DEFAULT_TEST_INSTRUCTIONS;
     if (currentGeneral !== originalGeneral) return true;
 
     // Check schedule times
     if (isScheduleDirty) return true;
 
     // Proctoring settings
-    if ((formData.enableTabSwitchTracking || false) !== (test.enableTabSwitchTracking || false)) return true;
-    if ((formData.blockCopyPaste || false) !== (test.blockCopyPaste || false)) return true;
-    if ((formData.blockRightClick || false) !== (test.blockRightClick || false)) return true;
-    if ((formData.warnOnFullscreenExit || false) !== (test.warnOnFullscreenExit || false)) return true;
+    if (
+      (formData.enableTabSwitchTracking || false) !==
+      (test.enableTabSwitchTracking || false)
+    )
+      return true;
+    if ((formData.blockCopyPaste || false) !== (test.blockCopyPaste || false))
+      return true;
+    if ((formData.blockRightClick || false) !== (test.blockRightClick || false))
+      return true;
+    if (
+      (formData.warnOnFullscreenExit || false) !==
+      (test.warnOnFullscreenExit || false)
+    )
+      return true;
     if ((formData.maxWarnings || 0) !== (test.maxWarnings || 0)) return true;
-    if ((formData.requireWebcam || false) !== (test.requireWebcam || false)) return true;
-    if ((formData.detectFaceNotVisible || false) !== (test.detectFaceNotVisible || false)) return true;
-    if ((formData.detectMultipleFaces || false) !== (test.detectMultipleFaces || false)) return true;
-    if ((formData.detectSuspiciousAudio || false) !== (test.detectSuspiciousAudio || false)) return true;
-    if ((formData.detectObjects || false) !== (test.detectObjects || false)) return true;
-    if ((formData.periodicSnapshots || false) !== (test.periodicSnapshots || false)) return true;
-    if ((formData.evidenceCapture || false) !== (test.evidenceCapture || false)) return true;
-    if ((formData.requireMicrophone || false) !== (test.requireMicrophone || false)) return true;
-    if ((formData.requireScreenShare || false) !== (test.requireScreenShare || false)) return true;
-    if ((formData.detectDevTools || false) !== (test.detectDevTools || false)) return true;
-    if ((formData.detectScreenShareStop || false) !== (test.detectScreenShareStop || false)) return true;
-    if ((formData.enableLiveProctoring || false) !== (test.enableLiveProctoring || false)) return true;
-    if ((formData.autoSubmitOnCriticalViolations || false) !== (test.autoSubmitOnCriticalViolations || false)) return true;
-    if ((formData.maxCriticalViolations || 0) !== (test.maxCriticalViolations || 0)) return true;
+    if ((formData.requireWebcam || false) !== (test.requireWebcam || false))
+      return true;
+    if (
+      (formData.detectFaceNotVisible || false) !==
+      (test.detectFaceNotVisible || false)
+    )
+      return true;
+    if (
+      (formData.detectMultipleFaces || false) !==
+      (test.detectMultipleFaces || false)
+    )
+      return true;
+    if (
+      (formData.detectSuspiciousAudio || false) !==
+      (test.detectSuspiciousAudio || false)
+    )
+      return true;
+    if ((formData.detectObjects || false) !== (test.detectObjects || false))
+      return true;
+    if (
+      (formData.periodicSnapshots || false) !==
+      (test.periodicSnapshots || false)
+    )
+      return true;
+    if ((formData.evidenceCapture || false) !== (test.evidenceCapture || false))
+      return true;
+    if (
+      (formData.requireMicrophone || false) !==
+      (test.requireMicrophone || false)
+    )
+      return true;
+    if (
+      (formData.requireScreenShare || false) !==
+      (test.requireScreenShare || false)
+    )
+      return true;
+    if ((formData.detectDevTools || false) !== (test.detectDevTools || false))
+      return true;
+    if (
+      (formData.detectScreenShareStop || false) !==
+      (test.detectScreenShareStop || false)
+    )
+      return true;
+    if (
+      (formData.enableLiveProctoring || false) !==
+      (test.enableLiveProctoring || false)
+    )
+      return true;
+    if (
+      (formData.autoSubmitOnCriticalViolations || false) !==
+      (test.autoSubmitOnCriticalViolations || false)
+    )
+      return true;
+    if (
+      (formData.maxCriticalViolations || 0) !==
+      (test.maxCriticalViolations || 0)
+    )
+      return true;
 
     return false;
   }, [formData, test, isScheduleDirty]);
@@ -479,7 +600,8 @@ export default function AdminTestsEdit() {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
       if (isFormDirty) {
         e.preventDefault();
-        e.returnValue = "You have unsaved changes. Are you sure you want to leave?";
+        e.returnValue =
+          "You have unsaved changes. Are you sure you want to leave?";
         return e.returnValue;
       }
     };
@@ -504,7 +626,7 @@ export default function AdminTestsEdit() {
       // Fetch test questions directly from the mapping table to avoid cached stale relationship on the test object
       try {
         const testQuestions = await testService.getTestQuestions(id!);
-        
+
         if (testQuestions && testQuestions.length > 0) {
           const allQuestions = await testService.getAllQuestions();
           const enrichedQuestions = testQuestions.map((tq) => ({
@@ -529,7 +651,7 @@ export default function AdminTestsEdit() {
         passMark: data.passMark,
         status: data.status,
         instructions: (() => {
-          const general = (data.instructions?.general as string || "").trim();
+          const general = ((data.instructions?.general as string) || "").trim();
           const oldDefaultTrimmed = `This is an online test.
 Please make sure that you are using the latest version of the browser. We recommend using Google Chrome.
 It's mandatory to disable all the browser extensions and enabled Add-ons or open the assessment in incognito mode.
@@ -544,25 +666,96 @@ To refer to the FAQ document, you can click on the HELP button which is present 
           return data.instructions;
         })(),
         proctoringMode: data.proctoringMode || "NONE",
-        enableTabSwitchTracking: (data.proctoringMode || "NONE") === "CUSTOM" ? (data.enableTabSwitchTracking || false) : getProctoringPreset(data.proctoringMode || "NONE").enableTabSwitchTracking,
-        blockCopyPaste: (data.proctoringMode || "NONE") === "CUSTOM" ? (data.blockCopyPaste || false) : getProctoringPreset(data.proctoringMode || "NONE").blockCopyPaste,
-        blockRightClick: (data.proctoringMode || "NONE") === "CUSTOM" ? (data.blockRightClick || false) : getProctoringPreset(data.proctoringMode || "NONE").blockRightClick,
-        warnOnFullscreenExit: (data.proctoringMode || "NONE") === "CUSTOM" ? (data.warnOnFullscreenExit || false) : getProctoringPreset(data.proctoringMode || "NONE").warnOnFullscreenExit,
-        maxWarnings: (data.proctoringMode || "NONE") === "CUSTOM" ? (data.maxWarnings || 0) : getProctoringPreset(data.proctoringMode || "NONE").maxWarnings,
-        requireWebcam: (data.proctoringMode || "NONE") === "CUSTOM" ? (data.requireWebcam || false) : getProctoringPreset(data.proctoringMode || "NONE").requireWebcam,
-        detectFaceNotVisible: (data.proctoringMode || "NONE") === "CUSTOM" ? (data.detectFaceNotVisible || false) : getProctoringPreset(data.proctoringMode || "NONE").detectFaceNotVisible,
-        detectMultipleFaces: (data.proctoringMode || "NONE") === "CUSTOM" ? (data.detectMultipleFaces || false) : getProctoringPreset(data.proctoringMode || "NONE").detectMultipleFaces,
-        detectSuspiciousAudio: (data.proctoringMode || "NONE") === "CUSTOM" ? (data.detectSuspiciousAudio || false) : getProctoringPreset(data.proctoringMode || "NONE").detectSuspiciousAudio,
-        detectObjects: (data.proctoringMode || "NONE") === "CUSTOM" ? (data.detectObjects || false) : getProctoringPreset(data.proctoringMode || "NONE").detectObjects,
-        periodicSnapshots: (data.proctoringMode || "NONE") === "CUSTOM" ? (data.periodicSnapshots || false) : getProctoringPreset(data.proctoringMode || "NONE").periodicSnapshots,
-        evidenceCapture: (data.proctoringMode || "NONE") === "CUSTOM" ? (data.evidenceCapture || false) : getProctoringPreset(data.proctoringMode || "NONE").evidenceCapture,
-        requireMicrophone: (data.proctoringMode || "NONE") === "CUSTOM" ? (data.requireMicrophone || false) : getProctoringPreset(data.proctoringMode || "NONE").requireMicrophone,
-        requireScreenShare: (data.proctoringMode || "NONE") === "CUSTOM" ? (data.requireScreenShare || false) : getProctoringPreset(data.proctoringMode || "NONE").requireScreenShare,
-        detectDevTools: (data.proctoringMode || "NONE") === "CUSTOM" ? (data.detectDevTools || false) : getProctoringPreset(data.proctoringMode || "NONE").detectDevTools,
-        detectScreenShareStop: (data.proctoringMode || "NONE") === "CUSTOM" ? (data.detectScreenShareStop || false) : getProctoringPreset(data.proctoringMode || "NONE").detectScreenShareStop,
-        enableLiveProctoring: (data.proctoringMode || "NONE") === "CUSTOM" ? (data.enableLiveProctoring || false) : getProctoringPreset(data.proctoringMode || "NONE").enableLiveProctoring,
-        autoSubmitOnCriticalViolations: (data.proctoringMode || "NONE") === "CUSTOM" ? (data.autoSubmitOnCriticalViolations || false) : getProctoringPreset(data.proctoringMode || "NONE").autoSubmitOnCriticalViolations,
-        maxCriticalViolations: (data.proctoringMode || "NONE") === "CUSTOM" ? (data.maxCriticalViolations || 0) : getProctoringPreset(data.proctoringMode || "NONE").maxCriticalViolations,
+        enableTabSwitchTracking:
+          (data.proctoringMode || "NONE") === "CUSTOM"
+            ? data.enableTabSwitchTracking || false
+            : getProctoringPreset(data.proctoringMode || "NONE")
+                .enableTabSwitchTracking,
+        blockCopyPaste:
+          (data.proctoringMode || "NONE") === "CUSTOM"
+            ? data.blockCopyPaste || false
+            : getProctoringPreset(data.proctoringMode || "NONE").blockCopyPaste,
+        blockRightClick:
+          (data.proctoringMode || "NONE") === "CUSTOM"
+            ? data.blockRightClick || false
+            : getProctoringPreset(data.proctoringMode || "NONE")
+                .blockRightClick,
+        warnOnFullscreenExit:
+          (data.proctoringMode || "NONE") === "CUSTOM"
+            ? data.warnOnFullscreenExit || false
+            : getProctoringPreset(data.proctoringMode || "NONE")
+                .warnOnFullscreenExit,
+        maxWarnings:
+          (data.proctoringMode || "NONE") === "CUSTOM"
+            ? data.maxWarnings || 0
+            : getProctoringPreset(data.proctoringMode || "NONE").maxWarnings,
+        requireWebcam:
+          (data.proctoringMode || "NONE") === "CUSTOM"
+            ? data.requireWebcam || false
+            : getProctoringPreset(data.proctoringMode || "NONE").requireWebcam,
+        detectFaceNotVisible:
+          (data.proctoringMode || "NONE") === "CUSTOM"
+            ? data.detectFaceNotVisible || false
+            : getProctoringPreset(data.proctoringMode || "NONE")
+                .detectFaceNotVisible,
+        detectMultipleFaces:
+          (data.proctoringMode || "NONE") === "CUSTOM"
+            ? data.detectMultipleFaces || false
+            : getProctoringPreset(data.proctoringMode || "NONE")
+                .detectMultipleFaces,
+        detectSuspiciousAudio:
+          (data.proctoringMode || "NONE") === "CUSTOM"
+            ? data.detectSuspiciousAudio || false
+            : getProctoringPreset(data.proctoringMode || "NONE")
+                .detectSuspiciousAudio,
+        detectObjects:
+          (data.proctoringMode || "NONE") === "CUSTOM"
+            ? data.detectObjects || false
+            : getProctoringPreset(data.proctoringMode || "NONE").detectObjects,
+        periodicSnapshots:
+          (data.proctoringMode || "NONE") === "CUSTOM"
+            ? data.periodicSnapshots || false
+            : getProctoringPreset(data.proctoringMode || "NONE")
+                .periodicSnapshots,
+        evidenceCapture:
+          (data.proctoringMode || "NONE") === "CUSTOM"
+            ? data.evidenceCapture || false
+            : getProctoringPreset(data.proctoringMode || "NONE")
+                .evidenceCapture,
+        requireMicrophone:
+          (data.proctoringMode || "NONE") === "CUSTOM"
+            ? data.requireMicrophone || false
+            : getProctoringPreset(data.proctoringMode || "NONE")
+                .requireMicrophone,
+        requireScreenShare:
+          (data.proctoringMode || "NONE") === "CUSTOM"
+            ? data.requireScreenShare || false
+            : getProctoringPreset(data.proctoringMode || "NONE")
+                .requireScreenShare,
+        detectDevTools:
+          (data.proctoringMode || "NONE") === "CUSTOM"
+            ? data.detectDevTools || false
+            : getProctoringPreset(data.proctoringMode || "NONE").detectDevTools,
+        detectScreenShareStop:
+          (data.proctoringMode || "NONE") === "CUSTOM"
+            ? data.detectScreenShareStop || false
+            : getProctoringPreset(data.proctoringMode || "NONE")
+                .detectScreenShareStop,
+        enableLiveProctoring:
+          (data.proctoringMode || "NONE") === "CUSTOM"
+            ? data.enableLiveProctoring || false
+            : getProctoringPreset(data.proctoringMode || "NONE")
+                .enableLiveProctoring,
+        autoSubmitOnCriticalViolations:
+          (data.proctoringMode || "NONE") === "CUSTOM"
+            ? data.autoSubmitOnCriticalViolations || false
+            : getProctoringPreset(data.proctoringMode || "NONE")
+                .autoSubmitOnCriticalViolations,
+        maxCriticalViolations:
+          (data.proctoringMode || "NONE") === "CUSTOM"
+            ? data.maxCriticalViolations || 0
+            : getProctoringPreset(data.proctoringMode || "NONE")
+                .maxCriticalViolations,
       });
     } catch (error: unknown) {
       console.error("Failed to fetch test:", error);
@@ -632,7 +825,9 @@ To refer to the FAQ document, you can click on the HELP button which is present 
     }
 
     if (formData.durationMins && formData.durationMins <= 0) {
-      console.error("Validation Error: Duration must be greater than 0 minutes.");
+      console.error(
+        "Validation Error: Duration must be greater than 0 minutes.",
+      );
       return;
     }
 
@@ -640,7 +835,9 @@ To refer to the FAQ document, you can click on the HELP button which is present 
       formData.passMark &&
       (formData.passMark < 0 || formData.passMark > 100)
     ) {
-      console.error("Validation Error: Passing mark must be between 0 and 100.");
+      console.error(
+        "Validation Error: Passing mark must be between 0 and 100.",
+      );
       return;
     }
 
@@ -648,7 +845,9 @@ To refer to the FAQ document, you can click on the HELP button which is present 
       const startDate = new Date(scheduleStartTime);
       const endDate = new Date(scheduleEndTime);
       if (endDate <= startDate) {
-        console.error("Validation Error: Schedule end time must be after start time.");
+        console.error(
+          "Validation Error: Schedule end time must be after start time.",
+        );
         return;
       }
     }
@@ -681,7 +880,8 @@ To refer to the FAQ document, you can click on the HELP button which is present 
         detectDevTools: formData.detectDevTools || false,
         detectScreenShareStop: formData.detectScreenShareStop || false,
         enableLiveProctoring: formData.enableLiveProctoring || false,
-        autoSubmitOnCriticalViolations: formData.autoSubmitOnCriticalViolations || false,
+        autoSubmitOnCriticalViolations:
+          formData.autoSubmitOnCriticalViolations || false,
         maxCriticalViolations: formData.maxCriticalViolations || 0,
       });
 
@@ -725,11 +925,18 @@ To refer to the FAQ document, you can click on the HELP button which is present 
       return;
     }
     if (formData.durationMins && formData.durationMins <= 0) {
-      console.error("Validation Error: Duration must be greater than 0 minutes.");
+      console.error(
+        "Validation Error: Duration must be greater than 0 minutes.",
+      );
       return;
     }
-    if (formData.passMark && (formData.passMark < 0 || formData.passMark > 100)) {
-      console.error("Validation Error: Passing mark must be between 0 and 100.");
+    if (
+      formData.passMark &&
+      (formData.passMark < 0 || formData.passMark > 100)
+    ) {
+      console.error(
+        "Validation Error: Passing mark must be between 0 and 100.",
+      );
       return;
     }
     try {
@@ -760,12 +967,29 @@ To refer to the FAQ document, you can click on the HELP button which is present 
         detectDevTools: formData.detectDevTools || false,
         detectScreenShareStop: formData.detectScreenShareStop || false,
         enableLiveProctoring: formData.enableLiveProctoring || false,
-        autoSubmitOnCriticalViolations: formData.autoSubmitOnCriticalViolations || false,
+        autoSubmitOnCriticalViolations:
+          formData.autoSubmitOnCriticalViolations || false,
         maxCriticalViolations: formData.maxCriticalViolations || 0,
       });
       // Sync local test state so dirty-check resets
-      setTest((prev) => prev ? { ...prev, title: formData.title!, description: formData.description, durationMins: formData.durationMins!, difficulty: formData.difficulty as "EASY" | "MEDIUM" | "HARD", passMark: formData.passMark!, status: formData.status as "DRAFT" | "PUBLISHED" | "ARCHIVED", instructions: formData.instructions } : prev);
-      toast({ title: "Saved", description: "Basic information saved successfully." });
+      setTest((prev) =>
+        prev
+          ? {
+              ...prev,
+              title: formData.title!,
+              description: formData.description,
+              durationMins: formData.durationMins!,
+              difficulty: formData.difficulty as "EASY" | "MEDIUM" | "HARD",
+              passMark: formData.passMark!,
+              status: formData.status as "DRAFT" | "PUBLISHED" | "ARCHIVED",
+              instructions: formData.instructions,
+            }
+          : prev,
+      );
+      toast({
+        title: "Saved",
+        description: "Basic information saved successfully.",
+      });
     } catch (error: unknown) {
       console.error("Failed to save:", error);
     } finally {
@@ -783,7 +1007,7 @@ To refer to the FAQ document, you can click on the HELP button which is present 
         durationMins: formData.durationMins,
         difficulty: formData.difficulty as "EASY" | "MEDIUM" | "HARD",
         passMark: formData.passMark,
-        status: "PUBLISHED",
+        status: "PUBLISHED" as "DRAFT" | "PUBLISHED" | "ARCHIVED",
         instructions: formData.instructions,
         proctoringMode: formData.proctoringMode || "NONE",
         enableTabSwitchTracking: formData.enableTabSwitchTracking || false,
@@ -803,39 +1027,51 @@ To refer to the FAQ document, you can click on the HELP button which is present 
         detectDevTools: formData.detectDevTools || false,
         detectScreenShareStop: formData.detectScreenShareStop || false,
         enableLiveProctoring: formData.enableLiveProctoring || false,
-        autoSubmitOnCriticalViolations: formData.autoSubmitOnCriticalViolations || false,
+        autoSubmitOnCriticalViolations:
+          formData.autoSubmitOnCriticalViolations || false,
         maxCriticalViolations: formData.maxCriticalViolations || 0,
       };
 
-      console.log("[Admin/TestsEdit] Saving proctoring settings. Payload:", payload);
+      console.log(
+        "[Admin/TestsEdit] Saving proctoring settings. Payload:",
+        payload,
+      );
       const res = await testService.updateTest(id!, payload);
       console.log("[Admin/TestsEdit] Save proctoring response:", res);
 
       // Sync local test state so dirty-check resets
-      setTest((prev) => prev ? {
-        ...prev,
-        proctoringMode: formData.proctoringMode as ProctoringMode,
-        enableTabSwitchTracking: formData.enableTabSwitchTracking,
-        blockCopyPaste: formData.blockCopyPaste,
-        blockRightClick: formData.blockRightClick,
-        warnOnFullscreenExit: formData.warnOnFullscreenExit,
-        maxWarnings: formData.maxWarnings,
-        requireWebcam: formData.requireWebcam,
-        detectFaceNotVisible: formData.detectFaceNotVisible,
-        detectMultipleFaces: formData.detectMultipleFaces,
-        detectSuspiciousAudio: formData.detectSuspiciousAudio,
-        detectObjects: formData.detectObjects,
-        periodicSnapshots: formData.periodicSnapshots,
-        evidenceCapture: formData.evidenceCapture,
-        requireMicrophone: formData.requireMicrophone,
-        requireScreenShare: formData.requireScreenShare,
-        detectDevTools: formData.detectDevTools,
-        detectScreenShareStop: formData.detectScreenShareStop,
-        enableLiveProctoring: formData.enableLiveProctoring,
-        autoSubmitOnCriticalViolations: formData.autoSubmitOnCriticalViolations,
-        maxCriticalViolations: formData.maxCriticalViolations,
-      } : prev);
-      toast({ title: "Saved", description: "Proctoring settings saved successfully." });
+      setTest((prev) =>
+        prev
+          ? {
+              ...prev,
+              proctoringMode: formData.proctoringMode as ProctoringMode,
+              enableTabSwitchTracking: formData.enableTabSwitchTracking,
+              blockCopyPaste: formData.blockCopyPaste,
+              blockRightClick: formData.blockRightClick,
+              warnOnFullscreenExit: formData.warnOnFullscreenExit,
+              maxWarnings: formData.maxWarnings,
+              requireWebcam: formData.requireWebcam,
+              detectFaceNotVisible: formData.detectFaceNotVisible,
+              detectMultipleFaces: formData.detectMultipleFaces,
+              detectSuspiciousAudio: formData.detectSuspiciousAudio,
+              detectObjects: formData.detectObjects,
+              periodicSnapshots: formData.periodicSnapshots,
+              evidenceCapture: formData.evidenceCapture,
+              requireMicrophone: formData.requireMicrophone,
+              requireScreenShare: formData.requireScreenShare,
+              detectDevTools: formData.detectDevTools,
+              detectScreenShareStop: formData.detectScreenShareStop,
+              enableLiveProctoring: formData.enableLiveProctoring,
+              autoSubmitOnCriticalViolations:
+                formData.autoSubmitOnCriticalViolations,
+              maxCriticalViolations: formData.maxCriticalViolations,
+            }
+          : prev,
+      );
+      toast({
+        title: "Saved",
+        description: "Proctoring settings saved successfully.",
+      });
     } catch (error: unknown) {
       console.error("[Admin/TestsEdit] Failed to save proctoring:", error);
     } finally {
@@ -845,14 +1081,18 @@ To refer to the FAQ document, you can click on the HELP button which is present 
 
   const handleSaveSchedule = async () => {
     if (!scheduleStartTime || !scheduleEndTime) {
-      console.error("Validation Error: Both start time and end time are required.");
+      console.error(
+        "Validation Error: Both start time and end time are required.",
+      );
       return false;
     }
 
     const startDate = new Date(scheduleStartTime);
     const endDate = new Date(scheduleEndTime);
     if (endDate <= startDate) {
-      console.error("Validation Error: Schedule end time must be after start time.");
+      console.error(
+        "Validation Error: Schedule end time must be after start time.",
+      );
       return false;
     }
 
@@ -883,21 +1123,35 @@ To refer to the FAQ document, you can click on the HELP button which is present 
       });
 
       // Update the test state in memory with the new schedule times
-      setTest(prev => {
+      setTest((prev) => {
         if (!prev) return prev;
         const testSchedules = prev.testSchedules || [];
-        const activeOrFirst = testSchedules.find((s) => s.status === "SCHEDULED" || s.status === "LIVE") || testSchedules[0];
-        
+        const activeOrFirst =
+          testSchedules.find(
+            (s) => s.status === "SCHEDULED" || s.status === "LIVE",
+          ) || testSchedules[0];
+
         let newSchedules;
         if (activeOrFirst) {
-          newSchedules = testSchedules.map(s => s.id === activeOrFirst.id ? { ...s, startTime: startISO, endTime: endISO } : s);
+          newSchedules = testSchedules.map((s) =>
+            s.id === activeOrFirst.id
+              ? { ...s, startTime: startISO, endTime: endISO }
+              : s,
+          );
         } else {
-          newSchedules = [...testSchedules, { id: selectedSchedule || "new-id", startTime: startISO, endTime: endISO } as unknown as TestScheduleExtended];
+          newSchedules = [
+            ...testSchedules,
+            {
+              id: selectedSchedule || "new-id",
+              startTime: startISO,
+              endTime: endISO,
+            } as unknown as TestScheduleExtended,
+          ];
         }
-        
+
         return {
           ...prev,
-          testSchedules: newSchedules
+          testSchedules: newSchedules,
         };
       });
 
@@ -975,10 +1229,17 @@ To refer to the FAQ document, you can click on the HELP button which is present 
 
     try {
       setDeletingQuestion(true);
-      console.log("[Admin/TestsEdit] Initiating API call to remove question with mapping ID:", selectedQuestion.id);
+      console.log(
+        "[Admin/TestsEdit] Initiating API call to remove question with mapping ID:",
+        selectedQuestion.id,
+      );
       // Call API to remove question from test
       await testService.removeQuestionFromTest(selectedQuestion.id);
-      console.log("[Admin/TestsEdit] API call succeeded. Question with ID:", selectedQuestion.id, "successfully removed from backend.");
+      console.log(
+        "[Admin/TestsEdit] API call succeeded. Question with ID:",
+        selectedQuestion.id,
+        "successfully removed from backend.",
+      );
 
       // Optimistically remove from local state immediately (no full reload)
       const removedId = selectedQuestion.id;
@@ -990,10 +1251,10 @@ To refer to the FAQ document, you can click on the HELP button which is present 
         return {
           ...prev,
           questions: (prev.questions || []).filter(
-            (q) => q.questionId !== selectedQuestion.questionId
+            (q) => q.questionId !== selectedQuestion.questionId,
           ),
           testQuestions: (prev.testQuestions || []).filter(
-            (q) => q.id !== removedId
+            (q) => q.id !== removedId,
           ),
         };
       });
@@ -1038,10 +1299,13 @@ To refer to the FAQ document, you can click on the HELP button which is present 
 
       // Filter schedules to only keep the ones for THIS test
       const testSchedules = schedulesData.filter((s) => s.testId === id);
-      
+
       // Auto-select the first schedule if available
       if (testSchedules.length > 0) {
-        const activeOrFirst = testSchedules.find((s) => s.status === "SCHEDULED" || s.status === "LIVE") || testSchedules[0];
+        const activeOrFirst =
+          testSchedules.find(
+            (s) => s.status === "SCHEDULED" || s.status === "LIVE",
+          ) || testSchedules[0];
         setSelectedSchedule(activeOrFirst.id);
         setSelectedScheduleData(activeOrFirst);
         if (activeOrFirst.startTime) {
@@ -1060,12 +1324,22 @@ To refer to the FAQ document, you can click on the HELP button which is present 
       setCandidates(candidatesData);
 
       try {
-        const response = await apiClient.get("/candidate-invitations?size=1000");
+        const response = await apiClient.get(
+          "/candidate-invitations?size=1000",
+        );
         const invData = response.data?.data;
         if (Array.isArray(invData)) {
           setInvitations(invData);
-        } else if (invData && typeof invData === "object" && "content" in invData && Array.isArray((invData as Record<string, unknown>).content)) {
-          setInvitations((invData as Record<string, unknown>).content as CandidateInvitation[]);
+        } else if (
+          invData &&
+          typeof invData === "object" &&
+          "content" in invData &&
+          Array.isArray((invData as Record<string, unknown>).content)
+        ) {
+          setInvitations(
+            (invData as Record<string, unknown>)
+              .content as CandidateInvitation[],
+          );
         } else {
           setInvitations([]);
         }
@@ -1093,7 +1367,7 @@ To refer to the FAQ document, you can click on the HELP button which is present 
       const schedulesData = await testService.getAllTestSchedules();
       const schedules = schedulesData.filter((s) => s.testId === id);
       setReportSchedules(schedules);
-      
+
       if (schedules.length === 0) {
         setReportCandidates([]);
         setLoadingReports(false);
@@ -1104,15 +1378,20 @@ To refer to the FAQ document, you can click on the HELP button which is present 
       const candidatesLists = await Promise.all(
         schedules.map(async (s) => {
           try {
-            const res = await apiClient.get(`/api/admin/proctoring/assessment-schedules/${s.id}/candidates`);
+            const res = await apiClient.get(
+              `/api/admin/proctoring/assessment-schedules/${s.id}/candidates`,
+            );
             const list = res.data?.data || res.data || [];
-            return list.map((c: ReportCandidate) => ({ ...c, scheduleId: s.id }));
+            return list.map((c: ReportCandidate) => ({
+              ...c,
+              scheduleId: s.id,
+            }));
           } catch {
             return [];
           }
-        })
+        }),
       );
-      
+
       const candidatesList = candidatesLists.flat();
       setReportCandidates(candidatesList);
 
@@ -1121,31 +1400,36 @@ To refer to the FAQ document, you can click on the HELP button which is present 
         candidatesList.map(async (c: ReportCandidate) => {
           try {
             const detailRes = await apiClient.get(
-              `/api/admin/proctoring/candidates/${c.candidateId}/details?scheduleId=${c.scheduleId}`
+              `/api/admin/proctoring/candidates/${c.candidateId}/details?scheduleId=${c.scheduleId}`,
             );
             const detail = detailRes.data?.data || detailRes.data;
             const sessionId = detail?.systemInfo?.sessionId;
-            
+
             if (sessionId) {
-              const resultRes = await apiClient.get(`/test-results/session/${sessionId}`);
+              const resultRes = await apiClient.get(
+                `/test-results/session/${sessionId}`,
+              );
               const result = resultRes.data?.data || resultRes.data;
               resultsMap[getReportCandidateKey(c)] = {
                 sessionId,
                 detail,
                 scheduleId: c.scheduleId,
-                result: result && result.id ? result : null
+                result: result && result.id ? result : null,
               };
             } else {
               resultsMap[getReportCandidateKey(c)] = {
                 detail,
                 scheduleId: c.scheduleId,
-                result: null
+                result: null,
               };
             }
           } catch (err) {
-            console.warn(`Failed to load details/result for candidate ${c.candidateId}:`, err);
+            console.warn(
+              `Failed to load details/result for candidate ${c.candidateId}:`,
+              err,
+            );
           }
-        })
+        }),
       );
       setCandidateResults(resultsMap);
     } catch (err) {
@@ -1176,7 +1460,7 @@ To refer to the FAQ document, you can click on the HELP button which is present 
       if (sessionId) {
         const [paperRes, resumeRes] = await Promise.all([
           apiClient.get(`/test-sessions/${sessionId}/paper`),
-          apiClient.get(`/test-sessions/${sessionId}/resume`)
+          apiClient.get(`/test-sessions/${sessionId}/resume`),
         ]);
 
         const paperData = paperRes.data?.data || paperRes.data;
@@ -1185,24 +1469,31 @@ To refer to the FAQ document, you can click on the HELP button which is present 
         const questionsList = paperData?.paper?.questions || [];
         const submissionsList = resumeData?.submissions || [];
 
-        const mappedSubmissions = questionsList.map((q: Record<string, unknown>) => {
-          const questionId = (q.sourceQuestionId || q.id) as string;
-          const submission = submissionsList.find((s: Record<string, unknown>) => s.questionId === questionId);
-          
-          const normalizedQuestion = {
-            id: questionId,
-            prompt: q.prompt,
-            title: (q.coding as { title?: string } | undefined)?.title || (q.prompt as string | undefined) || "Question",
-            questionType: q.type,
-            type: q.type,
-            mcqOptions: q.options || q.mcqOptions || []
-          };
+        const mappedSubmissions = questionsList.map(
+          (q: Record<string, unknown>) => {
+            const questionId = (q.sourceQuestionId || q.id) as string;
+            const submission = submissionsList.find(
+              (s: Record<string, unknown>) => s.questionId === questionId,
+            );
 
-          return {
-            question: normalizedQuestion,
-            submission: submission || null
-          };
-        });
+            const normalizedQuestion = {
+              id: questionId,
+              prompt: q.prompt,
+              title:
+                (q.coding as { title?: string } | undefined)?.title ||
+                (q.prompt as string | undefined) ||
+                "Question",
+              questionType: q.type,
+              type: q.type,
+              mcqOptions: q.options || q.mcqOptions || [],
+            };
+
+            return {
+              question: normalizedQuestion,
+              submission: submission || null,
+            };
+          },
+        );
         setCandidatePaperSubmissions(mappedSubmissions);
       }
     } catch (err) {
@@ -1212,20 +1503,29 @@ To refer to the FAQ document, you can click on the HELP button which is present 
     }
   };
 
-  const downloadScorecard = async (sessionId: string, candidateName: string) => {
+  const downloadScorecard = async (
+    sessionId: string,
+    candidateName: string,
+  ) => {
     try {
       toast({
         title: "Downloading Scorecard",
         description: "Please wait while we generate the PDF scorecard...",
       });
-      const response = await apiClient.get(`/test-results/session/${sessionId}/scorecard`, {
-        responseType: "blob",
-      });
+      const response = await apiClient.get(
+        `/test-results/session/${sessionId}/scorecard`,
+        {
+          responseType: "blob",
+        },
+      );
       const blob = new Blob([response.data], { type: "application/pdf" });
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
-      link.setAttribute("download", `Scorecard_${candidateName.replace(/\s+/g, "_")}.pdf`);
+      link.setAttribute(
+        "download",
+        `Scorecard_${candidateName.replace(/\s+/g, "_")}.pdf`,
+      );
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -1243,7 +1543,14 @@ To refer to the FAQ document, you can click on the HELP button which is present 
       .replace(/'/g, "&#039;");
   };
 
-  const downloadAdvancedReport = async (candidate: { candidateId: string; candidateName: string; email: string; testStatus?: string; violationCount?: number; scheduleId?: string }) => {
+  const downloadAdvancedReport = async (candidate: {
+    candidateId: string;
+    candidateName: string;
+    email: string;
+    testStatus?: string;
+    violationCount?: number;
+    scheduleId?: string;
+  }) => {
     try {
       toast({
         title: "Generating Advanced PDF",
@@ -1252,12 +1559,14 @@ To refer to the FAQ document, you can click on the HELP button which is present 
 
       const scoreData = candidateResults[getReportCandidateKey(candidate)];
       if (!scoreData?.sessionId) {
-        console.error("Download Failed: No active session found to build advanced report.");
+        console.error(
+          "Download Failed: No active session found to build advanced report.",
+        );
         return;
       }
 
       const detailRes = await apiClient.get(
-        `/api/admin/proctoring/candidates/${candidate.candidateId}/details?scheduleId=${candidate.scheduleId || reportScheduleId}`
+        `/api/admin/proctoring/candidates/${candidate.candidateId}/details?scheduleId=${candidate.scheduleId || reportScheduleId}`,
       );
       const detailData = detailRes.data?.data ?? detailRes.data;
 
@@ -1274,12 +1583,16 @@ To refer to the FAQ document, you can click on the HELP button which is present 
       const questionsList = paperData?.paper?.questions || [];
       const submissionsList = resumeData?.submissions || [];
 
-      const scoreText = scoreData?.result?.totalScore !== undefined
-        ? `${scoreData.result.totalScore} / ${scoreData.result.maxScore}`
-        : "N/A";
-      const passText = scoreData?.result?.passed !== undefined
-        ? (scoreData.result.passed ? "PASSED" : "FAILED")
-        : "N/A";
+      const scoreText =
+        scoreData?.result?.totalScore !== undefined
+          ? `${scoreData.result.totalScore} / ${scoreData.result.maxScore}`
+          : "N/A";
+      const passText =
+        scoreData?.result?.passed !== undefined
+          ? scoreData.result.passed
+            ? "PASSED"
+            : "FAILED"
+          : "N/A";
 
       // Initialize jsPDF document
       const doc = new jsPDF();
@@ -1302,184 +1615,427 @@ To refer to the FAQ document, you can click on the HELP button which is present 
       autoTable(doc, {
         startY: 36,
         margin: { left: 14, right: 14 },
-        head: [[{ content: 'CANDIDATE METADATA & SESSION INFORMATION', colSpan: 4, styles: { halign: 'left', fillColor: [30, 41, 59], fontStyle: 'bold' } }]],
+        head: [
+          [
+            {
+              content: "CANDIDATE METADATA & SESSION INFORMATION",
+              colSpan: 4,
+              styles: {
+                halign: "left",
+                fillColor: [30, 41, 59],
+                fontStyle: "bold",
+              },
+            },
+          ],
+        ],
         body: [
           [
-            { content: 'Candidate Name:', styles: { fontStyle: 'bold', textColor: [100, 116, 139] } },
+            {
+              content: "Candidate Name:",
+              styles: { fontStyle: "bold", textColor: [100, 116, 139] },
+            },
             candidate.candidateName,
-            { content: 'Final Score:', styles: { fontStyle: 'bold', textColor: [100, 116, 139] } },
-            { content: `${scoreText} (${passText})`, styles: { fontStyle: 'bold', textColor: scoreData?.result?.passed ? [16, 185, 129] : [239, 68, 68] } }
+            {
+              content: "Final Score:",
+              styles: { fontStyle: "bold", textColor: [100, 116, 139] },
+            },
+            {
+              content: `${scoreText} (${passText})`,
+              styles: {
+                fontStyle: "bold",
+                textColor: scoreData?.result?.passed
+                  ? [16, 185, 129]
+                  : [239, 68, 68],
+              },
+            },
           ],
           [
-            { content: 'Email Address:', styles: { fontStyle: 'bold', textColor: [100, 116, 139] } },
+            {
+              content: "Email Address:",
+              styles: { fontStyle: "bold", textColor: [100, 116, 139] },
+            },
             candidate.email,
-            { content: 'Proctoring Risk:', styles: { fontStyle: 'bold', textColor: [100, 116, 139] } },
-            { content: detailData?.riskLevel || 'NONE', styles: { fontStyle: 'bold', textColor: (detailData?.riskLevel === 'CRITICAL' || detailData?.riskLevel === 'HIGH') ? [239, 68, 68] : [16, 185, 129] } }
+            {
+              content: "Proctoring Risk:",
+              styles: { fontStyle: "bold", textColor: [100, 116, 139] },
+            },
+            {
+              content: detailData?.riskLevel || "NONE",
+              styles: {
+                fontStyle: "bold",
+                textColor:
+                  detailData?.riskLevel === "CRITICAL" ||
+                  detailData?.riskLevel === "HIGH"
+                    ? [239, 68, 68]
+                    : [16, 185, 129],
+              },
+            },
           ],
           [
-            { content: 'Session Status:', styles: { fontStyle: 'bold', textColor: [100, 116, 139] } },
-            (candidate.testStatus || 'N/A').replace(/_/g, ' '),
-            { content: 'Total Violations:', styles: { fontStyle: 'bold', textColor: [100, 116, 139] } },
-            { content: String(candidate.violationCount || 0), styles: { fontStyle: 'bold', textColor: (candidate.violationCount || 0) > 0 ? [239, 68, 68] : [100, 116, 139] } }
+            {
+              content: "Session Status:",
+              styles: { fontStyle: "bold", textColor: [100, 116, 139] },
+            },
+            (candidate.testStatus || "N/A").replace(/_/g, " "),
+            {
+              content: "Total Violations:",
+              styles: { fontStyle: "bold", textColor: [100, 116, 139] },
+            },
+            {
+              content: String(candidate.violationCount || 0),
+              styles: {
+                fontStyle: "bold",
+                textColor:
+                  (candidate.violationCount || 0) > 0
+                    ? [239, 68, 68]
+                    : [100, 116, 139],
+              },
+            },
           ],
           [
-            { content: 'IP Address:', styles: { fontStyle: 'bold', textColor: [100, 116, 139] } },
-            detailData?.systemInfo?.ipAddress || 'N/A',
-            { content: 'Browser / OS:', styles: { fontStyle: 'bold', textColor: [100, 116, 139] } },
-            `${detailData?.systemInfo?.browser || 'Chrome'} / ${detailData?.systemInfo?.os || 'Windows'}`
-          ]
+            {
+              content: "IP Address:",
+              styles: { fontStyle: "bold", textColor: [100, 116, 139] },
+            },
+            detailData?.systemInfo?.ipAddress || "N/A",
+            {
+              content: "Browser / OS:",
+              styles: { fontStyle: "bold", textColor: [100, 116, 139] },
+            },
+            `${detailData?.systemInfo?.browser || "Chrome"} / ${detailData?.systemInfo?.os || "Windows"}`,
+          ],
         ],
-        theme: 'grid',
-        styles: { fontSize: 8.5, cellPadding: 4.5, lineColor: [100, 116, 139], lineWidth: 0.5 }
+        theme: "grid",
+        styles: {
+          fontSize: 8.5,
+          cellPadding: 4.5,
+          lineColor: [100, 116, 139],
+          lineWidth: 0.5,
+        },
       });
 
       // Warnings Timeline Table
       const violations = detailData?.violations || [];
-      const violationsBody = violations.map((v: { eventId?: string; id?: string; occurredAt?: string; time?: string; eventType?: string; severity?: string; metadata?: { description?: string }; description?: string }) => [
-        new Date(v.occurredAt || v.time || '').toLocaleTimeString(),
-        (v.eventType || '').replace(/_/g, ' '),
-        v.severity || 'INFO',
-        v.metadata?.description || v.description || 'Violation logged'
-      ]);
+      const violationsBody = violations.map(
+        (v: {
+          eventId?: string;
+          id?: string;
+          occurredAt?: string;
+          time?: string;
+          eventType?: string;
+          severity?: string;
+          metadata?: { description?: string };
+          description?: string;
+        }) => [
+          new Date(v.occurredAt || v.time || "").toLocaleTimeString(),
+          (v.eventType || "").replace(/_/g, " "),
+          v.severity || "INFO",
+          v.metadata?.description || v.description || "Violation logged",
+        ],
+      );
 
       autoTable(doc, {
         startY: (doc as JsPDFWithAutoTable).lastAutoTable.finalY + 8,
         margin: { left: 14, right: 14 },
         head: [
-          [{ content: 'PROCTORING WARNINGS TIMELINE', colSpan: 4, styles: { halign: 'left', fillColor: [30, 41, 59], fontStyle: 'bold' } }],
-          ['Time', 'Event Type', 'Severity', 'Description']
+          [
+            {
+              content: "PROCTORING WARNINGS TIMELINE",
+              colSpan: 4,
+              styles: {
+                halign: "left",
+                fillColor: [30, 41, 59],
+                fontStyle: "bold",
+              },
+            },
+          ],
+          ["Time", "Event Type", "Severity", "Description"],
         ],
-        body: violationsBody.length > 0 ? violationsBody : [['-', 'No proctoring violations recorded during this session.', '-', '-']],
-        theme: 'striped',
-        headStyles: { fillColor: [71, 85, 105], textColor: [255, 255, 255], fontStyle: 'bold' },
-        styles: { fontSize: 8, cellPadding: 4, lineColor: [100, 116, 139], lineWidth: 0.5 }
+        body:
+          violationsBody.length > 0
+            ? violationsBody
+            : [
+                [
+                  "-",
+                  "No proctoring violations recorded during this session.",
+                  "-",
+                  "-",
+                ],
+              ],
+        theme: "striped",
+        headStyles: {
+          fillColor: [71, 85, 105],
+          textColor: [255, 255, 255],
+          fontStyle: "bold",
+        },
+        styles: {
+          fontSize: 8,
+          cellPadding: 4,
+          lineColor: [100, 116, 139],
+          lineWidth: 0.5,
+        },
       });
 
       // Section Separator Label
       doc.setFont("helvetica", "bold");
       doc.setFontSize(11);
       doc.setTextColor(30, 41, 59); // Slate header
-      doc.text("QUESTIONS & SUBMISSIONS DETAILS", 14, (doc as JsPDFWithAutoTable).lastAutoTable.finalY + 10);
+      doc.text(
+        "QUESTIONS & SUBMISSIONS DETAILS",
+        14,
+        (doc as JsPDFWithAutoTable).lastAutoTable.finalY + 10,
+      );
 
       // Question Cards using autoTables
-      questionsList.forEach((q: { id: string; sourceQuestionId?: string; prompt?: string; type?: string; coding?: { title?: string }; options?: Array<{ id: string; text: string; isCorrect: boolean }>; mcqOptions?: Array<{ id: string; text: string; isCorrect: boolean }> }, idx: number) => {
-        const questionId = q.sourceQuestionId || q.id;
-        const sub = submissionsList.find((s: { questionId: string; answerText?: string; selectedOptionIds?: string[] }) => s.questionId === questionId);
-        const isCoding = q.type === "CODING";
-
-        // Build exact selected ID set
-        let selectedIds = new Set<string>();
-        if (sub?.selectedOptionIds && Array.isArray(sub.selectedOptionIds)) {
-          selectedIds = new Set(sub.selectedOptionIds.map(String));
-        } else if (sub?.answerText) {
-          try {
-            const parsed = JSON.parse(sub.answerText);
-            if (Array.isArray(parsed)) parsed.forEach((id: string) => selectedIds.add(String(id)));
-          } catch { /* raw text */ }
-        }
-
-        // Fetch true correct options list
-        const enrichedTQ = questionsData.find(tq => tq.questionId === questionId);
-        const enrichedQuestion = enrichedTQ?.question;
-        const correctOptions = enrichedQuestion?.options || enrichedQuestion?.mcqOptions || [];
-
-        // Calculate time spent telemetry
-        const timeItem = timingsList.find((t: { questionId: string }) => t.questionId === questionId);
-        const activeSeconds = timeItem?.activeSeconds || 0;
-        const minutes = Math.floor(activeSeconds / 60);
-        const seconds = activeSeconds % 60;
-        const timeSpentText = minutes > 0 ? `${minutes}m ${seconds}s` : `${seconds}s`;
-
-        // Build structured body rows
-        const bodyRows: any[] = [
-          [{ content: `Question:\n${q.prompt || ""}`, colSpan: 3, styles: { textColor: [15, 23, 42], fontStyle: 'bold', fillColor: [248, 250, 252], fontSize: 9 } }]
-        ];
-
-        if (isCoding) {
-          bodyRows.push([{
-            content: `Submitted Code:\n${sub?.answerText || "No submission"}`,
-            colSpan: 3,
-            styles: { fontStyle: 'normal', fillColor: [248, 250, 252], textColor: [15, 23, 42] }
-          }]);
-        } else {
-          const optionsList = q.options || q.mcqOptions || [];
-          optionsList.forEach((opt: { id: string; text: string; isCorrect: boolean }, oIdx: number) => {
-            const optionLetter = String.fromCharCode(65 + oIdx);
-            const correctOpt = correctOptions.find(co => co.id === opt.id || co.text === opt.text);
-            const isOptionCorrect = correctOpt ? correctOpt.isCorrect : opt.isCorrect;
-            const isSelected = selectedIds.has(opt.id);
-
-            const statusLabel = isSelected && isOptionCorrect
-              ? "[SELECTED & CORRECT]"
-              : isSelected
-                ? "[SELECTED - INCORRECT]"
-                : isOptionCorrect
-                  ? "[CORRECT ANSWER]"
-                  : "";
-
-            const rowText = `${optionLetter}. ${opt.text} ${statusLabel}`.trim();
-
-            let cellStyle = { textColor: [30, 41, 59], fontStyle: 'normal', fillColor: [255, 255, 255] };
-            if (isSelected && isOptionCorrect) {
-              cellStyle = { textColor: [16, 185, 129], fontStyle: 'bold', fillColor: [240, 253, 250] }; // matrix green bg/fg
-            } else if (isSelected) {
-              cellStyle = { textColor: [239, 68, 68], fontStyle: 'bold', fillColor: [254, 242, 242] }; // soft red bg/fg
-            } else if (isOptionCorrect) {
-              cellStyle = { textColor: [16, 185, 129], fontStyle: 'bold', fillColor: [255, 255, 255] }; // correct option marker
-            }
-
-            bodyRows.push([{ content: rowText, colSpan: 3, styles: cellStyle }]);
-          });
-        }
-
-        autoTable(doc, {
-          pageBreak: 'avoid', // Keep entire card grouped to prevent hanging rows
-          startY: idx === 0 ? (doc as JsPDFWithAutoTable).lastAutoTable.finalY + 16 : (doc as JsPDFWithAutoTable).lastAutoTable.finalY + 12,
-          margin: { left: 14, right: 14 },
-          head: [[
-            { content: `Q${idx + 1}`, styles: { halign: 'center', fillColor: [30, 41, 59], textColor: [255, 255, 255], fontStyle: 'bold', lineColor: [100, 116, 139], lineWidth: 0.5 } },
-            { content: "", styles: { fillColor: [255, 255, 255], lineWidth: 0 } },
-            { content: "", styles: { fillColor: [255, 255, 255], lineWidth: 0 } }
-          ]],
-          body: bodyRows,
-          theme: 'grid',
-          styles: { fontSize: 8, cellPadding: 4.5, lineColor: [100, 116, 139], lineWidth: 0.5 },
-          columnStyles: {
-            0: { cellWidth: 15 }, // Q1, Q2 etc.
-            1: { cellWidth: 42 }, // Time Spent box (slightly wider to fit slant nicely)
-            2: { cellWidth: 125 } // Empty space on the right
+      questionsList.forEach(
+        (
+          q: {
+            id: string;
+            sourceQuestionId?: string;
+            prompt?: string;
+            type?: string;
+            coding?: { title?: string };
+            options?: Array<{ id: string; text: string; isCorrect: boolean }>;
+            mcqOptions?: Array<{
+              id: string;
+              text: string;
+              isCorrect: boolean;
+            }>;
           },
-          didDrawCell: (data) => {
-            if (data.row.section === 'head' && data.column.index === 1) {
-              const cell = data.cell;
-              const h = cell.height;
-              
-              // Draw custom 45-degree slanted polygon using two triangles for universal jsPDF support
-              doc.setFillColor(30, 41, 59);
-              doc.setDrawColor(30, 41, 59); // Match draw color to fill color to hide diagonal seam
-              doc.triangle(cell.x, cell.y, cell.x + cell.width - h, cell.y, cell.x, cell.y + h, 'FD');
-              doc.triangle(cell.x + cell.width - h, cell.y, cell.x + cell.width, cell.y + h, cell.x, cell.y + h, 'FD');
-              
-              // Draw slate borders around the slanted cell
-              doc.setDrawColor(100, 116, 139);
-              doc.setLineWidth(0.5);
-              doc.line(cell.x, cell.y, cell.x, cell.y + h); // left vertical
-              doc.line(cell.x, cell.y + h, cell.x + cell.width, cell.y + h); // bottom horizontal
-              doc.line(cell.x, cell.y, cell.x + cell.width - h, cell.y); // top horizontal
-              doc.line(cell.x + cell.width - h, cell.y, cell.x + cell.width, cell.y + h); // slanted right edge
-              
-              // Draw text centered within the shape
-              doc.setTextColor(255, 255, 255);
-              doc.setFont("helvetica", "bold");
-              doc.setFontSize(7.5);
-              doc.text(`Time Spent: ${timeSpentText}`, cell.x + 2, cell.y + (h / 2) + 1.5);
+          idx: number,
+        ) => {
+          const questionId = q.sourceQuestionId || q.id;
+          const sub = submissionsList.find(
+            (s: {
+              questionId: string;
+              answerText?: string;
+              selectedOptionIds?: string[];
+            }) => s.questionId === questionId,
+          );
+          const isCoding = q.type === "CODING";
+
+          // Build exact selected ID set
+          let selectedIds = new Set<string>();
+          if (sub?.selectedOptionIds && Array.isArray(sub.selectedOptionIds)) {
+            selectedIds = new Set(sub.selectedOptionIds.map(String));
+          } else if (sub?.answerText) {
+            try {
+              const parsed = JSON.parse(sub.answerText);
+              if (Array.isArray(parsed))
+                parsed.forEach((id: string) => selectedIds.add(String(id)));
+            } catch {
+              /* raw text */
             }
           }
-        });
-      });
+
+          // Fetch true correct options list
+          const enrichedTQ = questionsData.find(
+            (tq) => tq.questionId === questionId,
+          );
+          const enrichedQuestion = enrichedTQ?.question;
+          const correctOptions =
+            enrichedQuestion?.options || enrichedQuestion?.mcqOptions || [];
+
+          // Calculate time spent telemetry
+          const timeItem = timingsList.find(
+            (t: { questionId: string }) => t.questionId === questionId,
+          );
+          const activeSeconds = timeItem?.activeSeconds || 0;
+          const minutes = Math.floor(activeSeconds / 60);
+          const seconds = activeSeconds % 60;
+          const timeSpentText =
+            minutes > 0 ? `${minutes}m ${seconds}s` : `${seconds}s`;
+
+          // Build structured body rows
+          const bodyRows: any[] = [
+            [
+              {
+                content: `Question:\n${q.prompt || ""}`,
+                colSpan: 3,
+                styles: {
+                  textColor: [15, 23, 42],
+                  fontStyle: "bold",
+                  fillColor: [248, 250, 252],
+                  fontSize: 9,
+                },
+              },
+            ],
+          ];
+
+          if (isCoding) {
+            bodyRows.push([
+              {
+                content: `Submitted Code:\n${sub?.answerText || "No submission"}`,
+                colSpan: 3,
+                styles: {
+                  fontStyle: "normal",
+                  fillColor: [248, 250, 252],
+                  textColor: [15, 23, 42],
+                },
+              },
+            ]);
+          } else {
+            const optionsList = q.options || q.mcqOptions || [];
+            optionsList.forEach(
+              (
+                opt: { id: string; text: string; isCorrect: boolean },
+                oIdx: number,
+              ) => {
+                const optionLetter = String.fromCharCode(65 + oIdx);
+                const correctOpt = correctOptions.find(
+                  (co) => co.id === opt.id || co.text === opt.text,
+                );
+                const isOptionCorrect = correctOpt
+                  ? correctOpt.isCorrect
+                  : opt.isCorrect;
+                const isSelected = selectedIds.has(opt.id);
+
+                const statusLabel =
+                  isSelected && isOptionCorrect
+                    ? "[SELECTED & CORRECT]"
+                    : isSelected
+                      ? "[SELECTED - INCORRECT]"
+                      : isOptionCorrect
+                        ? "[CORRECT ANSWER]"
+                        : "";
+
+                const rowText =
+                  `${optionLetter}. ${opt.text} ${statusLabel}`.trim();
+
+                let cellStyle = {
+                  textColor: [30, 41, 59],
+                  fontStyle: "normal",
+                  fillColor: [255, 255, 255],
+                };
+                if (isSelected && isOptionCorrect) {
+                  cellStyle = {
+                    textColor: [16, 185, 129],
+                    fontStyle: "bold",
+                    fillColor: [240, 253, 250],
+                  }; // matrix green bg/fg
+                } else if (isSelected) {
+                  cellStyle = {
+                    textColor: [239, 68, 68],
+                    fontStyle: "bold",
+                    fillColor: [254, 242, 242],
+                  }; // soft red bg/fg
+                } else if (isOptionCorrect) {
+                  cellStyle = {
+                    textColor: [16, 185, 129],
+                    fontStyle: "bold",
+                    fillColor: [255, 255, 255],
+                  }; // correct option marker
+                }
+
+                bodyRows.push([
+                  { content: rowText, colSpan: 3, styles: cellStyle },
+                ]);
+              },
+            );
+          }
+
+          autoTable(doc, {
+            pageBreak: "avoid", // Keep entire card grouped to prevent hanging rows
+            startY:
+              idx === 0
+                ? (doc as JsPDFWithAutoTable).lastAutoTable.finalY + 16
+                : (doc as JsPDFWithAutoTable).lastAutoTable.finalY + 12,
+            margin: { left: 14, right: 14 },
+            head: [
+              [
+                {
+                  content: `Q${idx + 1}`,
+                  styles: {
+                    halign: "center",
+                    fillColor: [30, 41, 59],
+                    textColor: [255, 255, 255],
+                    fontStyle: "bold",
+                    lineColor: [100, 116, 139],
+                    lineWidth: 0.5,
+                  },
+                },
+                {
+                  content: "",
+                  styles: { fillColor: [255, 255, 255], lineWidth: 0 },
+                },
+                {
+                  content: "",
+                  styles: { fillColor: [255, 255, 255], lineWidth: 0 },
+                },
+              ],
+            ],
+            body: bodyRows,
+            theme: "grid",
+            styles: {
+              fontSize: 8,
+              cellPadding: 4.5,
+              lineColor: [100, 116, 139],
+              lineWidth: 0.5,
+            },
+            columnStyles: {
+              0: { cellWidth: 15 }, // Q1, Q2 etc.
+              1: { cellWidth: 42 }, // Time Spent box (slightly wider to fit slant nicely)
+              2: { cellWidth: 125 }, // Empty space on the right
+            },
+            didDrawCell: (data) => {
+              if (data.row.section === "head" && data.column.index === 1) {
+                const cell = data.cell;
+                const h = cell.height;
+
+                // Draw custom 45-degree slanted polygon using two triangles for universal jsPDF support
+                doc.setFillColor(30, 41, 59);
+                doc.setDrawColor(30, 41, 59); // Match draw color to fill color to hide diagonal seam
+                doc.triangle(
+                  cell.x,
+                  cell.y,
+                  cell.x + cell.width - h,
+                  cell.y,
+                  cell.x,
+                  cell.y + h,
+                  "FD",
+                );
+                doc.triangle(
+                  cell.x + cell.width - h,
+                  cell.y,
+                  cell.x + cell.width,
+                  cell.y + h,
+                  cell.x,
+                  cell.y + h,
+                  "FD",
+                );
+
+                // Draw slate borders around the slanted cell
+                doc.setDrawColor(100, 116, 139);
+                doc.setLineWidth(0.5);
+                doc.line(cell.x, cell.y, cell.x, cell.y + h); // left vertical
+                doc.line(cell.x, cell.y + h, cell.x + cell.width, cell.y + h); // bottom horizontal
+                doc.line(cell.x, cell.y, cell.x + cell.width - h, cell.y); // top horizontal
+                doc.line(
+                  cell.x + cell.width - h,
+                  cell.y,
+                  cell.x + cell.width,
+                  cell.y + h,
+                ); // slanted right edge
+
+                // Draw text centered within the shape
+                doc.setTextColor(255, 255, 255);
+                doc.setFont("helvetica", "bold");
+                doc.setFontSize(7.5);
+                doc.text(
+                  `Time Spent: ${timeSpentText}`,
+                  cell.x + 2,
+                  cell.y + h / 2 + 1.5,
+                );
+              }
+            },
+          });
+        },
+      );
 
       // Save PDF directly to user's downloads folder
-      doc.save(`Advanced_Report_${candidate.candidateName.replace(/\s+/g, "_")}.pdf`);
+      doc.save(
+        `Advanced_Report_${candidate.candidateName.replace(/\s+/g, "_")}.pdf`,
+      );
 
       toast({
         title: "Download Successful",
@@ -1524,11 +2080,13 @@ To refer to the FAQ document, you can click on the HELP button which is present 
     }
   };
 
-  const [candidateCustomFields, setCandidateCustomFields] = useState<CustomFieldItem[]>([]);
+  const [candidateCustomFields, setCandidateCustomFields] = useState<
+    CustomFieldItem[]
+  >([]);
 
   useEffect(() => {
     if (isAddDialogOpen && orgId) {
-      setCandidateFormData(prev => ({
+      setCandidateFormData((prev) => ({
         ...prev,
         organisationId: orgId,
       }));
@@ -1546,7 +2104,10 @@ To refer to the FAQ document, you can click on the HELP button which is present 
       setCandidateEmailError("Invalid email format");
       return;
     }
-    if (!candidateFormData.password.trim() || candidateFormData.password.length < 8) {
+    if (
+      !candidateFormData.password.trim() ||
+      candidateFormData.password.length < 8
+    ) {
       console.error("Validation Error: Password must be at least 8 characters");
       return;
     }
@@ -1572,20 +2133,34 @@ To refer to the FAQ document, you can click on the HELP button which is present 
 
       await candidateService.createCandidate({
         ...candidateFormData,
-        extraFields: Object.keys(extraFields).length > 0 ? extraFields : undefined,
+        extraFields:
+          Object.keys(extraFields).length > 0 ? extraFields : undefined,
       });
 
       toast({ title: "Success", description: "Candidate added successfully" });
       setIsAddDialogOpen(false);
       setCandidateCustomFields([]);
       setCandidateFormData({
-        name: "", email: "", password: "", phoneNumber: "", organisationId: orgId || "",
-        extraFields: { college: "", course: "", year: "", skills: "", city: "" }
+        name: "",
+        email: "",
+        password: "",
+        phoneNumber: "",
+        organisationId: orgId || "",
+        extraFields: {
+          college: "",
+          course: "",
+          year: "",
+          skills: "",
+          city: "",
+        },
       });
       fetchInvitationsData();
     } catch (error) {
       const err = error as { response?: { data?: { message?: string } } };
-      console.error("Failed to add candidate:", err.response?.data?.message || err);
+      console.error(
+        "Failed to add candidate:",
+        err.response?.data?.message || err,
+      );
     } finally {
       setCandidateSubmitting(false);
     }
@@ -1646,10 +2221,15 @@ To refer to the FAQ document, you can click on the HELP button which is present 
     setTimeout(() => setCopiedToken(null), 2000);
   };
 
-  const getInvitationForCandidate = (candidateId: string, scheduleId: string) => {
-    return invitations.find(
-      (i) => i.candidateId === candidateId && i.scheduleId === scheduleId,
-    ) || null;
+  const getInvitationForCandidate = (
+    candidateId: string,
+    scheduleId: string,
+  ) => {
+    return (
+      invitations.find(
+        (i) => i.candidateId === candidateId && i.scheduleId === scheduleId,
+      ) || null
+    );
   };
 
   const formatDateTime = (dateStr: string) => {
@@ -1671,19 +2251,28 @@ To refer to the FAQ document, you can click on the HELP button which is present 
     switch (status) {
       case "ACCEPTED":
         return (
-          <Badge variant="outline" className="border-emerald-500/20 bg-emerald-500/10 text-emerald-600 text-xs">
+          <Badge
+            variant="outline"
+            className="border-emerald-500/20 bg-emerald-500/10 text-emerald-600 text-xs"
+          >
             Accepted
           </Badge>
         );
       case "EXPIRED":
         return (
-          <Badge variant="outline" className="border-red-500/20 bg-red-500/10 text-red-600 text-xs">
+          <Badge
+            variant="outline"
+            className="border-red-500/20 bg-red-500/10 text-red-600 text-xs"
+          >
             Expired
           </Badge>
         );
       case "PENDING":
         return (
-          <Badge variant="outline" className="border-amber-500/20 bg-amber-500/10 text-amber-600 text-xs">
+          <Badge
+            variant="outline"
+            className="border-amber-500/20 bg-amber-500/10 text-amber-600 text-xs"
+          >
             Pending
           </Badge>
         );
@@ -1731,8 +2320,10 @@ To refer to the FAQ document, you can click on the HELP button which is present 
     );
 
     return {
-      available: candidates.filter((candidate) => !invitedIds.has(candidate.id)).length,
-      invited: candidates.filter((candidate) => invitedIds.has(candidate.id)).length,
+      available: candidates.filter((candidate) => !invitedIds.has(candidate.id))
+        .length,
+      invited: candidates.filter((candidate) => invitedIds.has(candidate.id))
+        .length,
       all: candidates.length,
     };
   }, [candidates, invitations, selectedSchedule]);
@@ -1809,7 +2400,11 @@ To refer to the FAQ document, you can click on the HELP button which is present 
         </div>
       </div>
 
-      <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
+      <Tabs
+        value={activeTab}
+        onValueChange={handleTabChange}
+        className="w-full"
+      >
         <TabsList className="grid w-full grid-cols-5 max-w-2xl">
           <TabsTrigger value="details">Basic Information</TabsTrigger>
           <TabsTrigger value="questions">
@@ -1841,8 +2436,6 @@ To refer to the FAQ document, you can click on the HELP button which is present 
                       onChange={handleInputChange}
                     />
                   </div>
-
-
 
                   <div className="space-y-2">
                     <Label htmlFor="description">Description</Label>
@@ -1901,8 +2494,6 @@ To refer to the FAQ document, you can click on the HELP button which is present 
                   </div>
                 </CardContent>
               </Card>
-
-
             </div>
 
             <div className="space-y-6 flex flex-col h-full">
@@ -1910,14 +2501,21 @@ To refer to the FAQ document, you can click on the HELP button which is present 
                 <CardHeader>
                   <CardTitle>Test Instructions</CardTitle>
                   <CardDescription>
-                    General instructions shown to candidates before starting the test
+                    General instructions shown to candidates before starting the
+                    test
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="flex-1 flex flex-col">
                   <Textarea
                     placeholder="Enter test instructions..."
                     className="flex-1 min-h-[350px] font-sans text-sm resize-none"
-                    value={(formData.instructions as Record<string, unknown> | undefined)?.general as string || ""}
+                    value={
+                      ((
+                        formData.instructions as
+                          | Record<string, unknown>
+                          | undefined
+                      )?.general as string) || ""
+                    }
                     onChange={(e) =>
                       setFormData((prev) => ({
                         ...prev,
@@ -1937,9 +2535,15 @@ To refer to the FAQ document, you can click on the HELP button which is present 
           <div className="flex justify-end pt-2">
             <Button onClick={handleSaveBasicInfo} disabled={saving}>
               {saving ? (
-                <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Saving...</>
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Saving...
+                </>
               ) : (
-                <><Save className="w-4 h-4 mr-2" />Save Basic Info</>
+                <>
+                  <Save className="w-4 h-4 mr-2" />
+                  Save Basic Info
+                </>
               )}
             </Button>
           </div>
@@ -1987,11 +2591,21 @@ To refer to the FAQ document, you can click on the HELP button which is present 
                         </div>
                         <div className="flex-1">
                           <p className="font-medium line-clamp-1">
-                            {item.question?.title || item.question?.prompt || "Unknown Question"}
+                            {item.question?.title ||
+                              item.question?.prompt ||
+                              "Unknown Question"}
                           </p>
                           <div className="flex gap-3 text-xs text-muted-foreground mt-1">
                             <span className="capitalize">
-                              {((item.question as unknown as Record<string, unknown> | undefined)?.type as string || item.question?.questionType || "")?.toLowerCase()}
+                              {(
+                                ((
+                                  item.question as unknown as
+                                    | Record<string, unknown>
+                                    | undefined
+                                )?.type as string) ||
+                                item.question?.questionType ||
+                                ""
+                              )?.toLowerCase()}
                             </span>
                             <span>•</span>
                             <span>{item.marks} marks</span>
@@ -2018,12 +2632,12 @@ To refer to the FAQ document, you can click on the HELP button which is present 
         </TabsContent>
 
         <TabsContent value="settings" className="pt-6 space-y-6">
-
           <Card>
             <CardHeader>
               <CardTitle>Test Schedule</CardTitle>
               <CardDescription>
-                Set the availability window for this test (Organisation is set to your Admin home by default)
+                Set the availability window for this test (Organisation is set
+                to your Admin home by default)
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -2031,7 +2645,9 @@ To refer to the FAQ document, you can click on the HELP button which is present 
                 {/* Starting Time */}
                 <div className="space-y-2">
                   <Label className="text-sm font-semibold">Starting time</Label>
-                  <p className="text-xs text-muted-foreground">This test would not be accessible before this.</p>
+                  <p className="text-xs text-muted-foreground">
+                    This test would not be accessible before this.
+                  </p>
                   <div className="flex gap-4 items-center mt-1">
                     <div className="flex-1">
                       <button
@@ -2041,15 +2657,24 @@ To refer to the FAQ document, you can click on the HELP button which is present 
                       >
                         <span className="flex items-center gap-2">
                           <Calendar className="w-4 h-4 text-slate-400" />
-                          {scheduleStartTime ? scheduleStartTime.split("T")[0] : "Select Date"}
+                          {scheduleStartTime
+                            ? scheduleStartTime.split("T")[0]
+                            : "Select Date"}
                         </span>
                       </button>
                       <MaterialDatePickerDialog
                         isOpen={startDatePickerOpen}
                         onClose={() => setStartDatePickerOpen(false)}
-                        value={scheduleStartTime ? scheduleStartTime.split("T")[0] : ""}
+                        value={
+                          scheduleStartTime
+                            ? scheduleStartTime.split("T")[0]
+                            : ""
+                        }
                         onChange={(date) => {
-                          const time = scheduleStartTime && scheduleStartTime.includes("T") ? scheduleStartTime.split("T")[1] : "00:00";
+                          const time =
+                            scheduleStartTime && scheduleStartTime.includes("T")
+                              ? scheduleStartTime.split("T")[1]
+                              : "00:00";
                           setScheduleStartTime(date ? `${date}T${time}` : "");
                         }}
                       />
@@ -2062,15 +2687,23 @@ To refer to the FAQ document, you can click on the HELP button which is present 
                       >
                         <span className="flex items-center gap-2">
                           <Clock className="w-4 h-4 text-slate-400" />
-                          {scheduleStartTime && scheduleStartTime.includes("T") ? scheduleStartTime.split("T")[1].slice(0, 5) : "Select Time"}
+                          {scheduleStartTime && scheduleStartTime.includes("T")
+                            ? scheduleStartTime.split("T")[1].slice(0, 5)
+                            : "Select Time"}
                         </span>
                       </button>
                       <MaterialTimePickerDialog
                         isOpen={startTimePickerOpen}
                         onClose={() => setStartTimePickerOpen(false)}
-                        value={scheduleStartTime && scheduleStartTime.includes("T") ? scheduleStartTime.split("T")[1].slice(0, 5) : ""}
+                        value={
+                          scheduleStartTime && scheduleStartTime.includes("T")
+                            ? scheduleStartTime.split("T")[1].slice(0, 5)
+                            : ""
+                        }
                         onChange={(time) => {
-                          const date = scheduleStartTime ? scheduleStartTime.split("T")[0] : new Date().toISOString().split("T")[0];
+                          const date = scheduleStartTime
+                            ? scheduleStartTime.split("T")[0]
+                            : new Date().toISOString().split("T")[0];
                           setScheduleStartTime(date ? `${date}T${time}` : "");
                         }}
                       />
@@ -2081,7 +2714,9 @@ To refer to the FAQ document, you can click on the HELP button which is present 
                 {/* Ending Time */}
                 <div className="space-y-2">
                   <Label className="text-sm font-semibold">Ending time</Label>
-                  <p className="text-xs text-muted-foreground">This test would not be accessible after this.</p>
+                  <p className="text-xs text-muted-foreground">
+                    This test would not be accessible after this.
+                  </p>
                   <div className="flex gap-4 items-center mt-1">
                     <div className="flex-1">
                       <button
@@ -2091,15 +2726,22 @@ To refer to the FAQ document, you can click on the HELP button which is present 
                       >
                         <span className="flex items-center gap-2">
                           <Calendar className="w-4 h-4 text-slate-400" />
-                          {scheduleEndTime ? scheduleEndTime.split("T")[0] : "Select Date"}
+                          {scheduleEndTime
+                            ? scheduleEndTime.split("T")[0]
+                            : "Select Date"}
                         </span>
                       </button>
                       <MaterialDatePickerDialog
                         isOpen={endDatePickerOpen}
                         onClose={() => setEndDatePickerOpen(false)}
-                        value={scheduleEndTime ? scheduleEndTime.split("T")[0] : ""}
+                        value={
+                          scheduleEndTime ? scheduleEndTime.split("T")[0] : ""
+                        }
                         onChange={(date) => {
-                          const time = scheduleEndTime && scheduleEndTime.includes("T") ? scheduleEndTime.split("T")[1] : "00:00";
+                          const time =
+                            scheduleEndTime && scheduleEndTime.includes("T")
+                              ? scheduleEndTime.split("T")[1]
+                              : "00:00";
                           setScheduleEndTime(date ? `${date}T${time}` : "");
                         }}
                       />
@@ -2112,15 +2754,23 @@ To refer to the FAQ document, you can click on the HELP button which is present 
                       >
                         <span className="flex items-center gap-2">
                           <Clock className="w-4 h-4 text-slate-400" />
-                          {scheduleEndTime && scheduleEndTime.includes("T") ? scheduleEndTime.split("T")[1].slice(0, 5) : "Select Time"}
+                          {scheduleEndTime && scheduleEndTime.includes("T")
+                            ? scheduleEndTime.split("T")[1].slice(0, 5)
+                            : "Select Time"}
                         </span>
                       </button>
                       <MaterialTimePickerDialog
                         isOpen={endTimePickerOpen}
                         onClose={() => setEndTimePickerOpen(false)}
-                        value={scheduleEndTime && scheduleEndTime.includes("T") ? scheduleEndTime.split("T")[1].slice(0, 5) : ""}
+                        value={
+                          scheduleEndTime && scheduleEndTime.includes("T")
+                            ? scheduleEndTime.split("T")[1].slice(0, 5)
+                            : ""
+                        }
                         onChange={(time) => {
-                          const date = scheduleEndTime ? scheduleEndTime.split("T")[0] : new Date().toISOString().split("T")[0];
+                          const date = scheduleEndTime
+                            ? scheduleEndTime.split("T")[0]
+                            : new Date().toISOString().split("T")[0];
                           setScheduleEndTime(date ? `${date}T${time}` : "");
                         }}
                       />
@@ -2135,9 +2785,9 @@ To refer to the FAQ document, you can click on the HELP button which is present 
                   You have unsaved schedule changes
                 </span>
               )}
-              <Button 
+              <Button
                 type="button"
-                onClick={handleSaveSchedule} 
+                onClick={handleSaveSchedule}
                 disabled={savingSchedule || !isScheduleDirty}
                 size="sm"
               >
@@ -2196,14 +2846,25 @@ To refer to the FAQ document, you can click on the HELP button which is present 
                     </h4>
                     <div className="grid grid-cols-2 gap-4">
                       <div className="flex items-center space-x-2">
-                        <Checkbox
-                          id="enableTabSwitchTracking"
-                          checked={formData.enableTabSwitchTracking}
-                          onCheckedChange={(checked) =>
-                            handleCheckboxChange("enableTabSwitchTracking", !!checked)
-                          }
-                          disabled={formData.proctoringMode !== "CUSTOM"}
-                        />
+                        <div className="relative flex items-center justify-center">
+                          <Checkbox
+                            id="enableTabSwitchTracking"
+                            checked={formData.enableTabSwitchTracking}
+                            onCheckedChange={(checked) =>
+                              handleCheckboxChange(
+                                "enableTabSwitchTracking",
+                                !!checked,
+                              )
+                            }
+                            disabled={formData.proctoringMode !== "CUSTOM"}
+                          />
+                          {!formData.enableTabSwitchTracking &&
+                            formData.proctoringMode !== "CUSTOM" && (
+                              <div className="absolute inset-0 flex items-center justify-center pointer-events-none rounded-sm border border-red-500/40 bg-red-500/10 text-red-500">
+                                <X className="h-3 w-3 stroke-[2.5]" />
+                              </div>
+                            )}
+                        </div>
                         <Label
                           htmlFor="enableTabSwitchTracking"
                           className="text-sm font-normal cursor-pointer"
@@ -2213,14 +2874,22 @@ To refer to the FAQ document, you can click on the HELP button which is present 
                       </div>
 
                       <div className="flex items-center space-x-2">
-                        <Checkbox
-                          id="blockCopyPaste"
-                          checked={formData.blockCopyPaste}
-                          onCheckedChange={(checked) =>
-                            handleCheckboxChange("blockCopyPaste", !!checked)
-                          }
-                          disabled={formData.proctoringMode !== "CUSTOM"}
-                        />
+                        <div className="relative flex items-center justify-center">
+                          <Checkbox
+                            id="blockCopyPaste"
+                            checked={formData.blockCopyPaste}
+                            onCheckedChange={(checked) =>
+                              handleCheckboxChange("blockCopyPaste", !!checked)
+                            }
+                            disabled={formData.proctoringMode !== "CUSTOM"}
+                          />
+                          {!formData.blockCopyPaste &&
+                            formData.proctoringMode !== "CUSTOM" && (
+                              <div className="absolute inset-0 flex items-center justify-center pointer-events-none rounded-sm border border-red-500/40 bg-red-500/10 text-red-500">
+                                <X className="h-3 w-3 stroke-[2.5]" />
+                              </div>
+                            )}
+                        </div>
                         <Label
                           htmlFor="blockCopyPaste"
                           className="text-sm font-normal cursor-pointer"
@@ -2230,14 +2899,22 @@ To refer to the FAQ document, you can click on the HELP button which is present 
                       </div>
 
                       <div className="flex items-center space-x-2">
-                        <Checkbox
-                          id="blockRightClick"
-                          checked={formData.blockRightClick}
-                          onCheckedChange={(checked) =>
-                            handleCheckboxChange("blockRightClick", !!checked)
-                          }
-                          disabled={formData.proctoringMode !== "CUSTOM"}
-                        />
+                        <div className="relative flex items-center justify-center">
+                          <Checkbox
+                            id="blockRightClick"
+                            checked={formData.blockRightClick}
+                            onCheckedChange={(checked) =>
+                              handleCheckboxChange("blockRightClick", !!checked)
+                            }
+                            disabled={formData.proctoringMode !== "CUSTOM"}
+                          />
+                          {!formData.blockRightClick &&
+                            formData.proctoringMode !== "CUSTOM" && (
+                              <div className="absolute inset-0 flex items-center justify-center pointer-events-none rounded-sm border border-red-500/40 bg-red-500/10 text-red-500">
+                                <X className="h-3 w-3 stroke-[2.5]" />
+                              </div>
+                            )}
+                        </div>
                         <Label
                           htmlFor="blockRightClick"
                           className="text-sm font-normal cursor-pointer"
@@ -2247,14 +2924,25 @@ To refer to the FAQ document, you can click on the HELP button which is present 
                       </div>
 
                       <div className="flex items-center space-x-2">
-                        <Checkbox
-                          id="warnOnFullscreenExit"
-                          checked={formData.warnOnFullscreenExit}
-                          onCheckedChange={(checked) =>
-                            handleCheckboxChange("warnOnFullscreenExit", !!checked)
-                          }
-                          disabled={formData.proctoringMode !== "CUSTOM"}
-                        />
+                        <div className="relative flex items-center justify-center">
+                          <Checkbox
+                            id="warnOnFullscreenExit"
+                            checked={formData.warnOnFullscreenExit}
+                            onCheckedChange={(checked) =>
+                              handleCheckboxChange(
+                                "warnOnFullscreenExit",
+                                !!checked,
+                              )
+                            }
+                            disabled={formData.proctoringMode !== "CUSTOM"}
+                          />
+                          {!formData.warnOnFullscreenExit &&
+                            formData.proctoringMode !== "CUSTOM" && (
+                              <div className="absolute inset-0 flex items-center justify-center pointer-events-none rounded-sm border border-red-500/40 bg-red-500/10 text-red-500">
+                                <X className="h-3 w-3 stroke-[2.5]" />
+                              </div>
+                            )}
+                        </div>
                         <Label
                           htmlFor="warnOnFullscreenExit"
                           className="text-sm font-normal cursor-pointer"
@@ -2263,20 +2951,16 @@ To refer to the FAQ document, you can click on the HELP button which is present 
                         </Label>
                       </div>
                     </div>
-
-
                   </div>
 
                   {/* Category 2: Webcam & Audio Monitoring */}
-                  {(formData.proctoringMode === "MEDIUM" ||
-                    formData.proctoringMode === "HIGH" ||
-                    formData.proctoringMode === "CUSTOM") && (
-                    <div className="space-y-4 pt-4 border-t">
-                      <h4 className="text-sm font-semibold text-slate-900 dark:text-slate-100 uppercase tracking-wider">
-                        Webcam & Audio Monitoring
-                      </h4>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="flex items-center space-x-2">
+                  <div className="space-y-4 pt-4 border-t">
+                    <h4 className="text-sm font-semibold text-slate-900 dark:text-slate-100 uppercase tracking-wider">
+                      Webcam & Audio Monitoring
+                    </h4>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="flex items-center space-x-2">
+                        <div className="relative flex items-center justify-center">
                           <Checkbox
                             id="requireWebcam"
                             checked={formData.requireWebcam}
@@ -2285,85 +2969,142 @@ To refer to the FAQ document, you can click on the HELP button which is present 
                             }
                             disabled={formData.proctoringMode !== "CUSTOM"}
                           />
-                          <Label
-                            htmlFor="requireWebcam"
-                            className="text-sm font-normal cursor-pointer"
-                          >
-                            Require webcam
-                          </Label>
+                          {!formData.requireWebcam &&
+                            formData.proctoringMode !== "CUSTOM" && (
+                              <div className="absolute inset-0 flex items-center justify-center pointer-events-none rounded-sm border border-red-500/40 bg-red-500/10 text-red-500">
+                                <X className="h-3 w-3 stroke-[2.5]" />
+                              </div>
+                            )}
                         </div>
+                        <Label
+                          htmlFor="requireWebcam"
+                          className="text-sm font-normal cursor-pointer"
+                        >
+                          Require webcam
+                        </Label>
+                      </div>
 
-                        <div className="flex items-center space-x-2">
+                      <div className="flex items-center space-x-2">
+                        <div className="relative flex items-center justify-center">
                           <Checkbox
                             id="detectFaceNotVisible"
                             checked={formData.detectFaceNotVisible}
                             onCheckedChange={(checked) =>
-                              handleCheckboxChange("detectFaceNotVisible", !!checked)
+                              handleCheckboxChange(
+                                "detectFaceNotVisible",
+                                !!checked,
+                              )
                             }
                             disabled={formData.proctoringMode !== "CUSTOM"}
                           />
-                          <Label
-                            htmlFor="detectFaceNotVisible"
-                            className="text-sm font-normal cursor-pointer"
-                          >
-                            Detect face not visible
-                          </Label>
+                          {!formData.detectFaceNotVisible &&
+                            formData.proctoringMode !== "CUSTOM" && (
+                              <div className="absolute inset-0 flex items-center justify-center pointer-events-none rounded-sm border border-red-500/40 bg-red-500/10 text-red-500">
+                                <X className="h-3 w-3 stroke-[2.5]" />
+                              </div>
+                            )}
                         </div>
+                        <Label
+                          htmlFor="detectFaceNotVisible"
+                          className="text-sm font-normal cursor-pointer"
+                        >
+                          Detect face not visible
+                        </Label>
+                      </div>
 
-                        <div className="flex items-center space-x-2">
+                      <div className="flex items-center space-x-2">
+                        <div className="relative flex items-center justify-center">
                           <Checkbox
                             id="detectMultipleFaces"
                             checked={formData.detectMultipleFaces}
                             onCheckedChange={(checked) =>
-                              handleCheckboxChange("detectMultipleFaces", !!checked)
+                              handleCheckboxChange(
+                                "detectMultipleFaces",
+                                !!checked,
+                              )
                             }
                             disabled={formData.proctoringMode !== "CUSTOM"}
                           />
-                          <Label
-                            htmlFor="detectMultipleFaces"
-                            className="text-sm font-normal cursor-pointer"
-                          >
-                            Detect multiple faces
-                          </Label>
+                          {!formData.detectMultipleFaces &&
+                            formData.proctoringMode !== "CUSTOM" && (
+                              <div className="absolute inset-0 flex items-center justify-center pointer-events-none rounded-sm border border-red-500/40 bg-red-500/10 text-red-500">
+                                <X className="h-3 w-3 stroke-[2.5]" />
+                              </div>
+                            )}
                         </div>
+                        <Label
+                          htmlFor="detectMultipleFaces"
+                          className="text-sm font-normal cursor-pointer"
+                        >
+                          Detect multiple faces
+                        </Label>
+                      </div>
 
-                        <div className="flex items-center space-x-2">
+                      <div className="flex items-center space-x-2">
+                        <div className="relative flex items-center justify-center">
                           <Checkbox
                             id="detectSuspiciousAudio"
                             checked={formData.detectSuspiciousAudio}
                             onCheckedChange={(checked) =>
-                              handleCheckboxChange("detectSuspiciousAudio", !!checked)
+                              handleCheckboxChange(
+                                "detectSuspiciousAudio",
+                                !!checked,
+                              )
                             }
                             disabled={formData.proctoringMode !== "CUSTOM"}
                           />
-                          <Label
-                            htmlFor="detectSuspiciousAudio"
-                            className="text-sm font-normal cursor-pointer"
-                          >
-                            Detect suspicious audio
-                          </Label>
+                          {!formData.detectSuspiciousAudio &&
+                            formData.proctoringMode !== "CUSTOM" && (
+                              <div className="absolute inset-0 flex items-center justify-center pointer-events-none rounded-sm border border-red-500/40 bg-red-500/10 text-red-500">
+                                <X className="h-3 w-3 stroke-[2.5]" />
+                              </div>
+                            )}
                         </div>
+                        <Label
+                          htmlFor="detectSuspiciousAudio"
+                          className="text-sm font-normal cursor-pointer"
+                        >
+                          Detect suspicious audio
+                        </Label>
+                      </div>
 
-
-
-                        <div className="flex items-center space-x-2">
+                      <div className="flex items-center space-x-2">
+                        <div className="relative flex items-center justify-center">
                           <Checkbox
                             id="periodicSnapshots"
                             checked={formData.periodicSnapshots}
                             onCheckedChange={(checked) =>
-                              handleCheckboxChange("periodicSnapshots", !!checked)
+                              handleCheckboxChange(
+                                "periodicSnapshots",
+                                !!checked,
+                              )
                             }
                             disabled={formData.proctoringMode !== "CUSTOM"}
                           />
-                          <Label
-                            htmlFor="periodicSnapshots"
-                            className="text-sm font-normal cursor-pointer"
-                          >
-                            Periodic snapshots
-                          </Label>
+                          {!formData.periodicSnapshots &&
+                            formData.proctoringMode !== "CUSTOM" && (
+                              <div className="absolute inset-0 flex items-center justify-center pointer-events-none rounded-sm border border-red-500/40 bg-red-500/10 text-red-500">
+                                <X className="h-3 w-3 stroke-[2.5]" />
+                              </div>
+                            )}
                         </div>
+                        <Label
+                          htmlFor="periodicSnapshots"
+                          className="text-sm font-normal cursor-pointer flex items-center gap-2"
+                        >
+                          <span>Periodic snapshots</span>
+                          {formData.periodicSnapshots && (
+                            <span className="text-[11px] font-mono font-medium px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                              {formData.proctoringMode === "HIGH"
+                                ? "⚡ 1 Frame / 1 min"
+                                : "⏱️ 1 Frame / 3 mins"}
+                            </span>
+                          )}
+                        </Label>
+                      </div>
 
-                        <div className="flex items-center space-x-2">
+                      <div className="flex items-center space-x-2">
+                        <div className="relative flex items-center justify-center">
                           <Checkbox
                             id="evidenceCapture"
                             checked={formData.evidenceCapture}
@@ -2372,60 +3113,92 @@ To refer to the FAQ document, you can click on the HELP button which is present 
                             }
                             disabled={formData.proctoringMode !== "CUSTOM"}
                           />
-                          <Label
-                            htmlFor="evidenceCapture"
-                            className="text-sm font-normal cursor-pointer"
-                          >
-                            Evidence capture
-                          </Label>
+                          {!formData.evidenceCapture &&
+                            formData.proctoringMode !== "CUSTOM" && (
+                              <div className="absolute inset-0 flex items-center justify-center pointer-events-none rounded-sm border border-red-500/40 bg-red-500/10 text-red-500">
+                                <X className="h-3 w-3 stroke-[2.5]" />
+                              </div>
+                            )}
                         </div>
+                        <Label
+                          htmlFor="evidenceCapture"
+                          className="text-sm font-normal cursor-pointer flex items-center gap-2"
+                        >
+                          <span>Evidence capture</span>
+                          {formData.evidenceCapture && (
+                            <span className="text-[11px] font-mono font-medium px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20">
+                              📸 Violation Snapshots
+                            </span>
+                          )}
+                        </Label>
                       </div>
                     </div>
-                  )}
+                  </div>
 
                   {/* Category 3: Advanced Security & Hardware */}
-                  {(formData.proctoringMode === "HIGH" ||
-                    formData.proctoringMode === "CUSTOM") && (
-                    <div className="space-y-4 pt-4 border-t">
-                      <h4 className="text-sm font-semibold text-slate-900 dark:text-slate-100 uppercase tracking-wider">
-                        Advanced Security & Hardware
-                      </h4>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="flex items-center space-x-2">
+                  <div className="space-y-4 pt-4 border-t">
+                    <h4 className="text-sm font-semibold text-slate-900 dark:text-slate-100 uppercase tracking-wider">
+                      Advanced Security & Hardware
+                    </h4>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="flex items-center space-x-2">
+                        <div className="relative flex items-center justify-center">
                           <Checkbox
                             id="requireMicrophone"
                             checked={formData.requireMicrophone}
                             onCheckedChange={(checked) =>
-                              handleCheckboxChange("requireMicrophone", !!checked)
+                              handleCheckboxChange(
+                                "requireMicrophone",
+                                !!checked,
+                              )
                             }
                             disabled={formData.proctoringMode !== "CUSTOM"}
                           />
-                          <Label
-                            htmlFor="requireMicrophone"
-                            className="text-sm font-normal cursor-pointer"
-                          >
-                            Require microphone
-                          </Label>
+                          {!formData.requireMicrophone &&
+                            formData.proctoringMode !== "CUSTOM" && (
+                              <div className="absolute inset-0 flex items-center justify-center pointer-events-none rounded-sm border border-red-500/40 bg-red-500/10 text-red-500">
+                                <X className="h-3 w-3 stroke-[2.5]" />
+                              </div>
+                            )}
                         </div>
+                        <Label
+                          htmlFor="requireMicrophone"
+                          className="text-sm font-normal cursor-pointer"
+                        >
+                          Require microphone
+                        </Label>
+                      </div>
 
-                        <div className="flex items-center space-x-2">
+                      <div className="flex items-center space-x-2">
+                        <div className="relative flex items-center justify-center">
                           <Checkbox
                             id="requireScreenShare"
                             checked={formData.requireScreenShare}
                             onCheckedChange={(checked) =>
-                              handleCheckboxChange("requireScreenShare", !!checked)
+                              handleCheckboxChange(
+                                "requireScreenShare",
+                                !!checked,
+                              )
                             }
                             disabled={formData.proctoringMode !== "CUSTOM"}
                           />
-                          <Label
-                            htmlFor="requireScreenShare"
-                            className="text-sm font-normal cursor-pointer"
-                          >
-                            Require screen share
-                          </Label>
+                          {!formData.requireScreenShare &&
+                            formData.proctoringMode !== "CUSTOM" && (
+                              <div className="absolute inset-0 flex items-center justify-center pointer-events-none rounded-sm border border-red-500/40 bg-red-500/10 text-red-500">
+                                <X className="h-3 w-3 stroke-[2.5]" />
+                              </div>
+                            )}
                         </div>
+                        <Label
+                          htmlFor="requireScreenShare"
+                          className="text-sm font-normal cursor-pointer"
+                        >
+                          Require screen share
+                        </Label>
+                      </div>
 
-                        <div className="flex items-center space-x-2">
+                      <div className="flex items-center space-x-2">
+                        <div className="relative flex items-center justify-center">
                           <Checkbox
                             id="detectDevTools"
                             checked={formData.detectDevTools}
@@ -2434,63 +3207,93 @@ To refer to the FAQ document, you can click on the HELP button which is present 
                             }
                             disabled={formData.proctoringMode !== "CUSTOM"}
                           />
-                          <Label
-                            htmlFor="detectDevTools"
-                            className="text-sm font-normal cursor-pointer"
-                          >
-                            Detect DevTools
-                          </Label>
+                          {!formData.detectDevTools &&
+                            formData.proctoringMode !== "CUSTOM" && (
+                              <div className="absolute inset-0 flex items-center justify-center pointer-events-none rounded-sm border border-red-500/40 bg-red-500/10 text-red-500">
+                                <X className="h-3 w-3 stroke-[2.5]" />
+                              </div>
+                            )}
                         </div>
+                        <Label
+                          htmlFor="detectDevTools"
+                          className="text-sm font-normal cursor-pointer"
+                        >
+                          Detect DevTools
+                        </Label>
+                      </div>
 
-                        <div className="flex items-center space-x-2">
+                      <div className="flex items-center space-x-2">
+                        <div className="relative flex items-center justify-center">
                           <Checkbox
                             id="detectScreenShareStop"
                             checked={formData.detectScreenShareStop}
                             onCheckedChange={(checked) =>
-                              handleCheckboxChange("detectScreenShareStop", !!checked)
+                              handleCheckboxChange(
+                                "detectScreenShareStop",
+                                !!checked,
+                              )
                             }
                             disabled={formData.proctoringMode !== "CUSTOM"}
                           />
-                          <Label
-                            htmlFor="detectScreenShareStop"
-                            className="text-sm font-normal cursor-pointer"
-                          >
-                            Detect screen-share stop
-                          </Label>
+                          {!formData.detectScreenShareStop &&
+                            formData.proctoringMode !== "CUSTOM" && (
+                              <div className="absolute inset-0 flex items-center justify-center pointer-events-none rounded-sm border border-red-500/40 bg-red-500/10 text-red-500">
+                                <X className="h-3 w-3 stroke-[2.5]" />
+                              </div>
+                            )}
                         </div>
+                        <Label
+                          htmlFor="detectScreenShareStop"
+                          className="text-sm font-normal cursor-pointer"
+                        >
+                          Detect screen-share stop
+                        </Label>
+                      </div>
 
-                        <div className="flex items-center space-x-2">
+                      <div className="flex items-center space-x-2">
+                        <div className="relative flex items-center justify-center">
                           <Checkbox
                             id="enableLiveProctoring"
                             checked={formData.enableLiveProctoring}
                             onCheckedChange={(checked) =>
-                              handleCheckboxChange("enableLiveProctoring", !!checked)
+                              handleCheckboxChange(
+                                "enableLiveProctoring",
+                                !!checked,
+                              )
                             }
                             disabled={formData.proctoringMode !== "CUSTOM"}
                           />
-                          <Label
-                            htmlFor="enableLiveProctoring"
-                            className="text-sm font-normal cursor-pointer"
-                          >
-                            Enable live proctoring
-                          </Label>
+                          {!formData.enableLiveProctoring &&
+                            formData.proctoringMode !== "CUSTOM" && (
+                              <div className="absolute inset-0 flex items-center justify-center pointer-events-none rounded-sm border border-red-500/40 bg-red-500/10 text-red-500">
+                                <X className="h-3 w-3 stroke-[2.5]" />
+                              </div>
+                            )}
                         </div>
-
-
+                        <Label
+                          htmlFor="enableLiveProctoring"
+                          className="text-sm font-normal cursor-pointer"
+                        >
+                          Enable live proctoring
+                        </Label>
                       </div>
-
-
                     </div>
-                  )}
+                  </div>
                 </div>
               )}
             </CardContent>
             <CardFooter className="flex justify-end border-t px-6 py-4 bg-muted/20">
               <Button onClick={handleSaveProctoring} disabled={saving}>
                 {saving ? (
-                  <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Saving...</>
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Saving...
+                  </>
                 ) : (
-                  <><Save className="w-4 h-4 mr-2" />Save Proctoring Settings</>
+                  <>
+                    <Save className="w-4 h-4 mr-2" />
+                    Save Proctoring Settings
+                  </>
                 )}
               </Button>
             </CardFooter>
@@ -2510,11 +3313,16 @@ To refer to the FAQ document, you can click on the HELP button which is present 
                 </CardDescription>
               </div>
               <div className="flex items-center gap-3 shrink-0">
-                <Button variant="outline" onClick={() => setIsBulkUploadOpen(true)}>
-                  <Upload className="w-4 h-4 mr-2" />Bulk Upload
+                <Button
+                  variant="outline"
+                  onClick={() => setIsBulkUploadOpen(true)}
+                >
+                  <Upload className="w-4 h-4 mr-2" />
+                  Bulk Upload
                 </Button>
                 <Button variant="hero" onClick={() => setIsAddDialogOpen(true)}>
-                  <Plus className="w-4 h-4 mr-2" />Add Candidate
+                  <Plus className="w-4 h-4 mr-2" />
+                  Add Candidate
                 </Button>
                 {selectedCandidates.length > 0 && selectedSchedule && (
                   <Button
@@ -2536,18 +3344,24 @@ To refer to the FAQ document, you can click on the HELP button which is present 
               {!selectedSchedule ? (
                 <div className="text-center py-12 border border-dashed rounded-lg bg-amber-50/10 border-amber-200/50">
                   <AlertCircle className="w-12 h-12 mx-auto text-amber-500 mb-4 opacity-80" />
-                  <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-200">No Active Schedules</h3>
+                  <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-200">
+                    No Active Schedules
+                  </h3>
                   <p className="text-muted-foreground max-w-md mx-auto mt-2 text-sm">
-                    This test has not been scheduled yet. You must create a schedule under Test Schedules before inviting candidates.
+                    This test has not been scheduled yet. You must create a
+                    schedule under Test Schedules before inviting candidates.
                   </p>
                 </div>
               ) : (
                 <>
                   <div className="rounded-lg border border-primary/10 bg-primary/5 p-4 text-sm">
                     <div>
-                      <p className="font-semibold text-primary">Schedule connected for this test</p>
+                      <p className="font-semibold text-primary">
+                        Schedule connected for this test
+                      </p>
                       <p className="text-xs text-muted-foreground mt-1">
-                        {formatDateTime(selectedScheduleData?.startTime || "")} - {formatDateTime(selectedScheduleData?.endTime || "")}
+                        {formatDateTime(selectedScheduleData?.startTime || "")}{" "}
+                        - {formatDateTime(selectedScheduleData?.endTime || "")}
                       </p>
                     </div>
                   </div>
@@ -2580,7 +3394,9 @@ To refer to the FAQ document, you can click on the HELP button which is present 
                                 }
                                 onCheckedChange={(checked) => {
                                   if (checked) {
-                                    const allIds = filteredCandidates.map((c) => c.id);
+                                    const allIds = filteredCandidates.map(
+                                      (c) => c.id,
+                                    );
                                     setSelectedCandidates((prev) =>
                                       Array.from(new Set([...prev, ...allIds])),
                                     );
@@ -2596,25 +3412,45 @@ To refer to the FAQ document, you can click on the HELP button which is present 
                               />
                             )}
                           </TableHead>
-                          <TableHead className="w-[50px] text-center text-xs text-muted-foreground">#</TableHead>
-                          <TableHead className="text-xs text-muted-foreground">Candidate</TableHead>
-                          <TableHead className="text-xs text-muted-foreground">Contact</TableHead>
-                          <TableHead className="text-xs text-muted-foreground">Account</TableHead>
-                          <TableHead className="text-xs text-muted-foreground">Invitation</TableHead>
-                          <TableHead className="text-xs text-muted-foreground">Test Link</TableHead>
-                          <TableHead className="text-right text-xs text-muted-foreground">Action</TableHead>
+                          <TableHead className="w-[50px] text-center text-xs text-muted-foreground">
+                            #
+                          </TableHead>
+                          <TableHead className="text-xs text-muted-foreground">
+                            Candidate
+                          </TableHead>
+                          <TableHead className="text-xs text-muted-foreground">
+                            Contact
+                          </TableHead>
+                          <TableHead className="text-xs text-muted-foreground">
+                            Account
+                          </TableHead>
+                          <TableHead className="text-xs text-muted-foreground">
+                            Invitation
+                          </TableHead>
+                          <TableHead className="text-xs text-muted-foreground">
+                            Test Link
+                          </TableHead>
+                          <TableHead className="text-right text-xs text-muted-foreground">
+                            Action
+                          </TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {loadingInvitations ? (
                           <TableRow className="hover:bg-transparent">
-                            <TableCell colSpan={8} className="text-center py-10">
+                            <TableCell
+                              colSpan={8}
+                              className="text-center py-10"
+                            >
                               <Loader2 className="w-6 h-6 animate-spin mx-auto text-primary" />
                             </TableCell>
                           </TableRow>
                         ) : filteredCandidates.length === 0 ? (
                           <TableRow className="hover:bg-transparent">
-                            <TableCell colSpan={8} className="text-center py-10 text-muted-foreground">
+                            <TableCell
+                              colSpan={8}
+                              className="text-center py-10 text-muted-foreground"
+                            >
                               {inviteTab === "available"
                                 ? "No candidates available to invite."
                                 : inviteTab === "invited"
@@ -2624,27 +3460,41 @@ To refer to the FAQ document, you can click on the HELP button which is present 
                           </TableRow>
                         ) : (
                           filteredCandidates.map((candidate, index) => {
-                            const invitation = getInvitationForCandidate(candidate.id, selectedSchedule);
+                            const invitation = getInvitationForCandidate(
+                              candidate.id,
+                              selectedSchedule,
+                            );
                             const isScheduleCompleted =
                               selectedScheduleData?.status === "COMPLETED" ||
                               selectedScheduleData?.status === "EXPIRED";
                             const displayStatus =
-                              invitation?.status === "PENDING" && isScheduleCompleted
+                              invitation?.status === "PENDING" &&
+                              isScheduleCompleted
                                 ? "EXPIRED"
                                 : invitation?.status;
 
                             return (
-                              <TableRow key={candidate.id} className="hover:bg-muted/30">
+                              <TableRow
+                                key={candidate.id}
+                                className="hover:bg-muted/30"
+                              >
                                 <TableCell>
                                   {!invitation && (
                                     <Checkbox
-                                      checked={selectedCandidates.includes(candidate.id)}
+                                      checked={selectedCandidates.includes(
+                                        candidate.id,
+                                      )}
                                       onCheckedChange={(checked) => {
                                         if (checked) {
-                                          setSelectedCandidates((prev) => [...prev, candidate.id]);
+                                          setSelectedCandidates((prev) => [
+                                            ...prev,
+                                            candidate.id,
+                                          ]);
                                         } else {
                                           setSelectedCandidates((prev) =>
-                                            prev.filter((id) => id !== candidate.id),
+                                            prev.filter(
+                                              (id) => id !== candidate.id,
+                                            ),
                                           );
                                         }
                                       }}
@@ -2665,14 +3515,20 @@ To refer to the FAQ document, you can click on the HELP button which is present 
                                         .slice(0, 2) || "C"}
                                     </div>
                                     <div>
-                                      <p className="font-medium text-sm">{candidate.user.name}</p>
-                                      <p className="text-[10px] text-muted-foreground">ID: {candidate.id.slice(0, 8)}</p>
+                                      <p className="font-medium text-sm">
+                                        {candidate.user.name}
+                                      </p>
+                                      <p className="text-[10px] text-muted-foreground">
+                                        ID: {candidate.id.slice(0, 8)}
+                                      </p>
                                     </div>
                                   </div>
                                 </TableCell>
                                 <TableCell className="text-sm">
                                   <div>{candidate.user.email}</div>
-                                  <div className="text-xs text-muted-foreground">{candidate.user.phoneNumber}</div>
+                                  <div className="text-xs text-muted-foreground">
+                                    {candidate.user.phoneNumber}
+                                  </div>
                                 </TableCell>
                                 <TableCell>
                                   <Badge variant="outline" className="text-xs">
@@ -2681,9 +3537,13 @@ To refer to the FAQ document, you can click on the HELP button which is present 
                                 </TableCell>
                                 <TableCell>
                                   {invitation ? (
-                                    getInvitationStatusBadge(displayStatus || "")
+                                    getInvitationStatusBadge(
+                                      displayStatus || "",
+                                    )
                                   ) : (
-                                    <span className="text-xs text-muted-foreground">Not invited</span>
+                                    <span className="text-xs text-muted-foreground">
+                                      Not invited
+                                    </span>
                                   )}
                                 </TableCell>
                                 <TableCell>
@@ -2691,24 +3551,32 @@ To refer to the FAQ document, you can click on the HELP button which is present 
                                     <Button
                                       variant="ghost"
                                       size="sm"
-                                      onClick={() => copyTestLink(invitation.id)}
+                                      onClick={() =>
+                                        copyTestLink(invitation.id)
+                                      }
                                       className="h-8 px-2"
                                       disabled={displayStatus === "EXPIRED"}
                                     >
                                       {copiedToken === invitation.id ? (
                                         <>
                                           <Check className="w-3 h-3 mr-1 text-green-500" />
-                                          <span className="text-xs">Copied!</span>
+                                          <span className="text-xs">
+                                            Copied!
+                                          </span>
                                         </>
                                       ) : (
                                         <>
                                           <Link2 className="w-3 h-3 mr-1" />
-                                          <span className="text-xs">Copy Link</span>
+                                          <span className="text-xs">
+                                            Copy Link
+                                          </span>
                                         </>
                                       )}
                                     </Button>
                                   ) : (
-                                    <span className="text-xs text-muted-foreground">-</span>
+                                    <span className="text-xs text-muted-foreground">
+                                      -
+                                    </span>
                                   )}
                                 </TableCell>
                                 <TableCell className="text-right">
@@ -2753,14 +3621,21 @@ To refer to the FAQ document, you can click on the HELP button which is present 
                   Candidate Performance Reports
                 </CardTitle>
                 <CardDescription>
-                  View test scores, detailed submissions, and proctoring metrics candidate-wise
+                  View test scores, detailed submissions, and proctoring metrics
+                  candidate-wise
                 </CardDescription>
               </div>
               <div className="flex items-center gap-3">
-                <Label htmlFor="report-schedule" className="text-sm font-medium whitespace-nowrap">
+                <Label
+                  htmlFor="report-schedule"
+                  className="text-sm font-medium whitespace-nowrap"
+                >
                   Filter by Schedule:
                 </Label>
-                <Select value={reportScheduleId} onValueChange={setReportScheduleId}>
+                <Select
+                  value={reportScheduleId}
+                  onValueChange={setReportScheduleId}
+                >
                   <SelectTrigger className="w-64">
                     <SelectValue placeholder="Select a schedule" />
                   </SelectTrigger>
@@ -2781,7 +3656,9 @@ To refer to the FAQ document, you can click on the HELP button which is present 
                   className="shrink-0"
                   title="Refresh Reports"
                 >
-                  <RefreshCw className={`w-4 h-4 ${loadingReports ? "animate-spin" : ""}`} />
+                  <RefreshCw
+                    className={`w-4 h-4 ${loadingReports ? "animate-spin" : ""}`}
+                  />
                 </Button>
               </div>
             </CardHeader>
@@ -2789,12 +3666,16 @@ To refer to the FAQ document, you can click on the HELP button which is present 
               {loadingReports ? (
                 <div className="flex flex-col items-center justify-center py-16 gap-3">
                   <Loader2 className="w-8 h-8 animate-spin text-primary" />
-                  <p className="text-sm text-muted-foreground">Loading candidate reports...</p>
+                  <p className="text-sm text-muted-foreground">
+                    Loading candidate reports...
+                  </p>
                 </div>
               ) : displayedCandidates.length === 0 ? (
                 <div className="text-center py-16 border-2 border-dashed rounded-lg">
                   <TrendingUp className="w-12 h-12 mx-auto text-muted-foreground mb-4 opacity-50" />
-                  <p className="text-muted-foreground font-medium">No candidate records found for this test.</p>
+                  <p className="text-muted-foreground font-medium">
+                    No candidate records found for this test.
+                  </p>
                 </div>
               ) : (
                 <div className="border rounded-lg overflow-hidden">
@@ -2805,29 +3686,50 @@ To refer to the FAQ document, you can click on the HELP button which is present 
                         <TableHead>Status</TableHead>
                         <TableHead className="text-center">Score</TableHead>
                         <TableHead className="text-center">Result</TableHead>
-                        <TableHead className="text-center">Proctoring Risk</TableHead>
-                        <TableHead className="text-center">Violations</TableHead>
-                        <TableHead className="text-right">Download Reports / View</TableHead>
+                        <TableHead className="text-center">
+                          Proctoring Risk
+                        </TableHead>
+                        <TableHead className="text-center">
+                          Violations
+                        </TableHead>
+                        <TableHead className="text-right">
+                          Download Reports / View
+                        </TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {displayedCandidates.map((candidate) => {
-                        const reportCandidateKey = getReportCandidateKey(candidate);
+                        const reportCandidateKey =
+                          getReportCandidateKey(candidate);
                         const scoreData = candidateResults[reportCandidateKey];
                         const testStatus = candidate.testStatus;
-                        
-                        let statusColor = "bg-slate-100 text-slate-700";
-                        if (testStatus === "SUBMITTED") statusColor = "bg-emerald-500/10 text-emerald-600 border-emerald-500/20";
-                        else if (testStatus === "AUTO_SUBMITTED") statusColor = "bg-amber-500/10 text-amber-600 border-amber-500/20";
-                        else if (testStatus === "IN_PROGRESS") statusColor = "bg-sky-500/10 text-sky-600 border-sky-500/20";
 
-                        const risk = scoreData?.detail?.riskLevel || candidate.riskLevel || "NONE";
+                        let statusColor = "bg-slate-100 text-slate-700";
+                        if (testStatus === "SUBMITTED")
+                          statusColor =
+                            "bg-emerald-500/10 text-emerald-600 border-emerald-500/20";
+                        else if (testStatus === "AUTO_SUBMITTED")
+                          statusColor =
+                            "bg-amber-500/10 text-amber-600 border-amber-500/20";
+                        else if (testStatus === "IN_PROGRESS")
+                          statusColor =
+                            "bg-sky-500/10 text-sky-600 border-sky-500/20";
+
+                        const risk =
+                          scoreData?.detail?.riskLevel ||
+                          candidate.riskLevel ||
+                          "NONE";
                         let riskColor = "bg-slate-100 text-slate-700";
-                        if (risk === "HIGH") riskColor = "bg-red-500/15 text-red-500";
-                        else if (risk === "CRITICAL") riskColor = "bg-red-500 text-white animate-pulse";
-                        else if (risk === "MEDIUM") riskColor = "bg-amber-500/15 text-amber-500";
-                        else if (risk === "LOW") riskColor = "bg-yellow-500/15 text-yellow-600";
-                        else if (risk === "NONE") riskColor = "bg-emerald-500/15 text-emerald-500";
+                        if (risk === "HIGH")
+                          riskColor = "bg-red-500/15 text-red-500";
+                        else if (risk === "CRITICAL")
+                          riskColor = "bg-red-500 text-white animate-pulse";
+                        else if (risk === "MEDIUM")
+                          riskColor = "bg-amber-500/15 text-amber-500";
+                        else if (risk === "LOW")
+                          riskColor = "bg-yellow-500/15 text-yellow-600";
+                        else if (risk === "NONE")
+                          riskColor = "bg-emerald-500/15 text-emerald-500";
 
                         const totalScore = scoreData?.result?.totalScore;
                         const maxScore = scoreData?.result?.maxScore;
@@ -2835,32 +3737,55 @@ To refer to the FAQ document, you can click on the HELP button which is present 
                         const isResultPending =
                           testStatus === "IN_PROGRESS" ||
                           testStatus === "NOT_STARTED" ||
-                          (!scoreData?.sessionId && totalScore === undefined && passed === undefined);
+                          (!scoreData?.sessionId &&
+                            totalScore === undefined &&
+                            passed === undefined);
 
                         return (
                           <TableRow key={reportCandidateKey}>
                             <TableCell>
-                              <div className="font-semibold">{candidate.candidateName}</div>
-                              <div className="text-xs text-muted-foreground">{candidate.email}</div>
+                              <div className="font-semibold">
+                                {candidate.candidateName}
+                              </div>
+                              <div className="text-xs text-muted-foreground">
+                                {candidate.email}
+                              </div>
                             </TableCell>
                             <TableCell>
                               <Badge variant="outline" className={statusColor}>
-                                {testStatus?.replace(/_/g, " ") || "NOT STARTED"}
+                                {testStatus?.replace(/_/g, " ") ||
+                                  "NOT STARTED"}
                               </Badge>
                             </TableCell>
                             <TableCell className="text-center font-medium">
-                              {totalScore !== undefined ? `${totalScore} / ${maxScore}` : isResultPending ? `0 / ${totalTestMarks}` : "-"}
+                              {totalScore !== undefined
+                                ? `${totalScore} / ${maxScore}`
+                                : isResultPending
+                                  ? `0 / ${totalTestMarks}`
+                                  : "-"}
                             </TableCell>
                             <TableCell className="text-center">
                               {passed !== undefined ? (
-                                <Badge variant="outline" className={passed ? "bg-emerald-500/15 text-emerald-500" : "bg-red-500/15 text-red-500"}>
+                                <Badge
+                                  variant="outline"
+                                  className={
+                                    passed
+                                      ? "bg-emerald-500/15 text-emerald-500"
+                                      : "bg-red-500/15 text-red-500"
+                                  }
+                                >
                                   {passed ? "Passed" : "Failed"}
                                 </Badge>
                               ) : isResultPending ? (
-                                <Badge variant="outline" className="bg-sky-500/10 text-sky-600 border-sky-500/20">
+                                <Badge
+                                  variant="outline"
+                                  className="bg-sky-500/10 text-sky-600 border-sky-500/20"
+                                >
                                   Pending
                                 </Badge>
-                              ) : "-"}
+                              ) : (
+                                "-"
+                              )}
                             </TableCell>
                             <TableCell className="text-center">
                               <Badge variant="outline" className={riskColor}>
@@ -2881,7 +3806,9 @@ To refer to the FAQ document, you can click on the HELP button which is present 
                                     variant="outline"
                                     size="sm"
                                     className="h-8 gap-1.5 text-xs border-indigo-500/20 text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-950/10 font-semibold"
-                                    onClick={() => handleOpenAdvancedReport(candidate)}
+                                    onClick={() =>
+                                      handleOpenAdvancedReport(candidate)
+                                    }
                                     title="View advanced submissions, telemetry, and violations"
                                   >
                                     <Eye className="w-3.5 h-3.5" />
@@ -2891,7 +3818,12 @@ To refer to the FAQ document, you can click on the HELP button which is present 
                                     variant="outline"
                                     size="sm"
                                     className="h-8 gap-1.5 text-xs border-emerald-500/20 text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/10 font-semibold"
-                                    onClick={() => downloadScorecard(scoreData.sessionId, candidate.candidateName)}
+                                    onClick={() =>
+                                      downloadScorecard(
+                                        scoreData.sessionId,
+                                        candidate.candidateName,
+                                      )
+                                    }
                                     title="Download normal scorecard PDF"
                                   >
                                     <Download className="w-3.5 h-3.5" />
@@ -2901,7 +3833,9 @@ To refer to the FAQ document, you can click on the HELP button which is present 
                                     variant="outline"
                                     size="sm"
                                     className="h-8 gap-1.5 text-xs border-indigo-500/20 text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-950/10 font-semibold"
-                                    onClick={() => downloadAdvancedReport(candidate)}
+                                    onClick={() =>
+                                      downloadAdvancedReport(candidate)
+                                    }
                                     title="Download advanced proctoring and submissions PDF"
                                   >
                                     <Download className="w-3.5 h-3.5" />
@@ -3042,16 +3976,22 @@ To refer to the FAQ document, you can click on the HELP button which is present 
         </DialogContent>
       </Dialog>
       {/* Unsaved Changes Dialog */}
-      <AlertDialog open={unsavedChangesDialogOpen} onOpenChange={setUnsavedChangesDialogOpen}>
+      <AlertDialog
+        open={unsavedChangesDialogOpen}
+        onOpenChange={setUnsavedChangesDialogOpen}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Unsaved Changes</AlertDialogTitle>
             <AlertDialogDescription>
-              You have unsaved changes to this test. Are you sure you want to go back without saving?
+              You have unsaved changes to this test. Are you sure you want to go
+              back without saving?
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setUnsavedChangesDialogOpen(false)}>
+            <AlertDialogCancel
+              onClick={() => setUnsavedChangesDialogOpen(false)}
+            >
               Cancel
             </AlertDialogCancel>
             <AlertDialogAction
@@ -3068,19 +4008,25 @@ To refer to the FAQ document, you can click on the HELP button which is present 
       </AlertDialog>
 
       {/* Unsaved Schedule Changes Dialog */}
-      <AlertDialog open={unsavedScheduleDialogOpen} onOpenChange={setUnsavedScheduleDialogOpen}>
+      <AlertDialog
+        open={unsavedScheduleDialogOpen}
+        onOpenChange={setUnsavedScheduleDialogOpen}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Unsaved Schedule Changes</AlertDialogTitle>
             <AlertDialogDescription>
-              You have unsaved changes to the test schedule. Would you like to save them before switching tabs?
+              You have unsaved changes to the test schedule. Would you like to
+              save them before switching tabs?
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => {
-              setUnsavedScheduleDialogOpen(false);
-              setPendingTab(null);
-            }}>
+            <AlertDialogCancel
+              onClick={() => {
+                setUnsavedScheduleDialogOpen(false);
+                setPendingTab(null);
+              }}
+            >
               Cancel
             </AlertDialogCancel>
             <AlertDialogAction
@@ -3089,9 +4035,7 @@ To refer to the FAQ document, you can click on the HELP button which is present 
             >
               Discard Changes
             </AlertDialogAction>
-            <AlertDialogAction
-              onClick={handleSaveAndSwitch}
-            >
+            <AlertDialogAction onClick={handleSaveAndSwitch}>
               Save & Switch
             </AlertDialogAction>
           </AlertDialogFooter>
@@ -3099,7 +4043,10 @@ To refer to the FAQ document, you can click on the HELP button which is present 
       </AlertDialog>
 
       {/* Advanced Candidate Report Dialog */}
-      <Dialog open={isAdvancedReportOpen} onOpenChange={setIsAdvancedReportOpen}>
+      <Dialog
+        open={isAdvancedReportOpen}
+        onOpenChange={setIsAdvancedReportOpen}
+      >
         <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-2xl font-bold flex items-center gap-2">
@@ -3107,40 +4054,66 @@ To refer to the FAQ document, you can click on the HELP button which is present 
               Advanced Report: {selectedReportCandidate?.candidateName}
             </DialogTitle>
             <DialogDescription>
-              Detailed logs of questions, selected options/submitted code, and proctoring metrics.
+              Detailed logs of questions, selected options/submitted code, and
+              proctoring metrics.
             </DialogDescription>
           </DialogHeader>
 
           {loadingAdvancedDetails ? (
             <div className="flex flex-col items-center justify-center py-20 gap-3">
               <Loader2 className="w-8 h-8 animate-spin text-primary" />
-              <p className="text-sm text-muted-foreground">Loading submission details...</p>
+              <p className="text-sm text-muted-foreground">
+                Loading submission details...
+              </p>
             </div>
           ) : (
             <div className="space-y-6">
               {/* Candidate Info Grid */}
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4 p-4 bg-muted/30 rounded-xl border">
                 <div>
-                  <div className="text-xs text-muted-foreground font-medium">Email</div>
-                  <div className="text-sm font-semibold truncate">{selectedReportCandidate?.email}</div>
+                  <div className="text-xs text-muted-foreground font-medium">
+                    Email
+                  </div>
+                  <div className="text-sm font-semibold truncate">
+                    {selectedReportCandidate?.email}
+                  </div>
                 </div>
                 <div>
-                  <div className="text-xs text-muted-foreground font-medium">Test Status</div>
-                  <div className="text-sm font-semibold capitalize">{selectedReportCandidate?.testStatus?.replace(/_/g, " ") || "Not Started"}</div>
+                  <div className="text-xs text-muted-foreground font-medium">
+                    Test Status
+                  </div>
+                  <div className="text-sm font-semibold capitalize">
+                    {selectedReportCandidate?.testStatus?.replace(/_/g, " ") ||
+                      "Not Started"}
+                  </div>
                 </div>
                 <div>
-                  <div className="text-xs text-muted-foreground font-medium">Final Score</div>
+                  <div className="text-xs text-muted-foreground font-medium">
+                    Final Score
+                  </div>
                   <div className="text-sm font-semibold">
-                    {selectedReportCandidate && candidateResults[getReportCandidateKey(selectedReportCandidate)]?.result?.totalScore !== undefined
+                    {selectedReportCandidate &&
+                    candidateResults[
+                      getReportCandidateKey(selectedReportCandidate)
+                    ]?.result?.totalScore !== undefined
                       ? `${candidateResults[getReportCandidateKey(selectedReportCandidate)].result.totalScore} / ${candidateResults[getReportCandidateKey(selectedReportCandidate)].result.maxScore}`
                       : "-"}
                   </div>
                 </div>
                 <div>
-                  <div className="text-xs text-muted-foreground font-medium">Passed / Failed</div>
+                  <div className="text-xs text-muted-foreground font-medium">
+                    Passed / Failed
+                  </div>
                   <div className="text-sm font-semibold">
-                    {selectedReportCandidate && candidateResults[getReportCandidateKey(selectedReportCandidate)]?.result?.passed !== undefined
-                      ? (candidateResults[getReportCandidateKey(selectedReportCandidate)].result.passed ? "PASSED" : "FAILED")
+                    {selectedReportCandidate &&
+                    candidateResults[
+                      getReportCandidateKey(selectedReportCandidate)
+                    ]?.result?.passed !== undefined
+                      ? candidateResults[
+                          getReportCandidateKey(selectedReportCandidate)
+                        ].result.passed
+                        ? "PASSED"
+                        : "FAILED"
                       : "-"}
                   </div>
                 </div>
@@ -3148,8 +4121,12 @@ To refer to the FAQ document, you can click on the HELP button which is present 
 
               <Tabs defaultValue="answers" className="w-full">
                 <TabsList className="grid w-full grid-cols-2 max-w-sm mb-4">
-                  <TabsTrigger value="answers">Questions & Submissions</TabsTrigger>
-                  <TabsTrigger value="proctoring">Proctoring Timeline</TabsTrigger>
+                  <TabsTrigger value="answers">
+                    Questions & Submissions
+                  </TabsTrigger>
+                  <TabsTrigger value="proctoring">
+                    Proctoring Timeline
+                  </TabsTrigger>
                 </TabsList>
 
                 {/* Answers Tab */}
@@ -3159,66 +4136,131 @@ To refer to the FAQ document, you can click on the HELP button which is present 
                       No submissions found for this candidate.
                     </div>
                   ) : (
-                    candidatePaperSubmissions.map((item: Record<string, unknown>, idx: number) => {
-                      const q = item.question as { id?: string; title?: string; prompt?: string; questionType?: string; type?: string; mcqOptions?: { id: string; text: string; isCorrect: boolean }[] };
-                      const sub = item.submission as { answerText?: string; selectedOptionIds?: string[]; questionId?: string } | null;
-                      const isCoding = q.questionType === "CODING" || q.type === "CODING";
+                    candidatePaperSubmissions.map(
+                      (item: Record<string, unknown>, idx: number) => {
+                        const q = item.question as {
+                          id?: string;
+                          title?: string;
+                          prompt?: string;
+                          questionType?: string;
+                          type?: string;
+                          mcqOptions?: {
+                            id: string;
+                            text: string;
+                            isCorrect: boolean;
+                          }[];
+                        };
+                        const sub = item.submission as {
+                          answerText?: string;
+                          selectedOptionIds?: string[];
+                          questionId?: string;
+                        } | null;
+                        const isCoding =
+                          q.questionType === "CODING" || q.type === "CODING";
 
-                      return (
-                        <Card key={q.id} className="border border-slate-200 shadow-sm overflow-hidden">
-                          <CardHeader className="bg-slate-50/50 p-4 border-b">
-                            <div className="flex justify-between items-start gap-4">
-                              <span className="font-semibold text-sm text-slate-800">
-                                Question {idx + 1}: {q.title || "Untitled Question"}
-                              </span>
-                              <Badge variant="secondary" className="shrink-0 text-xs">
-                                {isCoding ? "Coding" : "MCQ"}
-                              </Badge>
-                            </div>
-                            <p className="text-sm text-slate-600 mt-2 whitespace-pre-wrap">{q.prompt}</p>
-                          </CardHeader>
-                          <CardContent className="p-4 space-y-3">
-                            {isCoding ? (
-                              <div className="space-y-2">
-                                <div className="text-xs font-semibold text-slate-500">Submitted Source Code:</div>
-                                {sub?.answerText ? (
-                                  <pre className="p-4 bg-slate-900 text-slate-100 rounded-lg text-xs font-mono overflow-x-auto max-h-72">
-                                    <code>{sub.answerText}</code>
-                                  </pre>
-                                ) : (
-                                  <div className="text-sm text-muted-foreground italic">No code submitted.</div>
-                                )}
+                        return (
+                          <Card
+                            key={q.id}
+                            className="border border-slate-200 shadow-sm overflow-hidden"
+                          >
+                            <CardHeader className="bg-slate-50/50 p-4 border-b">
+                              <div className="flex justify-between items-start gap-4">
+                                <span className="font-semibold text-sm text-slate-800">
+                                  Question {idx + 1}:{" "}
+                                  {q.title || "Untitled Question"}
+                                </span>
+                                <Badge
+                                  variant="secondary"
+                                  className="shrink-0 text-xs"
+                                >
+                                  {isCoding ? "Coding" : "MCQ"}
+                                </Badge>
                               </div>
-                            ) : (
-                              <div className="space-y-2">
-                                <div className="text-xs font-semibold text-slate-500">MCQ Options:</div>
-                                <div className="grid gap-2">
-                                  {(q.mcqOptions || []).map((opt: { id: string; text: string; isCorrect: boolean }) => {
-                                    const isSelected = sub?.answerText?.includes(opt.id) || sub?.answerText?.includes(opt.text);
-                                    const isCorrect = opt.isCorrect;
-
-                                    let optionStyle = "border-slate-200 bg-white";
-                                    if (isSelected && isCorrect) optionStyle = "border-emerald-500 bg-emerald-500/5 text-emerald-700";
-                                    else if (isSelected && !isCorrect) optionStyle = "border-red-500 bg-red-500/5 text-red-700";
-                                    else if (!isSelected && isCorrect) optionStyle = "border-emerald-200 bg-emerald-50/20 text-emerald-600";
-
-                                    return (
-                                      <div key={opt.id} className={`p-3 border rounded-lg text-sm flex items-center justify-between ${optionStyle}`}>
-                                        <span>{opt.text}</span>
-                                        <div className="flex items-center gap-1.5 shrink-0 text-xs font-medium">
-                                          {isSelected && <Badge variant="outline" className="bg-primary/10 text-primary border-primary/20">Selected</Badge>}
-                                          {isCorrect && <Badge variant="outline" className="bg-emerald-500/10 text-emerald-600 border-emerald-500/20">Correct Answer</Badge>}
-                                        </div>
-                                      </div>
-                                    );
-                                  })}
+                              <p className="text-sm text-slate-600 mt-2 whitespace-pre-wrap">
+                                {q.prompt}
+                              </p>
+                            </CardHeader>
+                            <CardContent className="p-4 space-y-3">
+                              {isCoding ? (
+                                <div className="space-y-2">
+                                  <div className="text-xs font-semibold text-slate-500">
+                                    Submitted Source Code:
+                                  </div>
+                                  {sub?.answerText ? (
+                                    <pre className="p-4 bg-slate-900 text-slate-100 rounded-lg text-xs font-mono overflow-x-auto max-h-72">
+                                      <code>{sub.answerText}</code>
+                                    </pre>
+                                  ) : (
+                                    <div className="text-sm text-muted-foreground italic">
+                                      No code submitted.
+                                    </div>
+                                  )}
                                 </div>
-                              </div>
-                            )}
-                          </CardContent>
-                        </Card>
-                      );
-                    })
+                              ) : (
+                                <div className="space-y-2">
+                                  <div className="text-xs font-semibold text-slate-500">
+                                    MCQ Options:
+                                  </div>
+                                  <div className="grid gap-2">
+                                    {(q.mcqOptions || []).map(
+                                      (opt: {
+                                        id: string;
+                                        text: string;
+                                        isCorrect: boolean;
+                                      }) => {
+                                        const isSelected =
+                                          sub?.answerText?.includes(opt.id) ||
+                                          sub?.answerText?.includes(opt.text);
+                                        const isCorrect = opt.isCorrect;
+
+                                        let optionStyle =
+                                          "border-slate-200 bg-white";
+                                        if (isSelected && isCorrect)
+                                          optionStyle =
+                                            "border-emerald-500 bg-emerald-500/5 text-emerald-700";
+                                        else if (isSelected && !isCorrect)
+                                          optionStyle =
+                                            "border-red-500 bg-red-500/5 text-red-700";
+                                        else if (!isSelected && isCorrect)
+                                          optionStyle =
+                                            "border-emerald-200 bg-emerald-50/20 text-emerald-600";
+
+                                        return (
+                                          <div
+                                            key={opt.id}
+                                            className={`p-3 border rounded-lg text-sm flex items-center justify-between ${optionStyle}`}
+                                          >
+                                            <span>{opt.text}</span>
+                                            <div className="flex items-center gap-1.5 shrink-0 text-xs font-medium">
+                                              {isSelected && (
+                                                <Badge
+                                                  variant="outline"
+                                                  className="bg-primary/10 text-primary border-primary/20"
+                                                >
+                                                  Selected
+                                                </Badge>
+                                              )}
+                                              {isCorrect && (
+                                                <Badge
+                                                  variant="outline"
+                                                  className="bg-emerald-500/10 text-emerald-600 border-emerald-500/20"
+                                                >
+                                                  Correct Answer
+                                                </Badge>
+                                              )}
+                                            </div>
+                                          </div>
+                                        );
+                                      },
+                                    )}
+                                  </div>
+                                </div>
+                              )}
+                            </CardContent>
+                          </Card>
+                        );
+                      },
+                    )
                   )}
                 </TabsContent>
 
@@ -3227,30 +4269,52 @@ To refer to the FAQ document, you can click on the HELP button which is present 
                   {/* System & Device Specs */}
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 border rounded-lg bg-slate-50/50">
                     <div>
-                      <div className="text-xs text-muted-foreground">IP Address</div>
-                      <div className="text-sm font-semibold">{reportCandidateDetails?.systemInfo?.ipAddress || "N/A"}</div>
-                    </div>
-                    <div>
-                      <div className="text-xs text-muted-foreground">Browser / OS</div>
-                      <div className="text-sm font-semibold truncate">
-                        {reportCandidateDetails?.systemInfo?.browser || "Chrome"} / {reportCandidateDetails?.systemInfo?.os || "Windows"}
+                      <div className="text-xs text-muted-foreground">
+                        IP Address
+                      </div>
+                      <div className="text-sm font-semibold">
+                        {reportCandidateDetails?.systemInfo?.ipAddress || "N/A"}
                       </div>
                     </div>
                     <div>
-                      <div className="text-xs text-muted-foreground">Fullscreen Violations</div>
-                      <div className="text-sm font-semibold">{reportCandidateDetails?.systemInfo?.fullscreenViolations ?? 0}</div>
+                      <div className="text-xs text-muted-foreground">
+                        Browser / OS
+                      </div>
+                      <div className="text-sm font-semibold truncate">
+                        {reportCandidateDetails?.systemInfo?.browser ||
+                          "Chrome"}{" "}
+                        / {reportCandidateDetails?.systemInfo?.os || "Windows"}
+                      </div>
                     </div>
                     <div>
-                      <div className="text-xs text-muted-foreground">Total Warnings</div>
-                      <div className="text-sm font-semibold">{selectedReportCandidate?.violationCount || 0}</div>
+                      <div className="text-xs text-muted-foreground">
+                        Fullscreen Violations
+                      </div>
+                      <div className="text-sm font-semibold">
+                        {reportCandidateDetails?.systemInfo
+                          ?.fullscreenViolations ?? 0}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-xs text-muted-foreground">
+                        Total Warnings
+                      </div>
+                      <div className="text-sm font-semibold">
+                        {selectedReportCandidate?.violationCount || 0}
+                      </div>
                     </div>
                   </div>
 
                   {/* Violation Timeline */}
                   <div className="space-y-3">
-                    <h3 className="font-bold text-sm text-slate-800">Violation Records</h3>
-                    {!reportCandidateDetails?.violations || reportCandidateDetails.violations.length === 0 ? (
-                      <div className="text-sm text-muted-foreground italic">No proctoring violations recorded for this session.</div>
+                    <h3 className="font-bold text-sm text-slate-800">
+                      Violation Records
+                    </h3>
+                    {!reportCandidateDetails?.violations ||
+                    reportCandidateDetails.violations.length === 0 ? (
+                      <div className="text-sm text-muted-foreground italic">
+                        No proctoring violations recorded for this session.
+                      </div>
                     ) : (
                       <div className="border rounded-lg overflow-hidden">
                         <Table>
@@ -3263,22 +4327,42 @@ To refer to the FAQ document, you can click on the HELP button which is present 
                             </TableRow>
                           </TableHeader>
                           <TableBody>
-                            {reportCandidateDetails.violations.map((v: ReportViolation) => {
-                              let sevColor = "bg-slate-100 text-slate-700";
-                              if (v.severity === "CRITICAL" || v.severity === "HIGH") sevColor = "bg-red-500/10 text-red-500";
-                              else if (v.severity === "MEDIUM") sevColor = "bg-amber-500/10 text-amber-500";
+                            {reportCandidateDetails.violations.map(
+                              (v: ReportViolation) => {
+                                let sevColor = "bg-slate-100 text-slate-700";
+                                if (
+                                  v.severity === "CRITICAL" ||
+                                  v.severity === "HIGH"
+                                )
+                                  sevColor = "bg-red-500/10 text-red-500";
+                                else if (v.severity === "MEDIUM")
+                                  sevColor = "bg-amber-500/10 text-amber-500";
 
-                              return (
-                                <TableRow key={v.id}>
-                                  <TableCell className="text-xs whitespace-nowrap">{new Date(v.occurredAt || v.time).toLocaleTimeString()}</TableCell>
-                                  <TableCell className="text-xs font-semibold">{v.eventType?.replace(/_/g, " ")}</TableCell>
-                                  <TableCell>
-                                    <Badge variant="outline" className={sevColor}>{v.severity}</Badge>
-                                  </TableCell>
-                                  <TableCell className="text-xs text-muted-foreground">{v.description || "Violation triggered"}</TableCell>
-                                </TableRow>
-                              );
-                            })}
+                                return (
+                                  <TableRow key={v.id}>
+                                    <TableCell className="text-xs whitespace-nowrap">
+                                      {new Date(
+                                        v.occurredAt || v.time,
+                                      ).toLocaleTimeString()}
+                                    </TableCell>
+                                    <TableCell className="text-xs font-semibold">
+                                      {v.eventType?.replace(/_/g, " ")}
+                                    </TableCell>
+                                    <TableCell>
+                                      <Badge
+                                        variant="outline"
+                                        className={sevColor}
+                                      >
+                                        {v.severity}
+                                      </Badge>
+                                    </TableCell>
+                                    <TableCell className="text-xs text-muted-foreground">
+                                      {v.description || "Violation triggered"}
+                                    </TableCell>
+                                  </TableRow>
+                                );
+                              },
+                            )}
                           </TableBody>
                         </Table>
                       </div>
@@ -3287,20 +4371,38 @@ To refer to the FAQ document, you can click on the HELP button which is present 
 
                   {/* Snapshot / Evidence Captures */}
                   <div className="space-y-3">
-                    <h3 className="font-bold text-sm text-slate-800">Snapshot Evidence</h3>
-                    {!reportCandidateDetails?.evidence || reportCandidateDetails.evidence.length === 0 ? (
-                      <div className="text-sm text-muted-foreground italic">No image evidence collected.</div>
+                    <h3 className="font-bold text-sm text-slate-800">
+                      Snapshot Evidence
+                    </h3>
+                    {!reportCandidateDetails?.evidence ||
+                    reportCandidateDetails.evidence.length === 0 ? (
+                      <div className="text-sm text-muted-foreground italic">
+                        No image evidence collected.
+                      </div>
                     ) : (
                       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                        {reportCandidateDetails.evidence.map((img: ReportEvidence) => (
-                          <div key={img.id} className="border rounded-lg overflow-hidden bg-muted/20">
-                            <img src={img.imageData || img.imageUrl} alt="Proctor Capture" className="w-full h-32 object-cover" />
-                            <div className="p-2 text-[10px] text-muted-foreground">
-                              <div>{img.snapshotType || "VIOLATION"}</div>
-                              <div>{new Date(img.capturedAt).toLocaleTimeString()}</div>
+                        {reportCandidateDetails.evidence.map(
+                          (img: ReportEvidence) => (
+                            <div
+                              key={img.id}
+                              className="border rounded-lg overflow-hidden bg-muted/20"
+                            >
+                              <img
+                                src={img.imageData || img.imageUrl}
+                                alt="Proctor Capture"
+                                className="w-full h-32 object-cover"
+                              />
+                              <div className="p-2 text-[10px] text-muted-foreground">
+                                <div>{img.snapshotType || "VIOLATION"}</div>
+                                <div>
+                                  {new Date(
+                                    img.capturedAt,
+                                  ).toLocaleTimeString()}
+                                </div>
+                              </div>
                             </div>
-                          </div>
-                        ))}
+                          ),
+                        )}
                       </div>
                     )}
                   </div>
@@ -3310,7 +4412,9 @@ To refer to the FAQ document, you can click on the HELP button which is present 
           )}
 
           <DialogFooter>
-            <Button onClick={() => setIsAdvancedReportOpen(false)}>Close Report</Button>
+            <Button onClick={() => setIsAdvancedReportOpen(false)}>
+              Close Report
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -3319,28 +4423,71 @@ To refer to the FAQ document, you can click on the HELP button which is present 
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Add New Candidate</DialogTitle>
-            <DialogDescription>Create a new candidate record in {adminOrgName}.</DialogDescription>
+            <DialogDescription>
+              Create a new candidate record in {adminOrgName}.
+            </DialogDescription>
           </DialogHeader>
           <div className="grid gap-6 py-4">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <label className="text-sm font-medium">Full Name*</label>
-                <Input placeholder="John Doe" value={candidateFormData.name} onChange={(e) => setCandidateFormData({ ...candidateFormData, name: e.target.value })} />
+                <Input
+                  placeholder="John Doe"
+                  value={candidateFormData.name}
+                  onChange={(e) =>
+                    setCandidateFormData({
+                      ...candidateFormData,
+                      name: e.target.value,
+                    })
+                  }
+                />
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-medium">Email Address*</label>
-                <Input type="email" placeholder="john@example.com" value={candidateFormData.email} onChange={(e) => setCandidateFormData({ ...candidateFormData, email: e.target.value })} />
-                {candidateEmailError ? <p className="text-xs text-destructive">{candidateEmailError}</p> : null}
+                <Input
+                  type="email"
+                  placeholder="john@example.com"
+                  value={candidateFormData.email}
+                  onChange={(e) =>
+                    setCandidateFormData({
+                      ...candidateFormData,
+                      email: e.target.value,
+                    })
+                  }
+                />
+                {candidateEmailError ? (
+                  <p className="text-xs text-destructive">
+                    {candidateEmailError}
+                  </p>
+                ) : null}
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <label className="text-sm font-medium">Password*</label>
-                <Input type="password" value={candidateFormData.password} onChange={(e) => setCandidateFormData({ ...candidateFormData, password: e.target.value })} />
+                <Input
+                  type="password"
+                  value={candidateFormData.password}
+                  onChange={(e) =>
+                    setCandidateFormData({
+                      ...candidateFormData,
+                      password: e.target.value,
+                    })
+                  }
+                />
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-medium">Phone Number</label>
-                <Input placeholder="+91 1234567890" value={candidateFormData.phoneNumber} onChange={(e) => setCandidateFormData({ ...candidateFormData, phoneNumber: e.target.value })} />
+                <Input
+                  placeholder="+91 1234567890"
+                  value={candidateFormData.phoneNumber}
+                  onChange={(e) =>
+                    setCandidateFormData({
+                      ...candidateFormData,
+                      phoneNumber: e.target.value,
+                    })
+                  }
+                />
               </div>
             </div>
             <div className="space-y-4 border-t pt-4">
@@ -3348,19 +4495,57 @@ To refer to the FAQ document, you can click on the HELP button which is present 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <label className="text-sm font-medium">College</label>
-                  <Input value={candidateFormData.extraFields.college} onChange={(e) => setCandidateFormData({ ...candidateFormData, extraFields: { ...candidateFormData.extraFields, college: e.target.value } })} />
+                  <Input
+                    value={candidateFormData.extraFields.college}
+                    onChange={(e) =>
+                      setCandidateFormData({
+                        ...candidateFormData,
+                        extraFields: {
+                          ...candidateFormData.extraFields,
+                          college: e.target.value,
+                        },
+                      })
+                    }
+                  />
                 </div>
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Course</label>
-                  <Input value={candidateFormData.extraFields.course} onChange={(e) => setCandidateFormData({ ...candidateFormData, extraFields: { ...candidateFormData.extraFields, course: e.target.value } })} />
+                  <Input
+                    value={candidateFormData.extraFields.course}
+                    onChange={(e) =>
+                      setCandidateFormData({
+                        ...candidateFormData,
+                        extraFields: {
+                          ...candidateFormData.extraFields,
+                          course: e.target.value,
+                        },
+                      })
+                    }
+                  />
                 </div>
               </div>
-              <CustomFieldsSection customFields={candidateCustomFields} onChange={setCandidateCustomFields} />
+              <CustomFieldsSection
+                customFields={candidateCustomFields}
+                onChange={setCandidateCustomFields}
+              />
             </div>
             <div className="flex justify-end gap-3 mt-4">
-              <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>Cancel</Button>
-              <Button variant="hero" onClick={handleAddCandidate} disabled={candidateSubmitting}>
-                {candidateSubmitting ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Plus className="w-4 h-4 mr-2" />}
+              <Button
+                variant="outline"
+                onClick={() => setIsAddDialogOpen(false)}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="hero"
+                onClick={handleAddCandidate}
+                disabled={candidateSubmitting}
+              >
+                {candidateSubmitting ? (
+                  <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                ) : (
+                  <Plus className="w-4 h-4 mr-2" />
+                )}
                 Add Candidate
               </Button>
             </div>
@@ -3369,10 +4554,10 @@ To refer to the FAQ document, you can click on the HELP button which is present 
       </Dialog>
 
       {isBulkUploadOpen && (
-        <BulkUploadCandidates 
-          open={isBulkUploadOpen} 
-          onOpenChange={setIsBulkUploadOpen} 
-          onSuccess={fetchInvitationsData} 
+        <BulkUploadCandidates
+          open={isBulkUploadOpen}
+          onOpenChange={setIsBulkUploadOpen}
+          onSuccess={fetchInvitationsData}
         />
       )}
     </div>

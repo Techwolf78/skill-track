@@ -99,11 +99,15 @@ export const proctoringService = {
   },
 
   presignEvidence: async (sessionId: string, evidenceType: string, violationType?: string): Promise<{ url: string; storagePath: string }> => {
-    const response = await apiClient.post<BaseResponse<{ url: string; storagePath: string }>>(
+    const response = await apiClient.post<BaseResponse<{ signedUploadUrl?: string; url?: string; storagePath: string }>>(
       `/test-sessions/${sessionId}/evidence/presign`,
       { evidenceType, violationType }
     );
-    return unwrapResponse(response);
+    const data = unwrapResponse(response);
+    return {
+      url: data.signedUploadUrl || data.url || "",
+      storagePath: data.storagePath || ""
+    };
   },
 
   confirmEvidence: async (sessionId: string, storagePath: string, evidenceType: string, capturedAt: number, fileSizeBytes?: number): Promise<string> => {

@@ -200,8 +200,10 @@ export const ProctoringProvider: React.FC<{
     let timeoutId: NodeJS.Timeout;
 
     const scheduleNextSnapshot = () => {
-      // Random interval between 1 minute (60,000ms) and 5 minutes (300,000ms)
-      const randomIntervalMs = Math.floor(Math.random() * (300000 - 60000 + 1)) + 60000;
+      // Periodic snapshot interval:
+      // HIGH mode -> 1 min (60,000ms)
+      // MEDIUM / CUSTOM mode -> 3 mins (180,000ms)
+      const intervalMs = (config.liveProctoring || config.screenShare) ? 60000 : 180000;
 
       timeoutId = setTimeout(() => {
         const video = document.querySelector<HTMLVideoElement>("video");
@@ -213,12 +215,12 @@ export const ProctoringProvider: React.FC<{
                 evidenceType: "AUDIT_FRAME",
                 capturedAt: Date.now(),
               });
-              console.log(`📸 Audit snapshot enqueued. Next in ${Math.round(randomIntervalMs / 1000)}s.`);
+              console.log(`📸 Audit snapshot enqueued. Next in ${Math.round(intervalMs / 1000)}s.`);
             })
             .catch((e) => console.error("Periodic snapshot capture failed:", e));
         }
         scheduleNextSnapshot();
-      }, randomIntervalMs);
+      }, intervalMs);
     };
 
     scheduleNextSnapshot();
