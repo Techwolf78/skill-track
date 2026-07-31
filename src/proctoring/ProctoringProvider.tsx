@@ -120,6 +120,7 @@ export const ProctoringProvider: React.FC<{
   const store = useRef(new ViolationStore(sessionId));
   const behaviorAnalyzer = useRef(new LLMBehaviorAnalyzer());
   const uploadQueue = useRef(new UploadQueue(sessionId));
+  const lastUploadTimestamps = useRef<Record<string, number>>({});
 
   const addViolation = useCallback((type: ViolationType, metadata: Record<string, unknown> = {}) => {
     let severity: Severity = "LOW";
@@ -142,8 +143,17 @@ export const ProctoringProvider: React.FC<{
       trustScore: store.current.getScore(),
     }));
 
-    // For HIGH/CRITICAL: capture evidence frame off-thread and enqueue upload
-    if (severity === "CRITICAL" || severity === "HIGH") {
+    // Traffic Optimization:
+    // Capture & upload image evidence for malpractice events (TAB_SWITCH, MULTI_FACE, DEVTOOLS, BACKGROUND_OBJECT, SCREEN_RECORD)
+    const requiresImageEvidence = ["TAB_SWITCH", "EXTENDED_TAB_SWITCH", "MULTI_FACE", "NO_FACE", "DEVTOOLS_OPEN", "BACKGROUND_OBJECT", "SCREEN_RECORD"].includes(type);
+
+    // 30-second cooldown guard per violation type to avoid uploading duplicate frames back-to-back
+    const now = Date.now();
+    const lastUploadTime = lastUploadTimestamps.current[type] || 0;
+    const isCoolingDown = now - lastUploadTime < 30000;
+
+    if (requiresImageEvidence && !isCoolingDown) {
+      lastUploadTimestamps.current[type] = now;
       const video = document.querySelector<HTMLVideoElement>("video");
       if (video && !video.paused && !video.ended) {
         captureFrame(video, 640, 480, 0.6)
@@ -154,10 +164,14 @@ export const ProctoringProvider: React.FC<{
               violationType: type,
               capturedAt: Date.now(),
             });
+            console.log(`📸 Evidence image queued for violation: ${type}`);
           })
           .catch((err) => console.error("Evidence capture failed:", err));
       }
-      // Sync trust score immediately for critical violations
+    }
+
+    // Sync trust score immediately for critical/high violations
+    if (severity === "CRITICAL" || severity === "HIGH") {
       store.current.syncSingleViolation(newViolation)
         .then(score => { if (score !== null) setState(prev => ({ ...prev, trustScore: score })); })
         .catch(err => console.error("Failed to sync violation:", err));
@@ -190,9 +204,10 @@ export const ProctoringProvider: React.FC<{
   }, [state.isProctoringActive, config.llmDetector, state.violations]);
 
   /**
-   * HIGH mode: Periodic audit snapshot at a random interval between 1 and 5 minutes.
-   * Captures off-thread and enqueues upload — never blocks the main thread.
-   * Only active when config.periodicSnapshots === true (HIGH / CUSTOM modes).
+   * Periodic webcam audit snapshots:
+   * - HIGH mode (or live proctoring active): Every 2 minutes (120,000ms)
+   * - MEDIUM mode: Every 5 minutes (300,000ms)
+   * - CUSTOM mode: Uses config.snapshotIntervalSecs if defined
    */
   useEffect(() => {
     if (!state.isProctoringActive || !config.camera || !config.periodicSnapshots) return;
@@ -200,10 +215,12 @@ export const ProctoringProvider: React.FC<{
     let timeoutId: NodeJS.Timeout;
 
     const scheduleNextSnapshot = () => {
-      // Periodic snapshot interval:
-      // HIGH mode -> 1 min (60,000ms)
-      // MEDIUM / CUSTOM mode -> 3 mins (180,000ms)
-      const intervalMs = (config.liveProctoring || config.screenShare) ? 60000 : 180000;
+      let intervalMs = 300000; // Default MEDIUM mode: 5 minutes
+      if (config.snapshotIntervalSecs && config.snapshotIntervalSecs > 0) {
+        intervalMs = config.snapshotIntervalSecs * 1000;
+      } else if (config.liveProctoring || config.screenShare) {
+        intervalMs = 120000; // HIGH mode: 2 minutes
+      }
 
       timeoutId = setTimeout(() => {
         const video = document.querySelector<HTMLVideoElement>("video");
@@ -225,7 +242,7 @@ export const ProctoringProvider: React.FC<{
 
     scheduleNextSnapshot();
     return () => clearTimeout(timeoutId);
-  }, [state.isProctoringActive, config.camera, config.periodicSnapshots]);
+  }, [state.isProctoringActive, config.camera, config.periodicSnapshots, config.snapshotIntervalSecs, config.liveProctoring, config.screenShare]);
 
   // Initial load & AI model init
   useEffect(() => {

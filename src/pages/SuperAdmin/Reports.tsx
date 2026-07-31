@@ -193,7 +193,24 @@ export default function Reports() {
   const handleViewScorecard = async (sid: string) => {
     try {
       setPdfLoadingSessionId(sid);
+      console.log(`[Scorecard PDF Request] Downloading PDF scorecard for session ID:`, sid);
+      const sessionObj = sessions.find((s) => s.id === sid);
+      const sessionState = sessionStates[sid];
+      console.log(`[Scorecard Data Summary]`, {
+        sessionId: sid,
+        candidateName: sessionObj?.candidateName || sessionObj?.candidateEmail || "Unknown",
+        candidateEmail: sessionObj?.candidateEmail,
+        status: sessionObj?.status,
+        result: sessionState?.result,
+        totalScore: sessionState?.result?.totalScore,
+        maxScore: sessionState?.result?.maxScore,
+        percentage: sessionState?.result?.percentage,
+        passFailStatus: sessionState?.result?.status,
+      });
+
       const { data: blob, filename } = await testService.downloadScorecard(sid);
+      console.log(`[Scorecard Download Success] Received PDF Blob for file: ${filename}, Size: ${blob.size} bytes`);
+      
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
@@ -207,6 +224,7 @@ export default function Reports() {
         error instanceof Error
           ? error.message
           : "Scorecard PDF is not available yet.";
+      console.error(`[Scorecard Download Error] Failed to download scorecard PDF:`, error);
       window.alert(errMsg);
     } finally {
       setPdfLoadingSessionId(null);

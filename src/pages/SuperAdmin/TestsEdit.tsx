@@ -1049,10 +1049,10 @@ export default function TestsEdit() {
                           htmlFor="periodicSnapshots"
                           className="text-sm font-normal cursor-pointer flex items-center gap-2"
                         >
-                          <span>Periodic snapshots</span>
+                          <span>Periodic webcam audit snapshots</span>
                           {formData.periodicSnapshots && (
                             <span className="text-[11px] font-mono font-medium px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
-                              {formData.proctoringMode === "HIGH" ? "⚡ 1 Frame / 1 min" : "⏱️ 1 Frame / 3 mins"}
+                              {formData.proctoringMode === "HIGH" ? "⚡ 1 Frame / 2 mins (~30/hr)" : "⏱️ 1 Frame / 5 mins (~12/hr)"}
                             </span>
                           )}
                         </Label>

@@ -52,12 +52,16 @@ export class UploadQueue {
 
   private async upload(item: QueueItem): Promise<void> {
     const attempt = async (): Promise<void> => {
+      const token = localStorage.getItem("token");
+      const authHeaders: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
+
       // Step 1: Presign upload URL from backend
+      console.log(`[UploadQueue] Presigning evidence upload for type: ${item.evidenceType}...`);
       const res = await fetch(
         `/api/test-sessions/${this.sessionId}/evidence/presign`,
         {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: { "Content-Type": "application/json", ...authHeaders },
           body: JSON.stringify({
             evidenceType: item.evidenceType,
             ...(item.violationType ? { violationType: item.violationType } : {}),
@@ -67,24 +71,28 @@ export class UploadQueue {
       if (!res.ok) throw new Error(`Presign failed: ${res.status}`);
       const raw = await res.json();
       const payload = raw?.data ?? raw;
+      console.log(`[UploadQueue] Presign response payload:`, payload);
       const signedUrl: string = payload.signedUploadUrl || payload.url || "";
       const storagePath: string = payload.storagePath || "";
       if (!signedUrl) throw new Error("No signedUploadUrl returned from presign");
 
       // Step 2: PUT binary JPEG directly to Supabase Storage
+      console.log(`[UploadQueue] Uploading JPEG buffer to Supabase storage...`);
       const putRes = await fetch(signedUrl, {
         method: "PUT",
         headers: { "Content-Type": "image/jpeg", "x-upsert": "true" },
         body: item.buffer,
       });
       if (!putRes.ok) throw new Error(`Storage PUT failed: ${putRes.status}`);
+      console.log(`[UploadQueue] Supabase PUT upload success.`);
 
       // Step 3: Confirm evidence record in DB
-      await fetch(
+      console.log(`[UploadQueue] Confirming evidence with backend path: ${storagePath}...`);
+      const confirmRes = await fetch(
         `/api/test-sessions/${this.sessionId}/evidence/confirm`,
         {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: { "Content-Type": "application/json", ...authHeaders },
           body: JSON.stringify({
             storagePath,
             evidenceType: item.evidenceType,
@@ -93,6 +101,9 @@ export class UploadQueue {
           }),
         }
       );
+      if (!confirmRes.ok) throw new Error(`Confirm failed: ${confirmRes.status}`);
+      const confirmData = await confirmRes.json().catch(() => null);
+      console.log(`[UploadQueue] Confirm response from backend:`, confirmData);
     };
 
     // Exponential backoff retry (1s, 2s, 4s)
