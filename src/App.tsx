@@ -49,6 +49,7 @@ const AdminTests = React.lazy(() => import("./pages/Admin/Tests"));
 const AdminTestCreate = React.lazy(() => import("./pages/Admin/TestCreate"));
 const AdminTestsEdit = React.lazy(() => import("./pages/Admin/TestsEdit"));
 const AdminTestDetails = React.lazy(() => import("./pages/Admin/TestDetails"));
+const AdminProfile = React.lazy(() => import("./pages/Admin/Profile"));
 
 // Test Taking
 const TestInterface = React.lazy(() => import("./pages/test/TestInterface"));
@@ -177,6 +178,7 @@ const App = () => (
                   path="invitations-history"
                   element={<InvitedCandidatesHistory />}
                 />
+                <Route path="profile" element={<AdminProfile />} />
               </Route>
               {/* Student Test Taking */}
               <Route path="/test/:testId" element={<TestInterface />} />

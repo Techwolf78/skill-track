@@ -9,6 +9,7 @@ import {
   PanelLeftOpen,
   PanelLeftClose,
   ShieldAlert,
+  User,
 } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -26,6 +27,7 @@ const navItems = [
   { icon: Users, label: "Candidates", path: "/admin/candidates" },
   { icon: FileQuestion, label: "Question Bank", path: "/admin/questions" },
   { icon: ShieldAlert, label: "Proctoring", path: "/admin/proctoring" },
+  { icon: User, label: "Profile", path: "/admin/profile" },
 ];
 
 export function AdminSidebar() {
