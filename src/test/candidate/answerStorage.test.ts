@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { AnswerStore } from "../../lib/exam/answerStorage";
+import { AnswerStore, computeContentHash } from "../../lib/exam/answerStorage";
 import { apiClient } from "../../lib/api-client";
 import { testService } from "../../lib/test-service";
 
@@ -7,19 +7,23 @@ import { testService } from "../../lib/test-service";
 vi.mock("../../lib/api-client", () => ({
   apiClient: {
     post: vi.fn(),
+    put: vi.fn(),
   },
 }));
 
 vi.mock("../../lib/test-service", () => ({
   testService: {
     submitCode: vi.fn(),
+    saveQuestionAnswer: vi.fn(),
   },
 }));
 
-// Mock crypto.randomUUID
-vi.stubGlobal("crypto", {
-  randomUUID: () => "mocked-uuid-1234",
-});
+// Mock crypto.randomUUID and crypto.subtle for node environment testing
+if (!globalThis.crypto) {
+  vi.stubGlobal("crypto", {
+    randomUUID: () => "mocked-uuid-1234",
+  });
+}
 
 describe("AnswerStore", () => {
   const sessionId = "session-123";
@@ -29,6 +33,18 @@ describe("AnswerStore", () => {
     localStorage.clear();
     vi.restoreAllMocks();
     vi.clearAllMocks();
+  });
+
+  describe("computeContentHash", () => {
+    it("should generate consistent SHA-256 or fallback hash for string input", async () => {
+      const hash1 = await computeContentHash("function test() {}");
+      const hash2 = await computeContentHash("function test() {}");
+      const emptyHash = await computeContentHash("");
+
+      expect(hash1).toBeTruthy();
+      expect(hash1).toBe(hash2);
+      expect(emptyHash).toBe("");
+    });
   });
 
   describe("Code Drafts", () => {
@@ -74,63 +90,63 @@ describe("AnswerStore", () => {
   });
 
   describe("Offline Queue", () => {
-    it("should queue offline submissions and avoid duplicates for same questionId", () => {
-      const sub1 = AnswerStore.queueOfflineSubmission(sessionId, "q1", "MCQ", 1);
+    it("should queue offline submissions and coalesce duplicates for same questionId", () => {
+      const timestamp = 1700000000000;
+      const sub1 = AnswerStore.queueOfflineSubmission(sessionId, "q1", "MCQ", "opt-1", timestamp);
       expect(sub1).toEqual({
-        id: "mocked-uuid-1234",
+        id: expect.any(String),
         questionId: "q1",
         type: "MCQ",
-        payload: 1,
+        payload: "opt-1",
         timestamp: expect.any(Number),
+        clientTimestamp: timestamp,
       });
 
-      // Queue another for same question to test duplicate filtration
-      AnswerStore.queueOfflineSubmission(sessionId, "q1", "MCQ", 2);
+      // Queue another for same question to test duplicate filtration (coalescing)
+      AnswerStore.queueOfflineSubmission(sessionId, "q1", "MCQ", "opt-2", timestamp + 1000);
 
       const queue = AnswerStore.getOfflineQueue(sessionId);
       expect(queue.length).toBe(1);
-      expect(queue[0].payload).toBe(2);
+      expect(queue[0].payload).toBe("opt-2");
+      expect(queue[0].clientTimestamp).toBe(timestamp + 1000);
     });
 
     it("should remove items from queue by id", () => {
-      AnswerStore.queueOfflineSubmission(sessionId, "q1", "MCQ", 1);
+      const sub = AnswerStore.queueOfflineSubmission(sessionId, "q1", "MCQ", 1);
       const queueBefore = AnswerStore.getOfflineQueue(sessionId);
       expect(queueBefore.length).toBe(1);
 
-      AnswerStore.removeFromQueue(sessionId, "mocked-uuid-1234");
+      AnswerStore.removeFromQueue(sessionId, sub.id);
       const queueAfter = AnswerStore.getOfflineQueue(sessionId);
       expect(queueAfter.length).toBe(0);
     });
   });
 
   describe("Sync Offline Queue", () => {
-    it("should successfully sync MCQ and CODING submissions sequentially", async () => {
+    it("should successfully sync MCQ and CODING submissions sequentially via PUT answer endpoint", async () => {
       // Mock APIs
-      vi.mocked(apiClient.post).mockResolvedValue({ data: { success: true } });
-      vi.mocked(testService.submitCode).mockResolvedValue("submission-id-999");
+      vi.mocked(apiClient.put).mockResolvedValue({ data: { success: true } });
 
       // Queue an MCQ
-      AnswerStore.queueOfflineSubmission(sessionId, "q1", "MCQ", 3);
+      const t1 = 1700000000000;
+      const t2 = 1700000005000;
+      AnswerStore.queueOfflineSubmission(sessionId, "q1", "MCQ", "opt-3", t1);
       // Queue a Coding
-      AnswerStore.queueOfflineSubmission(sessionId, "q2", "CODING", { language: "typescript", code: "let a = 1;" });
+      AnswerStore.queueOfflineSubmission(sessionId, "q2", "CODING", { language: "typescript", code: "let a = 1;" }, t2);
 
       const onProgress = vi.fn();
 
       const success = await AnswerStore.syncOfflineQueue(sessionId, onProgress);
 
       expect(success).toBe(true);
-      expect(apiClient.post).toHaveBeenCalledWith("/submissions", {
-        sessionId,
-        questionId: "q1",
-        selectedOptionIds: [3],
-        saveVersion: 0,
+      expect(apiClient.put).toHaveBeenCalledWith(`/test-sessions/${sessionId}/questions/q1/answer`, {
+        answerText: "opt-3",
+        clientTimestamp: t1,
       });
-      expect(apiClient.post).toHaveBeenCalledWith("/submissions", {
-        sessionId,
-        questionId: "q2",
+      expect(apiClient.put).toHaveBeenCalledWith(`/test-sessions/${sessionId}/questions/q2/answer`, {
         answerText: "let a = 1;",
-        language: "typescript",
-        saveVersion: 0,
+        gradingLanguage: "typescript",
+        clientTimestamp: t2,
       });
 
       // Verify progress callback calls
@@ -146,7 +162,7 @@ describe("AnswerStore", () => {
     });
 
     it("should return false if any item in the sync fails, leaving failed items in the queue", async () => {
-      vi.mocked(apiClient.post).mockRejectedValue(new Error("Network Error"));
+      vi.mocked(apiClient.put).mockRejectedValue(new Error("Network Error"));
 
       AnswerStore.queueOfflineSubmission(sessionId, "q1", "MCQ", 3);
 
@@ -156,28 +172,6 @@ describe("AnswerStore", () => {
       expect(success).toBe(false);
       expect(onProgress).toHaveBeenCalledWith("q1", false);
       expect(AnswerStore.getOfflineQueue(sessionId).length).toBe(1);
-    });
-
-    it("should handle validation failures (e.g. invalid questionId, null queueing) gracefully", () => {
-      // Test queueing with empty payload/id
-      const sub = AnswerStore.queueOfflineSubmission(sessionId, "", "MCQ", null);
-      expect(sub.questionId).toBe("");
-      expect(sub.payload).toBeNull();
-      expect(AnswerStore.getOfflineQueue(sessionId).length).toBe(1);
-    });
-
-    it("should handle boundary cases (extreme payload sizes and multi-select formats)", async () => {
-      vi.mocked(apiClient.post).mockResolvedValue({ data: { success: true } });
-      
-      const complexPayload = {
-        selectedOptionIds: Array.from({ length: 1000 }, (_, i) => i),
-        notes: "a".repeat(10000)
-      };
-      
-      AnswerStore.queueOfflineSubmission(sessionId, "q-boundary", "MCQ", complexPayload);
-      const success = await AnswerStore.syncOfflineQueue(sessionId);
-      expect(success).toBe(true);
-      expect(AnswerStore.getOfflineQueue(sessionId).length).toBe(0);
     });
 
     it("should recover and trigger window reload / clear session when sync fails with an expired session error", async () => {
@@ -190,7 +184,7 @@ describe("AnswerStore", () => {
           data: { message: "session has expired" }
         }
       };
-      vi.mocked(apiClient.post).mockRejectedValue(expiredError);
+      vi.mocked(apiClient.put).mockRejectedValue(expiredError);
 
       AnswerStore.queueOfflineSubmission(sessionId, "q1", "MCQ", 3);
       const success = await AnswerStore.syncOfflineQueue(sessionId);

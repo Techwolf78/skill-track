@@ -11,12 +11,32 @@ interface CodeDraft {
   timestamp: number;
 }
 
+export async function computeContentHash(content: string): Promise<string> {
+  if (!content) return "";
+  try {
+    const encoder = new TextEncoder();
+    const data = encoder.encode(content);
+    const hashBuffer = await crypto.subtle.digest("SHA-256", data);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    return hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
+  } catch (e) {
+    console.error("SHA-256 computation failed, falling back to simple hash:", e);
+    let hash = 0;
+    for (let i = 0; i < content.length; i++) {
+      hash = (hash << 5) - hash + content.charCodeAt(i);
+      hash |= 0;
+    }
+    return hash.toString(16);
+  }
+}
+
 export interface OfflineSubmission {
   id: string;
   questionId: string;
   type: "MCQ" | "CODING";
   payload: unknown;
   timestamp: number;
+  clientTimestamp?: number;
 }
 
 export const AnswerStore = {
@@ -83,20 +103,22 @@ export const AnswerStore = {
   },
 
   // ==================== Offline Submission Queue ====================
-  queueOfflineSubmission(sessionId: string, questionId: string, type: "MCQ" | "CODING", payload: unknown): OfflineSubmission {
+  queueOfflineSubmission(sessionId: string, questionId: string, type: "MCQ" | "CODING", payload: unknown, clientTimestamp?: number): OfflineSubmission {
     const queueKey = `${OFFLINE_QUEUE_PREFIX}_${sessionId}`;
     const queueRaw = localStorage.getItem(queueKey);
     const queue: OfflineSubmission[] = queueRaw ? JSON.parse(queueRaw) : [];
     
-    // Remove duplicate offline items for same question to avoid spamming syncs
+    // Remove duplicate offline items for same question to coalesce edits into single latest entry
     const filteredQueue = queue.filter(item => item.questionId !== questionId);
     
+    const now = Date.now();
     const newSubmission: OfflineSubmission = {
       id: crypto.randomUUID(),
       questionId,
       type,
       payload,
-      timestamp: Date.now()
+      timestamp: now,
+      clientTimestamp: clientTimestamp || now
     };
     
     filteredQueue.push(newSubmission);
@@ -140,34 +162,33 @@ export const AnswerStore = {
     for (const item of queue) {
       try {
         let result: unknown = null;
+        const itemTimestamp = item.clientTimestamp || item.timestamp || Date.now();
+
         if (item.type === "MCQ") {
-          const payloadVal = item.payload && typeof item.payload === "object" && "value" in item.payload ? item.payload.value : item.payload;
-          const versionVal = item.payload && typeof item.payload === "object" && "saveVersion" in item.payload ? item.payload.saveVersion : 0;
-          await apiClient.post("/submissions", {
-            sessionId: sessionId,
-            questionId: item.questionId,
-            selectedOptionIds: [payloadVal],
-            saveVersion: versionVal
+          const payloadVal = item.payload && typeof item.payload === "object" && "value" in item.payload ? (item.payload as { value: unknown }).value : item.payload;
+          const answerTextStr = typeof payloadVal === "string" ? payloadVal : JSON.stringify(payloadVal);
+
+          await apiClient.put(`/test-sessions/${sessionId}/questions/${item.questionId}/answer`, {
+            answerText: answerTextStr,
+            clientTimestamp: itemTimestamp
           });
           this.saveAnswer(sessionId, item.questionId, payloadVal);
         } else if (item.type === "CODING") {
-          const codeVal = item.payload?.code || "";
-          const langVal = item.payload?.language || "python3";
-          const versionVal = item.payload?.saveVersion || 0;
+          const payloadObj = item.payload as { code?: string; language?: string } | null;
+          const codeVal = payloadObj?.code || "";
+          const langVal = payloadObj?.language || "python3";
 
-          await apiClient.post("/submissions", {
-            sessionId: sessionId,
-            questionId: item.questionId,
+          await apiClient.put(`/test-sessions/${sessionId}/questions/${item.questionId}/answer`, {
             answerText: codeVal,
-            language: langVal,
-            saveVersion: versionVal
+            gradingLanguage: langVal,
+            clientTimestamp: itemTimestamp
           });
 
           result = { code: codeVal, language: langVal };
           this.saveAnswer(sessionId, item.questionId, result);
         }
         
-        // Remove from queue
+        // Remove from queue on HTTP 200 OK (including stale write no-ops)
         this.removeFromQueue(sessionId, item.id);
         if (onProgress) {
           onProgress(item.questionId, true, result);

@@ -35,6 +35,12 @@ import {
 } from "@/components/ui/sheet";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   ShieldAlert,
   Search,
   Calendar,
@@ -58,10 +64,17 @@ import {
   Maximize,
   ArrowRight,
   Shield,
+  UserCheck,
   FileText,
+  Download,
+  ExternalLink,
+  Columns,
+  ZoomIn,
+  X,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiClient } from "@/lib/api-client";
+import { TestPhotoUploadModal } from "@/proctoring/components/TestPhotoUploadModal";
 
 // ==========================================
 // 7. TypeScript Types & Enums
@@ -96,6 +109,7 @@ export interface AssessmentSchedule {
 
 export interface ProctoringCandidate {
   id: string;
+  sessionId?: string;
   name: string;
   email: string;
   testStatus: TestStatus;
@@ -153,6 +167,7 @@ export interface CandidateProctoringDetail {
   violations: ProctoringViolation[];
   evidences: EvidenceItem[];
   snapshots: SnapshotItem[];
+  candidatePhoto?: { imageUrl: string; capturedAt: string } | null;
   systemInfo: SystemInfo;
   reviewStatus: ReviewStatus;
 }
@@ -189,6 +204,20 @@ export default function ProctoringDashboard() {
   const [candidateDetails, setCandidateDetails] =
     useState<CandidateProctoringDetail | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState("overview");
+
+  // Evidence UI Enhancements State
+  const [lightboxImage, setLightboxImage] = useState<{
+    url: string;
+    title: string;
+    capturedAt?: string;
+    eventType?: string;
+  } | null>(null);
+  const [compareWithBaseline, setCompareWithBaseline] = useState<string | null>(null); // frame ID being compared
+  const [activeViolationId, setActiveViolationId] = useState<string | null>(null);
+
+  // Test Photo Upload Modal State
+  const [showTestUploadModal, setShowTestUploadModal] = useState(false);
 
   // Fetch Schedules API
   const loadSchedules = useCallback(async () => {
@@ -223,8 +252,9 @@ export default function ProctoringDashboard() {
         `/api/admin/proctoring/assessment-schedules/${scheduleId}/candidates`,
       );
       const data = response.data?.data ?? response.data;
-      const mappedCandidates = Array.isArray(data) ? data.map((cand: { candidateId: string; candidateName: string; email: string; testStatus: string; proctoringMode: ProctoringMode; riskLevel: RiskLevel; violationCount: number; criticalViolationCount: number; lastActivityAt?: string; reviewStatus?: ReviewStatus }) => ({
+      const mappedCandidates = Array.isArray(data) ? data.map((cand: { candidateId: string; sessionId?: string; candidateName: string; email: string; testStatus: string; proctoringMode: ProctoringMode; riskLevel: RiskLevel; violationCount: number; criticalViolationCount: number; lastActivityAt?: string; reviewStatus?: ReviewStatus }) => ({
         id: cand.candidateId,
+        sessionId: cand.sessionId,
         name: cand.candidateName,
         email: cand.email,
         testStatus: (cand.testStatus === "ACTIVE" ? "IN_PROGRESS" : cand.testStatus) as TestStatus,
@@ -257,6 +287,11 @@ export default function ProctoringDashboard() {
         `/api/admin/proctoring/candidates/${candidate.id}/details?scheduleId=${selectedScheduleId}`,
       );
       const data = response.data?.data ?? response.data;
+      console.log(`[Proctoring Dashboard] loadCandidateDetails response:`, data);
+      console.log(`[Proctoring Dashboard] raw candidatePhoto:`, data?.candidatePhoto);
+      console.log(`[Proctoring Dashboard] raw evidence list:`, data?.evidence);
+      console.log(`[Proctoring Dashboard] raw snapshots list:`, data?.snapshots);
+
       if (data && typeof data === "object") {
         const mappedDetail: CandidateProctoringDetail = {
           id: data.candidate?.candidateId || candidate.id,
@@ -277,19 +312,45 @@ export default function ProctoringDashboard() {
             description: v.metadata?.description || `Triggered ${v.eventType?.replace(/_/g, " ") || "violation"}`,
             evidenceAvailable: data.evidence?.some((e: { eventId?: string }) => e.eventId === v.eventId) || false,
           })) || [],
-          evidences: data.evidence?.map((e: { id?: string; imageData?: string; s3Key?: string; snapshotType?: string; capturedAt?: string }) => ({
-            id: e.id,
-            imageUrl: e.imageData || e.s3Key || "",
-            eventType: e.snapshotType || "VIOLATION",
-            capturedAt: e.capturedAt ? new Date(e.capturedAt).toLocaleString() : "N/A",
-            severity: "HIGH" as ProctoringEventSeverity,
-            description: e.s3Key || "Attached Frame Capture",
-          })) || [],
-          snapshots: data.snapshots?.map((s: { id?: string; imageData?: string; s3Key?: string; capturedAt?: string }) => ({
-            id: s.id,
-            imageUrl: s.imageData || s.s3Key || "",
-            capturedAt: s.capturedAt ? new Date(s.capturedAt).toLocaleTimeString() : "N/A",
-          })) || [],
+          evidences: data.evidence?.map((e: { id?: string; imageData?: string; s3Key?: string; snapshotType?: string; capturedAt?: string }) => {
+            const key = e.imageData || e.s3Key || "";
+            const fullUrl = key && !key.startsWith("http") && !key.startsWith("data:")
+              ? `https://bcugndjwwyckvwctfdus.supabase.co/storage/v1/object/public/proctoring-evidence/${key}`
+              : key;
+            return {
+              id: e.id,
+              imageUrl: fullUrl,
+              eventType: e.snapshotType || "VIOLATION",
+              capturedAt: e.capturedAt ? new Date(e.capturedAt).toLocaleString() : "N/A",
+              severity: "HIGH" as ProctoringEventSeverity,
+              description: e.s3Key || "Attached Frame Capture",
+            };
+          }) || [],
+          snapshots: data.snapshots?.map((s: { id?: string; imageData?: string; s3Key?: string; capturedAt?: string }) => {
+            const key = s.imageData || s.s3Key || "";
+            const fullUrl = key && !key.startsWith("http") && !key.startsWith("data:")
+              ? `https://bcugndjwwyckvwctfdus.supabase.co/storage/v1/object/public/proctoring-evidence/${key}`
+              : key;
+            return {
+              id: s.id,
+              imageUrl: fullUrl,
+              capturedAt: s.capturedAt ? new Date(s.capturedAt).toLocaleTimeString() : "N/A",
+            };
+          }) || [],
+          candidatePhoto: data.candidatePhoto ? {
+            imageUrl: data.candidatePhoto.imageData
+              ? (data.candidatePhoto.imageData.startsWith("data:") ? data.candidatePhoto.imageData : `data:image/jpeg;base64,${data.candidatePhoto.imageData}`)
+              : (data.candidatePhoto.s3Key ? (data.candidatePhoto.s3Key.startsWith("http") ? data.candidatePhoto.s3Key : `https://bcugndjwwyckvwctfdus.supabase.co/storage/v1/object/public/proctoring-evidence/${data.candidatePhoto.s3Key}`) : ""),
+            capturedAt: data.candidatePhoto.capturedAt ? new Date(data.candidatePhoto.capturedAt).toLocaleString() : "N/A",
+          } : (() => {
+            const photoEvidence = data.evidence?.find((e: { snapshotType?: string }) => e.snapshotType === "CANDIDATE_PHOTO");
+            return photoEvidence ? {
+              imageUrl: photoEvidence.imageData
+                ? (photoEvidence.imageData.startsWith("data:") ? photoEvidence.imageData : `data:image/jpeg;base64,${photoEvidence.imageData}`)
+                : (photoEvidence.s3Key ? (photoEvidence.s3Key.startsWith("http") ? photoEvidence.s3Key : `https://bcugndjwwyckvwctfdus.supabase.co/storage/v1/object/public/proctoring-evidence/${photoEvidence.s3Key}`) : ""),
+              capturedAt: photoEvidence.capturedAt ? new Date(photoEvidence.capturedAt).toLocaleString() : "N/A",
+            } : null;
+          })(),
           systemInfo: {
             browser: data.systemInfo?.latestEventMetadata?.userAgent || data.systemInfo?.latestEventMetadata?.browser || "Chrome / Safari",
             os: data.systemInfo?.latestEventMetadata?.os || "Windows 11 / macOS",
@@ -393,6 +454,9 @@ export default function ProctoringDashboard() {
               `/api/admin/proctoring/candidates/${candidateId}/details?scheduleId=${scheduleId}`
             );
             const data = detailRes.data?.data ?? detailRes.data;
+            console.log(`[Proctoring Dashboard] Candidate Details Raw Response from Backend:`, data);
+            console.log(`[Proctoring Dashboard] candidatePhoto payload:`, data?.candidatePhoto);
+            console.log(`[Proctoring Dashboard] evidence list payload:`, data?.evidence);
             if (data && typeof data === "object") {
               const mappedDetail: CandidateProctoringDetail = {
                 id: data.candidate?.candidateId || candidateId,
@@ -413,19 +477,45 @@ export default function ProctoringDashboard() {
                   description: v.metadata?.description || `Triggered ${v.eventType?.replace(/_/g, " ") || "violation"}`,
                   evidenceAvailable: data.evidence?.some((e: { eventId?: string }) => e.eventId === v.eventId) || false,
                 })) || [],
-                evidences: data.evidence?.map((e: { id?: string; imageData?: string; s3Key?: string; snapshotType?: string; capturedAt?: string }) => ({
-                  id: e.id,
-                  imageUrl: e.imageData || e.s3Key || "",
-                  eventType: e.snapshotType || "VIOLATION",
-                  capturedAt: e.capturedAt ? new Date(e.capturedAt).toLocaleString() : "N/A",
-                  severity: "HIGH" as ProctoringEventSeverity,
-                  description: e.s3Key || "Attached Frame Capture",
-                })) || [],
-                snapshots: data.snapshots?.map((s: { id?: string; imageData?: string; s3Key?: string; capturedAt?: string }) => ({
-                  id: s.id,
-                  imageUrl: s.imageData || s.s3Key || "",
-                  capturedAt: s.capturedAt ? new Date(s.capturedAt).toLocaleTimeString() : "N/A",
-                })) || [],
+                evidences: data.evidence?.map((e: { id?: string; imageData?: string; s3Key?: string; snapshotType?: string; capturedAt?: string }) => {
+                  const key = e.imageData || e.s3Key || "";
+                  const fullUrl = key && !key.startsWith("http") && !key.startsWith("data:")
+                    ? `https://bcugndjwwyckvwctfdus.supabase.co/storage/v1/object/public/proctoring-evidence/${key}`
+                    : key;
+                  return {
+                    id: e.id,
+                    imageUrl: fullUrl,
+                    eventType: e.snapshotType || "VIOLATION",
+                    capturedAt: e.capturedAt ? new Date(e.capturedAt).toLocaleString() : "N/A",
+                    severity: "HIGH" as ProctoringEventSeverity,
+                    description: e.s3Key || "Attached Frame Capture",
+                  };
+                }) || [],
+                snapshots: data.snapshots?.map((s: { id?: string; imageData?: string; s3Key?: string; capturedAt?: string }) => {
+                  const key = s.imageData || s.s3Key || "";
+                  const fullUrl = key && !key.startsWith("http") && !key.startsWith("data:")
+                    ? `https://bcugndjwwyckvwctfdus.supabase.co/storage/v1/object/public/proctoring-evidence/${key}`
+                    : key;
+                  return {
+                    id: s.id,
+                    imageUrl: fullUrl,
+                    capturedAt: s.capturedAt ? new Date(s.capturedAt).toLocaleTimeString() : "N/A",
+                  };
+                }) || [],
+                candidatePhoto: data.candidatePhoto ? {
+                  imageUrl: data.candidatePhoto.imageData
+                    ? (data.candidatePhoto.imageData.startsWith("data:") ? data.candidatePhoto.imageData : `data:image/jpeg;base64,${data.candidatePhoto.imageData}`)
+                    : (data.candidatePhoto.s3Key ? (data.candidatePhoto.s3Key.startsWith("http") ? data.candidatePhoto.s3Key : `https://bcugndjwwyckvwctfdus.supabase.co/storage/v1/object/public/proctoring-evidence/${data.candidatePhoto.s3Key}`) : ""),
+                  capturedAt: data.candidatePhoto.capturedAt ? new Date(data.candidatePhoto.capturedAt).toLocaleString() : "N/A",
+                } : (() => {
+                  const photoEvidence = data.evidence?.find((e: { snapshotType?: string }) => e.snapshotType === "CANDIDATE_PHOTO");
+                  return photoEvidence ? {
+                    imageUrl: photoEvidence.imageData
+                      ? (photoEvidence.imageData.startsWith("data:") ? photoEvidence.imageData : `data:image/jpeg;base64,${photoEvidence.imageData}`)
+                      : (photoEvidence.s3Key ? (photoEvidence.s3Key.startsWith("http") ? photoEvidence.s3Key : `https://bcugndjwwyckvwctfdus.supabase.co/storage/v1/object/public/proctoring-evidence/${photoEvidence.s3Key}`) : ""),
+                    capturedAt: photoEvidence.capturedAt ? new Date(photoEvidence.capturedAt).toLocaleString() : "N/A",
+                  } : null;
+                })(),
                 systemInfo: {
                   browser: data.systemInfo?.latestEventMetadata?.userAgent || data.systemInfo?.latestEventMetadata?.browser || "Chrome / Safari",
                   os: data.systemInfo?.latestEventMetadata?.os || "Windows 11 / macOS",
@@ -740,6 +830,15 @@ export default function ProctoringDashboard() {
           </p>
         </div>
         <div className="flex items-center gap-3 shrink-0">
+
+          <Button
+            variant="default"
+            onClick={() => setShowTestUploadModal(true)}
+            className="h-10 bg-indigo-600 hover:bg-indigo-700 text-white font-medium"
+          >
+            <Camera className="h-4 w-4 mr-2" />
+            Test Photo Upload
+          </Button>
 
           <Button
             variant="outline"
@@ -1172,7 +1271,7 @@ export default function ProctoringDashboard() {
 
       {/* 4. Candidate Details Drawer / Modal Sheet */}
       <Sheet open={isDrawerOpen} onOpenChange={setIsDrawerOpen}>
-        <SheetContent className="w-full sm:max-w-2xl h-full p-0 flex flex-col bg-card border-l border-border/80">
+        <SheetContent className="w-full sm:max-w-3xl lg:max-w-4xl h-full p-0 flex flex-col bg-card border-l border-border/80">
           <SheetHeader className="p-5 border-b border-border/50 shrink-0 text-left bg-gradient-to-r from-card to-muted/20">
             <div className="flex justify-between items-start">
               <div className="space-y-1">
@@ -1198,7 +1297,7 @@ export default function ProctoringDashboard() {
             candidateDetails && (
               <div className="flex-1 overflow-y-auto flex flex-col p-5 space-y-6">
                 {/* Header Summary Profile card */}
-                <div className="p-4 rounded-xl border bg-card/60 relative overflow-hidden">
+                <div className="p-4 rounded-xl border bg-card/60 relative shrink-0">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     <div className="space-y-1">
                       <h3 className="text-lg font-bold">{candidateDetails.name}</h3>
@@ -1254,9 +1353,9 @@ export default function ProctoringDashboard() {
                 </div>
 
                 {/* Tabs inside drawer */}
-                <Tabs defaultValue="overview" className="w-full flex-1 flex flex-col">
+                <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full flex-1 flex flex-col">
                   {/* Radix tab selector styled beautifully */}
-                  <TabsList className="flex overflow-x-auto whitespace-nowrap bg-muted p-1 rounded-md shrink-0 scrollbar-none justify-start w-full">
+                  <TabsList className="flex flex-wrap h-auto bg-muted/80 p-1.5 rounded-lg shrink-0 justify-start gap-1 w-full border border-border/40">
                     <TabsTrigger value="overview" className="text-xs px-2.5 py-1.5 flex gap-1">
                       <Info className="h-3.5 w-3.5" /> Overview
                     </TabsTrigger>
@@ -1264,16 +1363,19 @@ export default function ProctoringDashboard() {
                       <AlertTriangle className="h-3.5 w-3.5" /> Violations ({candidateDetails.violationsCount})
                     </TabsTrigger>
                     <TabsTrigger value="evidence" className="text-xs px-2.5 py-1.5 flex gap-1">
-                      <FileText className="h-3.5 w-3.5" /> Evidence
+                      <FileText className="h-3.5 w-3.5" /> Evidence ({candidateDetails.evidences.length})
                     </TabsTrigger>
                     <TabsTrigger value="snapshots" className="text-xs px-2.5 py-1.5 flex gap-1">
-                      <Grid className="h-3.5 w-3.5" /> Snapshots
+                      <Grid className="h-3.5 w-3.5" /> Snapshots ({candidateDetails.snapshots.length})
                     </TabsTrigger>
                     <TabsTrigger value="system" className="text-xs px-2.5 py-1.5 flex gap-1">
                       <Laptop className="h-3.5 w-3.5" /> System Info
                     </TabsTrigger>
                     <TabsTrigger value="review" className="text-xs px-2.5 py-1.5 flex gap-1">
                       <Check className="h-3.5 w-3.5" /> Review
+                    </TabsTrigger>
+                    <TabsTrigger value="identity_pic" className="text-xs px-2.5 py-1.5 flex gap-1 font-semibold text-rose-500">
+                      <UserCheck className="h-3.5 w-3.5" /> Identity Pic
                     </TabsTrigger>
                   </TabsList>
 
@@ -1353,43 +1455,57 @@ export default function ProctoringDashboard() {
                       </div>
                     ) : (
                       <div className="relative border-l border-border pl-4 ml-2 space-y-5 py-2">
-                        {candidateDetails.violations.map((viol) => (
-                          <div key={viol.id} className="relative space-y-1">
-                            {/* Dot indicator */}
-                            <span className={`absolute -left-[22.5px] top-1 h-3 w-3 rounded-full border bg-background ${
-                              viol.severity === "CRITICAL"
-                                ? "border-red-500 ring-2 ring-red-500/20"
-                                : viol.severity === "HIGH"
-                                  ? "border-orange-500"
-                                  : "border-yellow-500"
-                            }`} />
-                            <div className="flex items-center justify-between gap-2">
-                              <span className="text-[10px] font-mono text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
-                                {viol.time}
-                              </span>
-                              <Badge className={`text-[9px] px-1.5 py-0 border-none ${
+                        {candidateDetails.violations.map((viol) => {
+                          const isHighlighted = activeViolationId === viol.id;
+                          return (
+                            <div
+                              key={viol.id}
+                              id={`violation-item-${viol.id}`}
+                              className={`relative space-y-1 p-2 rounded-lg transition-all ${
+                                isHighlighted ? "bg-rose-500/10 border border-rose-500/30 ring-1 ring-rose-500/30" : ""
+                              }`}
+                            >
+                              {/* Dot indicator */}
+                              <span className={`absolute -left-[22.5px] top-3 h-3 w-3 rounded-full border bg-background ${
                                 viol.severity === "CRITICAL"
-                                  ? "bg-red-500 text-white"
+                                  ? "border-red-500 ring-2 ring-red-500/20"
                                   : viol.severity === "HIGH"
-                                    ? "bg-orange-500 text-white"
-                                    : "bg-yellow-500 text-slate-900"
-                              }`}>
-                                {viol.severity}
-                              </Badge>
-                            </div>
-                            <h5 className="font-bold text-xs text-foreground uppercase tracking-wide mt-1">
-                              {viol.eventType.replace(/_/g, " ")}
-                            </h5>
-                            <p className="text-xs text-muted-foreground">
-                              {viol.description}
-                            </p>
-                            {viol.evidenceAvailable && (
-                              <div className="flex items-center gap-1 text-[9px] text-rose-500 font-semibold mt-1 font-mono uppercase">
-                                <Camera className="h-3 w-3" /> Image capture attached
+                                    ? "border-orange-500"
+                                    : "border-yellow-500"
+                              }`} />
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="text-[10px] font-mono text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
+                                  {viol.time}
+                                </span>
+                                <Badge className={`text-[9px] px-1.5 py-0 border-none ${
+                                  viol.severity === "CRITICAL"
+                                    ? "bg-red-500 text-white"
+                                    : viol.severity === "HIGH"
+                                      ? "bg-orange-500 text-white"
+                                      : "bg-yellow-500 text-slate-900"
+                                }`}>
+                                  {viol.severity}
+                                </Badge>
                               </div>
-                            )}
-                          </div>
-                        ))}
+                              <h5 className="font-bold text-xs text-foreground uppercase tracking-wide mt-1">
+                                {viol.eventType.replace(/_/g, " ")}
+                              </h5>
+                              <p className="text-xs text-muted-foreground">
+                                {viol.description}
+                              </p>
+                              {viol.evidenceAvailable && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => setActiveTab("evidence")}
+                                  className="h-6 px-2 text-[9px] text-rose-500 hover:text-rose-600 hover:bg-rose-500/10 font-semibold font-mono uppercase flex gap-1 items-center mt-1"
+                                >
+                                  <Camera className="h-3 w-3" /> View Frame Evidence
+                                </Button>
+                              )}
+                            </div>
+                          );
+                        })}
                       </div>
                     )}
                   </TabsContent>
@@ -1406,36 +1522,96 @@ export default function ProctoringDashboard() {
                       </div>
                     ) : (
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        {candidateDetails.evidences.map((ev) => (
-                          <div key={ev.id} className="bg-card border border-border/60 rounded-xl p-3.5 space-y-3 shadow-sm hover:shadow transition-shadow">
-                            <CameraFeedPlaceholder eventType={ev.eventType} isEvidence={true} imageUrl={ev.imageUrl} />
-                            
-                            <div className="space-y-1">
-                              <div className="flex justify-between items-center gap-1.5">
-                                <span className="text-xs font-bold text-foreground truncate uppercase max-w-[120px]">
-                                  {ev.eventType.replace(/_/g, " ")}
-                                </span>
-                                <Badge className={`text-[9px] px-1.5 py-0 border-none ${
-                                  ev.severity === "CRITICAL"
-                                    ? "bg-red-500 text-white animate-pulse"
-                                    : ev.severity === "HIGH"
-                                      ? "bg-orange-500 text-white"
-                                      : "bg-yellow-500 text-slate-900"
-                                }`}>
-                                  {ev.severity}
-                                </Badge>
-                              </div>
-                              <p className="text-[10px] text-muted-foreground font-mono">
-                                Capt: {ev.capturedAt}
-                              </p>
-                              {ev.description && (
-                                <p className="text-[10px] text-slate-600 dark:text-slate-400 mt-1 italic line-clamp-2">
-                                  {ev.description}
-                                </p>
+                        {candidateDetails.evidences.map((ev) => {
+                          const isComparing = compareWithBaseline === ev.id;
+                          return (
+                            <div key={ev.id} className="bg-card border border-border/60 rounded-xl p-3.5 space-y-3 shadow-sm hover:shadow transition-shadow">
+                              {/* Side-by-side identity comparison OR standard image view */}
+                              {isComparing && candidateDetails.candidatePhoto?.imageUrl ? (
+                                <div className="grid grid-cols-2 gap-2 bg-slate-950 p-1.5 rounded-lg border border-slate-800">
+                                  <div className="relative h-32 rounded overflow-hidden border border-emerald-500/40">
+                                    <img src={candidateDetails.candidatePhoto.imageUrl} alt="Baseline Identity" className="w-full h-full object-cover" />
+                                    <span className="absolute top-1 left-1 text-[7px] font-mono text-emerald-400 bg-slate-950/80 px-1 rounded uppercase font-bold">
+                                      BASELINE IDENTITY
+                                    </span>
+                                  </div>
+                                  <div className="relative h-32 rounded overflow-hidden border border-rose-500/40">
+                                    <img src={ev.imageUrl} alt="Captured Evidence" className="w-full h-full object-cover" />
+                                    <span className="absolute top-1 left-1 text-[7px] font-mono text-rose-400 bg-slate-950/80 px-1 rounded uppercase font-bold">
+                                      VIOLATION FRAME
+                                    </span>
+                                  </div>
+                                </div>
+                              ) : (
+                                <div className="relative group cursor-pointer" onClick={() => ev.imageUrl && setLightboxImage({ url: ev.imageUrl, title: `Evidence Frame: ${ev.eventType.replace(/_/g, " ")}`, capturedAt: ev.capturedAt, eventType: ev.eventType })}>
+                                  <CameraFeedPlaceholder eventType={ev.eventType} isEvidence={true} imageUrl={ev.imageUrl} />
+                                  <div className="absolute inset-0 bg-slate-950/40 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg flex items-center justify-center gap-2">
+                                    <Badge className="bg-white/90 text-slate-900 font-semibold text-[10px] flex gap-1 items-center">
+                                      <ZoomIn className="h-3 w-3" /> Zoom Frame
+                                    </Badge>
+                                  </div>
+                                </div>
                               )}
+                              
+                              <div className="space-y-2">
+                                <div className="flex justify-between items-center gap-1.5">
+                                  <span className="text-xs font-bold text-foreground truncate uppercase max-w-[120px]">
+                                    {ev.eventType.replace(/_/g, " ")}
+                                  </span>
+                                  <Badge className={`text-[9px] px-1.5 py-0 border-none ${
+                                    ev.severity === "CRITICAL"
+                                      ? "bg-red-500 text-white animate-pulse"
+                                      : ev.severity === "HIGH"
+                                        ? "bg-orange-500 text-white"
+                                        : "bg-yellow-500 text-slate-900"
+                                  }`}>
+                                    {ev.severity}
+                                  </Badge>
+                                </div>
+                                <p className="text-[10px] text-muted-foreground font-mono">
+                                  Capt: {ev.capturedAt}
+                                </p>
+
+                                {/* Action Buttons Toolbar */}
+                                <div className="flex flex-wrap items-center gap-1.5 pt-1 border-t border-border/40">
+                                  {ev.imageUrl && (
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={() => setLightboxImage({ url: ev.imageUrl!, title: `Evidence Frame: ${ev.eventType.replace(/_/g, " ")}`, capturedAt: ev.capturedAt, eventType: ev.eventType })}
+                                      className="h-7 text-[10px] px-2 flex gap-1 items-center"
+                                    >
+                                      <ZoomIn className="h-3 w-3" /> Inspect
+                                    </Button>
+                                  )}
+
+                                  {candidateDetails.candidatePhoto?.imageUrl && (
+                                    <Button
+                                      size="sm"
+                                      variant={isComparing ? "secondary" : "outline"}
+                                      onClick={() => setCompareWithBaseline(isComparing ? null : ev.id)}
+                                      className="h-7 text-[10px] px-2 flex gap-1 items-center text-rose-500 border-rose-500/20 hover:bg-rose-500/10"
+                                    >
+                                      <Columns className="h-3 w-3" /> {isComparing ? "Close Split" : "Compare ID"}
+                                    </Button>
+                                  )}
+
+                                  {ev.imageUrl && (
+                                    <a
+                                      href={ev.imageUrl}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      download={`evidence-${ev.id}.jpg`}
+                                      className="h-7 px-2 text-[10px] font-medium border border-border rounded flex items-center gap-1 hover:bg-muted transition-colors text-muted-foreground ml-auto"
+                                    >
+                                      <Download className="h-3 w-3" /> Save
+                                    </a>
+                                  )}
+                                </div>
+                              </div>
                             </div>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     )}
                   </TabsContent>
@@ -1450,8 +1626,13 @@ export default function ProctoringDashboard() {
                       
                       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                         {candidateDetails.snapshots.map((snap, idx) => (
-                          <div key={snap.id} className="bg-slate-950/5 border border-border/60 p-2 rounded-lg flex flex-col space-y-2">
-                            <CameraFeedPlaceholder eventType="AUDIT_SNAP" isEvidence={false} imageUrl={snap.imageUrl} />
+                          <div key={snap.id} className="bg-slate-950/5 border border-border/60 p-2 rounded-lg flex flex-col space-y-2 group">
+                            <div className="relative cursor-pointer" onClick={() => snap.imageUrl && setLightboxImage({ url: snap.imageUrl, title: `Periodic Snapshot #${idx + 1}`, capturedAt: snap.capturedAt, eventType: "PERIODIC_AUDIT" })}>
+                              <CameraFeedPlaceholder eventType="AUDIT_SNAP" isEvidence={false} imageUrl={snap.imageUrl} />
+                              <div className="absolute inset-0 bg-slate-950/40 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg flex items-center justify-center">
+                                <ZoomIn className="h-5 w-5 text-white" />
+                              </div>
+                            </div>
                             <div className="flex justify-between items-center text-[9px] font-mono text-muted-foreground">
                               <span>SNAP #{idx + 1}</span>
                               <span>{snap.capturedAt}</span>
@@ -1532,12 +1713,116 @@ export default function ProctoringDashboard() {
                       </CardContent>
                     </Card>
                   </TabsContent>
+
+                  {/* Identity Pic Tab Content */}
+                  <TabsContent value="identity_pic" className="space-y-4 pt-4 flex-1">
+                    <Card className="border-border/50">
+                      <CardHeader className="py-3 px-4 border-b bg-muted/10">
+                        <CardTitle className="text-xs uppercase font-bold tracking-wider text-rose-500 flex items-center gap-1.5">
+                          <UserCheck className="h-4 w-4" /> Candidate Identity Verification Photo
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="p-4 space-y-4">
+                        {candidateDetails.candidatePhoto?.imageUrl ? (
+                          <div
+                            className="relative w-full h-64 bg-slate-950 rounded-lg overflow-hidden flex items-center justify-center border border-slate-800 shadow-md group cursor-pointer"
+                            onClick={() => setLightboxImage({ url: candidateDetails.candidatePhoto!.imageUrl, title: "Verified Identity Baseline Photo", capturedAt: candidateDetails.candidatePhoto?.capturedAt, eventType: "IDENTITY_VERIFICATION" })}
+                          >
+                            <img
+                              src={candidateDetails.candidatePhoto.imageUrl}
+                              alt="Candidate Verification Identity Capture"
+                              className="w-full h-full object-contain bg-slate-950"
+                              onError={(e) => {
+                                console.error("Identity photo failed to load URL:", candidateDetails.candidatePhoto?.imageUrl);
+                                e.currentTarget.style.display = 'none';
+                              }}
+                            />
+                            <div className="absolute top-2 left-2 text-[10px] font-mono text-emerald-400 bg-slate-950/80 px-2 py-0.5 rounded border border-emerald-500/30 uppercase tracking-wider font-semibold">
+                              VERIFIED IDENTITY PHOTO
+                            </div>
+                            <div className="absolute inset-0 bg-slate-950/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                              <Badge className="bg-white/90 text-slate-900 font-semibold text-xs flex gap-1 items-center">
+                                <ZoomIn className="h-3.5 w-3.5" /> Fullscreen View
+                              </Badge>
+                            </div>
+                          </div>
+                        ) : (
+                          <CameraFeedPlaceholder
+                            eventType="IDENTITY_VERIFICATION"
+                            isEvidence={false}
+                            imageUrl=""
+                          />
+                        )}
+                        <div className="flex justify-between items-center text-xs font-mono bg-muted/30 p-2.5 rounded-lg border border-border/40">
+                          <span className="text-muted-foreground font-semibold">Captured At:</span>
+                          <span className="font-bold text-foreground">
+                            {candidateDetails.candidatePhoto?.capturedAt || candidateDetails.startedAt || "Identity Verification Stage"}
+                          </span>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </TabsContent>
                 </Tabs>
               </div>
             )
           )}
         </SheetContent>
       </Sheet>
+
+      {/* 5. Fullscreen Image Lightbox Modal */}
+      <Dialog open={!!lightboxImage} onOpenChange={(open) => !open && setLightboxImage(null)}>
+        <DialogContent className="max-w-4xl w-[95vw] bg-slate-950 border border-slate-800 text-white p-4">
+          <DialogHeader className="flex flex-row items-center justify-between border-b border-slate-850 pb-3">
+            <div>
+              <DialogTitle className="text-base font-bold flex items-center gap-2">
+                <Camera className="h-4 w-4 text-rose-500" />
+                {lightboxImage?.title}
+              </DialogTitle>
+              {lightboxImage?.capturedAt && (
+                <span className="text-xs font-mono text-slate-400 block mt-0.5">
+                  Captured: {lightboxImage.capturedAt}
+                </span>
+              )}
+            </div>
+          </DialogHeader>
+
+          <div className="relative w-full h-[70vh] max-h-[650px] bg-black rounded-lg overflow-hidden flex items-center justify-center my-2">
+            {lightboxImage?.url && (
+              <img
+                src={lightboxImage.url}
+                alt={lightboxImage.title}
+                className="max-w-full max-h-full object-contain"
+              />
+            )}
+          </div>
+
+          <div className="flex justify-between items-center pt-2 border-t border-slate-850 text-xs">
+            <span className="font-mono text-slate-400 text-[11px]">
+              {lightboxImage?.eventType ? `Type: ${lightboxImage.eventType}` : "Proctor Telemetry Image"}
+            </span>
+            {lightboxImage?.url && (
+              <a
+                href={lightboxImage.url}
+                target="_blank"
+                rel="noreferrer"
+                download="proctoring-frame.jpg"
+                className="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white font-semibold rounded flex items-center gap-1.5 text-xs transition-colors"
+              >
+                <Download className="h-3.5 w-3.5" /> Download High-Res
+              </a>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Test Photo Upload & Supabase Diagnostics Modal */}
+      {showTestUploadModal && (
+        <TestPhotoUploadModal
+          isOpen={showTestUploadModal}
+          onClose={() => setShowTestUploadModal(false)}
+          sessionId={selectedCandidate?.sessionId || candidates[0]?.sessionId || candidates[0]?.id || "375840ee-0c05-4ba5-8db9-1299021c7508"}
+        />
+      )}
     </div>
   );
 }

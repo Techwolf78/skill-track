@@ -42,6 +42,7 @@ import {
   Clock,
   Target,
   AlertCircle,
+  X,
 } from "lucide-react";
 import { testService, Test, CreateTestRequest, TestQuestion, Question, ProctoringMode } from "@/lib/test-service";
 import { useToast } from "@/hooks/use-toast";
@@ -658,7 +659,7 @@ export default function TestsEdit() {
                             )}
                             <Badge variant="outline">
                               {tq.question?.questionType ||
-                                tq.question?.type ||
+                                (tq.question as Record<string, unknown>)?.type as string ||
                                 "MCQ"}
                             </Badge>
                           </div>
@@ -829,14 +830,21 @@ export default function TestsEdit() {
                     </h4>
                     <div className="grid grid-cols-2 gap-4">
                       <div className="flex items-center space-x-2">
-                        <Checkbox
-                          id="enableTabSwitchTracking"
-                          checked={formData.enableTabSwitchTracking}
-                          onCheckedChange={(checked) =>
-                            handleCheckboxChange("enableTabSwitchTracking", !!checked)
-                          }
-                          disabled={formData.proctoringMode !== "CUSTOM"}
-                        />
+                        <div className="relative flex items-center justify-center">
+                          <Checkbox
+                            id="enableTabSwitchTracking"
+                            checked={formData.enableTabSwitchTracking}
+                            onCheckedChange={(checked) =>
+                              handleCheckboxChange("enableTabSwitchTracking", !!checked)
+                            }
+                            disabled={formData.proctoringMode !== "CUSTOM"}
+                          />
+                          {!formData.enableTabSwitchTracking && formData.proctoringMode !== "CUSTOM" && (
+                            <div className="absolute inset-0 flex items-center justify-center pointer-events-none rounded-full border border-red-500/40 bg-red-500/10 text-red-500">
+                              <X className="h-3 w-3 stroke-[2.5]" />
+                            </div>
+                          )}
+                        </div>
                         <Label
                           htmlFor="enableTabSwitchTracking"
                           className="text-sm font-normal cursor-pointer"
@@ -846,14 +854,21 @@ export default function TestsEdit() {
                       </div>
 
                       <div className="flex items-center space-x-2">
-                        <Checkbox
-                          id="blockCopyPaste"
-                          checked={formData.blockCopyPaste}
-                          onCheckedChange={(checked) =>
-                            handleCheckboxChange("blockCopyPaste", !!checked)
-                          }
-                          disabled={formData.proctoringMode !== "CUSTOM"}
-                        />
+                        <div className="relative flex items-center justify-center">
+                          <Checkbox
+                            id="blockCopyPaste"
+                            checked={formData.blockCopyPaste}
+                            onCheckedChange={(checked) =>
+                              handleCheckboxChange("blockCopyPaste", !!checked)
+                            }
+                            disabled={formData.proctoringMode !== "CUSTOM"}
+                          />
+                          {!formData.blockCopyPaste && formData.proctoringMode !== "CUSTOM" && (
+                            <div className="absolute inset-0 flex items-center justify-center pointer-events-none rounded-full border border-red-500/40 bg-red-500/10 text-red-500">
+                              <X className="h-3 w-3 stroke-[2.5]" />
+                            </div>
+                          )}
+                        </div>
                         <Label
                           htmlFor="blockCopyPaste"
                           className="text-sm font-normal cursor-pointer"
@@ -863,14 +878,21 @@ export default function TestsEdit() {
                       </div>
 
                       <div className="flex items-center space-x-2">
-                        <Checkbox
-                          id="blockRightClick"
-                          checked={formData.blockRightClick}
-                          onCheckedChange={(checked) =>
-                            handleCheckboxChange("blockRightClick", !!checked)
-                          }
-                          disabled={formData.proctoringMode !== "CUSTOM"}
-                        />
+                        <div className="relative flex items-center justify-center">
+                          <Checkbox
+                            id="blockRightClick"
+                            checked={formData.blockRightClick}
+                            onCheckedChange={(checked) =>
+                              handleCheckboxChange("blockRightClick", !!checked)
+                            }
+                            disabled={formData.proctoringMode !== "CUSTOM"}
+                          />
+                          {!formData.blockRightClick && formData.proctoringMode !== "CUSTOM" && (
+                            <div className="absolute inset-0 flex items-center justify-center pointer-events-none rounded-full border border-red-500/40 bg-red-500/10 text-red-500">
+                              <X className="h-3 w-3 stroke-[2.5]" />
+                            </div>
+                          )}
+                        </div>
                         <Label
                           htmlFor="blockRightClick"
                           className="text-sm font-normal cursor-pointer"
@@ -880,14 +902,21 @@ export default function TestsEdit() {
                       </div>
 
                       <div className="flex items-center space-x-2">
-                        <Checkbox
-                          id="warnOnFullscreenExit"
-                          checked={formData.warnOnFullscreenExit}
-                          onCheckedChange={(checked) =>
-                            handleCheckboxChange("warnOnFullscreenExit", !!checked)
-                          }
-                          disabled={formData.proctoringMode !== "CUSTOM"}
-                        />
+                        <div className="relative flex items-center justify-center">
+                          <Checkbox
+                            id="warnOnFullscreenExit"
+                            checked={formData.warnOnFullscreenExit}
+                            onCheckedChange={(checked) =>
+                              handleCheckboxChange("warnOnFullscreenExit", !!checked)
+                            }
+                            disabled={formData.proctoringMode !== "CUSTOM"}
+                          />
+                          {!formData.warnOnFullscreenExit && formData.proctoringMode !== "CUSTOM" && (
+                            <div className="absolute inset-0 flex items-center justify-center pointer-events-none rounded-full border border-red-500/40 bg-red-500/10 text-red-500">
+                              <X className="h-3 w-3 stroke-[2.5]" />
+                            </div>
+                          )}
+                        </div>
                         <Label
                           htmlFor="warnOnFullscreenExit"
                           className="text-sm font-normal cursor-pointer"
@@ -896,20 +925,16 @@ export default function TestsEdit() {
                         </Label>
                       </div>
                     </div>
-
-
                   </div>
 
                   {/* Category 2: Webcam & Audio Monitoring */}
-                  {(formData.proctoringMode === "MEDIUM" ||
-                    formData.proctoringMode === "HIGH" ||
-                    formData.proctoringMode === "CUSTOM") && (
-                    <div className="space-y-4 pt-4 border-t">
-                      <h4 className="text-sm font-semibold text-slate-900 dark:text-slate-100 uppercase tracking-wider">
-                        Webcam & Audio Monitoring
-                      </h4>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="flex items-center space-x-2">
+                  <div className="space-y-4 pt-4 border-t">
+                    <h4 className="text-sm font-semibold text-slate-900 dark:text-slate-100 uppercase tracking-wider">
+                      Webcam & Audio Monitoring
+                    </h4>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="flex items-center space-x-2">
+                        <div className="relative flex items-center justify-center">
                           <Checkbox
                             id="requireWebcam"
                             checked={formData.requireWebcam}
@@ -918,15 +943,22 @@ export default function TestsEdit() {
                             }
                             disabled={formData.proctoringMode !== "CUSTOM"}
                           />
-                          <Label
-                            htmlFor="requireWebcam"
-                            className="text-sm font-normal cursor-pointer"
-                          >
-                            Require webcam
-                          </Label>
+                          {!formData.requireWebcam && formData.proctoringMode !== "CUSTOM" && (
+                            <div className="absolute inset-0 flex items-center justify-center pointer-events-none rounded-full border border-red-500/40 bg-red-500/10 text-red-500">
+                              <X className="h-3 w-3 stroke-[2.5]" />
+                            </div>
+                          )}
                         </div>
+                        <Label
+                          htmlFor="requireWebcam"
+                          className="text-sm font-normal cursor-pointer"
+                        >
+                          Require webcam
+                        </Label>
+                      </div>
 
-                        <div className="flex items-center space-x-2">
+                      <div className="flex items-center space-x-2">
+                        <div className="relative flex items-center justify-center">
                           <Checkbox
                             id="detectFaceNotVisible"
                             checked={formData.detectFaceNotVisible}
@@ -935,15 +967,22 @@ export default function TestsEdit() {
                             }
                             disabled={formData.proctoringMode !== "CUSTOM"}
                           />
-                          <Label
-                            htmlFor="detectFaceNotVisible"
-                            className="text-sm font-normal cursor-pointer"
-                          >
-                            Detect face not visible
-                          </Label>
+                          {!formData.detectFaceNotVisible && formData.proctoringMode !== "CUSTOM" && (
+                            <div className="absolute inset-0 flex items-center justify-center pointer-events-none rounded-full border border-red-500/40 bg-red-500/10 text-red-500">
+                              <X className="h-3 w-3 stroke-[2.5]" />
+                            </div>
+                          )}
                         </div>
+                        <Label
+                          htmlFor="detectFaceNotVisible"
+                          className="text-sm font-normal cursor-pointer"
+                        >
+                          Detect face not visible
+                        </Label>
+                      </div>
 
-                        <div className="flex items-center space-x-2">
+                      <div className="flex items-center space-x-2">
+                        <div className="relative flex items-center justify-center">
                           <Checkbox
                             id="detectMultipleFaces"
                             checked={formData.detectMultipleFaces}
@@ -952,15 +991,22 @@ export default function TestsEdit() {
                             }
                             disabled={formData.proctoringMode !== "CUSTOM"}
                           />
-                          <Label
-                            htmlFor="detectMultipleFaces"
-                            className="text-sm font-normal cursor-pointer"
-                          >
-                            Detect multiple faces
-                          </Label>
+                          {!formData.detectMultipleFaces && formData.proctoringMode !== "CUSTOM" && (
+                            <div className="absolute inset-0 flex items-center justify-center pointer-events-none rounded-full border border-red-500/40 bg-red-500/10 text-red-500">
+                              <X className="h-3 w-3 stroke-[2.5]" />
+                            </div>
+                          )}
                         </div>
+                        <Label
+                          htmlFor="detectMultipleFaces"
+                          className="text-sm font-normal cursor-pointer"
+                        >
+                          Detect multiple faces
+                        </Label>
+                      </div>
 
-                        <div className="flex items-center space-x-2">
+                      <div className="flex items-center space-x-2">
+                        <div className="relative flex items-center justify-center">
                           <Checkbox
                             id="detectSuspiciousAudio"
                             checked={formData.detectSuspiciousAudio}
@@ -969,17 +1015,22 @@ export default function TestsEdit() {
                             }
                             disabled={formData.proctoringMode !== "CUSTOM"}
                           />
-                          <Label
-                            htmlFor="detectSuspiciousAudio"
-                            className="text-sm font-normal cursor-pointer"
-                          >
-                            Detect suspicious audio
-                          </Label>
+                          {!formData.detectSuspiciousAudio && formData.proctoringMode !== "CUSTOM" && (
+                            <div className="absolute inset-0 flex items-center justify-center pointer-events-none rounded-full border border-red-500/40 bg-red-500/10 text-red-500">
+                              <X className="h-3 w-3 stroke-[2.5]" />
+                            </div>
+                          )}
                         </div>
+                        <Label
+                          htmlFor="detectSuspiciousAudio"
+                          className="text-sm font-normal cursor-pointer"
+                        >
+                          Detect suspicious audio
+                        </Label>
+                      </div>
 
-
-
-                        <div className="flex items-center space-x-2">
+                      <div className="flex items-center space-x-2">
+                        <div className="relative flex items-center justify-center">
                           <Checkbox
                             id="periodicSnapshots"
                             checked={formData.periodicSnapshots}
@@ -988,15 +1039,27 @@ export default function TestsEdit() {
                             }
                             disabled={formData.proctoringMode !== "CUSTOM"}
                           />
-                          <Label
-                            htmlFor="periodicSnapshots"
-                            className="text-sm font-normal cursor-pointer"
-                          >
-                            Periodic snapshots
-                          </Label>
+                          {!formData.periodicSnapshots && formData.proctoringMode !== "CUSTOM" && (
+                            <div className="absolute inset-0 flex items-center justify-center pointer-events-none rounded-full border border-red-500/40 bg-red-500/10 text-red-500">
+                              <X className="h-3 w-3 stroke-[2.5]" />
+                            </div>
+                          )}
                         </div>
+                        <Label
+                          htmlFor="periodicSnapshots"
+                          className="text-sm font-normal cursor-pointer flex items-center gap-2"
+                        >
+                          <span>Periodic webcam audit snapshots</span>
+                          {formData.periodicSnapshots && (
+                            <span className="text-[11px] font-mono font-medium px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                              {formData.proctoringMode === "HIGH" ? "⚡ 1 Frame / 2 mins (~30/hr)" : "⏱️ 1 Frame / 5 mins (~12/hr)"}
+                            </span>
+                          )}
+                        </Label>
+                      </div>
 
-                        <div className="flex items-center space-x-2">
+                      <div className="flex items-center space-x-2">
+                        <div className="relative flex items-center justify-center">
                           <Checkbox
                             id="evidenceCapture"
                             checked={formData.evidenceCapture}
@@ -1005,26 +1068,35 @@ export default function TestsEdit() {
                             }
                             disabled={formData.proctoringMode !== "CUSTOM"}
                           />
-                          <Label
-                            htmlFor="evidenceCapture"
-                            className="text-sm font-normal cursor-pointer"
-                          >
-                            Evidence capture
-                          </Label>
+                          {!formData.evidenceCapture && formData.proctoringMode !== "CUSTOM" && (
+                            <div className="absolute inset-0 flex items-center justify-center pointer-events-none rounded-full border border-red-500/40 bg-red-500/10 text-red-500">
+                              <X className="h-3 w-3 stroke-[2.5]" />
+                            </div>
+                          )}
                         </div>
+                        <Label
+                          htmlFor="evidenceCapture"
+                          className="text-sm font-normal cursor-pointer flex items-center gap-2"
+                        >
+                          <span>Evidence capture</span>
+                          {formData.evidenceCapture && (
+                            <span className="text-[11px] font-mono font-medium px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20">
+                              📸 Violation Snapshots
+                            </span>
+                          )}
+                        </Label>
                       </div>
                     </div>
-                  )}
+                  </div>
 
                   {/* Category 3: Advanced Security & Hardware */}
-                  {(formData.proctoringMode === "HIGH" ||
-                    formData.proctoringMode === "CUSTOM") && (
-                    <div className="space-y-4 pt-4 border-t">
-                      <h4 className="text-sm font-semibold text-slate-900 dark:text-slate-100 uppercase tracking-wider">
-                        Advanced Security & Hardware
-                      </h4>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="flex items-center space-x-2">
+                  <div className="space-y-4 pt-4 border-t">
+                    <h4 className="text-sm font-semibold text-slate-900 dark:text-slate-100 uppercase tracking-wider">
+                      Advanced Security & Hardware
+                    </h4>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="flex items-center space-x-2">
+                        <div className="relative flex items-center justify-center">
                           <Checkbox
                             id="requireMicrophone"
                             checked={formData.requireMicrophone}
@@ -1033,15 +1105,22 @@ export default function TestsEdit() {
                             }
                             disabled={formData.proctoringMode !== "CUSTOM"}
                           />
-                          <Label
-                            htmlFor="requireMicrophone"
-                            className="text-sm font-normal cursor-pointer"
-                          >
-                            Require microphone
-                          </Label>
+                          {!formData.requireMicrophone && formData.proctoringMode !== "CUSTOM" && (
+                            <div className="absolute inset-0 flex items-center justify-center pointer-events-none rounded-full border border-red-500/40 bg-red-500/10 text-red-500">
+                              <X className="h-3 w-3 stroke-[2.5]" />
+                            </div>
+                          )}
                         </div>
+                        <Label
+                          htmlFor="requireMicrophone"
+                          className="text-sm font-normal cursor-pointer"
+                        >
+                          Require microphone
+                        </Label>
+                      </div>
 
-                        <div className="flex items-center space-x-2">
+                      <div className="flex items-center space-x-2">
+                        <div className="relative flex items-center justify-center">
                           <Checkbox
                             id="requireScreenShare"
                             checked={formData.requireScreenShare}
@@ -1050,15 +1129,22 @@ export default function TestsEdit() {
                             }
                             disabled={formData.proctoringMode !== "CUSTOM"}
                           />
-                          <Label
-                            htmlFor="requireScreenShare"
-                            className="text-sm font-normal cursor-pointer"
-                          >
-                            Require screen share
-                          </Label>
+                          {!formData.requireScreenShare && formData.proctoringMode !== "CUSTOM" && (
+                            <div className="absolute inset-0 flex items-center justify-center pointer-events-none rounded-full border border-red-500/40 bg-red-500/10 text-red-500">
+                              <X className="h-3 w-3 stroke-[2.5]" />
+                            </div>
+                          )}
                         </div>
+                        <Label
+                          htmlFor="requireScreenShare"
+                          className="text-sm font-normal cursor-pointer"
+                        >
+                          Require screen share
+                        </Label>
+                      </div>
 
-                        <div className="flex items-center space-x-2">
+                      <div className="flex items-center space-x-2">
+                        <div className="relative flex items-center justify-center">
                           <Checkbox
                             id="detectDevTools"
                             checked={formData.detectDevTools}
@@ -1067,15 +1153,22 @@ export default function TestsEdit() {
                             }
                             disabled={formData.proctoringMode !== "CUSTOM"}
                           />
-                          <Label
-                            htmlFor="detectDevTools"
-                            className="text-sm font-normal cursor-pointer"
-                          >
-                            Detect DevTools
-                          </Label>
+                          {!formData.detectDevTools && formData.proctoringMode !== "CUSTOM" && (
+                            <div className="absolute inset-0 flex items-center justify-center pointer-events-none rounded-full border border-red-500/40 bg-red-500/10 text-red-500">
+                              <X className="h-3 w-3 stroke-[2.5]" />
+                            </div>
+                          )}
                         </div>
+                        <Label
+                          htmlFor="detectDevTools"
+                          className="text-sm font-normal cursor-pointer"
+                        >
+                          Detect DevTools
+                        </Label>
+                      </div>
 
-                        <div className="flex items-center space-x-2">
+                      <div className="flex items-center space-x-2">
+                        <div className="relative flex items-center justify-center">
                           <Checkbox
                             id="detectScreenShareStop"
                             checked={formData.detectScreenShareStop}
@@ -1084,15 +1177,22 @@ export default function TestsEdit() {
                             }
                             disabled={formData.proctoringMode !== "CUSTOM"}
                           />
-                          <Label
-                            htmlFor="detectScreenShareStop"
-                            className="text-sm font-normal cursor-pointer"
-                          >
-                            Detect screen-share stop
-                          </Label>
+                          {!formData.detectScreenShareStop && formData.proctoringMode !== "CUSTOM" && (
+                            <div className="absolute inset-0 flex items-center justify-center pointer-events-none rounded-full border border-red-500/40 bg-red-500/10 text-red-500">
+                              <X className="h-3 w-3 stroke-[2.5]" />
+                            </div>
+                          )}
                         </div>
+                        <Label
+                          htmlFor="detectScreenShareStop"
+                          className="text-sm font-normal cursor-pointer"
+                        >
+                          Detect screen-share stop
+                        </Label>
+                      </div>
 
-                        <div className="flex items-center space-x-2">
+                      <div className="flex items-center space-x-2">
+                        <div className="relative flex items-center justify-center">
                           <Checkbox
                             id="enableLiveProctoring"
                             checked={formData.enableLiveProctoring}
@@ -1101,20 +1201,21 @@ export default function TestsEdit() {
                             }
                             disabled={formData.proctoringMode !== "CUSTOM"}
                           />
-                          <Label
-                            htmlFor="enableLiveProctoring"
-                            className="text-sm font-normal cursor-pointer"
-                          >
-                            Enable live proctoring
-                          </Label>
+                          {!formData.enableLiveProctoring && formData.proctoringMode !== "CUSTOM" && (
+                            <div className="absolute inset-0 flex items-center justify-center pointer-events-none rounded-full border border-red-500/40 bg-red-500/10 text-red-500">
+                              <X className="h-3 w-3 stroke-[2.5]" />
+                            </div>
+                          )}
                         </div>
-
-
+                        <Label
+                          htmlFor="enableLiveProctoring"
+                          className="text-sm font-normal cursor-pointer"
+                        >
+                          Enable live proctoring
+                        </Label>
                       </div>
-
-
                     </div>
-                  )}
+                  </div>
                 </div>
               )}
             </CardContent>
