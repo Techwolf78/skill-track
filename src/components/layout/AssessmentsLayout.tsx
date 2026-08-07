@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { ClipboardList, CalendarDays, UserPlus } from "lucide-react";
+import { getDedicatedSkeleton } from "@/components/ui/DedicatedSkeletons";
 
 export function AssessmentsLayout() {
   const location = useLocation();
@@ -60,7 +61,7 @@ export function AssessmentsLayout() {
 
       {/* Content wrapper */}
       <div className="mt-4">
-        <Suspense fallback={null}>
+        <Suspense fallback={getDedicatedSkeleton(location.pathname)}>
           <Outlet />
         </Suspense>
       </div>

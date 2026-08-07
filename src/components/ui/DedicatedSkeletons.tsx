@@ -313,16 +313,116 @@ export const SettingsSkeleton = () => (
   </div>
 );
 
+// 11. Candidate Certificates Skeleton
+export const CandidateCertificatesSkeleton = () => (
+  <div className="p-8 space-y-6 w-full animate-pulse bg-slate-50/50 min-h-screen rounded-2xl">
+    <div className="flex justify-between items-center pb-4 border-b border-slate-200/80">
+      <div className="space-y-2">
+        <Skeleton className="h-7 w-48 bg-slate-200/80 rounded-lg" />
+        <Skeleton className="h-4 w-72 bg-slate-200/50 rounded-md" />
+      </div>
+    </div>
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      {[1, 2, 3, 4].map((i) => (
+        <div key={i} className="p-6 rounded-2xl bg-white border border-slate-200/80 shadow-sm space-y-4 flex flex-col justify-between">
+          <div className="flex items-center gap-4">
+            <Skeleton className="h-12 w-12 rounded-xl bg-amber-100/80" />
+            <div className="space-y-2 flex-1">
+              <Skeleton className="h-5 w-44 bg-slate-300/80 rounded" />
+              <Skeleton className="h-3 w-28 bg-slate-200/60 rounded" />
+            </div>
+          </div>
+          <Skeleton className="h-20 w-full bg-slate-50 rounded-xl" />
+          <div className="flex justify-between items-center pt-2 border-t border-slate-100">
+            <Skeleton className="h-4 w-24 bg-slate-200/60 rounded" />
+            <Skeleton className="h-9 w-28 bg-slate-300/80 rounded-xl" />
+          </div>
+        </div>
+      ))}
+    </div>
+  </div>
+);
+
+// 12. Candidate Notifications Skeleton
+export const CandidateNotificationsSkeleton = () => (
+  <div className="p-8 space-y-6 w-full animate-pulse bg-slate-50/50 min-h-screen rounded-2xl">
+    <div className="flex justify-between items-center pb-4 border-b border-slate-200/80">
+      <div className="space-y-2">
+        <Skeleton className="h-7 w-40 bg-slate-200/80 rounded-lg" />
+        <Skeleton className="h-4 w-60 bg-slate-200/50 rounded-md" />
+      </div>
+    </div>
+    <div className="p-6 rounded-2xl bg-white border border-slate-200/80 shadow-sm space-y-4">
+      {[1, 2, 3, 4, 5].map((i) => (
+        <div key={i} className="flex gap-4 items-center p-3 rounded-xl border border-slate-100 bg-slate-50/40">
+          <Skeleton className="h-10 w-10 rounded-full bg-slate-200/80 flex-shrink-0" />
+          <div className="space-y-1.5 flex-1">
+            <Skeleton className="h-4 w-3/4 bg-slate-300/80 rounded" />
+            <Skeleton className="h-3 w-32 bg-slate-200/50 rounded" />
+          </div>
+        </div>
+      ))}
+    </div>
+  </div>
+);
+
+// 13. Candidate Support / FAQ Skeleton
+export const CandidateSupportSkeleton = () => (
+  <div className="p-8 space-y-6 w-full animate-pulse bg-slate-50/50 min-h-screen rounded-2xl">
+    <div className="flex justify-between items-center pb-4 border-b border-slate-200/80">
+      <div className="space-y-2">
+        <Skeleton className="h-7 w-48 bg-slate-200/80 rounded-lg" />
+        <Skeleton className="h-4 w-80 bg-slate-200/50 rounded-md" />
+      </div>
+    </div>
+    <div className="space-y-4">
+      {[1, 2, 3, 4, 5].map((i) => (
+        <div key={i} className="p-5 rounded-2xl bg-white border border-slate-200/80 shadow-sm space-y-3">
+          <Skeleton className="h-5 w-2/3 bg-slate-300/80 rounded" />
+          <Skeleton className="h-4 w-full bg-slate-100 rounded" />
+        </div>
+      ))}
+    </div>
+  </div>
+);
+
+// 14. Profile Skeleton
+export const ProfileSkeleton = () => (
+  <div className="p-8 space-y-6 w-full animate-pulse bg-slate-50/50 min-h-screen rounded-2xl">
+    <div className="p-6 rounded-2xl bg-white border border-slate-200/80 shadow-sm space-y-6">
+      <div className="flex items-center gap-6">
+        <Skeleton className="h-20 w-20 rounded-full bg-slate-200/80" />
+        <div className="space-y-2">
+          <Skeleton className="h-6 w-48 bg-slate-300/80 rounded-lg" />
+          <Skeleton className="h-4 w-36 bg-slate-200/60 rounded" />
+        </div>
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-slate-100">
+        {[1, 2, 3, 4].map((f) => (
+          <div key={f} className="space-y-2">
+            <Skeleton className="h-4 w-28 bg-slate-300/70 rounded" />
+            <Skeleton className="h-10 w-full bg-slate-100 rounded-xl" />
+          </div>
+        ))}
+      </div>
+    </div>
+  </div>
+);
+
 // Helper function to pick the matching dedicated skeleton based on pathname
 export const getDedicatedSkeleton = (pathname: string) => {
   if (pathname.includes("/organisations")) return <OrganisationsSkeleton />;
   if (pathname.includes("/users")) return <UsersSkeleton />;
-  if (pathname.includes("/students") || pathname.includes("/candidates")) return <CandidatesSkeleton />;
+  if (pathname.includes("/students") || pathname.includes("/candidates") || pathname.includes("/admin/candidates")) return <CandidatesSkeleton />;
   if (pathname.includes("/questions")) return <QuestionBankSkeleton />;
-  if (pathname.includes("/tests") || pathname.includes("/test-schedules") || pathname.includes("/invitations")) return <TestsSkeleton />;
+  if (pathname.includes("/tests") || pathname.includes("/test-schedules") || pathname.includes("/invitations") || pathname.includes("/assessments") || pathname.includes("/schedules")) return <TestsSkeleton />;
   if (pathname.includes("/proctoring")) return <ProctoringSkeleton />;
-  if (pathname.includes("/reports")) return <ReportsSkeleton />;
+  if (pathname.includes("/reports") || pathname.includes("/results")) return <ReportsSkeleton />;
+  if (pathname.includes("/certificates")) return <CandidateCertificatesSkeleton />;
+  if (pathname.includes("/notifications")) return <CandidateNotificationsSkeleton />;
+  if (pathname.includes("/support")) return <CandidateSupportSkeleton />;
   if (pathname.includes("/audit-logs")) return <AuditLogsSkeleton />;
+  if (pathname.includes("/profile")) return <ProfileSkeleton />;
   if (pathname.includes("/settings")) return <SettingsSkeleton />;
 
   // Default fallback (Dashboard)
