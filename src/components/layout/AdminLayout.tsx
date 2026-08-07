@@ -1,4 +1,4 @@
-import { Suspense, useState, useEffect } from "react";
+import { Suspense } from "react";
 import { Outlet, useLocation } from "react-router-dom";
 import { SuperAdminSidebar } from "./SuperAdminSidebar";
 import { AdminSidebar } from "./AdminSidebarNew";
@@ -8,21 +8,7 @@ import { getDedicatedSkeleton } from "@/components/ui/DedicatedSkeletons";
 
 function AdminContentWrapper() {
   const location = useLocation();
-  const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    setLoading(true);
-    const timer = setTimeout(() => {
-      setLoading(false);
-    }, 3000);
-    return () => clearTimeout(timer);
-  }, [location.pathname]);
-
   const skeleton = getDedicatedSkeleton(location.pathname);
-
-  if (loading) {
-    return skeleton;
-  }
 
   return (
     <Suspense fallback={skeleton}>
