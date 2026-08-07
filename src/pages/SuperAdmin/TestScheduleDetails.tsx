@@ -319,7 +319,7 @@ export default function TestScheduleDetails() {
             </div>
             <div>
               <p className="text-sm font-medium text-muted-foreground">Created At</p>
-              <p className="text-sm">{formatDateTime(schedule.createdAt || "")}</p>
+              <p className="text-sm">{formatDateTime((schedule as any).createdAt || schedule.startTime || test?.createdAt || "")}</p>
             </div>
             <div>
               <p className="text-sm font-medium text-muted-foreground">Created By</p>
