@@ -73,20 +73,24 @@ export default function TestScheduleDetails() {
       );
 
       const candMap = new Map<string, { name: string; email: string }>();
-      (candData || []).forEach((c: any) => {
-        const name = c.user?.name || c.name || c.email || c.user?.email || "";
-        const email = c.user?.email || c.email || "";
+      (candData || []).forEach((c: Candidate) => {
+        const userObj = c.user || (c as unknown as { user?: { id?: string; name?: string; email?: string } }).user;
+        const name = userObj?.name || (c as unknown as { name?: string }).name || (c as unknown as { email?: string }).email || userObj?.email || "";
+        const email = userObj?.email || (c as unknown as { email?: string }).email || "";
         candMap.set(c.id, { name, email });
-        if (c.user?.id) {
-          candMap.set(c.user.id, { name, email });
+        if (userObj?.id) {
+          candMap.set(userObj.id, { name, email });
         }
       });
 
       const resolvedInvs: Invitation[] = scheduleInvs.map((inv) => {
+        const invObj = inv as Record<string, unknown>;
         const candidateId = String(inv.candidateId || "");
         const cand = candMap.get(candidateId);
-        const name = String(inv.candidateName || (inv as any).name || cand?.name || inv.candidateEmail || cand?.email || "Candidate");
-        const email = String(inv.candidateEmail || (inv as any).email || cand?.email || "N/A");
+        const invName = String(inv.candidateName || invObj.name || "");
+        const invEmail = String(inv.candidateEmail || invObj.email || "");
+        const name = String(invName || cand?.name || invEmail || cand?.email || "Candidate");
+        const email = String(invEmail || cand?.email || "N/A");
         return {
           id: String(inv.id || ""),
           candidateId,
@@ -319,7 +323,7 @@ export default function TestScheduleDetails() {
             </div>
             <div>
               <p className="text-sm font-medium text-muted-foreground">Created At</p>
-              <p className="text-sm">{formatDateTime((schedule as any).createdAt || schedule.startTime || test?.createdAt || "")}</p>
+              <p className="text-sm">{formatDateTime(schedule.createdAt || (schedule as Record<string, unknown>).startTime as string || test?.createdAt || "")}</p>
             </div>
             <div>
               <p className="text-sm font-medium text-muted-foreground">Created By</p>

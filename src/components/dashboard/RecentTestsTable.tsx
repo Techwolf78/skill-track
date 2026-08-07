@@ -14,13 +14,16 @@ import { Eye, ShieldCheck, ChevronRight, Loader2, Calendar } from "lucide-react"
 import { useNavigate } from "react-router-dom";
 import { testService, TestScheduleExtended, Test } from "@/lib/test-service";
 import { apiClient } from "@/lib/api-client";
-import { organisationService, Organisation } from "@/lib/organisation-service";
+import { organisationService, OrganisationResponse } from "@/lib/organisation-service";
 
 interface MappedSchedule extends TestScheduleExtended {
   resolvedTestTitle: string;
   resolvedOrgName: string;
   invitedCount: number;
   completedCount: number;
+  proctoringMode?: string;
+  batchName?: string;
+  batch?: string;
 }
 
 export function RecentTestsTable() {
@@ -39,7 +42,7 @@ export function RecentTestsTable() {
         });
 
         const testsData = await testService.getAllTests().catch(() => [] as Test[]);
-        const orgsData = await organisationService.getOrganisations().catch(() => [] as Organisation[]);
+        const orgsData = await organisationService.getOrganisations().catch(() => [] as OrganisationResponse[]);
 
         // Fetch candidate invitations safely
         let invitations: Array<{ testScheduleId?: string; scheduleId?: string; status?: string }> = [];
@@ -68,24 +71,22 @@ export function RecentTestsTable() {
         const safeSchedulesData = Array.isArray(schedulesData) ? schedulesData : [];
 
         const mapped: MappedSchedule[] = safeSchedulesData.map((sch) => {
+          const schAny = sch as Record<string, any>;
           const test = testMap.get(sch.testId);
-          const resolvedTestTitle = test?.title || sch.testTitle || sch.title || "React Test";
+          const resolvedTestTitle = test?.title || schAny.testTitle || schAny.title || "React Test";
 
           let resolvedOrgName = "Gryphon Academy";
           if (test?.organisationId && orgMap.has(test.organisationId)) {
             resolvedOrgName = orgMap.get(test.organisationId)!;
-          } else {
-            const schOrgId = (sch as { organisationId?: string }).organisationId;
-            if (schOrgId && orgMap.has(schOrgId)) {
-              resolvedOrgName = orgMap.get(schOrgId)!;
-            }
+          } else if (schAny.organisationId && orgMap.has(schAny.organisationId)) {
+            resolvedOrgName = orgMap.get(schAny.organisationId)!;
           }
 
           const schInvs = invitations.filter(
             (inv) => inv.testScheduleId === sch.id || inv.scheduleId === sch.id
           );
-          const invitedCount = schInvs.length || sch.totalInvitations || 1;
-          const completedCount = schInvs.filter((inv) => inv.status === "ACCEPTED" || inv.status === "SUBMITTED").length || sch.completedInvitations || 0;
+          const invitedCount = schInvs.length || schAny.totalInvitations || 1;
+          const completedCount = schInvs.filter((inv) => inv.status === "ACCEPTED" || inv.status === "SUBMITTED").length || schAny.completedInvitations || 0;
 
           return {
             ...sch,
@@ -98,35 +99,35 @@ export function RecentTestsTable() {
 
         setSchedules(mapped);
       } catch (err) {
-        console.error("Failed to fetch schedules for RecentTestsTable:", err);
+        console.error("Failed to load full schedule table data:", err);
       } finally {
         setLoading(false);
       }
     }
+
     fetchCompleteScheduleData();
   }, []);
 
-  const filteredSchedules = schedules.filter((schedule) => {
-    const statusUpper = (schedule.status || "").toUpperCase();
-    const isLive = statusUpper === "ACTIVE" || statusUpper === "LIVE" || statusUpper === "SCHEDULED" || statusUpper === "UPCOMING" || statusUpper === "";
-    if (filter === "ACTIVE") return isLive;
-    if (filter === "COMPLETED") return statusUpper === "COMPLETED" || statusUpper === "EXPIRED";
+  const filteredSchedules = schedules.filter((sch) => {
+    const status = String(sch.status || "").toUpperCase();
+    if (filter === "ACTIVE") return status === "LIVE" || status === "SCHEDULED" || status === "ACTIVE";
+    if (filter === "COMPLETED") return status === "COMPLETED" || status === "EXPIRED";
     return true;
   });
 
   return (
-    <div className="space-y-4">
-      {/* Table Sub-header & Filter Tabs */}
-      <div className="flex items-center justify-between pb-2 border-b border-slate-800 font-mono">
-        <div className="flex items-center gap-2 text-xs">
-          {["ALL", "ACTIVE", "COMPLETED"].map((tab) => (
+    <div className="space-y-3 font-sans">
+      {/* Table Filter Tabs Bar */}
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex items-center bg-muted/60 border border-border rounded-lg p-0.5 text-xs font-mono">
+          {(["ALL", "ACTIVE", "COMPLETED"] as const).map((tab) => (
             <button
               key={tab}
-              onClick={() => setFilter(tab as "ALL" | "ACTIVE" | "COMPLETED")}
-              className={`px-3 py-1 rounded-md transition-all font-bold ${
+              onClick={() => setFilter(tab)}
+              className={`px-3 py-1 rounded-md transition-all font-semibold ${
                 filter === tab
-                  ? "bg-slate-800 text-emerald-400 border border-slate-700"
-                  : "text-slate-500 hover:text-slate-300"
+                  ? "bg-background text-foreground shadow-sm border border-border/50"
+                  : "text-muted-foreground hover:text-foreground"
               }`}
             >
               {tab}
@@ -135,10 +136,10 @@ export function RecentTestsTable() {
         </div>
 
         <Button
-          variant="ghost"
           size="sm"
+          variant="ghost"
           onClick={() => navigate("/superadmin/test-schedules")}
-          className="text-xs text-slate-400 hover:text-emerald-400 hover:bg-transparent"
+          className="text-xs text-muted-foreground hover:text-foreground hover:bg-transparent"
         >
           VIEW ALL SCHEDULES <ChevronRight className="w-3.5 h-3.5 ml-1" />
         </Button>
@@ -148,7 +149,7 @@ export function RecentTestsTable() {
       <div className="border border-border rounded-lg overflow-hidden bg-card text-xs">
         {loading ? (
           <div className="p-8 flex flex-col items-center justify-center gap-2 text-muted-foreground">
-            <Loader2 className="w-5 h-5 animate-spin text-emerald-500" />
+            <Loader2 className="w-5 h-5 animate-spin text-primary" />
             <span className="font-mono text-xs">Loading live schedule data...</span>
           </div>
         ) : filteredSchedules.length === 0 ? (
@@ -172,6 +173,7 @@ export function RecentTestsTable() {
                 const totalInvited = sch.invitedCount;
                 const completedCount = sch.completedCount;
                 const progressPct = totalInvited > 0 ? Math.round((completedCount / totalInvited) * 100) : 0;
+                const schStatus = String(sch.status || "").toUpperCase();
 
                 return (
                   <TableRow key={sch.id} className="hover:bg-muted/30 border-border/60 transition-colors">
@@ -196,22 +198,22 @@ export function RecentTestsTable() {
                       </div>
                     </TableCell>
                     <TableCell>
-                      {sch.status === "COMPLETED" && (
+                      {schStatus === "COMPLETED" && (
                         <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-[10px] font-mono font-medium inline-flex items-center gap-1">
                           <ShieldCheck className="w-3 h-3" /> COMPLETED
                         </span>
                       )}
-                      {(sch.status === "ACTIVE" || sch.status === "LIVE" || !sch.status) && (
+                      {(schStatus === "LIVE" || schStatus === "ACTIVE" || !sch.status) && (
                         <span className="px-2 py-0.5 rounded-full bg-primary/10 border border-primary/20 text-primary text-[10px] font-mono font-medium inline-flex items-center gap-1">
                           <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" /> LIVE ACTIVE
                         </span>
                       )}
-                      {(sch.status === "SCHEDULED" || sch.status === "UPCOMING") && (
+                      {(schStatus === "SCHEDULED" || schStatus === "UPCOMING") && (
                         <span className="px-2 py-0.5 rounded-full bg-muted border border-border text-muted-foreground text-[10px] font-mono font-medium">
                           SCHEDULED
                         </span>
                       )}
-                      {sch.status === "EXPIRED" && (
+                      {schStatus === "EXPIRED" && (
                         <span className="px-2 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400 text-[10px] font-mono font-medium">
                           EXPIRED
                         </span>
