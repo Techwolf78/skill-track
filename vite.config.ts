@@ -14,11 +14,7 @@ export default defineConfig(({ mode }) => ({
     },
     proxy: {
       "/api": {
-        target: "http://localhost:8081",
-        // target: "http://192.168.1.68:8080",
-        // target: "http://169.254.98.61:8080",
-        // target: "http://192.168.1.63:8080",
-        // target: "http://167.235.49.94",
+        target: process.env.BACKEND_URL || "http://localhost:8081",
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api/, ""),
       },
