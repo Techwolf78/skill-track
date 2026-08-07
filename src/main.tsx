@@ -23,7 +23,7 @@ if (sentryDsn) {
 }
 
 createRoot(document.getElementById("root")!).render(<App />);
-initKeepAlive();
+// initKeepAlive(); // Disabled: backend hosted on dedicated Airtel Cloud VPS (24/7 active)
 
 
 if ("serviceWorker" in navigator) {
