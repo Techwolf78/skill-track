@@ -85,7 +85,7 @@ const App = () => (
           <Toaster />
           <Sonner />
           <BrowserRouter>
-            <Suspense fallback={<div className="flex items-center justify-center min-h-screen bg-slate-950 text-slate-200 font-mono">Loading dynamic module...</div>}>
+            <Suspense fallback={null}>
               <Routes>
               <Route path="/" element={<NationalLandingPage />} />
               <Route path="/login" element={<Login />} />
