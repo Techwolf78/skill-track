@@ -103,13 +103,9 @@ export function initKeepAlive() {
             email: `keepalive-${Math.floor(Math.random() * 1000)}@sandbox.local`,
             password: "dummy-password-string",
             token: `dummy-token-${Math.floor(Math.random() * 1000)}`
-          }, {
-            headers: { "X-Keep-Alive": "true" }
           });
         } else {
-          await apiClient.get(finalPath, {
-            headers: { "X-Keep-Alive": "true" }
-          });
+          await apiClient.get(finalPath);
         }
         console.log(`✅ Keep-alive ping to ${rawPath} completed successfully.`);
       } catch (error) {
@@ -127,9 +123,7 @@ export function initKeepAlive() {
   setTimeout(async () => {
     console.log("📡 Sending initial bootstrap keep-alive ping...");
     try {
-      await apiClient.get(`/subjects?_cb=bootstrap-${Math.floor(Math.random() * 1000000)}`, {
-        headers: { "X-Keep-Alive": "true" }
-      });
+      await apiClient.get(`/subjects?_cb=bootstrap-${Math.floor(Math.random() * 1000000)}`);
       console.log("✅ Initial bootstrap keep-alive ping completed.");
     } catch (e) {
       console.log("ℹ_ Initial bootstrap keep-alive ping processed.");

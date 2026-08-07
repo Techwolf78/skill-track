@@ -42,10 +42,7 @@ describe("initKeepAlive", () => {
     await vi.advanceTimersByTimeAsync(1000);
 
     expect(apiClient.get).toHaveBeenCalledWith(
-      expect.stringContaining("/subjects?_cb=bootstrap-"),
-      expect.objectContaining({
-        headers: { "X-Keep-Alive": "true" },
-      })
+      expect.stringContaining("/subjects?_cb=bootstrap-")
     );
   });
 
@@ -79,10 +76,7 @@ describe("initKeepAlive", () => {
 
     expect(apiClient.post).toHaveBeenCalledWith(
       expect.stringContaining("/candidate-invitations/validate"),
-      expect.any(Object),
-      expect.objectContaining({
-        headers: { "X-Keep-Alive": "true" },
-      })
+      expect.any(Object)
     );
 
     randomSpy.mockRestore();
