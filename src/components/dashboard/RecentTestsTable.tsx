@@ -71,22 +71,22 @@ export function RecentTestsTable() {
         const safeSchedulesData = Array.isArray(schedulesData) ? schedulesData : [];
 
         const mapped: MappedSchedule[] = safeSchedulesData.map((sch) => {
-          const schAny = sch as Record<string, any>;
+          const schAny = sch as unknown as Record<string, unknown>;
           const test = testMap.get(sch.testId);
-          const resolvedTestTitle = test?.title || schAny.testTitle || schAny.title || "React Test";
+          const resolvedTestTitle = test?.title || (schAny.testTitle as string) || (schAny.title as string) || "React Test";
 
           let resolvedOrgName = "Gryphon Academy";
           if (test?.organisationId && orgMap.has(test.organisationId)) {
             resolvedOrgName = orgMap.get(test.organisationId)!;
-          } else if (schAny.organisationId && orgMap.has(schAny.organisationId)) {
-            resolvedOrgName = orgMap.get(schAny.organisationId)!;
+          } else if (schAny.organisationId && orgMap.has(schAny.organisationId as string)) {
+            resolvedOrgName = orgMap.get(schAny.organisationId as string)!;
           }
 
           const schInvs = invitations.filter(
             (inv) => inv.testScheduleId === sch.id || inv.scheduleId === sch.id
           );
-          const invitedCount = schInvs.length || schAny.totalInvitations || 1;
-          const completedCount = schInvs.filter((inv) => inv.status === "ACCEPTED" || inv.status === "SUBMITTED").length || schAny.completedInvitations || 0;
+          const invitedCount = schInvs.length || (schAny.totalInvitations as number) || 1;
+          const completedCount = schInvs.filter((inv) => inv.status === "ACCEPTED" || inv.status === "SUBMITTED").length || (schAny.completedInvitations as number) || 0;
 
           return {
             ...sch,

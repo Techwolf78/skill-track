@@ -22,7 +22,7 @@ import { testService, TestScheduleExtended, Test } from "@/lib/test-service";
 import { apiClient } from "@/lib/api-client";
 import { useAuth } from "@/lib/auth-context";
 import { organisationService } from "@/lib/organisation-service";
-import { candidateService } from "@/lib/candidate-service";
+import { candidateService, Candidate } from "@/lib/candidate-service";
 
 interface Organisation {
   id: string;
@@ -323,7 +323,7 @@ export default function TestScheduleDetails() {
             </div>
             <div>
               <p className="text-sm font-medium text-muted-foreground">Created At</p>
-              <p className="text-sm">{formatDateTime(schedule.createdAt || (schedule as Record<string, unknown>).startTime as string || test?.createdAt || "")}</p>
+              <p className="text-sm">{formatDateTime(schedule.createdAt || (schedule as unknown as Record<string, unknown>).startTime as string || test?.createdAt || "")}</p>
             </div>
             <div>
               <p className="text-sm font-medium text-muted-foreground">Created By</p>
