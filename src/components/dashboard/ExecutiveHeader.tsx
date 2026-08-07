@@ -25,8 +25,8 @@ export function ExecutiveHeader({
           <h1 className="text-2xl font-bold tracking-tight text-foreground font-sans">
             SuperAdmin Overview
           </h1>
-          <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 text-[11px] font-medium">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+          <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20 text-[11px] font-medium font-mono">
+            <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
             Live System
           </span>
         </div>
@@ -70,7 +70,7 @@ export function ExecutiveHeader({
         <Button
           size="sm"
           onClick={() => navigate("/superadmin/tests/create")}
-          className="h-8 bg-foreground text-background hover:bg-foreground/90 font-medium text-xs px-3.5 shadow-sm transition-all"
+          className="h-8 bg-primary hover:bg-primary/90 text-primary-foreground font-medium text-xs px-3.5 shadow-sm transition-all"
         >
           <Plus className="w-3.5 h-3.5 mr-1" />
           Create Test

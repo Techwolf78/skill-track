@@ -113,7 +113,7 @@ export default function AdminDashboard() {
         <div className="lg:col-span-8 space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="text-base font-semibold text-foreground flex items-center gap-2">
-              <ClipboardCheck className="w-4 h-4 text-emerald-500" />
+              <ClipboardCheck className="w-4 h-4 text-primary" />
               Active & Recent Assessments
             </h2>
           </div>
@@ -138,7 +138,7 @@ export default function AdminDashboard() {
                 variant="outline"
                 className="w-full justify-start h-9 border-border bg-muted/20 hover:bg-accent text-foreground text-xs gap-2.5 font-medium"
               >
-                <UserPlus className="w-4 h-4 text-emerald-500" />
+                <UserPlus className="w-4 h-4 text-primary" />
                 Invite Candidates
               </Button>
 

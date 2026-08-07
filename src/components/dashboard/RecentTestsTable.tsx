@@ -202,8 +202,8 @@ export function RecentTestsTable() {
                         </span>
                       )}
                       {(sch.status === "ACTIVE" || sch.status === "LIVE" || !sch.status) && (
-                        <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-[10px] font-mono font-medium inline-flex items-center gap-1">
-                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" /> LIVE ACTIVE
+                        <span className="px-2 py-0.5 rounded-full bg-primary/10 border border-primary/20 text-primary text-[10px] font-mono font-medium inline-flex items-center gap-1">
+                          <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" /> LIVE ACTIVE
                         </span>
                       )}
                       {(sch.status === "SCHEDULED" || sch.status === "UPCOMING") && (

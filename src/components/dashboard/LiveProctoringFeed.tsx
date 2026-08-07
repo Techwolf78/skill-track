@@ -29,13 +29,13 @@ export function LiveProctoringFeed() {
     <Card className="border-border bg-card shadow-xs overflow-hidden">
       <CardHeader className="py-3 px-4 border-b border-border/60 flex flex-row items-center justify-between">
         <div className="flex items-center gap-2">
-          <Terminal className="w-4 h-4 text-emerald-500" />
+          <Terminal className="w-4 h-4 text-primary" />
           <CardTitle className="text-xs font-semibold uppercase tracking-wider text-muted-foreground font-mono">
             System & Audit Telemetry
           </CardTitle>
         </div>
-        <span className="flex items-center gap-1.5 text-[10px] font-mono text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full">
-          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+        <span className="flex items-center gap-1.5 text-[10px] font-mono text-primary bg-primary/10 border border-primary/20 px-2 py-0.5 rounded-full">
+          <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
           Live Stream
         </span>
       </CardHeader>
