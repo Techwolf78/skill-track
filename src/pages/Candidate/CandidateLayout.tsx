@@ -1,3 +1,4 @@
+import { Suspense, useState } from "react";
 import { NavLink, useNavigate, useLocation, Outlet } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import {
@@ -14,7 +15,6 @@ import {
   ChevronRight,
   GraduationCap
 } from "lucide-react";
-import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { authService } from "@/lib/auth-service";
 
@@ -152,7 +152,9 @@ export function CandidateLayout() {
           </div>
         </header>
         <div className="flex-1 p-8 animate-fade-in">
-          <Outlet />
+          <Suspense fallback={null}>
+            <Outlet />
+          </Suspense>
         </div>
       </main>
     </div>

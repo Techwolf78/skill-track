@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { ClipboardList, CalendarDays, UserPlus } from "lucide-react";
@@ -59,7 +60,9 @@ export function AssessmentsLayout() {
 
       {/* Content wrapper */}
       <div className="mt-4">
-        <Outlet />
+        <Suspense fallback={null}>
+          <Outlet />
+        </Suspense>
       </div>
     </div>
   );
