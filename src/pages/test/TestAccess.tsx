@@ -167,7 +167,6 @@ export default function TestAccess() {
   const [otpCode, setOtpCode] = useState("");
   const [otpRequested, setOtpRequested] = useState(false);
   const [otpCooldown, setOtpCooldown] = useState(0);
-  const [devOtp, setDevOtp] = useState<string | null>(null);
   const [isVerifyingOtp, setIsVerifyingOtp] = useState(false);
 
   // Invitation public status (checked on mount — no auth needed)
@@ -322,13 +321,9 @@ export default function TestAccess() {
     setIsLoggingIn(true);
     setError(null);
     try {
-      const response = await apiClient.post(`/candidate-invitations/${id}/access/request`);
-      const resData = response.data?.data || response.data;
+      await apiClient.post(`/candidate-invitations/${id}/access/request`);
       setOtpRequested(true);
       setOtpCooldown(60);
-      if (resData?.devOtp) {
-        setDevOtp(resData.devOtp);
-      }
       toast({
         title: "Access Link Sent",
         description: "A secure access link and OTP have been sent to your email.",
@@ -952,14 +947,6 @@ export default function TestAccess() {
                     autoComplete="one-time-code"
                   />
                 </div>
-
-                {devOtp && (
-                  <div className="p-3 rounded-lg bg-emerald-950/30 border border-emerald-500/20 text-xs font-mono text-emerald-400 animate-pulse">
-                    <span className="font-bold">[Dev Environment Mock Email]</span>
-                    <br />
-                    Access Code: <span className="underline font-bold text-sm tracking-wider">{devOtp}</span>
-                  </div>
-                )}
 
                 <div className="flex flex-col gap-2">
                   <Button
