@@ -3,7 +3,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 
 // 1. Dashboard Skeleton (macOS Light Theme - Clean Grey/White)
 export const DashboardSkeleton = () => (
-  <div className="p-8 space-y-6 max-w-7xl mx-auto w-full animate-pulse bg-slate-50/50 min-h-screen rounded-2xl">
+  <div className="p-8 space-y-6 w-full animate-pulse bg-slate-50/50 min-h-screen rounded-2xl">
     <div className="flex items-center justify-between pb-4 border-b border-slate-200/80">
       <div className="space-y-2">
         <Skeleton className="h-7 w-52 bg-slate-200/80 rounded-lg" />
@@ -51,7 +51,7 @@ export const DashboardSkeleton = () => (
 
 // 2. Organisations Skeleton (Grid of Cards)
 export const OrganisationsSkeleton = () => (
-  <div className="p-8 space-y-6 max-w-7xl mx-auto w-full animate-pulse bg-slate-50/50 min-h-screen rounded-2xl">
+  <div className="p-8 space-y-6 w-full animate-pulse bg-slate-50/50 min-h-screen rounded-2xl">
     <div className="flex justify-between items-center pb-4 border-b border-slate-200/80">
       <div className="space-y-2">
         <Skeleton className="h-7 w-48 bg-slate-200/80 rounded-lg" />
@@ -86,7 +86,7 @@ export const OrganisationsSkeleton = () => (
 
 // 3. Users Skeleton (Full Data Table layout)
 export const UsersSkeleton = () => (
-  <div className="p-8 space-y-6 max-w-7xl mx-auto w-full animate-pulse bg-slate-50/50 min-h-screen rounded-2xl">
+  <div className="p-8 space-y-6 w-full animate-pulse bg-slate-50/50 min-h-screen rounded-2xl">
     <div className="flex justify-between items-center pb-4 border-b border-slate-200/80">
       <div className="space-y-2">
         <Skeleton className="h-7 w-40 bg-slate-200/80 rounded-lg" />
@@ -119,7 +119,7 @@ export const UsersSkeleton = () => (
 
 // 4. Candidates Skeleton
 export const CandidatesSkeleton = () => (
-  <div className="p-8 space-y-6 max-w-7xl mx-auto w-full animate-pulse bg-slate-50/50 min-h-screen rounded-2xl">
+  <div className="p-8 space-y-6 w-full animate-pulse bg-slate-50/50 min-h-screen rounded-2xl">
     <div className="flex justify-between items-center pb-4 border-b border-slate-200/80">
       <div className="space-y-2">
         <Skeleton className="h-7 w-44 bg-slate-200/80 rounded-lg" />
@@ -150,7 +150,7 @@ export const CandidatesSkeleton = () => (
 
 // 5. QuestionBank Skeleton (Split View / Filterable List)
 export const QuestionBankSkeleton = () => (
-  <div className="p-8 space-y-6 max-w-7xl mx-auto w-full animate-pulse bg-slate-50/50 min-h-screen rounded-2xl">
+  <div className="p-8 space-y-6 w-full animate-pulse bg-slate-50/50 min-h-screen rounded-2xl">
     <div className="flex justify-between items-center pb-4 border-b border-slate-200/80">
       <div className="space-y-2">
         <Skeleton className="h-7 w-48 bg-slate-200/80 rounded-lg" />
@@ -186,7 +186,7 @@ export const QuestionBankSkeleton = () => (
 
 // 6. Tests / Assessments Skeleton
 export const TestsSkeleton = () => (
-  <div className="p-8 space-y-6 max-w-7xl mx-auto w-full animate-pulse bg-slate-50/50 min-h-screen rounded-2xl">
+  <div className="p-8 space-y-6 w-full animate-pulse bg-slate-50/50 min-h-screen rounded-2xl">
     <div className="flex justify-between items-center pb-4 border-b border-slate-200/80">
       <div className="space-y-2">
         <Skeleton className="h-7 w-52 bg-slate-200/80 rounded-lg" />
@@ -214,7 +214,7 @@ export const TestsSkeleton = () => (
 
 // 7. Proctoring Dashboard Skeleton (Grid of webcam feeds)
 export const ProctoringSkeleton = () => (
-  <div className="p-8 space-y-6 max-w-7xl mx-auto w-full animate-pulse bg-slate-50/50 min-h-screen rounded-2xl">
+  <div className="p-8 space-y-6 w-full animate-pulse bg-slate-50/50 min-h-screen rounded-2xl">
     <div className="flex justify-between items-center pb-4 border-b border-slate-200/80">
       <div className="space-y-2">
         <Skeleton className="h-7 w-56 bg-slate-200/80 rounded-lg" />
@@ -241,7 +241,7 @@ export const ProctoringSkeleton = () => (
 
 // 8. Reports Skeleton (Metrics & Graphs)
 export const ReportsSkeleton = () => (
-  <div className="p-8 space-y-6 max-w-7xl mx-auto w-full animate-pulse bg-slate-50/50 min-h-screen rounded-2xl">
+  <div className="p-8 space-y-6 w-full animate-pulse bg-slate-50/50 min-h-screen rounded-2xl">
     <div className="flex justify-between items-center pb-4 border-b border-slate-200/80">
       <div className="space-y-2">
         <Skeleton className="h-7 w-48 bg-slate-200/80 rounded-lg" />
@@ -263,7 +263,7 @@ export const ReportsSkeleton = () => (
 
 // 9. Audit Logs Skeleton (Timeline Feed)
 export const AuditLogsSkeleton = () => (
-  <div className="p-8 space-y-6 max-w-7xl mx-auto w-full animate-pulse bg-slate-50/50 min-h-screen rounded-2xl">
+  <div className="p-8 space-y-6 w-full animate-pulse bg-slate-50/50 min-h-screen rounded-2xl">
     <div className="flex justify-between items-center pb-4 border-b border-slate-200/80">
       <div className="space-y-2">
         <Skeleton className="h-7 w-40 bg-slate-200/80 rounded-lg" />
@@ -289,7 +289,7 @@ export const AuditLogsSkeleton = () => (
 
 // 10. Settings Skeleton (Tabbed Form Sections)
 export const SettingsSkeleton = () => (
-  <div className="p-8 space-y-6 max-w-7xl mx-auto w-full animate-pulse bg-slate-50/50 min-h-screen rounded-2xl">
+  <div className="p-8 space-y-6 w-full animate-pulse bg-slate-50/50 min-h-screen rounded-2xl">
     <div className="flex justify-between items-center pb-4 border-b border-slate-200/80">
       <div className="space-y-2">
         <Skeleton className="h-7 w-36 bg-slate-200/80 rounded-lg" />
