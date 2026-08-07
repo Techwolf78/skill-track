@@ -22,6 +22,7 @@ import { testService, TestScheduleExtended, Test } from "@/lib/test-service";
 import { apiClient } from "@/lib/api-client";
 import { useAuth } from "@/lib/auth-context";
 import { organisationService } from "@/lib/organisation-service";
+import { candidateService } from "@/lib/candidate-service";
 
 interface Organisation {
   id: string;
@@ -53,12 +54,52 @@ export default function TestScheduleDetails() {
   const fetchInvitations = useCallback(async () => {
     try {
       setInvitationsLoading(true);
-      // This endpoint might need to be added by backend
-      const response = await apiClient.get(`/candidate-invitations/schedule/${id}?size=1000`);
-      const data = response.data?.data || response.data;
-      setInvitations(data || []);
+      // Fetch all invitations and candidates for map resolution
+      const [invRes, candData] = await Promise.all([
+        apiClient.get("/candidate-invitations?size=1000").catch(() => null),
+        candidateService.getCandidates().catch(() => []),
+      ]);
+
+      const rawInvList = invRes?.data?.data || invRes?.data || [];
+      const list: Array<Record<string, unknown>> = Array.isArray(rawInvList)
+        ? rawInvList
+        : rawInvList && typeof rawInvList === "object" && "content" in rawInvList && Array.isArray((rawInvList as Record<string, unknown>).content)
+        ? ((rawInvList as Record<string, unknown>).content as Array<Record<string, unknown>>)
+        : [];
+
+      // Filter invitations matching this schedule ID
+      const scheduleInvs = list.filter(
+        (inv) => inv.testScheduleId === id || inv.scheduleId === id
+      );
+
+      const candMap = new Map<string, { name: string; email: string }>();
+      (candData || []).forEach((c: any) => {
+        const name = c.user?.name || c.name || c.email || c.user?.email || "";
+        const email = c.user?.email || c.email || "";
+        candMap.set(c.id, { name, email });
+        if (c.user?.id) {
+          candMap.set(c.user.id, { name, email });
+        }
+      });
+
+      const resolvedInvs: Invitation[] = scheduleInvs.map((inv) => {
+        const candidateId = String(inv.candidateId || "");
+        const cand = candMap.get(candidateId);
+        const name = String(inv.candidateName || (inv as any).name || cand?.name || inv.candidateEmail || cand?.email || "Candidate");
+        const email = String(inv.candidateEmail || (inv as any).email || cand?.email || "N/A");
+        return {
+          id: String(inv.id || ""),
+          candidateId,
+          candidateName: name === "Candidate" || name === "Unknown Candidate" ? (cand?.name || cand?.email || name) : name,
+          candidateEmail: email === "N/A" ? (cand?.email || "N/A") : email,
+          status: (String(inv.status || "PENDING").toUpperCase() as "PENDING" | "ACCEPTED" | "EXPIRED"),
+          sentAt: String(inv.sentAt || inv.createdAt || ""),
+        };
+      });
+
+      setInvitations(resolvedInvs);
     } catch (error) {
-      console.log("No invitations found or endpoint not ready");
+      console.log("Error loading invitations:", error);
       setInvitations([]);
     } finally {
       setInvitationsLoading(false);
@@ -69,25 +110,39 @@ export default function TestScheduleDetails() {
     try {
       setLoading(true);
       
-      // Fetch schedule
-      const scheduleData = await testService.getTestScheduleById(id!) as TestScheduleExtended & { organisationId?: string };
-      console.log("📋 Schedule Details:", scheduleData);
+      // Fetch schedule, tests, and organisations
+      const [scheduleData, allTests, allOrgs] = await Promise.all([
+        testService.getTestScheduleById(id!).catch(() => null) as Promise<(TestScheduleExtended & { organisationId?: string; organisation?: { name: string } }) | null>,
+        testService.getAllTests().catch(() => []),
+        organisationService.getOrganisations().catch(() => []),
+      ]);
+
+      if (!scheduleData) {
+        setSchedule(null);
+        return;
+      }
+
       setSchedule(scheduleData);
       
-      // Fetch test details
+      // Resolve test
       if (scheduleData.testId) {
-        const testData = await testService.getTestById(scheduleData.testId);
-        console.log("📋 Test Details:", testData);
-        setTest(testData);
+        const foundTest = allTests.find((t) => t.id === scheduleData.testId);
+        setTest(foundTest || null);
       }
       
-      // Fetch organisation details
-      if (scheduleData.organisationId) {
-        const orgs = await organisationService.getOrganisations();
-        const org = orgs.find((o: Organisation) => o.id === scheduleData.organisationId);
-        setOrganisation(org || null);
+      // Resolve organisation (from scheduleData.organisationId, or scheduleData.organisation, or first org fallback)
+      const orgId = scheduleData.organisationId;
+      const foundOrg = allOrgs.find((o) => o.id === orgId);
+      if (foundOrg) {
+        setOrganisation(foundOrg);
+      } else if (scheduleData.organisation?.name) {
+        setOrganisation({ id: orgId || "default", name: scheduleData.organisation.name });
+      } else if (allOrgs.length > 0) {
+        setOrganisation({ id: allOrgs[0].id, name: allOrgs[0].name });
+      } else {
+        setOrganisation({ id: "default", name: "Default Organisation" });
       }
-      
+
       // Fetch invitations for this schedule
       await fetchInvitations();
       
