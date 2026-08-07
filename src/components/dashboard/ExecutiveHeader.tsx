@@ -18,48 +18,35 @@ export function ExecutiveHeader({
   const navigate = useNavigate();
 
   return (
-    <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-2 border-b border-slate-800/80">
+    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-border">
       {/* Title & Subtitle */}
       <div>
-        <div className="flex items-center gap-3">
-          <h1 className="text-3xl font-bold font-mono tracking-tight text-slate-100">
-            SUPERADMIN COMMAND CENTER
+        <div className="flex items-center gap-2.5">
+          <h1 className="text-2xl font-bold tracking-tight text-foreground font-sans">
+            SuperAdmin Overview
           </h1>
-          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-950/60 border border-emerald-500/30 text-emerald-400 text-xs font-mono">
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping mr-0.5" />
-            LIVE TELEMETRY
-          </div>
+          <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 text-[11px] font-medium">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+            Live System
+          </span>
         </div>
-        <p className="text-slate-400 text-sm mt-1 font-sans">
-          Real-time candidate assessment velocity, proctoring security metrics, and subject performance insights.
+        <p className="text-muted-foreground text-xs mt-1">
+          Monitor active schedules, candidate enrolments, question repository, and test performance.
         </p>
       </div>
 
       {/* Action Controls & Health Bar */}
-      <div className="flex flex-wrap items-center gap-3">
-        {/* System Health Indicators */}
-        <div className="hidden xl:flex items-center gap-4 px-3 py-1.5 rounded-lg bg-slate-900/80 border border-slate-800 text-xs font-mono text-slate-400">
-          <div className="flex items-center gap-1.5">
-            <Cpu className="w-3.5 h-3.5 text-cyan-400" />
-            <span>API: <strong className="text-emerald-400">99.98%</strong></span>
-          </div>
-          <div className="h-3 w-[1px] bg-slate-800" />
-          <div className="flex items-center gap-1.5">
-            <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-            <span>PROCTORING: <strong className="text-emerald-400">ONLINE</strong></span>
-          </div>
-        </div>
-
+      <div className="flex items-center gap-2.5">
         {/* Timeframe Selector */}
-        <div className="flex items-center bg-slate-950 border border-slate-800 rounded-lg p-1 font-mono text-xs">
+        <div className="flex items-center bg-muted/60 border border-border rounded-lg p-0.5 text-xs">
           {["24H", "7D", "30D", "YTD"].map((tf) => (
             <button
               key={tf}
               onClick={() => setTimeframe(tf)}
-              className={`px-3 py-1 rounded-md transition-all font-semibold ${
+              className={`px-2.5 py-1 rounded-md transition-all font-medium text-xs ${
                 timeframe === tf
-                  ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 shadow-sm"
-                  : "text-slate-400 hover:text-slate-200"
+                  ? "bg-background text-foreground shadow-sm font-semibold border border-border/50"
+                  : "text-muted-foreground hover:text-foreground"
               }`}
             >
               {tf}
@@ -73,19 +60,20 @@ export function ExecutiveHeader({
           size="sm"
           onClick={onRefresh}
           disabled={isRefreshing}
-          className="border-slate-800 bg-slate-900/90 hover:bg-slate-800 hover:border-slate-700 text-slate-200 hover:text-white font-mono text-xs h-9 transition-all"
+          className="h-8 border-border bg-background hover:bg-muted text-foreground text-xs px-3 transition-all"
         >
-          <RefreshCw className={`w-3.5 h-3.5 mr-1.5 ${isRefreshing ? "animate-spin text-emerald-400" : ""}`} />
-          REFRESH
+          <RefreshCw className={`w-3.5 h-3.5 mr-1.5 text-muted-foreground ${isRefreshing ? "animate-spin text-primary" : ""}`} />
+          Refresh
         </Button>
 
         {/* Create Test Primary CTA */}
         <Button
+          size="sm"
           onClick={() => navigate("/superadmin/tests/create")}
-          className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 hover:text-slate-950 font-bold tracking-wider font-mono text-xs h-9 px-4 shadow-lg shadow-emerald-950/40 transition-all"
+          className="h-8 bg-foreground text-background hover:bg-foreground/90 font-medium text-xs px-3.5 shadow-sm transition-all"
         >
-          <Plus className="w-4 h-4 mr-1" />
-          CREATE TEST
+          <Plus className="w-3.5 h-3.5 mr-1" />
+          Create Test
         </Button>
       </div>
     </div>

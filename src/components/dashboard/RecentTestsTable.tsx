@@ -145,95 +145,95 @@ export function RecentTestsTable() {
       </div>
 
       {/* Modern High-Density Table */}
-      <div className="border border-slate-800 rounded-xl overflow-hidden bg-slate-900/60 backdrop-blur-md font-mono text-xs">
+      <div className="border border-border rounded-lg overflow-hidden bg-card text-xs">
         {loading ? (
-          <div className="p-12 flex flex-col items-center justify-center gap-2 text-slate-400">
-            <Loader2 className="w-6 h-6 animate-spin text-emerald-400" />
-            <span>Loading live schedule data from backend...</span>
+          <div className="p-8 flex flex-col items-center justify-center gap-2 text-muted-foreground">
+            <Loader2 className="w-5 h-5 animate-spin text-emerald-500" />
+            <span className="font-mono text-xs">Loading live schedule data...</span>
           </div>
         ) : filteredSchedules.length === 0 ? (
-          <div className="p-12 text-center text-slate-500 font-sans">
-            No schedules found matching filter <strong className="text-slate-400 font-mono">{filter}</strong>.
+          <div className="p-8 text-center text-muted-foreground font-sans">
+            No schedules found matching filter <strong className="text-foreground font-mono">{filter}</strong>.
           </div>
         ) : (
           <Table>
-            <TableHeader className="bg-slate-950/80 border-b border-slate-800">
-              <TableRow className="hover:bg-transparent border-slate-800">
-                <TableHead className="text-slate-400 uppercase font-bold py-3">TEST / SCHEDULE</TableHead>
-                <TableHead className="text-slate-400 uppercase font-bold">TYPE</TableHead>
-                <TableHead className="text-slate-400 uppercase font-bold">ORGANISATION / BATCH</TableHead>
-                <TableHead className="text-slate-400 uppercase font-bold">STATUS</TableHead>
-                <TableHead className="text-slate-400 uppercase font-bold text-center">INVITATION PROGRESS</TableHead>
-                <TableHead className="text-slate-400 uppercase font-bold text-right pr-6">ACTION</TableHead>
+            <TableHeader className="bg-muted/50 border-b border-border">
+              <TableRow className="hover:bg-transparent border-border">
+                <TableHead className="text-muted-foreground uppercase font-mono text-[10px] tracking-wider py-2.5">TEST / SCHEDULE</TableHead>
+                <TableHead className="text-muted-foreground uppercase font-mono text-[10px] tracking-wider">TYPE</TableHead>
+                <TableHead className="text-muted-foreground uppercase font-mono text-[10px] tracking-wider">ORGANISATION / BATCH</TableHead>
+                <TableHead className="text-muted-foreground uppercase font-mono text-[10px] tracking-wider">STATUS</TableHead>
+                <TableHead className="text-muted-foreground uppercase font-mono text-[10px] tracking-wider text-center">INVITATION PROGRESS</TableHead>
+                <TableHead className="text-muted-foreground uppercase font-mono text-[10px] tracking-wider text-right pr-4">ACTION</TableHead>
               </TableRow>
             </TableHeader>
-            <TableBody className="divide-y divide-slate-800/60">
+            <TableBody className="divide-y divide-border/60">
               {filteredSchedules.map((sch) => {
                 const totalInvited = sch.invitedCount;
                 const completedCount = sch.completedCount;
                 const progressPct = totalInvited > 0 ? Math.round((completedCount / totalInvited) * 100) : 0;
 
                 return (
-                  <TableRow key={sch.id} className="hover:bg-slate-800/40 border-slate-800 transition-colors">
-                    <TableCell className="font-bold text-slate-200 py-3.5">
+                  <TableRow key={sch.id} className="hover:bg-muted/30 border-border/60 transition-colors">
+                    <TableCell className="font-medium text-foreground py-3">
                       <div className="flex flex-col">
-                        <span className="text-slate-100 font-semibold">{sch.resolvedTestTitle}</span>
-                        <span className="text-slate-500 text-[11px] font-mono flex items-center gap-1 mt-0.5">
-                          <Calendar className="w-3 h-3 text-slate-600" />
+                        <span className="text-foreground font-semibold text-xs">{sch.resolvedTestTitle}</span>
+                        <span className="text-muted-foreground text-[10px] font-mono flex items-center gap-1 mt-0.5">
+                          <Calendar className="w-3 h-3 text-muted-foreground/60" />
                           {sch.startTime ? new Date(sch.startTime).toLocaleDateString() : "Scheduled"}
                         </span>
                       </div>
                     </TableCell>
                     <TableCell>
-                      <Badge variant="outline" className="border-slate-700 bg-slate-950 text-slate-300 font-mono text-[10px]">
+                      <Badge variant="outline" className="border-border bg-muted/40 text-muted-foreground font-mono text-[10px]">
                         {sch.proctoringMode || "PROCTORED"}
                       </Badge>
                     </TableCell>
                     <TableCell>
                       <div className="flex flex-col font-sans">
-                        <span className="text-slate-200 text-xs font-semibold">{sch.resolvedOrgName}</span>
-                        <span className="text-slate-500 text-[11px] font-mono">{sch.batchName || sch.batch || "All Candidates"}</span>
+                        <span className="text-foreground text-xs font-semibold">{sch.resolvedOrgName}</span>
+                        <span className="text-muted-foreground text-[10px] font-mono">{sch.batchName || sch.batch || "All Candidates"}</span>
                       </div>
                     </TableCell>
                     <TableCell>
                       {sch.status === "COMPLETED" && (
-                        <span className="px-2 py-0.5 rounded-full bg-emerald-950/80 border border-emerald-500/30 text-emerald-400 text-[11px] font-bold inline-flex items-center gap-1">
+                        <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-[10px] font-mono font-medium inline-flex items-center gap-1">
                           <ShieldCheck className="w-3 h-3" /> COMPLETED
                         </span>
                       )}
                       {(sch.status === "ACTIVE" || sch.status === "LIVE" || !sch.status) && (
-                        <span className="px-2 py-0.5 rounded-full bg-cyan-950/80 border border-cyan-500/30 text-cyan-400 text-[11px] font-bold inline-flex items-center gap-1">
-                          <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-ping" /> LIVE ACTIVE
+                        <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-[10px] font-mono font-medium inline-flex items-center gap-1">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" /> LIVE ACTIVE
                         </span>
                       )}
                       {(sch.status === "SCHEDULED" || sch.status === "UPCOMING") && (
-                        <span className="px-2 py-0.5 rounded-full bg-slate-950 border border-slate-700 text-slate-400 text-[11px] font-bold">
+                        <span className="px-2 py-0.5 rounded-full bg-muted border border-border text-muted-foreground text-[10px] font-mono font-medium">
                           SCHEDULED
                         </span>
                       )}
                       {sch.status === "EXPIRED" && (
-                        <span className="px-2 py-0.5 rounded-full bg-amber-950/60 border border-amber-500/30 text-amber-400 text-[11px] font-bold">
+                        <span className="px-2 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400 text-[10px] font-mono font-medium">
                           EXPIRED
                         </span>
                       )}
                     </TableCell>
-                    <TableCell className="w-[180px]">
+                    <TableCell className="w-[160px]">
                       <div className="space-y-1">
-                        <div className="flex justify-between text-[11px]">
-                          <span className="text-slate-300 font-bold">{completedCount} / {totalInvited}</span>
-                          <span className="text-slate-500">{progressPct}%</span>
+                        <div className="flex justify-between text-[10px] font-mono">
+                          <span className="text-foreground font-medium">{completedCount} / {totalInvited}</span>
+                          <span className="text-muted-foreground">{progressPct}%</span>
                         </div>
-                        <Progress value={progressPct} className="h-1.5 bg-slate-950 border border-slate-800" />
+                        <Progress value={progressPct} className="h-1.5 bg-muted border border-border/40" />
                       </div>
                     </TableCell>
-                    <TableCell className="text-right pr-6">
+                    <TableCell className="text-right pr-4">
                       <Button
                         size="sm"
                         variant="outline"
                         onClick={() => navigate(`/superadmin/test-schedules/${sch.id}`)}
-                        className="h-8 border-slate-800 bg-slate-950 hover:bg-slate-900 hover:border-emerald-500/50 text-slate-200 hover:text-white font-mono text-[11px] transition-all group"
+                        className="h-7 border-border bg-background hover:bg-muted text-foreground font-mono text-[10px] transition-all"
                       >
-                        <Eye className="w-3.5 h-3.5 mr-1 text-emerald-400 group-hover:text-emerald-300" />
+                        <Eye className="w-3.5 h-3.5 mr-1 text-muted-foreground" />
                         VIEW
                       </Button>
                     </TableCell>
