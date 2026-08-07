@@ -32,6 +32,8 @@ import {
   Building2,
   Trash2,
   AlertTriangle,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -68,6 +70,7 @@ export default function Users() {
   // Add User Form State
   const [isAddUserOpen, setIsAddUserOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -443,15 +446,30 @@ export default function Users() {
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="pass">Temporary Password</Label>
-                      <Input
-                        id="pass"
-                        type="password"
-                        placeholder="Leave blank for default"
-                        value={formData.password}
-                        onChange={(e) =>
-                          setFormData({ ...formData, password: e.target.value })
-                        }
-                      />
+                      <div className="relative">
+                        <Input
+                          id="pass"
+                          type={showPassword ? "text" : "password"}
+                          placeholder="Leave blank for default"
+                          value={formData.password}
+                          onChange={(e) =>
+                            setFormData({ ...formData, password: e.target.value })
+                          }
+                          className="pr-10"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword(!showPassword)}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors focus:outline-none"
+                          tabIndex={-1}
+                        >
+                          {showPassword ? (
+                            <EyeOff className="w-4 h-4" />
+                          ) : (
+                            <Eye className="w-4 h-4" />
+                          )}
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>
