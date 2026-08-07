@@ -45,6 +45,7 @@ import {
   Loader2,
   Calendar,
   TrendingUp,
+  BarChart3,
   CheckCircle,
   FileText,
   Archive,
@@ -540,7 +541,7 @@ export default function AdminTests() {
                     <Users className="w-5 h-5" />
                   </Button>
 
-                  {/* Reports Button (Bar chart icon / TrendingUp) */}
+                  {/* Reports Button (Bar chart icon / BarChart3) */}
                   <Button
                     variant="ghost"
                     size="icon"
@@ -550,7 +551,7 @@ export default function AdminTests() {
                     title="View Reports"
                     className="text-slate-500 hover:text-primary hover:bg-slate-50 rounded-md"
                   >
-                    <TrendingUp className="w-5 h-5 text-indigo-600" />
+                    <BarChart3 className="w-5 h-5 text-indigo-600" />
                   </Button>
 
                   {/* Dropdown Menu for all actions */}
@@ -589,7 +590,7 @@ export default function AdminTests() {
                           navigate(`/admin/tests/edit/${test.id}?tab=reports`)
                         }
                       >
-                        <TrendingUp className="w-4 h-4 mr-2 text-indigo-600" />
+                        <BarChart3 className="w-4 h-4 mr-2 text-indigo-600" />
                         View Reports
                       </DropdownMenuItem>
                       <DropdownMenuItem onClick={() => handleDuplicate(test)}>

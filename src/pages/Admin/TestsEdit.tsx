@@ -72,6 +72,7 @@ import {
   Calendar,
   Download,
   TrendingUp,
+  BarChart3,
   RefreshCw,
   Eye,
   Upload,
@@ -400,6 +401,8 @@ export default function AdminTestsEdit() {
     autoSubmitOnCriticalViolations: false,
     maxCriticalViolations: 0,
   });
+  const [initialFormData, setInitialFormData] =
+    useState<Partial<CreateTestRequest> | null>(null);
 
   // Form state
   const [unsavedChangesDialogOpen, setUnsavedChangesDialogOpen] =
@@ -496,14 +499,18 @@ export default function AdminTestsEdit() {
   }, [test, selectedScheduleData, scheduleStartTime, scheduleEndTime]);
 
   const isFormDirty = useMemo(() => {
-    if (!test) return false;
-    if (formData.title !== test.title) return true;
-    if ((formData.description || "") !== (test.description || "")) return true;
-    if (formData.durationMins !== test.durationMins) return true;
-    if (formData.difficulty !== test.difficulty) return true;
-    if (formData.passMark !== test.passMark) return true;
-    if (formData.status !== test.status) return true;
-    if ((formData.proctoringMode || "NONE") !== (test.proctoringMode || "NONE"))
+    if (!test || !initialFormData) return false;
+    if (formData.title !== initialFormData.title) return true;
+    if ((formData.description || "") !== (initialFormData.description || ""))
+      return true;
+    if (formData.durationMins !== initialFormData.durationMins) return true;
+    if (formData.difficulty !== initialFormData.difficulty) return true;
+    if (formData.passMark !== initialFormData.passMark) return true;
+    if (formData.status !== initialFormData.status) return true;
+    if (
+      (formData.proctoringMode || "NONE") !==
+      (initialFormData.proctoringMode || "NONE")
+    )
       return true;
 
     // Check instructions general text
@@ -511,8 +518,8 @@ export default function AdminTestsEdit() {
       (formData.instructions as Record<string, unknown> | undefined)?.general ||
       "";
     const originalGeneral =
-      (test.instructions as Record<string, unknown> | undefined)?.general ||
-      DEFAULT_TEST_INSTRUCTIONS;
+      (initialFormData.instructions as Record<string, unknown> | undefined)
+        ?.general || "";
     if (currentGeneral !== originalGeneral) return true;
 
     // Check schedule times
@@ -521,80 +528,101 @@ export default function AdminTestsEdit() {
     // Proctoring settings
     if (
       (formData.enableTabSwitchTracking || false) !==
-      (test.enableTabSwitchTracking || false)
+      (initialFormData.enableTabSwitchTracking || false)
     )
       return true;
-    if ((formData.blockCopyPaste || false) !== (test.blockCopyPaste || false))
+    if (
+      (formData.blockCopyPaste || false) !==
+      (initialFormData.blockCopyPaste || false)
+    )
       return true;
-    if ((formData.blockRightClick || false) !== (test.blockRightClick || false))
+    if (
+      (formData.blockRightClick || false) !==
+      (initialFormData.blockRightClick || false)
+    )
       return true;
     if (
       (formData.warnOnFullscreenExit || false) !==
-      (test.warnOnFullscreenExit || false)
+      (initialFormData.warnOnFullscreenExit || false)
     )
       return true;
-    if ((formData.maxWarnings || 0) !== (test.maxWarnings || 0)) return true;
-    if ((formData.requireWebcam || false) !== (test.requireWebcam || false))
+    if (
+      (formData.maxWarnings || 0) !== (initialFormData.maxWarnings || 0)
+    )
+      return true;
+    if (
+      (formData.requireWebcam || false) !==
+      (initialFormData.requireWebcam || false)
+    )
       return true;
     if (
       (formData.detectFaceNotVisible || false) !==
-      (test.detectFaceNotVisible || false)
+      (initialFormData.detectFaceNotVisible || false)
     )
       return true;
     if (
       (formData.detectMultipleFaces || false) !==
-      (test.detectMultipleFaces || false)
+      (initialFormData.detectMultipleFaces || false)
     )
       return true;
     if (
       (formData.detectSuspiciousAudio || false) !==
-      (test.detectSuspiciousAudio || false)
+      (initialFormData.detectSuspiciousAudio || false)
     )
       return true;
-    if ((formData.detectObjects || false) !== (test.detectObjects || false))
+    if (
+      (formData.detectObjects || false) !==
+      (initialFormData.detectObjects || false)
+    )
       return true;
     if (
       (formData.periodicSnapshots || false) !==
-      (test.periodicSnapshots || false)
+      (initialFormData.periodicSnapshots || false)
     )
       return true;
-    if ((formData.evidenceCapture || false) !== (test.evidenceCapture || false))
+    if (
+      (formData.evidenceCapture || false) !==
+      (initialFormData.evidenceCapture || false)
+    )
       return true;
     if (
       (formData.requireMicrophone || false) !==
-      (test.requireMicrophone || false)
+      (initialFormData.requireMicrophone || false)
     )
       return true;
     if (
       (formData.requireScreenShare || false) !==
-      (test.requireScreenShare || false)
+      (initialFormData.requireScreenShare || false)
     )
       return true;
-    if ((formData.detectDevTools || false) !== (test.detectDevTools || false))
+    if (
+      (formData.detectDevTools || false) !==
+      (initialFormData.detectDevTools || false)
+    )
       return true;
     if (
       (formData.detectScreenShareStop || false) !==
-      (test.detectScreenShareStop || false)
+      (initialFormData.detectScreenShareStop || false)
     )
       return true;
     if (
       (formData.enableLiveProctoring || false) !==
-      (test.enableLiveProctoring || false)
+      (initialFormData.enableLiveProctoring || false)
     )
       return true;
     if (
       (formData.autoSubmitOnCriticalViolations || false) !==
-      (test.autoSubmitOnCriticalViolations || false)
+      (initialFormData.autoSubmitOnCriticalViolations || false)
     )
       return true;
     if (
       (formData.maxCriticalViolations || 0) !==
-      (test.maxCriticalViolations || 0)
+      (initialFormData.maxCriticalViolations || 0)
     )
       return true;
 
     return false;
-  }, [formData, test, isScheduleDirty]);
+  }, [formData, initialFormData, test, isScheduleDirty]);
 
   useEffect(() => {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
@@ -642,8 +670,25 @@ export default function AdminTestsEdit() {
         setQuestionsData([]);
       }
 
+      // Populate schedule state with active or first schedule
+      const testSchedules = data.testSchedules || [];
+      const activeOrFirst =
+        testSchedules.find(
+          (s) => s.status === "SCHEDULED" || s.status === "LIVE",
+        ) || testSchedules[0];
+
+      if (activeOrFirst) {
+        setSelectedScheduleData(activeOrFirst);
+        if (activeOrFirst.startTime) {
+          setScheduleStartTime(activeOrFirst.startTime.slice(0, 16));
+        }
+        if (activeOrFirst.endTime) {
+          setScheduleEndTime(activeOrFirst.endTime.slice(0, 16));
+        }
+      }
+
       // Populate form with test data
-      setFormData({
+      const initialForm: Partial<CreateTestRequest> = {
         title: data.title,
         description: data.description || "",
         durationMins: data.durationMins,
@@ -756,7 +801,10 @@ To refer to the FAQ document, you can click on the HELP button which is present 
             ? data.maxCriticalViolations || 0
             : getProctoringPreset(data.proctoringMode || "NONE")
                 .maxCriticalViolations,
-      });
+      };
+
+      setFormData(initialForm);
+      setInitialFormData(initialForm);
     } catch (error: unknown) {
       console.error("Failed to fetch test:", error);
       navigate("/admin/tests");
@@ -986,6 +1034,7 @@ To refer to the FAQ document, you can click on the HELP button which is present 
             }
           : prev,
       );
+      setInitialFormData({ ...formData });
       toast({
         title: "Saved",
         description: "Basic information saved successfully.",
@@ -1068,6 +1117,7 @@ To refer to the FAQ document, you can click on the HELP button which is present 
             }
           : prev,
       );
+      setInitialFormData({ ...formData });
       toast({
         title: "Saved",
         description: "Proctoring settings saved successfully.",
@@ -3617,7 +3667,7 @@ To refer to the FAQ document, you can click on the HELP button which is present 
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
               <div>
                 <CardTitle className="text-xl font-bold flex items-center gap-2">
-                  <TrendingUp className="w-5 h-5 text-indigo-500" />
+                  <BarChart3 className="w-5 h-5 text-indigo-500" />
                   Candidate Performance Reports
                 </CardTitle>
                 <CardDescription>
@@ -3672,7 +3722,7 @@ To refer to the FAQ document, you can click on the HELP button which is present 
                 </div>
               ) : displayedCandidates.length === 0 ? (
                 <div className="text-center py-16 border-2 border-dashed rounded-lg">
-                  <TrendingUp className="w-12 h-12 mx-auto text-muted-foreground mb-4 opacity-50" />
+                  <BarChart3 className="w-12 h-12 mx-auto text-muted-foreground mb-4 opacity-50" />
                   <p className="text-muted-foreground font-medium">
                     No candidate records found for this test.
                   </p>
@@ -4050,7 +4100,7 @@ To refer to the FAQ document, you can click on the HELP button which is present 
         <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-2xl font-bold flex items-center gap-2">
-              <TrendingUp className="w-6 h-6 text-indigo-500" />
+              <BarChart3 className="w-6 h-6 text-indigo-500" />
               Advanced Report: {selectedReportCandidate?.candidateName}
             </DialogTitle>
             <DialogDescription>
