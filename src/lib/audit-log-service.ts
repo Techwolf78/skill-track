@@ -64,13 +64,17 @@ export const auditLogService = {
     const data = response.data?.data;
 
     const mapBackendLog = (log: BackendAuditLog): AuditLog => {
-      // Parse timestamp (handles ISO string and Spring Boot LocalDateTime array format)
+      // Parse timestamp (handles ISO string and Spring Boot LocalDateTime array format as UTC)
       let timestamp = new Date().toISOString();
       const dateVal = log.createdAt || log.timestamp;
       if (dateVal) {
         if (Array.isArray(dateVal)) {
           const [year, month, day, hour = 0, minute = 0, second = 0, ms = 0] = dateVal;
-          timestamp = new Date(year, month - 1, day, hour, minute, second, ms).toISOString();
+          // Spring Boot LocalDateTime arrays are in UTC
+          timestamp = new Date(Date.UTC(year, month - 1, day, hour, minute, second, ms)).toISOString();
+        } else if (typeof dateVal === "string") {
+          const str = (!dateVal.endsWith("Z") && !dateVal.includes("+") && dateVal.includes("T")) ? `${dateVal}Z` : dateVal;
+          timestamp = new Date(str).toISOString();
         } else {
           timestamp = new Date(dateVal).toISOString();
         }
