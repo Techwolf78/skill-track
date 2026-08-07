@@ -6,6 +6,13 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import {
   GraduationCap,
   Shield,
   BarChart3,
@@ -454,6 +461,7 @@ export default function NationalLandingPage() {
   const [isScrolled, setIsScrolled] = useState(false);
   const [scrollProgress, setScrollProgress] = useState(0);
   const [isNavTransitioning, setIsNavTransitioning] = useState(false);
+  const [isVideoModalOpen, setIsVideoModalOpen] = useState(false);
   const [activeLayout, setActiveLayout] = useState<"horizontal" | "vertical">(
     "horizontal",
   );
@@ -748,15 +756,13 @@ export default function NationalLandingPage() {
                   <Button
                     size="lg"
                     variant="outline"
-                    className="text-sm px-6 py-5 rounded-xl bg-white hover:bg-slate-50 border border-slate-200 shadow-sm hover:scale-[1.01] active:scale-[0.99] transition-all duration-200"
-                    onClick={() =>
-                      document
-                        .getElementById("features")
-                        ?.scrollIntoView({ behavior: "smooth" })
-                    }
+                    className="text-sm px-6 py-5 rounded-xl bg-white hover:bg-slate-50 border border-slate-200 shadow-sm hover:scale-[1.01] active:scale-[0.99] transition-all duration-200 flex items-center gap-2"
+                    onClick={() => setIsVideoModalOpen(true)}
                   >
+                    <Play className="w-4 h-4 text-primary fill-primary/20" />
                     View Demo
                   </Button>
+
                 </div>
 
                 {/* Sleek inline Stats Row */}
@@ -1175,13 +1181,10 @@ export default function NationalLandingPage() {
 
                 <div className="flex items-center gap-4 pt-2">
                   <Button
-                    onClick={() =>
-                      document
-                        .getElementById("contact")
-                        ?.scrollIntoView({ behavior: "smooth" })
-                    }
-                    className="px-6 py-3 rounded-lg bg-[#FF5733] hover:bg-[#E04F2E] text-white font-semibold text-sm transition-all shadow-sm border-0 h-auto"
+                    onClick={() => setIsVideoModalOpen(true)}
+                    className="px-6 py-3 rounded-lg bg-[#FF5733] hover:bg-[#E04F2E] text-white font-semibold text-sm transition-all shadow-sm border-0 h-auto flex items-center gap-2 group"
                   >
+                    <Play className="w-4 h-4 fill-white group-hover:scale-110 transition-transform" />
                     Watch video
                   </Button>
 
@@ -2129,6 +2132,37 @@ export default function NationalLandingPage() {
           </div>
         </div>
       </footer>
+
+      {/* Video Modal Popup */}
+      <Dialog open={isVideoModalOpen} onOpenChange={setIsVideoModalOpen}>
+        <DialogContent className="max-w-4xl p-0 overflow-hidden bg-slate-950 border-slate-800 text-white rounded-2xl shadow-2xl">
+          <DialogHeader className="p-4 sm:p-5 bg-slate-900/90 border-b border-slate-800/80 flex flex-row items-center justify-between text-left pr-12">
+            <div>
+              <DialogTitle className="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+                <div className="w-7 h-7 rounded-lg bg-primary/20 border border-primary/30 flex items-center justify-center">
+                  <Play className="w-3.5 h-3.5 text-primary fill-primary" />
+                </div>
+                Platform Demo & Video Tour
+              </DialogTitle>
+              <DialogDescription className="text-xs text-slate-400 mt-1">
+                Explore our automated skill evaluation and proctoring platform. (Placeholder video — official platform tour coming soon)
+              </DialogDescription>
+            </div>
+          </DialogHeader>
+
+          <div className="relative w-full aspect-video bg-black flex items-center justify-center">
+            {isVideoModalOpen && (
+              <iframe
+                src="https://www.youtube.com/embed/8mAITCNt70k?autoplay=1&rel=0"
+                title="RxOne Platform Video"
+                className="w-full h-full border-0"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                allowFullScreen
+              />
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
