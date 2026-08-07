@@ -107,6 +107,14 @@ const App = () => (
                 <Route path="students" element={<Students />} />
                 <Route path="questions" element={<QuestionBank />} />
                 <Route
+                  path="dsa-playground"
+                  element={<DSAPlayground />}
+                />
+                <Route
+                  path="questions/playground"
+                  element={<DSAPlayground />}
+                />
+                <Route
                   path="questions/playground/:id"
                   element={<DSAPlayground />}
                 />
