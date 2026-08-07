@@ -138,23 +138,10 @@ export default function InviteCandidates() {
     }
   }, [toast]);
 
+  // Do not auto-select schedule on initial page load to keep dropdown explicit
   useEffect(() => {
     fetchData();
   }, [fetchData]);
-
-  // Auto-select the first active schedule when data is loaded
-  useEffect(() => {
-    if (schedules.length > 0 && !selectedSchedule) {
-      const active = schedules.filter(
-        (s) => s.status === "SCHEDULED" || s.status === "LIVE",
-      );
-      if (active.length > 0) {
-        setSelectedSchedule(active[0].id);
-      } else {
-        setSelectedSchedule(schedules[0].id);
-      }
-    }
-  }, [schedules, selectedSchedule]);
 
   const handleInvite = async () => {
     if (!selectedSchedule) {
@@ -493,7 +480,7 @@ export default function InviteCandidates() {
 
             <Button
               variant="outline"
-              onClick={() => navigate("../invitations-history")}
+              onClick={() => navigate(`../invitations-history${selectedSchedule ? `?scheduleId=${selectedSchedule}` : ""}`)}
               className="w-full h-8 justify-between border-border bg-muted/20 text-[10px] font-mono text-muted-foreground hover:text-foreground hover:bg-muted px-2.5"
             >
               <span className="flex items-center gap-1.5">

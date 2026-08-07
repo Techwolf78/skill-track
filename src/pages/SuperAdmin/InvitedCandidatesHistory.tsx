@@ -28,6 +28,15 @@ import { candidateService, Candidate } from "@/lib/candidate-service";
 import { apiClient } from "@/lib/api-client";
 import { useNavigate } from "react-router-dom";
 
+import { useSearchParams } from "react-router-dom";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+
 interface CandidateInvitation {
   id: string;
   scheduleId: string;
@@ -38,9 +47,13 @@ interface CandidateInvitation {
 }
 
 export default function InvitedCandidatesHistory() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const initialScheduleId = searchParams.get("scheduleId") || "ALL";
+
   const [schedules, setSchedules] = useState<TestSchedule[]>([]);
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [invitations, setInvitations] = useState<CandidateInvitation[]>([]);
+  const [selectedScheduleFilter, setSelectedScheduleFilter] = useState<string>(initialScheduleId);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [copiedToken, setCopiedToken] = useState<string | null>(null);
@@ -122,8 +135,12 @@ export default function InvitedCandidatesHistory() {
     return new Date(dateStr).toLocaleString();
   };
 
-  // Filter ONLY invited candidates
-  const invitedCandidateIds = new Set(invitations.map(i => i.candidateId));
+  // Filter invitations by selected schedule (if specific schedule is selected)
+  const filteredInvitationsList = selectedScheduleFilter === "ALL" 
+    ? invitations 
+    : invitations.filter(i => i.scheduleId === selectedScheduleFilter);
+
+  const invitedCandidateIds = new Set(filteredInvitationsList.map(i => i.candidateId));
   
   const filteredInvitedCandidates = candidates.filter(candidate => {
     const isInvited = invitedCandidateIds.has(candidate.id);
@@ -135,7 +152,7 @@ export default function InvitedCandidatesHistory() {
 
   // Map invitations to candidate display
   const invitationsForDisplay = filteredInvitedCandidates.flatMap(candidate => {
-    const candInvs = invitations.filter(i => i.candidateId === candidate.id);
+    const candInvs = filteredInvitationsList.filter(i => i.candidateId === candidate.id);
     return candInvs.map(inv => {
       const schedule = schedules.find(s => s.id === inv.scheduleId);
       return {
@@ -165,17 +182,43 @@ export default function InvitedCandidatesHistory() {
         </div>
       </div>
 
-      <div className="flex items-center justify-between gap-4">
-        <div className="relative max-w-md w-full">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input
-            placeholder="Search by name or email..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10"
-          />
+      <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
+        <div className="flex flex-1 items-center gap-3">
+          <div className="relative max-w-md w-full">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Input
+              placeholder="Search by name or email..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10 font-mono text-sm"
+            />
+          </div>
+
+          {/* Schedule Filter Dropdown (Toggle Selected Schedule vs All Schedules) */}
+          <Select
+            value={selectedScheduleFilter}
+            onValueChange={(val) => {
+              setSelectedScheduleFilter(val);
+              setSearchParams(val === "ALL" ? {} : { scheduleId: val });
+            }}
+          >
+            <SelectTrigger className="w-[260px] font-mono text-xs h-10 border-border bg-background">
+              <SelectValue placeholder="Filter by schedule..." />
+            </SelectTrigger>
+            <SelectContent className="font-mono text-xs bg-popover border-border">
+              <SelectItem value="ALL" className="font-bold text-emerald-400">
+                🌐 All Test Schedules (Global View)
+              </SelectItem>
+              {schedules.map((s) => (
+                <SelectItem key={s.id} value={s.id}>
+                  {s.test?.title || "Test Schedule"} ({s.status})
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
-        <Badge variant="secondary" className="px-3 py-1">
+
+        <Badge variant="secondary" className="px-3 py-1 font-mono text-xs border border-border shrink-0">
           {invitationsForDisplay.length} Total Invitations
         </Badge>
       </div>
