@@ -4,7 +4,7 @@ import { SuperAdminSidebar } from "./SuperAdminSidebar";
 import { AdminSidebar } from "./AdminSidebarNew";
 import { useAuth } from "@/lib/auth-context";
 import { ROLES } from "@/lib/roles";
-import { SuperAdminSkeletonLoader } from "@/components/ui/SuperAdminSkeletonLoader";
+import { getDedicatedSkeleton } from "@/components/ui/DedicatedSkeletons";
 
 function AdminContentWrapper() {
   const location = useLocation();
@@ -18,12 +18,14 @@ function AdminContentWrapper() {
     return () => clearTimeout(timer);
   }, [location.pathname]);
 
+  const skeleton = getDedicatedSkeleton(location.pathname);
+
   if (loading) {
-    return <SuperAdminSkeletonLoader />;
+    return skeleton;
   }
 
   return (
-    <Suspense fallback={<SuperAdminSkeletonLoader />}>
+    <Suspense fallback={skeleton}>
       <Outlet />
     </Suspense>
   );
