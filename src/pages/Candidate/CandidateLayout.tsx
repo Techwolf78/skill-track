@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { authService } from "@/lib/auth-service";
+import { getDedicatedSkeleton } from "@/components/ui/DedicatedSkeletons";
 
 const navItems = [
   { icon: LayoutDashboard, label: "Dashboard", path: "/candidate", end: true },
@@ -152,7 +153,7 @@ export function CandidateLayout() {
           </div>
         </header>
         <div className="flex-1 p-8 animate-fade-in">
-          <Suspense fallback={null}>
+          <Suspense fallback={getDedicatedSkeleton(location.pathname)}>
             <Outlet />
           </Suspense>
         </div>

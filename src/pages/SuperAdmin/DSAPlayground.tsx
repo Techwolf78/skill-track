@@ -327,6 +327,85 @@ export default function DSAPlayground() {
   useEffect(() => {
     if (id) {
       fetchQuestionFromBackend();
+    } else {
+      // Fallback: Fetch questions from question bank and load first coding question, or default template
+      async function loadDefaultQuestion() {
+        try {
+          setLoading(true);
+          const allQuestions = await testService.getAllQuestions();
+          const firstCoding = allQuestions.find((q) => q.questionType === "CODING");
+          if (firstCoding) {
+            const tc = await testService.getTestCasesByCodingQuestion(firstCoding.id);
+            const sampleInput = tc.find((t) => t.sample)?.input || tc[0]?.input || "nums = [2, 7, 11, 15], target = 9";
+            const sampleOutput = tc.find((t) => t.sample)?.expectedOutput || tc[0]?.expectedOutput || "[0, 1]";
+
+            setQuestion({
+              id: firstCoding.id,
+              type: "coding",
+              question: firstCoding.prompt,
+              title: firstCoding.title || "Two Sum - Algorithmic Sandbox",
+              difficulty: firstCoding.difficulty || "MEDIUM",
+              constraints: firstCoding.constraints || "2 <= nums.length <= 10^4",
+              hints: firstCoding.hints || ["Use a hash map to look up complements in O(1) time."],
+              problemStatement: firstCoding.prompt,
+              sampleInput,
+              sampleOutput,
+              testCases: tc.map((t) => ({ input: t.input, expected: t.expectedOutput, isHidden: !t.sample })),
+              marks: firstCoding.marks || 10,
+              codeSnippets: [
+                { code: getDefaultCode("python3", firstCoding.prompt), lang: "Python 3", langSlug: "python3" },
+                { code: getDefaultCode("javascript", firstCoding.prompt), lang: "JavaScript", langSlug: "javascript" },
+                { code: getDefaultCode("java", firstCoding.prompt), lang: "Java", langSlug: "java" },
+                { code: getDefaultCode("cpp", firstCoding.prompt), lang: "C++", langSlug: "cpp" },
+              ]
+            });
+            setCode(getDefaultCode("python3", firstCoding.prompt));
+          } else {
+            // Default sample DSA question if bank is empty
+            const defaultPrompt = "Given an array of integers `nums` and an integer `target`, return indices of the two numbers such that they add up to `target`.";
+            setQuestion({
+              id: "sample-two-sum",
+              type: "coding",
+              question: defaultPrompt,
+              title: "Two Sum Sandbox",
+              difficulty: "EASY",
+              constraints: "2 <= nums.length <= 10^4",
+              hints: ["Try using a Hash Table to store numbers seen so far."],
+              problemStatement: defaultPrompt,
+              sampleInput: "nums = [2, 7, 11, 15], target = 9",
+              sampleOutput: "[0, 1]",
+              testCases: [{ input: "[2, 7, 11, 15]\n9", expected: "[0, 1]", isHidden: false }],
+              marks: 10,
+              codeSnippets: [
+                { code: getDefaultCode("python3", defaultPrompt), lang: "Python 3", langSlug: "python3" },
+                { code: getDefaultCode("javascript", defaultPrompt), lang: "JavaScript", langSlug: "javascript" },
+              ]
+            });
+            setCode(getDefaultCode("python3", defaultPrompt));
+          }
+        } catch {
+          // Fallback static question
+          const defaultPrompt = "Given an array of integers `nums` and an integer `target`, return indices of the two numbers such that they add up to `target`.";
+          setQuestion({
+            id: "sample-two-sum",
+            type: "coding",
+            question: defaultPrompt,
+            title: "Two Sum Sandbox",
+            difficulty: "EASY",
+            constraints: "2 <= nums.length <= 10^4",
+            hints: ["Try using a Hash Table to store numbers seen so far."],
+            problemStatement: defaultPrompt,
+            sampleInput: "nums = [2, 7, 11, 15], target = 9",
+            sampleOutput: "[0, 1]",
+            testCases: [{ input: "[2, 7, 11, 15]\n9", expected: "[0, 1]", isHidden: false }],
+            marks: 10,
+          });
+          setCode(getDefaultCode("python3", defaultPrompt));
+        } finally {
+          setLoading(false);
+        }
+      }
+      loadDefaultQuestion();
     }
   }, [id, fetchQuestionFromBackend]);
 

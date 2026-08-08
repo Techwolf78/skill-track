@@ -1,54 +1,39 @@
- import { cn } from "@/lib/utils";
- import { LucideIcon } from "lucide-react";
- 
- interface StatsCardProps {
-   title: string;
-   value: string | number;
-   subtitle?: string;
-   icon: LucideIcon;
-   variant?: "default" | "accent" | "success" | "warning";
-   trend?: {
-     value: number;
-     positive: boolean;
-   };
- }
- 
- export function StatsCard({ 
-   title, 
-   value, 
-   subtitle, 
-   icon: Icon, 
-   variant = "default",
-   trend 
- }: StatsCardProps) {
-   return (
-     <div className={cn("stat-card card-hover", variant)}>
-       <div className="flex items-start justify-between">
-         <div>
-           <p className="text-sm font-medium text-muted-foreground">{title}</p>
-           <p className="text-3xl font-bold font-heading mt-2">{value}</p>
-           {subtitle && (
-             <p className="text-sm text-muted-foreground mt-1">{subtitle}</p>
-           )}
-           {trend && (
-             <p className={cn(
-               "text-sm font-medium mt-2",
-               trend.positive ? "text-success" : "text-destructive"
-             )}>
-               {trend.positive ? "+" : "-"}{Math.abs(trend.value)}% from last month
-             </p>
-           )}
-         </div>
-         <div className={cn(
-           "w-12 h-12 rounded-xl flex items-center justify-center",
-           variant === "default" && "bg-primary/10 text-primary",
-           variant === "accent" && "bg-accent/10 text-accent",
-           variant === "success" && "bg-success/10 text-success",
-           variant === "warning" && "bg-warning/10 text-warning"
-         )}>
-           <Icon className="w-6 h-6" />
-         </div>
-       </div>
-     </div>
-   );
- }
+import { cn } from "@/lib/utils";
+import { LucideIcon } from "lucide-react";
+
+interface StatsCardProps {
+  title: string;
+  value: string | number;
+  subtitle?: string;
+  icon: LucideIcon;
+  variant?: "default" | "accent" | "success" | "warning" | "danger";
+  trend?: {
+    value: number;
+    positive: boolean;
+  };
+  sparklineData?: number[];
+}
+
+export function StatsCard({
+  title,
+  value,
+  subtitle,
+  icon: Icon,
+}: StatsCardProps) {
+  return (
+    <div className="p-4 rounded-xl border border-border bg-card hover:bg-accent/30 transition-colors shadow-xs group">
+      <div className="flex items-center justify-between">
+        <span className="text-xs font-medium text-muted-foreground">{title}</span>
+        <div className="w-8 h-8 rounded-lg bg-muted/60 flex items-center justify-center text-muted-foreground group-hover:text-foreground group-hover:bg-background transition-colors border border-border/40">
+          <Icon className="w-4 h-4" />
+        </div>
+      </div>
+      <div className="mt-3">
+        <span className="text-2xl font-bold text-foreground font-mono tracking-tight">{value}</span>
+        {subtitle && (
+          <p className="text-[11px] text-muted-foreground mt-1 font-mono">{subtitle}</p>
+        )}
+      </div>
+    </div>
+  );
+}

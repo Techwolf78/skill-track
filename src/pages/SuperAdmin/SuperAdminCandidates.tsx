@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -229,6 +230,7 @@ function CandidateInsightsSection({ candidateId, onInsightsLoaded }: { candidate
 }
 
 export default function Students() {
+  const [searchParams] = useSearchParams();
   const [searchTerm, setSearchTerm] = useState("");
   const [testsCountMap, setTestsCountMap] = useState<Record<string, number>>({});
   const { data: candidates = [], isLoading: candidatesLoading, refetch: refetchCandidates } = useCandidatesQuery();
@@ -239,6 +241,12 @@ export default function Students() {
   
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isBulkUploadOpen, setIsBulkUploadOpen] = useState(false);
+
+  useEffect(() => {
+    if (searchParams.get("action") === "bulk-upload") {
+      setIsBulkUploadOpen(true);
+    }
+  }, [searchParams]);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [selectedCandidate, setSelectedCandidate] = useState<Candidate | null>(null);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
