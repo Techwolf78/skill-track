@@ -27,3 +27,7 @@ dist-ssr
 .env
 .env.*
 !.env.example
+
+# PDF output files and PDF generation scripts
+*.pdf
+generate_*.py
