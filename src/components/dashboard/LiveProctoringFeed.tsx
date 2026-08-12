@@ -2,15 +2,20 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Terminal, ShieldAlert, CheckCircle, AlertTriangle, Play, Loader2 } from "lucide-react";
 import { auditLogService, AuditLog } from "@/lib/audit-log-service";
+import { getTimeframeCutoff } from "@/lib/utils";
 
-export function LiveProctoringFeed() {
+interface LiveProctoringFeedProps {
+  timeframe?: string;
+}
+
+export function LiveProctoringFeed({ timeframe = "7D" }: LiveProctoringFeedProps) {
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [loading, setLoading] = useState(true);
 
   const fetchLiveLogs = async () => {
     try {
       setLoading(true);
-      const res = await auditLogService.getAuditLogs({ page: 0, size: 8 });
+      const res = await auditLogService.getAuditLogs({ page: 0, size: 20 });
       setLogs(res.content || []);
     } catch (err) {
       console.error("Failed to fetch live audit logs:", err);
@@ -23,7 +28,16 @@ export function LiveProctoringFeed() {
     fetchLiveLogs();
     const interval = setInterval(fetchLiveLogs, 10000); // refresh every 10s
     return () => clearInterval(interval);
-  }, []);
+  }, [timeframe]);
+
+  const cutoff = getTimeframeCutoff(timeframe);
+  const filteredLogs = logs.filter((log) => {
+    if (!log.timestamp) return true;
+    const logDate = new Date(log.timestamp);
+    if (isNaN(logDate.getTime())) return true;
+    return logDate.getTime() >= cutoff.getTime();
+  }).slice(0, 8);
+
 
   return (
     <Card className="border-border bg-card shadow-xs overflow-hidden">
@@ -40,18 +54,19 @@ export function LiveProctoringFeed() {
         </span>
       </CardHeader>
       <CardContent className="p-0">
-        {loading && logs.length === 0 ? (
+        {loading && filteredLogs.length === 0 ? (
           <div className="p-6 flex items-center justify-center gap-2 text-muted-foreground text-xs font-sans">
             <Loader2 className="w-4 h-4 animate-spin text-emerald-500" />
             Connecting to live audit log stream...
           </div>
-        ) : logs.length === 0 ? (
+        ) : filteredLogs.length === 0 ? (
           <div className="p-6 text-center text-muted-foreground text-xs font-sans">
-            No recent audit telemetry events recorded.
+            No audit telemetry events in selected period ({timeframe}).
           </div>
         ) : (
           <div className="divide-y divide-border/50 max-h-[220px] overflow-y-auto font-mono">
-            {logs.map((log) => {
+            {filteredLogs.map((log) => {
+
               const timeStr = log.timestamp
                 ? new Date(log.timestamp).toLocaleTimeString()
                 : "Just now";

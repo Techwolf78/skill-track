@@ -31,6 +31,10 @@ describe("Code Execution Logic", () => {
     it("should return true for TIME_LIMIT_EXCEEDED", () => {
       expect(isTerminalStatus("TIME_LIMIT_EXCEEDED")).toBe(true);
     });
+
+    it("should return true for MEMORY_LIMIT_EXCEEDED", () => {
+      expect(isTerminalStatus("MEMORY_LIMIT_EXCEEDED")).toBe(true);
+    });
   });
 
   describe("mapTestCaseResults", () => {

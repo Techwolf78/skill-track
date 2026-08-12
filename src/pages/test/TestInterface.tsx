@@ -1068,6 +1068,7 @@ useEffect(() => {
 
 
   const handleRunCode = useCallback(async () => {
+    if (isRunning || isSubmittingCode) return;
     if (questions.length === 0) return;
     const currentQ = questions[currentIndex];
     if (!currentQ || currentQ.type !== "CODING") return;
@@ -1129,6 +1130,7 @@ useEffect(() => {
   }, [questions, currentIndex, sessionId, language, code, toast]);
 
   const handleSubmitQuestion = useCallback(async () => {
+    if (isRunning || isSubmittingCode) return;
     if (questions.length === 0) return;
     const currentQ = questions[currentIndex];
     if (!currentQ) return;

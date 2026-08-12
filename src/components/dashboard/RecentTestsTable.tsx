@@ -15,6 +15,7 @@ import { useNavigate } from "react-router-dom";
 import { testService, TestScheduleExtended, Test } from "@/lib/test-service";
 import { apiClient } from "@/lib/api-client";
 import { organisationService, OrganisationResponse } from "@/lib/organisation-service";
+import { getTimeframeCutoff } from "@/lib/utils";
 
 interface MappedSchedule extends TestScheduleExtended {
   resolvedTestTitle: string;
@@ -26,7 +27,12 @@ interface MappedSchedule extends TestScheduleExtended {
   batch?: string;
 }
 
-export function RecentTestsTable() {
+interface RecentTestsTableProps {
+  timeframe?: string;
+}
+
+export function RecentTestsTable({ timeframe = "7D" }: RecentTestsTableProps) {
+
   const navigate = useNavigate();
   const [filter, setFilter] = useState<"ALL" | "ACTIVE" | "COMPLETED">("ALL");
   const [schedules, setSchedules] = useState<MappedSchedule[]>([]);
@@ -110,10 +116,31 @@ export function RecentTestsTable() {
 
   const filteredSchedules = schedules.filter((sch) => {
     const status = String(sch.status || "").toUpperCase();
-    if (filter === "ACTIVE") return status === "LIVE" || status === "SCHEDULED" || status === "ACTIVE";
-    if (filter === "COMPLETED") return status === "COMPLETED" || status === "EXPIRED";
+    
+    // Status tab filter
+    let matchStatus = true;
+    if (filter === "ACTIVE") matchStatus = status === "LIVE" || status === "SCHEDULED" || status === "ACTIVE";
+    else if (filter === "COMPLETED") matchStatus = status === "COMPLETED" || status === "EXPIRED";
+    if (!matchStatus) return false;
+
+    // Timeframe cutoff filter
+    if (timeframe) {
+      const cutoff = getTimeframeCutoff(timeframe);
+      const schDateStr = sch.startTime || sch.createdAt;
+      if (schDateStr) {
+        const schDate = new Date(schDateStr);
+        if (!isNaN(schDate.getTime()) && schDate.getTime() < cutoff.getTime()) {
+          // Preserve live/active tests, but filter out older finished/scheduled entries outside the timeframe
+          if (status !== "LIVE" && status !== "ACTIVE") {
+            return false;
+          }
+        }
+      }
+    }
+
     return true;
   });
+
 
   return (
     <div className="space-y-3 font-sans">
