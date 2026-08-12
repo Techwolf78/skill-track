@@ -1864,15 +1864,21 @@ To refer to the FAQ document, you can click on the HELP button which is present 
           );
           const isCoding = q.type === "CODING";
 
-          // Build exact selected ID set
-          let selectedIds = new Set<string>();
+          // Build exact selected ID set & raw answers list
+          let selectedValues = new Set<string>();
           if (sub?.selectedOptionIds && Array.isArray(sub.selectedOptionIds)) {
-            selectedIds = new Set(sub.selectedOptionIds.map(String));
-          } else if (sub?.answerText) {
+            sub.selectedOptionIds.forEach((id: string) => selectedValues.add(String(id).trim().toLowerCase()));
+          }
+          if (sub?.answerText) {
+            const rawAns = String(sub.answerText).trim();
+            selectedValues.add(rawAns.toLowerCase());
             try {
               const parsed = JSON.parse(sub.answerText);
-              if (Array.isArray(parsed))
-                parsed.forEach((id: string) => selectedIds.add(String(id)));
+              if (Array.isArray(parsed)) {
+                parsed.forEach((id: string) => selectedValues.add(String(id).trim().toLowerCase()));
+              } else if (typeof parsed === "string") {
+                selectedValues.add(parsed.trim().toLowerCase());
+              }
             } catch {
               /* raw text */
             }
@@ -1931,14 +1937,33 @@ To refer to the FAQ document, you can click on the HELP button which is present 
                 opt: { id: string; text: string; isCorrect: boolean },
                 oIdx: number,
               ) => {
-                const optionLetter = String.fromCharCode(65 + oIdx);
+                const optionLetter = String.fromCharCode(65 + oIdx); // 'A', 'B', etc.
                 const correctOpt = correctOptions.find(
-                  (co) => co.id === opt.id || co.text === opt.text,
+                  (co) =>
+                    (co.id && opt.id && co.id === opt.id) ||
+                    (co.text && opt.text && co.text.trim().toLowerCase() === opt.text.trim().toLowerCase()),
                 );
                 const isOptionCorrect = correctOpt
-                  ? correctOpt.isCorrect
-                  : opt.isCorrect;
-                const isSelected = selectedIds.has(opt.id);
+                  ? Boolean(correctOpt.isCorrect)
+                  : Boolean(opt.isCorrect);
+
+                // Robust check for selection matching ID, letter, index, or option text
+                const optIdStr = String(opt.id || "").trim().toLowerCase();
+                const optTextStr = String(opt.text || "").trim().toLowerCase();
+                const letterStr = optionLetter.toLowerCase();
+                const idxStr = String(oIdx);
+
+                const isSelected =
+                  (optIdStr !== "" && selectedValues.has(optIdStr)) ||
+                  selectedValues.has(letterStr) ||
+                  selectedValues.has(idxStr) ||
+                  (optTextStr !== "" && selectedValues.has(optTextStr)) ||
+                  Array.from(selectedValues).some(
+                    (val) =>
+                      val === optTextStr ||
+                      val.startsWith(`${letterStr}.`) ||
+                      val.startsWith(`${letterStr} `)
+                  );
 
                 const statusLabel =
                   isSelected && isOptionCorrect
