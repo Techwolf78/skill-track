@@ -205,6 +205,7 @@ export default function ProctoringDashboard() {
     useState<CandidateProctoringDetail | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("overview");
+  const [isSavingReview, setIsSavingReview] = useState(false);
 
   // Evidence UI Enhancements State
   const [lightboxImage, setLightboxImage] = useState<{
@@ -372,29 +373,49 @@ export default function ProctoringDashboard() {
     }
   };
 
-  // Update Candidate Review status (local state only)
-  const handleUpdateReviewStatus = (newStatus: ReviewStatus) => {
+  // Update Candidate Review status (persisted to DB)
+  const handleUpdateReviewStatus = async (newStatus: ReviewStatus) => {
     if (!selectedCandidate) return;
 
-    // Update list state
-    setCandidates((prev) =>
-      prev.map((c) =>
-        c.id === selectedCandidate.id ? { ...c, reviewStatus: newStatus } : c,
-      ),
-    );
+    setIsSavingReview(true);
+    try {
+      await apiClient.patch(
+        `/api/admin/proctoring/candidates/${selectedCandidate.id}/review-status`,
+        {
+          scheduleId: selectedScheduleId,
+          reviewStatus: newStatus,
+        },
+      );
 
-    // Update detail states
-    setSelectedCandidate((prev) =>
-      prev ? { ...prev, reviewStatus: newStatus } : null,
-    );
-    setCandidateDetails((prev) =>
-      prev ? { ...prev, reviewStatus: newStatus } : null,
-    );
+      // Update list state
+      setCandidates((prev) =>
+        prev.map((c) =>
+          c.id === selectedCandidate.id ? { ...c, reviewStatus: newStatus } : c,
+        ),
+      );
 
-    toast({
-      title: "Review Completed",
-      description: `Review status updated to ${newStatus.replace(/_/g, " ")}.`,
-    });
+      // Update detail states
+      setSelectedCandidate((prev) =>
+        prev ? { ...prev, reviewStatus: newStatus } : null,
+      );
+      setCandidateDetails((prev) =>
+        prev ? { ...prev, reviewStatus: newStatus } : null,
+      );
+
+      toast({
+        title: "Review Decision Saved",
+        description: `Review status updated to ${newStatus.replace(/_/g, " ")} and saved to database.`,
+      });
+    } catch (err) {
+      console.error("Failed to update candidate review status:", err);
+      toast({
+        title: "Update Failed",
+        description: "Could not save candidate review status to database. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSavingReview(false);
+    }
   };
 
   // Retry loading
@@ -1693,6 +1714,7 @@ export default function ProctoringDashboard() {
                           <Select
                             value={candidateDetails.reviewStatus}
                             onValueChange={(val) => handleUpdateReviewStatus(val as ReviewStatus)}
+                            disabled={isSavingReview}
                           >
                             <SelectTrigger className="w-full h-10 border-border/80 bg-background/50">
                               <SelectValue placeholder="Update status" />
@@ -1708,7 +1730,7 @@ export default function ProctoringDashboard() {
                         </div>
                         
                         <p className="text-[10px] text-muted-foreground italic leading-relaxed">
-                          Note: Updates are simulated. Changing candidate review status will update the list and details view dynamically.
+                          Review status decisions are saved directly to candidate audit records in the database.
                         </p>
                       </CardContent>
                     </Card>
