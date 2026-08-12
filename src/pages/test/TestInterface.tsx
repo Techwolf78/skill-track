@@ -1127,7 +1127,7 @@ useEffect(() => {
     } finally {
       setIsRunning(false);
     }
-  }, [questions, currentIndex, sessionId, language, code, toast]);
+  }, [questions, currentIndex, sessionId, language, code, toast, isRunning, isSubmittingCode]);
 
   const handleSubmitQuestion = useCallback(async () => {
     if (isRunning || isSubmittingCode) return;
@@ -1340,7 +1340,7 @@ useEffect(() => {
     } finally {
       setIsSubmittingCode(false);
     }
-  }, [questions, currentIndex, sessionId, language, code, answers, toast, isOnline, flushQuestionTiming, getNextSaveVersion]);
+  }, [questions, currentIndex, sessionId, language, code, answers, toast, isOnline, flushQuestionTiming, getNextSaveVersion, isRunning, isSubmittingCode]);
 
   const handleResetCode = useCallback(() => {
     const currentQ = questions[currentIndex];

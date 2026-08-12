@@ -4,6 +4,7 @@ import {
   mapTestCaseResults,
   buildSubmitOutputMessage,
   buildRunOutputMessage,
+  type SubmissionStatus,
 } from "../../lib/exam/codeExecution";
 
 describe("Code Execution Logic", () => {
