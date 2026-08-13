@@ -1,6 +1,10 @@
 {
   "rewrites": [
     {
+      "source": "/api/:path*",
+      "destination": "https://api.gryphonacademy.co.in/:path*"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }
