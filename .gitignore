@@ -31,3 +31,8 @@ dist-ssr
 # PDF output files and PDF generation scripts
 *.pdf
 generate_*.py
+
+# DSA practice files
+dsapratice.js
+dsa*.js
+

@@ -25,6 +25,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { Label } from "@/components/ui/label";
 import {
   Sheet,
@@ -40,6 +45,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import {
   ShieldAlert,
   Search,
@@ -71,6 +82,15 @@ import {
   Columns,
   ZoomIn,
   X,
+  ChevronsUpDown,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
+  FilterX,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiClient } from "@/lib/api-client";
@@ -198,6 +218,27 @@ export default function ProctoringDashboard() {
   const [filterStatus, setFilterStatus] = useState<string>("ALL");
   const [filterReview, setFilterReview] = useState<string>("ALL");
 
+  // Schedule Search Combobox State
+  const [scheduleComboboxOpen, setScheduleComboboxOpen] = useState(false);
+  const [scheduleSearchQuery, setScheduleSearchQuery] = useState("");
+
+  // Table Sorting State
+  type SortField =
+    | "name"
+    | "testStatus"
+    | "proctoringMode"
+    | "riskLevel"
+    | "violationsCount"
+    | "lastActivity"
+    | "reviewStatus";
+  const [sortField, setSortField] = useState<SortField>("riskLevel");
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
+
+  // Table Pagination & View Mode State
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
+  const [isCompact, setIsCompact] = useState(false);
+
   // Selected Candidate Details / Drawer State
   const [selectedCandidate, setSelectedCandidate] =
     useState<ProctoringCandidate | null>(null);
@@ -266,6 +307,7 @@ export default function ProctoringDashboard() {
         lastActivity: cand.lastActivityAt ? new Date(cand.lastActivityAt).toLocaleString() : "No activity",
         reviewStatus: cand.reviewStatus || "NOT_REVIEWED",
       })) : [];
+
       setCandidates(mappedCandidates);
     } catch {
       setErrorCandidates("Could not load candidates for this schedule.");
@@ -575,6 +617,20 @@ export default function ProctoringDashboard() {
     }
   }, [sessionId, schedules]);
 
+  // Auto-reset page when filters, sorting, or selected schedule changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [
+    searchQuery,
+    filterRisk,
+    filterStatus,
+    filterReview,
+    selectedScheduleId,
+    pageSize,
+    sortField,
+    sortOrder,
+  ]);
+
   // Filter candidates client-side
   const filteredCandidates = candidates.filter((cand) => {
     const matchesSearch =
@@ -588,6 +644,139 @@ export default function ProctoringDashboard() {
 
     return matchesSearch && matchesRisk && matchesStatus && matchesReview;
   });
+
+  // Sort candidates
+  const riskWeight: Record<RiskLevel, number> = {
+    CRITICAL: 4,
+    HIGH: 3,
+    MEDIUM: 2,
+    LOW: 1,
+    NONE: 0,
+  };
+
+  const sortedCandidates = [...filteredCandidates].sort((a, b) => {
+    let result = 0;
+    switch (sortField) {
+      case "name":
+        result = a.name.localeCompare(b.name);
+        break;
+      case "testStatus":
+        result = a.testStatus.localeCompare(b.testStatus);
+        break;
+      case "proctoringMode":
+        result = a.proctoringMode.localeCompare(b.proctoringMode);
+        break;
+      case "riskLevel":
+        result =
+          (riskWeight[a.riskLevel] || 0) - (riskWeight[b.riskLevel] || 0);
+        break;
+      case "violationsCount":
+        result = a.violationsCount - b.violationsCount;
+        break;
+      case "lastActivity":
+        result = a.lastActivity.localeCompare(b.lastActivity);
+        break;
+      case "reviewStatus":
+        result = a.reviewStatus.localeCompare(b.reviewStatus);
+        break;
+      default:
+        result = 0;
+    }
+    return sortOrder === "asc" ? result : -result;
+  });
+
+  // Pagination computations
+  const totalFilteredCount = sortedCandidates.length;
+  const totalPages = Math.max(1, Math.ceil(totalFilteredCount / pageSize));
+  const startIndex = (currentPage - 1) * pageSize;
+  const paginatedCandidates = sortedCandidates.slice(
+    startIndex,
+    startIndex + pageSize,
+  );
+
+  // Column sort toggler
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortOrder(sortOrder === "asc" ? "desc" : "asc");
+    } else {
+      setSortField(field);
+      setSortOrder("desc");
+    }
+  };
+
+  // Sort header icon renderer
+  const renderSortIcon = (field: SortField) => {
+    if (sortField !== field) {
+      return (
+        <ArrowUpDown className="h-3 w-3 text-muted-foreground/40 ml-1 inline" />
+      );
+    }
+    return sortOrder === "asc" ? (
+      <ArrowUp className="h-3 w-3 text-rose-500 ml-1 inline" />
+    ) : (
+      <ArrowDown className="h-3 w-3 text-rose-500 ml-1 inline" />
+    );
+  };
+
+  // CSV Export handler
+  const handleExportCSV = () => {
+    if (filteredCandidates.length === 0) {
+      toast({
+        title: "Export Empty",
+        description: "No candidate records match the current filter set.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const headers = [
+      "Candidate Name",
+      "Email",
+      "Test Status",
+      "Proctor Mode",
+      "Risk Level",
+      "Violations Count",
+      "Critical Violations",
+      "Last Activity",
+      "Review Status",
+    ];
+
+    const rows = filteredCandidates.map((c) => [
+      `"${c.name.replace(/"/g, '""')}"`,
+      `"${c.email.replace(/"/g, '""')}"`,
+      c.testStatus,
+      c.proctoringMode,
+      c.riskLevel,
+      c.violationsCount,
+      c.criticalViolationsCount,
+      `"${c.lastActivity}"`,
+      c.reviewStatus,
+    ]);
+
+    const csvContent = [
+      headers.join(","),
+      ...rows.map((r) => r.join(",")),
+    ].join("\n");
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    const safeName =
+      selectedSchedule?.assessmentName.replace(/[^a-zA-Z0-9]/g, "_") ||
+      "Schedule";
+    link.setAttribute(
+      "download",
+      `Proctoring_Audit_${safeName}_${new Date().toISOString().slice(0, 10)}.csv`,
+    );
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    toast({
+      title: "Export Complete",
+      description: `Exported ${filteredCandidates.length} candidate record(s) to CSV.`,
+    });
+  };
 
   // Selected schedule info
   const selectedSchedule = schedules.find((s) => s.id === selectedScheduleId);
@@ -819,10 +1008,10 @@ export default function ProctoringDashboard() {
   };
 
   return (
-    <div className="p-4 md:p-8 space-y-6 md:space-y-8 animate-fade-in w-full">
+    <div className="p-3 md:p-5 space-y-4 animate-fade-in w-full">
       {/* API Error Banner for Schedules */}
       {errorSchedules && (
-        <div className="flex items-center justify-between gap-4 p-3 bg-red-500/10 border border-red-500/20 text-red-700 dark:text-red-400 rounded-lg text-xs md:text-sm shadow-sm">
+        <div className="flex items-center justify-between gap-3 p-2.5 bg-red-500/10 border border-red-500/20 text-red-700 dark:text-red-400 rounded-lg text-xs shadow-sm">
           <div className="flex items-center gap-2">
             <AlertCircle className="h-4 w-4 shrink-0 text-red-500" />
             <span>{errorSchedules}</span>
@@ -831,7 +1020,7 @@ export default function ProctoringDashboard() {
             variant="outline"
             size="sm"
             onClick={loadSchedules}
-            className="h-8 border-red-500/20 hover:bg-red-500/10 text-red-600 dark:text-red-400 flex gap-1 items-center shrink-0"
+            className="h-7 border-red-500/20 hover:bg-red-500/10 text-red-600 dark:text-red-400 flex gap-1 items-center shrink-0 text-xs"
           >
             <RefreshCw className="h-3 w-3" /> Retry
           </Button>
@@ -839,25 +1028,25 @@ export default function ProctoringDashboard() {
       )}
 
       {/* Header Panel */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-border/40 pb-6">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-border/40 pb-3">
         <div>
-          <h1 className="text-2xl md:text-3xl font-heading font-bold flex items-center gap-3">
-            <ShieldAlert className="h-8 w-8 text-rose-600 animate-pulse shrink-0" />
+          <h1 className="text-xl md:text-2xl font-heading font-bold flex items-center gap-2.5">
+            <ShieldAlert className="h-6 w-6 text-rose-600 animate-pulse shrink-0" />
             Proctoring Security Center
           </h1>
-          <p className="text-muted-foreground mt-1 text-sm md:text-base">
+          <p className="text-muted-foreground mt-0.5 text-xs md:text-sm">
             Track student activities, view system configuration, check camera
             captures, and manage violations.
           </p>
         </div>
-        <div className="flex items-center gap-3 shrink-0">
+        <div className="flex items-center gap-2 shrink-0">
 
           <Button
             variant="default"
             onClick={() => setShowTestUploadModal(true)}
-            className="h-10 bg-indigo-600 hover:bg-indigo-700 text-white font-medium"
+            className="h-8.5 text-xs bg-indigo-600 hover:bg-indigo-700 text-white font-medium px-3"
           >
-            <Camera className="h-4 w-4 mr-2" />
+            <Camera className="h-3.5 w-3.5 mr-1.5" />
             Test Photo Upload
           </Button>
 
@@ -865,10 +1054,10 @@ export default function ProctoringDashboard() {
             variant="outline"
             onClick={handleRetry}
             disabled={loadingSchedules || loadingCandidates}
-            className="h-10 hover:bg-rose-50/40 dark:hover:bg-rose-950/10 border-rose-500/20 text-rose-600"
+            className="h-8.5 text-xs hover:bg-rose-50/40 dark:hover:bg-rose-950/10 border-rose-500/20 text-rose-600 px-3"
           >
             <RefreshCw
-              className={`h-4 w-4 mr-2 ${loadingSchedules || loadingCandidates ? "animate-spin" : ""}`}
+              className={`h-3.5 w-3.5 mr-1.5 ${loadingSchedules || loadingCandidates ? "animate-spin" : ""}`}
             />
             Sync Feed
           </Button>
@@ -876,38 +1065,137 @@ export default function ProctoringDashboard() {
       </div>
 
       {/* 1. Assessment Schedule Dropdown selection */}
-      <div className="grid grid-cols-1 gap-6 items-end bg-card p-5 md:p-6 rounded-xl border border-border/60 shadow-sm backdrop-blur-md">
-        <div className="space-y-2.5">
-          <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-            <Layers className="h-3.5 w-3.5 text-primary" /> Select Assessment
-            Schedule
+      <div className="bg-card p-3 md:p-4 rounded-lg border border-border/60 shadow-sm backdrop-blur-md space-y-2">
+        <div className="flex items-center justify-between">
+          <Label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+            <Layers className="h-3.5 w-3.5 text-rose-500" /> Select Assessment Schedule
           </Label>
-          <Select
-            value={selectedScheduleId}
-            onValueChange={setSelectedScheduleId}
-            disabled={loadingSchedules}
-          >
-            <SelectTrigger className="h-11 border-border/80 bg-background/50 focus:ring-primary/20">
-              <SelectValue placeholder="Choose an assessment schedule to audit..." />
-            </SelectTrigger>
-            <SelectContent>
-              {schedules.map((sch) => (
-                <SelectItem
-                  key={sch.id}
-                  value={sch.id}
-                  className="cursor-pointer"
-                >
-                  <span className="font-semibold text-foreground">
-                    {sch.assessmentName}
-                  </span>
-                  <span className="text-xs text-muted-foreground ml-2.5">
-                    — {sch.scheduledDate} ({sch.startTime})
-                  </span>
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          {schedules.length > 0 && (
+            <Badge variant="outline" className="text-[10px] font-mono font-semibold border-border/80 text-muted-foreground px-1.5 py-0">
+              {schedules.length} Schedules
+            </Badge>
+          )}
         </div>
+
+        <Popover open={scheduleComboboxOpen} onOpenChange={setScheduleComboboxOpen}>
+          <PopoverTrigger asChild>
+            <Button
+              variant="outline"
+              role="combobox"
+              aria-expanded={scheduleComboboxOpen}
+              disabled={loadingSchedules}
+              className="w-full justify-between h-9 px-3 border-border/80 bg-background/50 hover:bg-background/80 focus:ring-2 focus:ring-primary/20 text-left font-normal text-xs md:text-sm"
+            >
+              {selectedSchedule ? (
+                <div className="flex items-center gap-3 truncate">
+                  <span className="font-semibold text-foreground truncate">
+                    {selectedSchedule.assessmentName}
+                  </span>
+                  <span className="text-xs text-muted-foreground shrink-0 font-mono">
+                    — {selectedSchedule.scheduledDate} ({selectedSchedule.startTime})
+                  </span>
+                  {selectedSchedule.proctoringMode && (
+                    <Badge variant="secondary" className="text-[10px] uppercase font-mono shrink-0 hidden sm:inline-flex">
+                      {selectedSchedule.proctoringMode} MODE
+                    </Badge>
+                  )}
+                </div>
+              ) : (
+                <span className="text-muted-foreground">
+                  {loadingSchedules ? "Loading schedules..." : "Search or choose an assessment schedule..."}
+                </span>
+              )}
+              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-2 bg-card border-border shadow-2xl rounded-xl z-50">
+            <div className="space-y-2">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Type to search schedules..."
+                  value={scheduleSearchQuery}
+                  onChange={(e) => setScheduleSearchQuery(e.target.value)}
+                  className="pl-9 h-9 border-border/70 text-xs bg-background"
+                />
+                {scheduleSearchQuery && (
+                  <button
+                    onClick={() => setScheduleSearchQuery("")}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                )}
+              </div>
+
+              <div className="max-h-64 overflow-y-auto space-y-1 pr-1">
+                {schedules.filter(
+                  (sch) =>
+                    sch.assessmentName
+                      .toLowerCase()
+                      .includes(scheduleSearchQuery.toLowerCase()) ||
+                    sch.scheduledDate
+                      .toLowerCase()
+                      .includes(scheduleSearchQuery.toLowerCase()),
+                ).length === 0 ? (
+                  <div className="p-4 text-center text-xs text-muted-foreground">
+                    No matching schedules found.
+                  </div>
+                ) : (
+                  schedules
+                    .filter(
+                      (sch) =>
+                        sch.assessmentName
+                          .toLowerCase()
+                          .includes(scheduleSearchQuery.toLowerCase()) ||
+                        sch.scheduledDate
+                          .toLowerCase()
+                          .includes(scheduleSearchQuery.toLowerCase()),
+                    )
+                    .map((sch) => {
+                      const isSelected = sch.id === selectedScheduleId;
+                      return (
+                        <button
+                          key={sch.id}
+                          onClick={() => {
+                            setSelectedScheduleId(sch.id);
+                            setScheduleComboboxOpen(false);
+                          }}
+                          className={`w-full flex items-center justify-between p-2.5 rounded-lg text-xs text-left transition-colors ${
+                            isSelected
+                              ? "bg-rose-500/10 text-rose-600 dark:text-rose-400 font-semibold border border-rose-500/20"
+                              : "hover:bg-muted/60 text-foreground"
+                          }`}
+                        >
+                          <div className="truncate pr-2">
+                            <div className="font-medium truncate">
+                              {sch.assessmentName}
+                            </div>
+                            <div className="text-[11px] text-muted-foreground font-mono">
+                              {sch.scheduledDate} ({sch.startTime})
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            {sch.proctoringMode && (
+                              <Badge
+                                variant="outline"
+                                className="text-[10px] font-mono uppercase px-1.5 py-0"
+                              >
+                                {sch.proctoringMode}
+                              </Badge>
+                            )}
+                            {isSelected && (
+                              <Check className="h-4 w-4 text-rose-500 shrink-0" />
+                            )}
+                          </div>
+                        </button>
+                      );
+                    })
+                )}
+              </div>
+            </div>
+          </PopoverContent>
+        </Popover>
       </div>
 
       {/* Main Panel Content */}
@@ -943,20 +1231,20 @@ export default function ProctoringDashboard() {
           </Button>
         </div>
       ) : (
-        <div className="space-y-8 animate-slide-up">
+        <div className="space-y-4 animate-slide-up">
           {/* Summary Cards */}
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2.5 md:gap-3">
             <Card className="border-border/60 hover:shadow-md transition-all duration-300 bg-gradient-to-br from-card to-card/50">
-              <CardContent className="p-5 flex flex-col justify-between h-full">
+              <CardContent className="p-3 md:p-3.5 flex flex-col justify-between h-full">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                  <span className="text-[10px] md:text-xs font-bold uppercase tracking-wider text-muted-foreground">
                     Total Candidates
                   </span>
-                  <Users className="h-4.5 w-4.5 text-blue-600 dark:text-blue-400" />
+                  <Users className="h-4 w-4 text-blue-600 dark:text-blue-400" />
                 </div>
-                <div className="mt-4">
-                  <span className="text-3xl font-bold">{totalCount}</span>
-                  <p className="text-[10px] text-muted-foreground mt-1">
+                <div className="mt-2">
+                  <span className="text-2xl md:text-3xl font-bold">{totalCount}</span>
+                  <p className="text-[10px] text-muted-foreground mt-0.5">
                     Invited to assessment
                   </p>
                 </div>
@@ -964,18 +1252,18 @@ export default function ProctoringDashboard() {
             </Card>
 
             <Card className="border-border/60 hover:shadow-md transition-all duration-300 bg-gradient-to-br from-card to-card/50">
-              <CardContent className="p-5 flex flex-col justify-between h-full">
+              <CardContent className="p-3 md:p-3.5 flex flex-col justify-between h-full">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                  <span className="text-[10px] md:text-xs font-bold uppercase tracking-wider text-muted-foreground">
                     Active Candidates
                   </span>
-                  <Clock className="h-4.5 w-4.5 text-emerald-600 dark:text-emerald-400" />
+                  <Clock className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
                 </div>
-                <div className="mt-4">
-                  <span className="text-3xl font-bold text-emerald-600 dark:text-emerald-450">
+                <div className="mt-2">
+                  <span className="text-2xl md:text-3xl font-bold text-emerald-600 dark:text-emerald-450">
                     {activeCount}
                   </span>
-                  <p className="text-[10px] text-muted-foreground mt-1">
+                  <p className="text-[10px] text-muted-foreground mt-0.5">
                     Currently taking test
                   </p>
                 </div>
@@ -983,18 +1271,18 @@ export default function ProctoringDashboard() {
             </Card>
 
             <Card className="border-border/60 hover:shadow-md transition-all duration-300 bg-gradient-to-br from-card to-card/50">
-              <CardContent className="p-5 flex flex-col justify-between h-full">
+              <CardContent className="p-3 md:p-3.5 flex flex-col justify-between h-full">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                  <span className="text-[10px] md:text-xs font-bold uppercase tracking-wider text-muted-foreground">
                     Submitted
                   </span>
-                  <CheckCircle className="h-4.5 w-4.5 text-purple-600 dark:text-purple-400" />
+                  <CheckCircle className="h-4 w-4 text-purple-600 dark:text-purple-400" />
                 </div>
-                <div className="mt-4">
-                  <span className="text-3xl font-bold text-purple-600 dark:text-purple-450">
+                <div className="mt-2">
+                  <span className="text-2xl md:text-3xl font-bold text-purple-600 dark:text-purple-450">
                     {submittedCount}
                   </span>
-                  <p className="text-[10px] text-muted-foreground mt-1">
+                  <p className="text-[10px] text-muted-foreground mt-0.5">
                     Tests completed
                   </p>
                 </div>
@@ -1002,18 +1290,18 @@ export default function ProctoringDashboard() {
             </Card>
 
             <Card className="border-rose-500/20 hover:shadow-md transition-all duration-300 bg-gradient-to-br from-card to-card/50 relative overflow-hidden">
-              <CardContent className="p-5 flex flex-col justify-between h-full">
+              <CardContent className="p-3 md:p-3.5 flex flex-col justify-between h-full">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                  <span className="text-[10px] md:text-xs font-bold uppercase tracking-wider text-muted-foreground">
                     Flagged Candidates
                   </span>
-                  <AlertTriangle className="h-4.5 w-4.5 text-rose-600 dark:text-rose-400 animate-bounce" />
+                  <AlertTriangle className="h-4 w-4 text-rose-600 dark:text-rose-400 animate-bounce" />
                 </div>
-                <div className="mt-4">
-                  <span className="text-3xl font-bold text-rose-600 dark:text-rose-400">
+                <div className="mt-2">
+                  <span className="text-2xl md:text-3xl font-bold text-rose-600 dark:text-rose-400">
                     {flaggedCount}
                   </span>
-                  <p className="text-[10px] text-muted-foreground mt-1">
+                  <p className="text-[10px] text-muted-foreground mt-0.5">
                     High/Critical risk levels
                   </p>
                 </div>
@@ -1021,18 +1309,18 @@ export default function ProctoringDashboard() {
             </Card>
 
             <Card className="border-border/60 hover:shadow-md transition-all duration-300 bg-gradient-to-br from-card to-card/50 col-span-2 md:col-span-1">
-              <CardContent className="p-5 flex flex-col justify-between h-full">
+              <CardContent className="p-3 md:p-3.5 flex flex-col justify-between h-full">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                  <span className="text-[10px] md:text-xs font-bold uppercase tracking-wider text-muted-foreground">
                     Proctoring Mode
                   </span>
-                  <Camera className="h-4.5 w-4.5 text-orange-650 dark:text-orange-400" />
+                  <Camera className="h-4 w-4 text-orange-650 dark:text-orange-400" />
                 </div>
-                <div className="mt-4">
-                  <span className="text-xl md:text-2xl font-bold text-orange-650 dark:text-orange-400 uppercase">
+                <div className="mt-2">
+                  <span className="text-lg md:text-xl font-bold text-orange-650 dark:text-orange-400 uppercase">
                     {proctorMode}
                   </span>
-                  <p className="text-[10px] text-muted-foreground mt-1">
+                  <p className="text-[10px] text-muted-foreground mt-0.5">
                     Assigned security level
                   </p>
                 </div>
@@ -1040,79 +1328,163 @@ export default function ProctoringDashboard() {
             </Card>
           </div>
 
-          {/* Filters Row */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 bg-card p-4 rounded-xl border border-border/60 shadow-sm">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search candidate name or email..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9 h-10 border-border/80 bg-background/50 focus-visible:ring-primary/20 text-sm"
-              />
+          {/* Filters & Control Toolbar */}
+          <div className="flex flex-col space-y-2 bg-card p-3 rounded-lg border border-border/60 shadow-sm">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                <Input
+                  placeholder="Search name or email..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-8 pr-7 h-8.5 border-border/80 bg-background/50 focus-visible:ring-primary/20 text-xs"
+                />
+                {searchQuery && (
+                  <button
+                    onClick={() => setSearchQuery("")}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                )}
+              </div>
+
+              <div>
+                <Select value={filterRisk} onValueChange={setFilterRisk}>
+                  <SelectTrigger className="h-8.5 bg-background/50 text-xs">
+                    <SelectValue placeholder="Filter by Risk Level" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ALL">All Risk Levels</SelectItem>
+                    <SelectItem value="NONE">None</SelectItem>
+                    <SelectItem value="LOW">Low</SelectItem>
+                    <SelectItem value="MEDIUM">Medium</SelectItem>
+                    <SelectItem value="HIGH">High</SelectItem>
+                    <SelectItem value="CRITICAL">Critical</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Select value={filterStatus} onValueChange={setFilterStatus}>
+                  <SelectTrigger className="h-8.5 bg-background/50 text-xs">
+                    <SelectValue placeholder="Filter by Test Status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ALL">All Test Statuses</SelectItem>
+                    <SelectItem value="NOT_STARTED">Not Started</SelectItem>
+                    <SelectItem value="IN_PROGRESS">In Progress</SelectItem>
+                    <SelectItem value="SUBMITTED">Submitted</SelectItem>
+                    <SelectItem value="AUTO_SUBMITTED">Auto Submitted</SelectItem>
+                    <SelectItem value="TERMINATED">Terminated</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Select value={filterReview} onValueChange={setFilterReview}>
+                  <SelectTrigger className="h-8.5 bg-background/50 text-xs">
+                    <SelectValue placeholder="Filter by Review Status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ALL">All Review Statuses</SelectItem>
+                    <SelectItem value="NOT_REVIEWED">Not Reviewed</SelectItem>
+                    <SelectItem value="CLEAN">Clean</SelectItem>
+                    <SelectItem value="WARNING_ISSUED">Warning Issued</SelectItem>
+                    <SelectItem value="NEEDS_MANUAL_REVIEW">
+                      Needs Review
+                    </SelectItem>
+                    <SelectItem value="DISQUALIFIED">Disqualified</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
 
-            <div>
-              <Select value={filterRisk} onValueChange={setFilterRisk}>
-                <SelectTrigger className="h-10 bg-background/50 text-xs md:text-sm">
-                  <SelectValue placeholder="Filter by Risk Level" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="ALL">All Risk Levels</SelectItem>
-                  <SelectItem value="NONE">None</SelectItem>
-                  <SelectItem value="LOW">Low</SelectItem>
-                  <SelectItem value="MEDIUM">Medium</SelectItem>
-                  <SelectItem value="HIGH">High</SelectItem>
-                  <SelectItem value="CRITICAL">Critical</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+            {/* Utility row: results count, clear filters, density toggle, CSV export */}
+            <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-border/40 text-xs">
+              <div className="flex items-center gap-2">
+                <span className="text-muted-foreground font-medium">
+                  Showing <strong className="text-foreground">{totalFilteredCount}</strong> of{" "}
+                  <strong className="text-foreground">{candidates.length}</strong> candidates
+                </span>
+                {(searchQuery ||
+                  filterRisk !== "ALL" ||
+                  filterStatus !== "ALL" ||
+                  filterReview !== "ALL") && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      setSearchQuery("");
+                      setFilterRisk("ALL");
+                      setFilterStatus("ALL");
+                      setFilterReview("ALL");
+                    }}
+                    className="h-7 text-xs text-rose-600 hover:text-rose-700 hover:bg-rose-500/10 px-2 gap-1"
+                  >
+                    <FilterX className="h-3 w-3" /> Clear Filters
+                  </Button>
+                )}
+              </div>
 
-            <div>
-              <Select value={filterStatus} onValueChange={setFilterStatus}>
-                <SelectTrigger className="h-10 bg-background/50 text-xs md:text-sm">
-                  <SelectValue placeholder="Filter by Test Status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="ALL">All Test Statuses</SelectItem>
-                  <SelectItem value="NOT_STARTED">Not Started</SelectItem>
-                  <SelectItem value="IN_PROGRESS">In Progress</SelectItem>
-                  <SelectItem value="SUBMITTED">Submitted</SelectItem>
-                  <SelectItem value="AUTO_SUBMITTED">Auto Submitted</SelectItem>
-                  <SelectItem value="TERMINATED">Terminated</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className="inline-block cursor-not-allowed">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          disabled={totalFilteredCount === 0}
+                          onClick={() => setIsCompact(!isCompact)}
+                          className={`h-8 text-xs gap-1.5 ${isCompact ? "bg-muted font-semibold" : ""}`}
+                        >
+                          <Columns className="h-3.5 w-3.5" />
+                          {isCompact ? "Standard View" : "Compact View"}
+                        </Button>
+                      </span>
+                    </TooltipTrigger>
+                    {totalFilteredCount === 0 && (
+                      <TooltipContent side="top" className="text-xs">
+                        No candidate data available to toggle view
+                      </TooltipContent>
+                    )}
+                  </Tooltip>
 
-            <div>
-              <Select value={filterReview} onValueChange={setFilterReview}>
-                <SelectTrigger className="h-10 bg-background/50 text-xs md:text-sm">
-                  <SelectValue placeholder="Filter by Review Status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="ALL">All Review Statuses</SelectItem>
-                  <SelectItem value="NOT_REVIEWED">Not Reviewed</SelectItem>
-                  <SelectItem value="CLEAN">Clean</SelectItem>
-                  <SelectItem value="WARNING_ISSUED">Warning Issued</SelectItem>
-                  <SelectItem value="NEEDS_MANUAL_REVIEW">
-                    Needs Review
-                  </SelectItem>
-                  <SelectItem value="DISQUALIFIED">Disqualified</SelectItem>
-                </SelectContent>
-              </Select>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className="inline-block cursor-not-allowed">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          disabled={totalFilteredCount === 0}
+                          onClick={handleExportCSV}
+                          className="h-8 text-xs border-border/80 hover:bg-muted gap-1.5 font-medium disabled:opacity-50"
+                        >
+                          <Download className="h-3.5 w-3.5 text-rose-500" /> Export CSV
+                        </Button>
+                      </span>
+                    </TooltipTrigger>
+                    {totalFilteredCount === 0 && (
+                      <TooltipContent side="top" className="text-xs">
+                        No candidate data available to export
+                      </TooltipContent>
+                    )}
+                  </Tooltip>
+                </TooltipProvider>
+              </div>
             </div>
           </div>
 
           {/* Candidate List UI */}
-          {filteredCandidates.length === 0 ? (
+          {totalFilteredCount === 0 ? (
             <div className="text-center py-20 border border-dashed rounded-xl bg-card/10 space-y-3">
               <Users className="h-12 w-12 text-muted-foreground/35 mx-auto" />
               <p className="font-semibold text-muted-foreground text-sm">
                 No candidates found for this schedule.
               </p>
               <p className="text-xs text-muted-foreground/80 max-w-xs mx-auto">
-                No telemetry details match your search terms or filter
-                configurations.
+                No telemetry details match your search terms or filter configurations.
               </p>
             </div>
           ) : (
@@ -1122,26 +1494,47 @@ export default function ProctoringDashboard() {
                 <Table>
                   <TableHeader className="bg-muted/40 font-heading">
                     <TableRow>
-                      <TableHead className="pl-6 text-xs font-bold uppercase text-muted-foreground tracking-wider">
-                        Candidate
+                      <TableHead
+                        onClick={() => handleSort("name")}
+                        className="pl-6 text-xs font-bold uppercase text-muted-foreground tracking-wider cursor-pointer select-none hover:text-foreground transition-colors"
+                      >
+                        Candidate {renderSortIcon("name")}
                       </TableHead>
-                      <TableHead className="text-xs font-bold uppercase text-muted-foreground tracking-wider">
-                        Test Status
+                      <TableHead
+                        onClick={() => handleSort("testStatus")}
+                        className="text-xs font-bold uppercase text-muted-foreground tracking-wider cursor-pointer select-none hover:text-foreground transition-colors"
+                      >
+                        Test Status {renderSortIcon("testStatus")}
                       </TableHead>
-                      <TableHead className="text-xs font-bold uppercase text-muted-foreground tracking-wider">
-                        Proctor Mode
+                      <TableHead
+                        onClick={() => handleSort("proctoringMode")}
+                        className="text-xs font-bold uppercase text-muted-foreground tracking-wider cursor-pointer select-none hover:text-foreground transition-colors"
+                      >
+                        Proctor Mode {renderSortIcon("proctoringMode")}
                       </TableHead>
-                      <TableHead className="text-xs font-bold uppercase text-muted-foreground tracking-wider">
-                        Risk Level
+                      <TableHead
+                        onClick={() => handleSort("riskLevel")}
+                        className="text-xs font-bold uppercase text-muted-foreground tracking-wider cursor-pointer select-none hover:text-foreground transition-colors"
+                      >
+                        Risk Level {renderSortIcon("riskLevel")}
                       </TableHead>
-                      <TableHead className="text-xs font-bold uppercase text-muted-foreground tracking-wider text-center">
-                        Violations (Crit)
+                      <TableHead
+                        onClick={() => handleSort("violationsCount")}
+                        className="text-xs font-bold uppercase text-muted-foreground tracking-wider text-center cursor-pointer select-none hover:text-foreground transition-colors"
+                      >
+                        Violations (Crit) {renderSortIcon("violationsCount")}
                       </TableHead>
-                      <TableHead className="text-xs font-bold uppercase text-muted-foreground tracking-wider">
-                        Last Activity
+                      <TableHead
+                        onClick={() => handleSort("lastActivity")}
+                        className="text-xs font-bold uppercase text-muted-foreground tracking-wider cursor-pointer select-none hover:text-foreground transition-colors"
+                      >
+                        Last Activity {renderSortIcon("lastActivity")}
                       </TableHead>
-                      <TableHead className="text-xs font-bold uppercase text-muted-foreground tracking-wider">
-                        Review Status
+                      <TableHead
+                        onClick={() => handleSort("reviewStatus")}
+                        className="text-xs font-bold uppercase text-muted-foreground tracking-wider cursor-pointer select-none hover:text-foreground transition-colors"
+                      >
+                        Review Status {renderSortIcon("reviewStatus")}
                       </TableHead>
                       <TableHead className="text-right pr-6 text-xs font-bold uppercase text-muted-foreground tracking-wider">
                         Action
@@ -1149,27 +1542,31 @@ export default function ProctoringDashboard() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredCandidates.map((cand) => (
+                    {paginatedCandidates.map((cand) => (
                       <TableRow
                         key={cand.id}
                         className="hover:bg-muted/5 transition-colors border-b"
                       >
-                        <TableCell className="pl-6 py-4">
+                        <TableCell className={`pl-6 ${isCompact ? "py-2" : "py-3.5"}`}>
                           <div>
                             <p className="font-semibold text-sm text-foreground">
                               {cand.name}
                             </p>
-                            <p className="text-xs text-muted-foreground">
+                            <p className="text-xs text-muted-foreground font-mono">
                               {cand.email}
                             </p>
                           </div>
                         </TableCell>
-                        <TableCell>{getTestStatusBadge(cand.testStatus)}</TableCell>
-                        <TableCell className="font-mono text-xs font-semibold uppercase">
+                        <TableCell className={isCompact ? "py-2" : "py-3.5"}>
+                          {getTestStatusBadge(cand.testStatus)}
+                        </TableCell>
+                        <TableCell className={`font-mono text-xs font-semibold uppercase ${isCompact ? "py-2" : "py-3.5"}`}>
                           {cand.proctoringMode}
                         </TableCell>
-                        <TableCell>{getRiskBadge(cand.riskLevel)}</TableCell>
-                        <TableCell className="text-center font-mono font-medium">
+                        <TableCell className={isCompact ? "py-2" : "py-3.5"}>
+                          {getRiskBadge(cand.riskLevel)}
+                        </TableCell>
+                        <TableCell className={`text-center font-mono font-medium ${isCompact ? "py-2" : "py-3.5"}`}>
                           <span
                             className={
                               cand.violationsCount > 0
@@ -1194,13 +1591,13 @@ export default function ProctoringDashboard() {
                             )
                           </span>
                         </TableCell>
-                        <TableCell className="font-mono text-xs text-muted-foreground">
+                        <TableCell className={`font-mono text-xs text-muted-foreground ${isCompact ? "py-2" : "py-3.5"}`}>
                           {cand.lastActivity}
                         </TableCell>
-                        <TableCell>
+                        <TableCell className={isCompact ? "py-2" : "py-3.5"}>
                           {getReviewStatusBadge(cand.reviewStatus)}
                         </TableCell>
-                        <TableCell className="text-right pr-6">
+                        <TableCell className={`text-right pr-6 ${isCompact ? "py-2" : "py-3.5"}`}>
                           <Button
                             size="sm"
                             variant="outline"
@@ -1219,13 +1616,13 @@ export default function ProctoringDashboard() {
 
               {/* Mobile Card-Based List View */}
               <div className="grid grid-cols-1 gap-4 lg:hidden">
-                {filteredCandidates.map((cand) => (
+                {paginatedCandidates.map((cand) => (
                   <Card key={cand.id} className="border-border/60 hover:shadow">
                     <CardContent className="p-4 space-y-3.5">
                       <div className="flex justify-between items-start">
                         <div>
                           <h4 className="font-semibold text-sm">{cand.name}</h4>
-                          <p className="text-xs text-muted-foreground">
+                          <p className="text-xs text-muted-foreground font-mono">
                             {cand.email}
                           </p>
                         </div>
@@ -1247,8 +1644,7 @@ export default function ProctoringDashboard() {
                             Violations (Crit)
                           </span>
                           <span className="font-mono font-bold text-slate-700 dark:text-slate-350">
-                            {cand.violationsCount} ({cand.criticalViolationsCount}
-                            )
+                            {cand.violationsCount} ({cand.criticalViolationsCount})
                           </span>
                         </div>
 
@@ -1284,6 +1680,81 @@ export default function ProctoringDashboard() {
                     </CardContent>
                   </Card>
                 ))}
+              </div>
+
+              {/* Pagination Controls Footer */}
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-card p-4 rounded-xl border border-border/60 shadow-sm text-xs">
+                <div className="flex items-center gap-3 text-muted-foreground">
+                  <span>
+                    Showing <strong className="text-foreground font-semibold">{totalFilteredCount > 0 ? startIndex + 1 : 0}</strong> to{" "}
+                    <strong className="text-foreground font-semibold">{Math.min(startIndex + pageSize, totalFilteredCount)}</strong> of{" "}
+                    <strong className="text-foreground font-semibold">{totalFilteredCount}</strong> records
+                  </span>
+
+                  <div className="flex items-center gap-1.5 ml-2">
+                    <span className="hidden sm:inline text-muted-foreground">Rows per page:</span>
+                    <Select
+                      value={String(pageSize)}
+                      onValueChange={(val) => setPageSize(Number(val))}
+                    >
+                      <SelectTrigger className="h-8 w-16 text-xs bg-background">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="10">10</SelectItem>
+                        <SelectItem value="25">25</SelectItem>
+                        <SelectItem value="50">50</SelectItem>
+                        <SelectItem value="100">100</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-1.5">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(1)}
+                    disabled={currentPage <= 1}
+                    className="h-8 w-8 p-0"
+                    title="First Page"
+                  >
+                    <ChevronsLeft className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                    disabled={currentPage <= 1}
+                    className="h-8 w-8 p-0"
+                    title="Previous Page"
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                  <span className="px-3 font-mono font-medium text-foreground">
+                    Page {currentPage} of {totalPages}
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                    disabled={currentPage >= totalPages}
+                    className="h-8 w-8 p-0"
+                    title="Next Page"
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(totalPages)}
+                    disabled={currentPage >= totalPages}
+                    className="h-8 w-8 p-0"
+                    title="Last Page"
+                  >
+                    <ChevronsRight className="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
             </>
           )}

@@ -21,6 +21,11 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -52,7 +57,15 @@ import {
   Search,
   BookOpen,
   SlidersHorizontal,
+  ChevronLeft,
   ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
+  ChevronsUpDown,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
+  X,
   GraduationCap,
   ShieldAlert,
 } from "lucide-react";
@@ -80,6 +93,16 @@ export default function Reports() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("ALL");
 
+  // Schedule Combobox state
+  const [scheduleComboboxOpen, setScheduleComboboxOpen] = useState(false);
+  const [scheduleSearchQuery, setScheduleSearchQuery] = useState("");
+
+  // Candidate Inspector Pagination & Sorting state
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const [pageSize, setPageSize] = useState<number>(15);
+  const [sortField, setSortField] = useState<"name" | "startTime" | "status" | "score">("name");
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
+
   // Status mapping for each session ID
   const [sessionStates, setSessionStates] = useState<
     Record<
@@ -98,7 +121,7 @@ export default function Reports() {
   );
   const pollingRefs = useRef<Record<string, NodeJS.Timeout>>({});
 
-  // Fetch all initial data
+  // Fetch all initial data from real backend services
   const loadAllData = async () => {
     try {
       setLoadingData(true);
@@ -195,17 +218,18 @@ export default function Reports() {
       setPdfLoadingSessionId(sid);
       console.log(`[Scorecard PDF Request] Downloading PDF scorecard for session ID:`, sid);
       const sessionObj = sessions.find((s) => s.id === sid);
+      const candObj = sessionObj ? getCandidateForSession(sessionObj.candidateId) : null;
       const sessionState = sessionStates[sid];
       console.log(`[Scorecard Data Summary]`, {
         sessionId: sid,
-        candidateName: sessionObj?.candidateName || sessionObj?.candidateEmail || "Unknown",
-        candidateEmail: sessionObj?.candidateEmail,
+        candidateName: candObj?.user?.name || "Unknown",
+        candidateEmail: candObj?.user?.email || "No Email",
         status: sessionObj?.status,
         result: sessionState?.result,
         totalScore: sessionState?.result?.totalScore,
         maxScore: sessionState?.result?.maxScore,
         percentage: sessionState?.result?.percentage,
-        passFailStatus: sessionState?.result?.status,
+        passFailStatus: sessionState?.result?.passed ? "PASSED" : "FAILED",
       });
 
       const { data: blob, filename } = await testService.downloadScorecard(sid);
@@ -327,8 +351,8 @@ export default function Reports() {
     }));
 
     try {
-      const response = await testService.recalculateTestResult(sid);
-      const statusCode = response.statusCode || response.status;
+      const response = (await testService.recalculateTestResult(sid)) as any;
+      const statusCode = response?.statusCode || response?.status;
       if (statusCode === 202) {
         startPollingSession(sid);
       } else {
@@ -337,7 +361,7 @@ export default function Reports() {
           [sid]: {
             status: "SUCCESS",
             message: "Result calculated successfully.",
-            result: response.data,
+            result: response?.data || response,
           },
         }));
       }
@@ -380,9 +404,39 @@ export default function Reports() {
     }
   };
 
-  // Filters sessions for the selected schedule
+  // Selected schedule object & Search filtering for 200+ schedules dropdown
+  const selectedSchedule = useMemo(
+    () => schedules.find((s) => s.id === selectedScheduleId),
+    [schedules, selectedScheduleId]
+  );
+
+  const filteredSchedulesBySearch = useMemo(() => {
+    if (!scheduleSearchQuery.trim()) return schedules;
+    const q = scheduleSearchQuery.toLowerCase();
+    return schedules.filter((sch) => {
+      const title = sch.test?.title?.toLowerCase() || "";
+      const testId = sch.testId?.toLowerCase() || "";
+      const schId = sch.id?.toLowerCase() || "";
+      const dateStr = sch.startTime
+        ? new Date(sch.startTime).toLocaleDateString().toLowerCase()
+        : "";
+      return (
+        title.includes(q) ||
+        testId.includes(q) ||
+        schId.includes(q) ||
+        dateStr.includes(q)
+      );
+    });
+  }, [schedules, scheduleSearchQuery]);
+
+  // Filters sessions for the selected schedule (or all 550+ sessions when ALL_SCHEDULES is selected)
   const filteredSessions = useMemo(
-    () => sessions.filter((s) => s.scheduleId === selectedScheduleId),
+    () => {
+      if (!selectedScheduleId || selectedScheduleId === "ALL_SCHEDULES") {
+        return sessions;
+      }
+      return sessions.filter((s) => s.scheduleId === selectedScheduleId);
+    },
     [sessions, selectedScheduleId],
   );
 
@@ -404,6 +458,100 @@ export default function Reports() {
       return matchesSearch && matchesStatus;
     });
   }, [filteredSessions, candidates, searchQuery, statusFilter]);
+
+  // Reset to Page 1 when filters or selected schedule change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, statusFilter, selectedScheduleId]);
+
+  // Sort candidate sessions
+  const sortedSessions = useMemo(() => {
+    return [...searchedAndFilteredSessions].sort((a, b) => {
+      const candA = candidates.find((c) => c.id === a.candidateId);
+      const candB = candidates.find((c) => c.id === b.candidateId);
+      const nameA = candA?.user?.name || "";
+      const nameB = candB?.user?.name || "";
+
+      if (sortField === "name") {
+        return sortOrder === "asc"
+          ? nameA.localeCompare(nameB)
+          : nameB.localeCompare(nameA);
+      }
+      if (sortField === "startTime") {
+        const timeA = a.startedAt ? new Date(a.startedAt).getTime() : 0;
+        const timeB = b.startedAt ? new Date(b.startedAt).getTime() : 0;
+        return sortOrder === "asc" ? timeA - timeB : timeB - timeA;
+      }
+      if (sortField === "status") {
+        return sortOrder === "asc"
+          ? (a.status || "").localeCompare(b.status || "")
+          : (b.status || "").localeCompare(a.status || "");
+      }
+      if (sortField === "score") {
+        const scoreA = sessionStates[a.id]?.result?.percentage ?? -1;
+        const scoreB = sessionStates[b.id]?.result?.percentage ?? -1;
+        return sortOrder === "asc" ? scoreA - scoreB : scoreB - scoreA;
+      }
+      return 0;
+    });
+  }, [searchedAndFilteredSessions, candidates, sortField, sortOrder, sessionStates]);
+
+  // Paginated Candidate Sessions
+  const totalPages = Math.ceil(sortedSessions.length / pageSize) || 1;
+  const safePage = Math.min(Math.max(currentPage, 1), totalPages);
+  const paginatedSessions = useMemo(() => {
+    const startIdx = (safePage - 1) * pageSize;
+    return sortedSessions.slice(startIdx, startIdx + pageSize);
+  }, [sortedSessions, safePage, pageSize]);
+
+  // Export filtered candidate session data to CSV
+  const handleExportCSV = () => {
+    if (sortedSessions.length === 0) return;
+
+    const headers = [
+      "Candidate Name",
+      "Email",
+      "Institution",
+      "Session ID",
+      "Schedule Title",
+      "Start Time",
+      "Status",
+      "Score Percentage",
+      "Pass / Fail",
+    ];
+
+    const rows = sortedSessions.map((session) => {
+      const cand = candidates.find((c) => c.id === session.candidateId);
+      const schedule = schedules.find((s) => s.id === session.scheduleId);
+      const state = sessionStates[session.id];
+      const percentage = state?.result?.percentage ?? "N/A";
+      const passedStr = state?.result ? (state.result.passed ? "PASSED" : "FAILED") : "N/A";
+
+      return [
+        `"${(cand?.user?.name || "N/A").replace(/"/g, '""')}"`,
+        `"${(cand?.user?.email || "N/A").replace(/"/g, '""')}"`,
+        `"${(cand?.organisation?.name || "General Group").replace(/"/g, '""')}"`,
+        `"${session.id}"`,
+        `"${(schedule?.test?.title || "N/A").replace(/"/g, '""')}"`,
+        `"${session.startedAt ? new Date(session.startedAt).toLocaleString() : "N/A"}"`,
+        `"${session.status || "N/A"}"`,
+        `"${percentage !== "N/A" ? `${percentage}%` : "N/A"}"`,
+        `"${passedStr}"`,
+      ].join(",");
+    });
+
+    const csvData = [headers.join(","), ...rows].join("\n");
+    const blob = new Blob([csvData], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    const dateStr = new Date().toISOString().slice(0, 10);
+    link.setAttribute("download", `candidate_session_report_${dateStr}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
 
   // Load results once when a schedule is selected, avoiding infinite loops
   useEffect(() => {
@@ -522,15 +670,19 @@ export default function Reports() {
   }, [realResults, isUsingRealData]);
 
   // Real Top Performers
+  // Real Top Performers (Top 15 candidates)
   const computedTopPerformers = useMemo(() => {
     if (!isUsingRealData) return [];
 
-    // Sort descending by percentage
-    const sortedResults = [...realResults].sort(
-      (a, b) => b.percentage - a.percentage,
-    );
+    // Sort descending by percentage, tie-breaking by totalScore
+    const sortedResults = [...realResults].sort((a, b) => {
+      if (b.percentage !== a.percentage) {
+        return b.percentage - a.percentage;
+      }
+      return b.totalScore - a.totalScore;
+    });
 
-    return sortedResults.slice(0, 5).map((res, index) => {
+    return sortedResults.slice(0, 15).map((res, index) => {
       const cand = candidates.find((c) => c.id === res.candidateId);
       const name = cand?.user?.name || "Candidate";
       const college = cand?.organisation?.name || "Institution";
@@ -582,33 +734,42 @@ export default function Reports() {
     }));
   }, [realResults, candidates, isUsingRealData]);
 
-  // Real Test-Wise Performance
+  // Real Test-Wise Performance (Grouped cleanly by base test title)
   const computedTopicWise = useMemo(() => {
     if (!isUsingRealData) return [];
 
     const testGroups: Record<
       string,
-      { sumScore: number; count: number; difficulty: string }
+      { sumScore: number; count: number; difficulty: string; candidateCount: number }
     > = {};
 
     realResults.forEach((res) => {
       const session = sessions.find((s) => s.id === res.testSessionId);
       const schedule = schedules.find((s) => s.id === session?.scheduleId);
       const testTitle = schedule?.test?.title || "Test Evaluation";
+      // Strip (Batch #X) to group cleanly by assessment name
+      const cleanTitle = testTitle.replace(/\s*\(Batch\s*#\d+\)/i, "").trim();
       const difficulty = schedule?.test?.difficulty || "MEDIUM";
 
-      if (!testGroups[testTitle]) {
-        testGroups[testTitle] = { sumScore: 0, count: 0, difficulty };
+      if (!testGroups[cleanTitle]) {
+        testGroups[cleanTitle] = {
+          sumScore: 0,
+          count: 0,
+          difficulty,
+          candidateCount: 0,
+        };
       }
 
-      testGroups[testTitle].sumScore += res.percentage;
-      testGroups[testTitle].count += 1;
+      testGroups[cleanTitle].sumScore += res.percentage;
+      testGroups[cleanTitle].count += 1;
+      testGroups[cleanTitle].candidateCount += 1;
     });
 
     return Object.entries(testGroups).map(([title, stats]) => ({
       topic: title,
       avgScore: Math.round(stats.sumScore / stats.count),
       difficulty: stats.difficulty.toLowerCase(),
+      candidateCount: stats.candidateCount,
     }));
   }, [realResults, sessions, schedules, isUsingRealData]);
 
@@ -773,24 +934,31 @@ export default function Reports() {
           {/* Grid Layout for details */}
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
             {/* Top Performers */}
-            <Card className="border-border/60 shadow-sm lg:col-span-5 bg-card/30">
-              <CardHeader className="pb-4">
-                <CardTitle className="text-lg font-bold font-heading flex items-center gap-2">
-                  <Award className="h-5 w-5 text-yellow-500" />
-                  Top Performers
-                </CardTitle>
-                <CardDescription>
-                  Highest scoring candidates from graded evaluations
-                </CardDescription>
+            <Card className="border-border/60 shadow-sm lg:col-span-5 bg-card/30 flex flex-col h-[400px]">
+              <CardHeader className="pb-4 shrink-0 flex flex-row items-center justify-between">
+                <div>
+                  <CardTitle className="text-lg font-bold font-heading flex items-center gap-2">
+                    <Award className="h-5 w-5 text-yellow-500" />
+                    Top Performers
+                  </CardTitle>
+                  <CardDescription>
+                    Highest scoring candidates from graded evaluations
+                  </CardDescription>
+                </div>
+                {computedTopPerformers.length > 0 && (
+                  <Badge variant="outline" className="font-mono text-xs px-2 py-0.5 shrink-0">
+                    Top {computedTopPerformers.length}
+                  </Badge>
+                )}
               </CardHeader>
-              <CardContent className="px-0">
-                <div className="border-t">
+              <CardContent className="px-0 pb-0 flex-1 flex flex-col min-h-0">
+                <div className="border-t flex-1 overflow-y-auto min-h-0">
                   <Table>
-                    <TableHeader className="bg-muted/20">
+                    <TableHeader className="bg-muted/20 sticky top-0 z-10 backdrop-blur-md">
                       <TableRow>
-                        <TableHead className="w-12 text-center">Rank</TableHead>
+                        <TableHead className="w-14 text-center">Rank</TableHead>
                         <TableHead>Candidate</TableHead>
-                        <TableHead className="text-right">Score</TableHead>
+                        <TableHead className="text-right pr-6">Score</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -801,29 +969,46 @@ export default function Reports() {
                           </TableCell>
                         </TableRow>
                       ) : (
-                        computedTopPerformers.map((perf) => (
-                          <TableRow
-                            key={perf.rank}
-                            className="hover:bg-muted/10 transition-colors"
-                          >
-                            <TableCell className="text-center font-bold text-muted-foreground">
-                              {perf.rank}
-                            </TableCell>
-                            <TableCell>
-                              <div>
-                                <p className="font-semibold text-sm">
-                                  {perf.name}
-                                </p>
-                                <p className="text-[10px] text-muted-foreground">
-                                  {perf.college} • {perf.batch}
-                                </p>
-                              </div>
-                            </TableCell>
-                            <TableCell className="text-right font-bold text-primary">
-                              {perf.score}%
-                            </TableCell>
-                          </TableRow>
-                        ))
+                        computedTopPerformers.map((perf) => {
+                          const isTop1 = perf.rank === 1;
+                          const isTop2 = perf.rank === 2;
+                          const isTop3 = perf.rank === 3;
+                          return (
+                            <TableRow
+                              key={perf.rank}
+                              className="hover:bg-muted/10 transition-colors"
+                            >
+                              <TableCell className="text-center">
+                                <span
+                                  className={`inline-flex items-center justify-center h-6 w-6 rounded-full font-bold text-xs font-mono ${
+                                    isTop1
+                                      ? "bg-yellow-500/20 text-yellow-600 dark:text-yellow-400 border border-yellow-500/30"
+                                      : isTop2
+                                      ? "bg-slate-300/30 text-slate-700 dark:text-slate-300 border border-slate-400/30"
+                                      : isTop3
+                                      ? "bg-amber-700/20 text-amber-700 dark:text-amber-400 border border-amber-600/30"
+                                      : "text-muted-foreground"
+                                  }`}
+                                >
+                                  {isTop1 ? "🥇" : isTop2 ? "🥈" : isTop3 ? "🥉" : perf.rank}
+                                </span>
+                              </TableCell>
+                              <TableCell>
+                                <div>
+                                  <p className="font-semibold text-sm">
+                                    {perf.name}
+                                  </p>
+                                  <p className="text-[10px] text-muted-foreground line-clamp-1">
+                                    {perf.college} • {perf.batch}
+                                  </p>
+                                </div>
+                              </TableCell>
+                              <TableCell className="text-right pr-6 font-bold text-primary font-mono">
+                                {perf.score}%
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })
                       )}
                     </TableBody>
                   </Table>
@@ -831,28 +1016,35 @@ export default function Reports() {
               </CardContent>
             </Card>
 
-            {/* Batch Performance */}
-            <Card className="border-border/60 shadow-sm lg:col-span-7 bg-card/30">
-              <CardHeader className="pb-4">
-                <CardTitle className="text-lg font-bold font-heading flex items-center gap-2">
-                  <GraduationCap className="h-5 w-5 text-primary" />
-                  Institution Performance
-                </CardTitle>
-                <CardDescription>
-                  Average performance tracked across active colleges
-                </CardDescription>
+            {/* Institution Performance */}
+            <Card className="border-border/60 shadow-sm lg:col-span-7 bg-card/30 flex flex-col h-[400px]">
+              <CardHeader className="pb-4 flex flex-row items-center justify-between shrink-0">
+                <div>
+                  <CardTitle className="text-lg font-bold font-heading flex items-center gap-2">
+                    <GraduationCap className="h-5 w-5 text-primary" />
+                    Institution Performance
+                  </CardTitle>
+                  <CardDescription>
+                    Average performance tracked across active colleges
+                  </CardDescription>
+                </div>
+                {computedBatchPerformance.length > 0 && (
+                  <Badge variant="outline" className="font-mono text-xs px-2 py-0.5 shrink-0">
+                    {computedBatchPerformance.length} Colleges
+                  </Badge>
+                )}
               </CardHeader>
-              <CardContent className="px-0">
-                <div className="border-t">
+              <CardContent className="px-0 pb-0 flex-1 flex flex-col min-h-0">
+                <div className="border-t flex-1 overflow-y-auto min-h-0">
                   <Table>
-                    <TableHeader className="bg-muted/20">
+                    <TableHeader className="bg-muted/30 sticky top-0 z-10 backdrop-blur-md">
                       <TableRow>
                         <TableHead>Institution</TableHead>
                         <TableHead className="text-center">
                           Candidates
                         </TableHead>
                         <TableHead className="text-center">Avg Score</TableHead>
-                        <TableHead className="text-right">Pass Rate</TableHead>
+                        <TableHead className="text-right pr-6">Pass Rate</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -868,24 +1060,17 @@ export default function Reports() {
                             key={index}
                             className="hover:bg-muted/10 transition-colors"
                           >
-                            <TableCell>
-                              <div>
-                                <p className="font-semibold text-sm">
-                                  {batch.batch}
-                                </p>
-                                <p className="text-[10px] text-muted-foreground">
-                                  {batch.college}
-                                </p>
-                              </div>
+                            <TableCell className="font-semibold text-sm">
+                              {batch.batch}
                             </TableCell>
-                            <TableCell className="text-center text-sm font-semibold">
+                            <TableCell className="text-center text-sm font-semibold font-mono">
                               {batch.students}
                             </TableCell>
-                            <TableCell className="text-center text-sm font-bold text-foreground">
+                            <TableCell className="text-center text-sm font-bold text-foreground font-mono">
                               {batch.avgScore}%
                             </TableCell>
-                            <TableCell className="text-right">
-                              <Badge className="bg-green-500/10 text-green-500 border-green-500/20 font-bold">
+                            <TableCell className="text-right pr-6">
+                              <Badge className="bg-green-500/10 text-green-500 border-green-500/20 font-bold font-mono">
                                 {batch.passRate}% Pass
                               </Badge>
                             </TableCell>
@@ -899,49 +1084,89 @@ export default function Reports() {
             </Card>
           </div>
 
-          {/* Topic / Test Strengths */}
+          {/* Assessment-Wise Performance Analysis */}
           <Card className="border-border/60 shadow-sm bg-card/30">
-            <CardHeader>
-              <CardTitle className="text-lg font-bold font-heading flex items-center gap-2">
-                <BookOpen className="h-5 w-5 text-primary" />
-                Assessment-Wise Performance Analysis
-              </CardTitle>
-              <CardDescription>
-                Average score distribution mapped to each test
-              </CardDescription>
+            <CardHeader className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4">
+              <div>
+                <CardTitle className="text-lg font-bold font-heading flex items-center gap-2">
+                  <BookOpen className="h-5 w-5 text-primary" />
+                  Assessment-Wise Performance Analysis
+                </CardTitle>
+                <CardDescription>
+                  Average score distribution and benchmark metrics mapped across unique assessments
+                </CardDescription>
+              </div>
+              {computedTopicWise.length > 0 && (
+                <Badge variant="outline" className="font-mono text-xs px-2.5 py-1 shrink-0 self-start md:self-auto">
+                  {computedTopicWise.length} Assessments Tracked
+                </Badge>
+              )}
             </CardHeader>
             <CardContent>
               {computedTopicWise.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground text-sm">
-                  No data available
+                  No assessment data available
                 </div>
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
-                  {computedTopicWise.map((topic, index) => (
-                    <div
-                      key={index}
-                      className="space-y-2 p-4 border rounded-xl bg-background/50 hover:bg-background/80 transition-all shadow-sm"
-                    >
-                      <div className="flex justify-between items-center text-sm">
-                        <span className="font-semibold text-foreground">
-                          {topic.topic}
-                        </span>
-                        <Badge
-                          variant="outline"
-                          className="text-xs uppercase font-bold tracking-wider px-2 py-0.5"
+                <div className="max-h-[420px] overflow-y-auto pr-1.5 space-y-3">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {computedTopicWise.map((topic, index) => {
+                      const isHighPerformance = topic.avgScore >= 70;
+                      const isMediumPerformance = topic.avgScore >= 50 && topic.avgScore < 70;
+                      return (
+                        <div
+                          key={index}
+                          className="space-y-3 p-4 border border-border/70 rounded-xl bg-background/60 hover:bg-background/90 transition-all shadow-sm flex flex-col justify-between"
                         >
-                          {topic.difficulty}
-                        </Badge>
-                      </div>
-                      <div className="flex justify-between items-center text-xs text-muted-foreground">
-                        <span>Average Score:</span>
-                        <span className="font-bold text-primary">
-                          {topic.avgScore}%
-                        </span>
-                      </div>
-                      <Progress value={topic.avgScore} className="h-2 bg-muted" />
-                    </div>
-                  ))}
+                          <div className="space-y-1.5">
+                            <div className="flex justify-between items-start gap-2">
+                              <span className="font-bold text-sm text-foreground line-clamp-2 leading-snug">
+                                {topic.topic}
+                              </span>
+                              <Badge
+                                variant="outline"
+                                className="text-[10px] uppercase font-mono font-bold shrink-0 px-1.5 py-0.5"
+                              >
+                                {topic.difficulty}
+                              </Badge>
+                            </div>
+                            <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+                              <span className="bg-muted px-1.5 py-0.5 rounded font-mono">
+                                {topic.candidateCount} candidate(s) evaluated
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="space-y-1.5 pt-1 border-t border-border/40">
+                            <div className="flex justify-between items-center text-xs">
+                              <span className="text-muted-foreground font-medium">Average Score:</span>
+                              <Badge
+                                className={`font-mono font-bold text-xs ${
+                                  isHighPerformance
+                                    ? "bg-green-500/10 text-green-500 border-green-500/20"
+                                    : isMediumPerformance
+                                    ? "bg-amber-500/10 text-amber-500 border-amber-500/20"
+                                    : "bg-rose-500/10 text-rose-500 border-rose-500/20"
+                                }`}
+                              >
+                                {topic.avgScore}%
+                              </Badge>
+                            </div>
+                            <Progress
+                              value={topic.avgScore}
+                              className={`h-2 bg-muted ${
+                                isHighPerformance
+                                  ? "[&>div]:bg-green-500"
+                                  : isMediumPerformance
+                                  ? "[&>div]:bg-amber-500"
+                                  : "[&>div]:bg-rose-500"
+                              }`}
+                            />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
               )}
             </CardContent>
@@ -963,6 +1188,16 @@ export default function Reports() {
                     performance and scorecards.
                   </CardDescription>
                 </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleExportCSV}
+                  disabled={sortedSessions.length === 0}
+                  className="gap-2 text-xs font-semibold hover:bg-primary/10 hover:text-primary hover:border-primary/30 transition-all shrink-0 self-start md:self-auto"
+                >
+                  <Download className="h-4 w-4 text-primary" />
+                  Export CSV ({sortedSessions.length})
+                </Button>
               </div>
             </CardHeader>
 
@@ -989,55 +1224,147 @@ export default function Reports() {
                   </div>
                 </div>
 
-                {/* Schedule Selector */}
+                {/* Schedule Selector Combobox (200-300+ Schedules) */}
                 <div className="lg:col-span-5 space-y-1.5">
-                  <Label
-                    htmlFor="scheduleSelect"
-                    className="text-xs font-bold uppercase tracking-wider text-muted-foreground"
-                  >
-                    Select Test Schedule
-                  </Label>
+                  <div className="flex items-center justify-between">
+                    <Label
+                      htmlFor="scheduleSelect"
+                      className="text-xs font-bold uppercase tracking-wider text-muted-foreground"
+                    >
+                      Select Test Schedule
+                    </Label>
+                    {schedules.length > 0 && (
+                      <Badge variant="outline" className="text-[10px] font-mono font-semibold px-1.5 py-0">
+                        {schedules.length} total
+                      </Badge>
+                    )}
+                  </div>
                   {loadingData ? (
                     <div className="flex items-center gap-2 text-sm text-muted-foreground p-2 border rounded-lg bg-muted/20 h-10">
                       <RefreshCw className="h-4 w-4 animate-spin text-primary" />
                       Loading schedules...
                     </div>
                   ) : (
-                    <Select
-                      value={selectedScheduleId}
-                      onValueChange={setSelectedScheduleId}
-                    >
-                      <SelectTrigger
-                        id="scheduleSelect"
-                        className="h-10 border-border/80"
-                      >
-                        <SelectValue placeholder="-- Select a Schedule --" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {schedules.map((sch) => {
-                          const dateStr = sch.startTime
-                            ? new Date(sch.startTime).toLocaleDateString()
-                            : "No date";
-                          const testTitle = sch.test?.title || "Unknown Test";
-                          const testIdAbbrev = sch.testId
-                            ? sch.testId.slice(0, 8)
-                            : "N/A";
-                          return (
-                            <SelectItem key={sch.id} value={sch.id}>
-                              <span className="font-semibold text-foreground mr-1.5">
-                                {testTitle}
+                    <Popover open={scheduleComboboxOpen} onOpenChange={setScheduleComboboxOpen}>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          role="combobox"
+                          aria-expanded={scheduleComboboxOpen}
+                          className="w-full justify-between h-10 px-3 border-border/80 bg-background/50 hover:bg-background/80 focus:ring-2 focus:ring-primary/20 text-left font-normal text-xs md:text-sm"
+                        >
+                          {selectedScheduleId === "ALL_SCHEDULES" || !selectedScheduleId ? (
+                            <div className="flex items-center gap-2 truncate">
+                              <span className="font-bold text-primary truncate">
+                                ⚡ All Test Schedules ({schedules.length} Total)
                               </span>
-                              <span className="text-[10px] text-muted-foreground font-mono bg-muted/80 px-1 py-0.5 rounded mr-2">
-                                ID: {testIdAbbrev}
+                              <span className="text-[10px] text-muted-foreground font-mono shrink-0 bg-muted/80 px-1.5 py-0.5 rounded">
+                                {sessions.length} sessions
                               </span>
-                              <span className="text-xs text-muted-foreground">
-                                ({dateStr})
+                            </div>
+                          ) : selectedSchedule ? (
+                            <div className="flex items-center gap-2 truncate">
+                              <span className="font-semibold text-foreground truncate">
+                                {selectedSchedule.test?.title || "Unknown Test"}
                               </span>
-                            </SelectItem>
-                          );
-                        })}
-                      </SelectContent>
-                    </Select>
+                              <span className="text-[10px] text-muted-foreground font-mono shrink-0 bg-muted/80 px-1 py-0.5 rounded">
+                                ID: {selectedSchedule.testId?.slice(0, 8) || "N/A"}
+                              </span>
+                              <span className="text-xs text-muted-foreground shrink-0 font-mono">
+                                ({selectedSchedule.startTime ? new Date(selectedSchedule.startTime).toLocaleDateString() : "No date"})
+                              </span>
+                            </div>
+                          ) : (
+                            <span className="text-muted-foreground">
+                              Search or select schedule from {schedules.length} schedules...
+                            </span>
+                          )}
+                          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-2 bg-card border-border shadow-2xl rounded-xl z-50">
+                        <div className="space-y-2">
+                          <div className="relative">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                            <Input
+                              placeholder="Type to search schedules..."
+                              value={scheduleSearchQuery}
+                              onChange={(e) => setScheduleSearchQuery(e.target.value)}
+                              className="pl-9 h-9 border-border/70 text-xs bg-background"
+                            />
+                            {scheduleSearchQuery && (
+                              <button
+                                onClick={() => setScheduleSearchQuery("")}
+                                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                              >
+                                <X className="h-3.5 w-3.5" />
+                              </button>
+                            )}
+                          </div>
+
+                          <div className="max-h-64 overflow-y-auto space-y-1 pr-1">
+                            {/* All Schedules option */}
+                            <button
+                              onClick={() => {
+                                setSelectedScheduleId("ALL_SCHEDULES");
+                                setScheduleComboboxOpen(false);
+                              }}
+                              className={`w-full flex items-center justify-between p-2.5 rounded-lg text-xs text-left transition-colors font-bold ${
+                                selectedScheduleId === "ALL_SCHEDULES" || !selectedScheduleId
+                                  ? "bg-primary/10 text-primary border border-primary/20"
+                                  : "hover:bg-muted/60 text-foreground"
+                              }`}
+                            >
+                              <div className="truncate pr-2">
+                                <div>⚡ All Test Schedules ({schedules.length} Schedules)</div>
+                                <div className="text-[11px] text-muted-foreground font-mono font-normal">
+                                  Show all {sessions.length} candidate sessions across all schedules
+                                </div>
+                              </div>
+                              {(selectedScheduleId === "ALL_SCHEDULES" || !selectedScheduleId) && (
+                                <Check className="h-4 w-4 text-primary shrink-0" />
+                              )}
+                            </button>
+
+                            {filteredSchedulesBySearch.length === 0 ? (
+                              <div className="p-4 text-center text-xs text-muted-foreground">
+                                No matching schedules found.
+                              </div>
+                            ) : (
+                              filteredSchedulesBySearch.map((sch) => {
+                                const isSelected = sch.id === selectedScheduleId;
+                                const dateStr = sch.startTime
+                                  ? new Date(sch.startTime).toLocaleDateString()
+                                  : "No date";
+                                const testTitle = sch.test?.title || "Unknown Test";
+                                return (
+                                  <button
+                                    key={sch.id}
+                                    onClick={() => {
+                                      setSelectedScheduleId(sch.id);
+                                      setScheduleComboboxOpen(false);
+                                    }}
+                                    className={`w-full flex items-center justify-between p-2.5 rounded-lg text-xs text-left transition-colors ${
+                                      isSelected
+                                        ? "bg-primary/10 text-primary font-semibold border border-primary/20"
+                                        : "hover:bg-muted/60 text-foreground"
+                                    }`}
+                                  >
+                                    <div className="truncate pr-2">
+                                      <div className="font-medium truncate">{testTitle}</div>
+                                      <div className="text-[11px] text-muted-foreground font-mono">
+                                        ID: {sch.testId?.slice(0, 8)} • {dateStr}
+                                      </div>
+                                    </div>
+                                    {isSelected && <Check className="h-4 w-4 text-primary shrink-0" />}
+                                  </button>
+                                );
+                              })
+                            )}
+                          </div>
+                        </div>
+                      </PopoverContent>
+                    </Popover>
                   )}
                 </div>
 
@@ -1076,9 +1403,7 @@ export default function Reports() {
                         {filteredSessions.length}
                       </Badge>
                     </h3>
-                  </div>
-
-                  {searchedAndFilteredSessions.length === 0 ? (
+                  </div>                  {searchedAndFilteredSessions.length === 0 ? (
                     <div className="text-center py-12 border border-dashed rounded-xl bg-muted/5">
                       <Users className="h-12 w-12 mx-auto mb-3 opacity-30 text-muted-foreground" />
                       <p className="text-muted-foreground text-sm font-semibold">
@@ -1093,18 +1418,120 @@ export default function Reports() {
                       <Table>
                         <TableHeader className="bg-muted/40">
                           <TableRow>
-                            <TableHead>Candidate</TableHead>
-                            <TableHead>Session ID</TableHead>
-                            <TableHead>Start Time</TableHead>
-                            <TableHead>Session Status</TableHead>
-                            <TableHead>Grading / Score</TableHead>
-                            <TableHead className="text-right pr-6">
+                            <TableHead>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => {
+                                  if (sortField === "name") {
+                                    setSortOrder(sortOrder === "asc" ? "desc" : "asc");
+                                  } else {
+                                    setSortField("name");
+                                    setSortOrder("asc");
+                                  }
+                                }}
+                                className="h-8 px-1 text-xs font-bold uppercase tracking-wider text-muted-foreground hover:text-foreground -ml-1"
+                              >
+                                Candidate
+                                {sortField === "name" ? (
+                                  sortOrder === "asc" ? (
+                                    <ArrowUp className="ml-1 h-3.5 w-3.5 text-primary" />
+                                  ) : (
+                                    <ArrowDown className="ml-1 h-3.5 w-3.5 text-primary" />
+                                  )
+                                ) : (
+                                  <ArrowUpDown className="ml-1 h-3.5 w-3.5 opacity-40" />
+                                )}
+                              </Button>
+                            </TableHead>
+                            <TableHead className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                              Session ID
+                            </TableHead>
+                            <TableHead>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => {
+                                  if (sortField === "startTime") {
+                                    setSortOrder(sortOrder === "asc" ? "desc" : "asc");
+                                  } else {
+                                    setSortField("startTime");
+                                    setSortOrder("asc");
+                                  }
+                                }}
+                                className="h-8 px-1 text-xs font-bold uppercase tracking-wider text-muted-foreground hover:text-foreground -ml-1"
+                              >
+                                Start Time
+                                {sortField === "startTime" ? (
+                                  sortOrder === "asc" ? (
+                                    <ArrowUp className="ml-1 h-3.5 w-3.5 text-primary" />
+                                  ) : (
+                                    <ArrowDown className="ml-1 h-3.5 w-3.5 text-primary" />
+                                  )
+                                ) : (
+                                  <ArrowUpDown className="ml-1 h-3.5 w-3.5 opacity-40" />
+                                )}
+                              </Button>
+                            </TableHead>
+                            <TableHead>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => {
+                                  if (sortField === "status") {
+                                    setSortOrder(sortOrder === "asc" ? "desc" : "asc");
+                                  } else {
+                                    setSortField("status");
+                                    setSortOrder("asc");
+                                  }
+                                }}
+                                className="h-8 px-1 text-xs font-bold uppercase tracking-wider text-muted-foreground hover:text-foreground -ml-1"
+                              >
+                                Session Status
+                                {sortField === "status" ? (
+                                  sortOrder === "asc" ? (
+                                    <ArrowUp className="ml-1 h-3.5 w-3.5 text-primary" />
+                                  ) : (
+                                    <ArrowDown className="ml-1 h-3.5 w-3.5 text-primary" />
+                                  )
+                                ) : (
+                                  <ArrowUpDown className="ml-1 h-3.5 w-3.5 opacity-40" />
+                                )}
+                              </Button>
+                            </TableHead>
+                            <TableHead>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => {
+                                  if (sortField === "score") {
+                                    setSortOrder(sortOrder === "asc" ? "desc" : "asc");
+                                  } else {
+                                    setSortField("score");
+                                    setSortOrder("asc");
+                                  }
+                                }}
+                                className="h-8 px-1 text-xs font-bold uppercase tracking-wider text-muted-foreground hover:text-foreground -ml-1"
+                              >
+                                Grading / Score
+                                {sortField === "score" ? (
+                                  sortOrder === "asc" ? (
+                                    <ArrowUp className="ml-1 h-3.5 w-3.5 text-primary" />
+                                  ) : (
+                                    <ArrowDown className="ml-1 h-3.5 w-3.5 text-primary" />
+                                  )
+                                ) : (
+                                  <ArrowUpDown className="ml-1 h-3.5 w-3.5 opacity-40" />
+                                )}
+                              </Button>
+                            </TableHead>
+                            <TableHead className="text-right pr-6 text-xs font-bold uppercase tracking-wider text-muted-foreground">
                               Actions
                             </TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {searchedAndFilteredSessions.map((session) => {
+                          {paginatedSessions.map((session) => {
                             const cand = getCandidateForSession(
                               session.candidateId,
                             );
@@ -1246,7 +1673,7 @@ export default function Reports() {
                                           PDF
                                         </Button>
                                       )}
-                                     <Button
+                                    <Button
                                       size="sm"
                                       variant="outline"
                                       onClick={() =>
@@ -1281,6 +1708,84 @@ export default function Reports() {
                           })}
                         </TableBody>
                       </Table>
+
+                      {/* Pagination Controls Bar */}
+                      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 border-t bg-muted/20">
+                        <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                          <span>
+                            Showing <strong className="text-foreground">{sortedSessions.length === 0 ? 0 : (safePage - 1) * pageSize + 1}</strong> to{" "}
+                            <strong className="text-foreground">{Math.min(safePage * pageSize, sortedSessions.length)}</strong> of{" "}
+                            <strong className="text-foreground">{sortedSessions.length}</strong> candidate session(s)
+                          </span>
+                          <div className="flex items-center gap-1.5 ml-2 border-l border-border/80 pl-3">
+                            <span>Per page:</span>
+                            <Select
+                              value={String(pageSize)}
+                              onValueChange={(val) => {
+                                setPageSize(Number(val));
+                                setCurrentPage(1);
+                              }}
+                            >
+                              <SelectTrigger className="h-7 w-[70px] text-xs">
+                                <SelectValue placeholder={String(pageSize)} />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="10">10</SelectItem>
+                                <SelectItem value="15">15</SelectItem>
+                                <SelectItem value="25">25</SelectItem>
+                                <SelectItem value="50">50</SelectItem>
+                                <SelectItem value="100">100</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-1.5">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-8 w-8 p-0"
+                            onClick={() => setCurrentPage(1)}
+                            disabled={safePage === 1}
+                            title="First Page"
+                          >
+                            <ChevronsLeft className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-8 w-8 p-0"
+                            onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                            disabled={safePage === 1}
+                            title="Previous Page"
+                          >
+                            <ChevronLeft className="h-4 w-4" />
+                          </Button>
+                          <span className="text-xs font-semibold px-2 font-mono">
+                            Page {safePage} of {totalPages}
+                          </span>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-8 w-8 p-0"
+                            onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                            disabled={safePage === totalPages}
+                            title="Next Page"
+                          >
+                            <ChevronRight className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-8 w-8 p-0"
+                            onClick={() => setCurrentPage(totalPages)}
+                            disabled={safePage === totalPages}
+                            title="Last Page"
+                          >
+                            <ChevronsRight className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
                     </div>
                   )}
                 </div>
