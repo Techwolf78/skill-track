@@ -11,6 +11,13 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   Plus,
   Search,
   Upload,
@@ -28,6 +35,8 @@ import {
   MessageSquare,
   ChevronLeft,
   ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
   X,
   Eye,
 } from "lucide-react";
@@ -58,8 +67,19 @@ import {
   useDeleteCandidateMutation,
 } from "@/hooks/use-query-hooks";
 
+interface CandidateInsightData {
+  totalTests?: number;
+  totalEvals?: number;
+  overallPercentile?: number;
+  commPercentile?: number;
+  lastComputed?: string;
+  strongTopics?: string[] | string;
+  weakTopics?: string[] | string;
+  improvementAreas?: string[] | string;
+}
+
 function CandidateInsightsSection({ candidateId, onInsightsLoaded }: { candidateId: string; onInsightsLoaded?: (totalTests: number) => void }) {
-  const [insights, setInsights] = useState<any>(null);
+  const [insights, setInsights] = useState<CandidateInsightData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -69,13 +89,14 @@ function CandidateInsightsSection({ candidateId, onInsightsLoaded }: { candidate
       setError(null);
       try {
         const response = await apiClient.get(`/candidates/${candidateId}/insights`);
-        const data = response.data?.data ?? response.data;
+        const data: CandidateInsightData = response.data?.data ?? response.data;
         setInsights(data);
         if (data && typeof data.totalTests === "number" && onInsightsLoaded) {
           onInsightsLoaded(data.totalTests);
         }
-      } catch (err: any) {
-        if (err?.response?.status !== 404) {
+      } catch (err: unknown) {
+        const errorObj = err as { response?: { status?: number } };
+        if (errorObj?.response?.status !== 404) {
           console.error("Failed to load insights:", err);
         }
         setError("No tests taken by candidate yet.");
@@ -84,7 +105,7 @@ function CandidateInsightsSection({ candidateId, onInsightsLoaded }: { candidate
       }
     }
     fetchInsights();
-  }, [candidateId]);
+  }, [candidateId, onInsightsLoaded]);
 
   if (loading) {
     return (
@@ -107,14 +128,16 @@ function CandidateInsightsSection({ candidateId, onInsightsLoaded }: { candidate
     );
   }
 
-  const parseList = (raw: any): string[] => {
+  const parseList = (raw: unknown): string[] => {
     if (!raw) return [];
-    if (Array.isArray(raw)) return raw;
+    if (Array.isArray(raw)) return raw.map(String);
     if (typeof raw === "string") {
       try {
         const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed)) return parsed;
-      } catch {}
+        if (Array.isArray(parsed)) return parsed.map(String);
+      } catch {
+        // Fallback split string on comma
+      }
       return raw.split(",").map(s => s.trim()).filter(Boolean);
     }
     return [];
@@ -249,6 +272,14 @@ export default function AdminCandidates() {
                        candidates.find(c => c.organisation?.id === orgId)?.organisation?.name || 
                        "Your Organisation";
 
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(15);
+
+  // Reset pagination to page 1 on filter/search change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm]);
+
   const filteredCandidates = candidates.filter((candidate) => {
     return (
       candidate.user.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -256,6 +287,11 @@ export default function AdminCandidates() {
       candidate.user.phoneNumber?.toLowerCase().includes(searchTerm.toLowerCase())
     );
   });
+
+  const totalFilteredCount = filteredCandidates.length;
+  const totalPages = Math.max(1, Math.ceil(totalFilteredCount / pageSize));
+  const startIndex = (currentPage - 1) * pageSize;
+  const paginatedCandidates = filteredCandidates.slice(startIndex, startIndex + pageSize);
 
   // Initialize candidate tests count map to 0
   useEffect(() => {
@@ -464,9 +500,9 @@ export default function AdminCandidates() {
           <TableBody>
             {loading ? (
               <TableRow><TableCell colSpan={4} className="text-center py-10"><Loader2 className="w-6 h-6 animate-spin mx-auto" /></TableCell></TableRow>
-            ) : filteredCandidates.length === 0 ? (
+            ) : paginatedCandidates.length === 0 ? (
               <TableRow><TableCell colSpan={4} className="text-center py-10">No candidates found.</TableCell></TableRow>
-            ) : filteredCandidates.map((candidate) => (
+            ) : paginatedCandidates.map((candidate) => (
               <React.Fragment key={candidate.id}>
                 <TableRow className="hover:bg-muted/30 transition-colors cursor-pointer" onClick={() => setDetailsCandidate(candidate)}>
                   <TableCell>
@@ -504,6 +540,87 @@ export default function AdminCandidates() {
             ))}
           </TableBody>
         </Table>
+      </div>
+
+      {/* Pagination Controls Footer */}
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-card p-4 rounded-xl border border-border/60 shadow-sm text-xs">
+        <div className="flex items-center gap-3 text-muted-foreground">
+          <span>
+            Showing <strong className="text-foreground font-semibold">{totalFilteredCount > 0 ? startIndex + 1 : 0}</strong> to{" "}
+            <strong className="text-foreground font-semibold">{Math.min(startIndex + pageSize, totalFilteredCount)}</strong> of{" "}
+            <strong className="text-foreground font-semibold">{totalFilteredCount}</strong> candidates
+          </span>
+
+          <div className="flex items-center gap-1.5 ml-2">
+            <span className="hidden sm:inline text-muted-foreground">Rows per page:</span>
+            <Select
+              value={String(pageSize)}
+              onValueChange={(val) => {
+                setPageSize(Number(val));
+                setCurrentPage(1);
+              }}
+            >
+              <SelectTrigger className="h-8 w-20 text-xs bg-background">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="10">10</SelectItem>
+                <SelectItem value="15">15</SelectItem>
+                <SelectItem value="25">25</SelectItem>
+                <SelectItem value="50">50</SelectItem>
+                <SelectItem value="100">100</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-1.5">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setCurrentPage(1)}
+            disabled={currentPage <= 1}
+            className="h-8 w-8 p-0"
+            title="First Page"
+          >
+            <ChevronsLeft className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+            disabled={currentPage <= 1}
+            className="h-8 w-8 p-0"
+            title="Previous Page"
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+
+          <span className="px-2 font-medium text-foreground">
+            Page {currentPage} of {totalPages}
+          </span>
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+            disabled={currentPage >= totalPages}
+            className="h-8 w-8 p-0"
+            title="Next Page"
+          >
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setCurrentPage(totalPages)}
+            disabled={currentPage >= totalPages}
+            className="h-8 w-8 p-0"
+            title="Last Page"
+          >
+            <ChevronsRight className="h-4 w-4" />
+          </Button>
+        </div>
       </div>
 
       {/* Candidate Details Dialog */}

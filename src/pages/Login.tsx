@@ -1,19 +1,18 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import axios from "axios";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import {
   GraduationCap,
-  Shield,
   BookOpen,
   CheckCircle2,
   Eye,
   EyeOff,
   Loader2,
+  Shield,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { authService } from "@/lib/auth-service";
@@ -34,25 +33,10 @@ export default function Login() {
   const { toast } = useToast();
   const { login: loginToContext } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
-  const [showColdStartMessage, setShowColdStartMessage] = useState(false);
 
-  useEffect(() => {
-    let timer: any;
-    if (isLoading) {
-      timer = setTimeout(() => {
-        setShowColdStartMessage(true);
-      }, 4000);
-    } else {
-      setShowColdStartMessage(false);
-    }
-    return () => clearTimeout(timer);
-  }, [isLoading]);
   const [adminEmail, setAdminEmail] = useState("superadmin@gryphonacademy.co.in");
   const [adminPassword, setAdminPassword] = useState("");
-  const [studentEmail, setStudentEmail] = useState("");
-  const [studentPassword, setStudentPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [showStudentPassword, setShowStudentPassword] = useState(false);
 
   const handleAdminLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -64,14 +48,7 @@ export default function Login() {
         password: adminPassword,
       });
 
-      // The authService now handles storing the token and user
-      // But let's verify it was stored
       console.log("Login response:", response);
-      console.log("Stored token:", localStorage.getItem("token"));
-      console.log("Stored user:", localStorage.getItem("user"));
-
-      // Use the login function from AuthContext to update React state immediately
-      // This prevents the race condition where ProtectedRoute checks isAuthenticated before state updates
       loginToContext(response.accessToken, response.user);
 
       toast({
@@ -79,9 +56,7 @@ export default function Login() {
         description: `Welcome back, ${response.user.name || adminEmail}!`,
       });
 
-      // Navigate based on role
       const redirectPath = getRedirectPathForRole(response.user.role);
-      console.log("Redirecting to:", redirectPath);
       navigate(redirectPath);
     } catch (error: unknown) {
       console.error("Login failed:", error);
@@ -108,57 +83,9 @@ export default function Login() {
     }
   };
 
-  const handleStudentAccess = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (isLoading) return;
-    setIsLoading(true);
-    try {
-      const response = await authService.login({
-        email: studentEmail,
-        password: studentPassword,
-      });
-
-      loginToContext(response.accessToken, response.user);
-
-      toast({
-        title: "Login Successful!",
-        description: `Welcome, ${response.user.name || studentEmail}!`,
-      });
-
-      const redirectPath = getRedirectPathForRole(response.user.role);
-      navigate(redirectPath);
-    } catch (error: unknown) {
-      let errorMessage = "Invalid email or password.";
-      let errorTitle = "Access Denied";
-      if (axios.isAxiosError(error)) {
-        if (error.response?.status === 429) {
-          errorTitle = "Rate Limit Exceeded";
-        }
-        errorMessage =
-          error.response?.data?.message ||
-          error.response?.data?.data?.message ||
-          error.message;
-      } else if (error instanceof Error) {
-        errorMessage = error.message;
-      }
-      toast({
-        title: errorTitle,
-        description: errorMessage,
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   const fillAdminCredentials = () => {
     setAdminEmail("superadmin@gryphonacademy.co.in");
     setAdminPassword("password123");
-  };
-
-  const fillStudentCredentials = () => {
-    setStudentEmail("gorodoro@gmail.com");
-    setStudentPassword("12345678");
   };
 
   return (
@@ -235,7 +162,7 @@ export default function Login() {
         </div>
       </motion.div>
 
-      {/* Right Panel - Login Forms */}
+      {/* Right Panel - Admin Login Form */}
       <motion.div
         className="flex-1 flex items-center justify-center p-8 bg-background"
         initial={{ opacity: 0, x: 50 }}
@@ -244,199 +171,96 @@ export default function Login() {
       >
         <div className="w-full max-w-md space-y-8">
           <div className="text-center lg:text-left">
-            <h2 className="text-2xl font-heading font-bold">Welcome Back</h2>
+            <h2 className="text-2xl font-heading font-bold">Admin Login</h2>
             <p className="text-muted-foreground mt-1">
-              Choose your portal to continue
+              Enter your credentials to access the admin portal
             </p>
           </div>
 
-          <Tabs defaultValue="admin" className="w-full">
-            <TabsList className="grid w-full grid-cols-2 h-12">
-              <TabsTrigger value="admin" className="text-sm font-medium">
-                <Shield className="w-4 h-4 mr-2" />
-                Admin / Trainer
-              </TabsTrigger>
-              <TabsTrigger value="student" className="text-sm font-medium">
-                <GraduationCap className="w-4 h-4 mr-2" />
-                Student
-              </TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="admin" className="mt-6">
-              <div className="flex items-center justify-between gap-3 mb-4">
-                <p className="text-sm text-muted-foreground">
-                  Use quick-fill credentials for demo login.
-                </p>
-                <button
-                  type="button"
-                  onClick={fillAdminCredentials}
-                  className="text-sm font-medium text-primary hover:underline"
-                >
-                  Fill Admin
-                </button>
+          <div className="mt-6">
+            <div className="flex items-center justify-between gap-3 mb-4">
+              <p className="text-sm text-muted-foreground">
+                Use quick-fill credentials for demo login.
+              </p>
+              <button
+                type="button"
+                onClick={fillAdminCredentials}
+                className="text-sm font-medium text-primary hover:underline"
+              >
+                Fill Admin
+              </button>
+            </div>
+            <form onSubmit={handleAdminLogin} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="adminEmail">Email</Label>
+                <Input
+                  id="adminEmail"
+                  type="email"
+                  placeholder="admin@company.com"
+                  className={cn(
+                    "h-12",
+                    adminEmail && validateLoginForm({ email: adminEmail }).errors.email && "border-red-500 focus-visible:ring-red-500"
+                  )}
+                  value={adminEmail}
+                  onChange={(event) => setAdminEmail(event.target.value)}
+                  required
+                />
+                {adminEmail && validateLoginForm({ email: adminEmail }).errors.email && (
+                  <p className="text-xs text-red-500 font-medium">Please enter a valid email address (e.g. user@domain.com)</p>
+                )}
               </div>
-              <form onSubmit={handleAdminLogin} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="adminEmail">Email</Label>
+              <div className="space-y-2">
+                <Label htmlFor="adminPassword">Password</Label>
+                <div className="relative">
                   <Input
-                    id="adminEmail"
-                    type="email"
-                    placeholder="admin@company.com"
-                    className={cn(
-                      "h-12",
-                      adminEmail && validateLoginForm({ email: adminEmail }).errors.email && "border-red-500 focus-visible:ring-red-500"
-                    )}
-                    value={adminEmail}
-                    onChange={(event) => setAdminEmail(event.target.value)}
+                    id="adminPassword"
+                    type={showPassword ? "text" : "password"}
+                    placeholder="••••••••"
+                    className="h-12 pr-10"
+                    value={adminPassword}
+                    onChange={(event) => setAdminPassword(event.target.value)}
                     required
                   />
-                  {adminEmail && validateLoginForm({ email: adminEmail }).errors.email && (
-                    <p className="text-xs text-red-500 font-medium">Please enter a valid email address (e.g. user@domain.com)</p>
-                  )}
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="adminPassword">Password</Label>
-                  <div className="relative">
-                    <Input
-                      id="adminPassword"
-                      type={showPassword ? "text" : "password"}
-                      placeholder="••••••••"
-                      className="h-12 pr-10"
-                      value={adminPassword}
-                      onChange={(event) => setAdminPassword(event.target.value)}
-                      required
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                    >
-                      {showPassword ? (
-                        <EyeOff className="w-5 h-5" />
-                      ) : (
-                        <Eye className="w-5 h-5" />
-                      )}
-                    </button>
-                  </div>
-                </div>
-                <div className="flex items-center justify-between text-sm">
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input type="checkbox" className="rounded border-input" />
-                    <span className="text-muted-foreground">Remember me</span>
-                  </label>
-                  <a href="#" className="text-primary hover:underline">
-                    Forgot password?
-                  </a>
-                </div>
-                <Button
-                  type="submit"
-                  variant="hero"
-                  size="lg"
-                  className="w-full"
-                  disabled={isLoading}
-                >
-                  {isLoading ? (
-                    <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Signing in...
-                    </>
-                  ) : (
-                    "Sign in as Admin"
-                  )}
-                </Button>
-                {showColdStartMessage && (
-                  <p className="text-center text-xs text-amber-500 animate-pulse mt-2">
-                    ⏳ Backend is waking up... Cold start on Render free tier can take up to 50 seconds. Please wait.
-                  </p>
-                )}
-
-              </form>
-            </TabsContent>
-
-            <TabsContent value="student" className="mt-6">
-              <div className="flex items-center justify-between gap-3 mb-4">
-                <p className="text-sm text-muted-foreground">
-                  Login with your candidate email and password.
-                </p>
-                <button
-                  type="button"
-                  onClick={fillStudentCredentials}
-                  className="text-sm font-medium text-primary hover:underline"
-                >
-                  Fill Sample
-                </button>
-              </div>
-              <form onSubmit={handleStudentAccess} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="studentEmail">Email Address</Label>
-                  <Input
-                    id="studentEmail"
-                    type="email"
-                    placeholder="gorodoro@gmail.com"
-                    className={cn(
-                      "h-12",
-                      studentEmail && validateLoginForm({ email: studentEmail }).errors.email && "border-red-500 focus-visible:ring-red-500"
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    {showPassword ? (
+                      <EyeOff className="w-5 h-5" />
+                    ) : (
+                      <Eye className="w-5 h-5" />
                     )}
-                    value={studentEmail}
-                    onChange={(event) => setStudentEmail(event.target.value)}
-                    required
-                  />
-                  {studentEmail && validateLoginForm({ email: studentEmail }).errors.email && (
-                    <p className="text-xs text-red-500 font-medium">Please enter a valid email address (e.g. user@domain.com)</p>
-                  )}
+                  </button>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="studentPassword">Password</Label>
-                  <div className="relative">
-                    <Input
-                      id="studentPassword"
-                      type={showStudentPassword ? "text" : "password"}
-                      placeholder="••••••••"
-                      className="h-12 pr-10"
-                      value={studentPassword}
-                      onChange={(event) => setStudentPassword(event.target.value)}
-                      required
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowStudentPassword(!showStudentPassword)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                    >
-                      {showStudentPassword ? (
-                        <EyeOff className="w-5 h-5" />
-                      ) : (
-                        <Eye className="w-5 h-5" />
-                      )}
-                    </button>
-                  </div>
-                </div>
-                <Button
-                  type="submit"
-                  variant="hero"
-                  size="lg"
-                  className="w-full"
-                  disabled={isLoading}
-                >
-                  {isLoading ? (
-                    <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Signing in...
-                    </>
-                  ) : (
-                    "Sign in as Candidate"
-                  )}
-                </Button>
-                {showColdStartMessage && (
-                  <p className="text-center text-xs text-amber-500 animate-pulse mt-2">
-                    ⏳ Backend is waking up... Cold start on Render free tier can take up to 50 seconds. Please wait.
-                  </p>
+              </div>
+              <div className="flex items-center justify-between text-sm">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" className="rounded border-input" />
+                  <span className="text-muted-foreground">Remember me</span>
+                </label>
+                <a href="#" className="text-primary hover:underline">
+                  Forgot password?
+                </a>
+              </div>
+              <Button
+                type="submit"
+                variant="hero"
+                size="lg"
+                className="w-full"
+                disabled={isLoading}
+              >
+                {isLoading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Signing in...
+                  </>
+                ) : (
+                  "Sign in as Admin"
                 )}
-                <p className="text-center text-sm text-muted-foreground">
-                  Use the credentials shared by your assessment administrator
-                </p>
-              </form>
-            </TabsContent>
-          </Tabs>
+              </Button>
+            </form>
+          </div>
         </div>
       </motion.div>
     </div>

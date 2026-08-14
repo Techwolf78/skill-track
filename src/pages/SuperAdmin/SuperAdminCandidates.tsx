@@ -31,6 +31,10 @@ import {
   Loader2,
   ChevronDown,
   ChevronUp,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
   Brain,
   MessageSquare,
 } from "lucide-react";
@@ -61,8 +65,19 @@ import { BulkUploadCandidates } from "../Admin/BulkUploadCandidates";
 import { EditCandidateDialog } from "../Admin/EditCandidateDialog";
 import { DeleteConfirmDialog } from "../Admin/DeleteConfirmDialog";
 
+interface CandidateInsightData {
+  totalTests?: number;
+  totalEvals?: number;
+  overallPercentile?: number;
+  commPercentile?: number;
+  lastComputed?: string;
+  strongTopics?: string[] | string;
+  weakTopics?: string[] | string;
+  improvementAreas?: string[] | string;
+}
+
 function CandidateInsightsSection({ candidateId, onInsightsLoaded }: { candidateId: string; onInsightsLoaded?: (totalTests: number) => void }) {
-  const [insights, setInsights] = useState<any>(null);
+  const [insights, setInsights] = useState<CandidateInsightData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -72,12 +87,12 @@ function CandidateInsightsSection({ candidateId, onInsightsLoaded }: { candidate
       setError(null);
       try {
         const response = await apiClient.get(`/candidates/${candidateId}/insights`);
-        const data = response.data?.data ?? response.data;
+        const data: CandidateInsightData = response.data?.data ?? response.data;
         setInsights(data);
         if (data && typeof data.totalTests === "number" && onInsightsLoaded) {
           onInsightsLoaded(data.totalTests);
         }
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error("Failed to load insights:", err);
         setError("No insights generated for this candidate yet.");
       } finally {
@@ -85,7 +100,7 @@ function CandidateInsightsSection({ candidateId, onInsightsLoaded }: { candidate
       }
     }
     fetchInsights();
-  }, [candidateId]);
+  }, [candidateId, onInsightsLoaded]);
 
   if (loading) {
     return (
@@ -108,14 +123,16 @@ function CandidateInsightsSection({ candidateId, onInsightsLoaded }: { candidate
     );
   }
 
-  const parseList = (raw: any): string[] => {
+  const parseList = (raw: unknown): string[] => {
     if (!raw) return [];
-    if (Array.isArray(raw)) return raw;
+    if (Array.isArray(raw)) return raw.map(String);
     if (typeof raw === "string") {
       try {
         const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed)) return parsed;
-      } catch {}
+        if (Array.isArray(parsed)) return parsed.map(String);
+      } catch {
+        // Fallback split string on comma
+      }
       return raw.split(",").map(s => s.trim()).filter(Boolean);
     }
     return [];
@@ -282,6 +299,14 @@ export default function Students() {
     refetchOrgs();
   }, [refetchCandidates, refetchOrgs]);
 
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(15);
+
+  // Reset pagination to page 1 on filter/search change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, selectedOrganisation]);
+
   const filteredCandidates = candidates.filter((candidate) => {
     const matchesSearch = 
       candidate.user.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -292,6 +317,11 @@ export default function Students() {
     
     return matchesSearch && matchesOrg;
   });
+
+  const totalFilteredCount = filteredCandidates.length;
+  const totalPages = Math.max(1, Math.ceil(totalFilteredCount / pageSize));
+  const startIndex = (currentPage - 1) * pageSize;
+  const paginatedCandidates = filteredCandidates.slice(startIndex, startIndex + pageSize);
 
   // Fetch tests count (from insights) for each candidate on mount / when candidates change
   useEffect(() => {
@@ -307,65 +337,70 @@ export default function Students() {
         } else {
           setTestsCountMap(prev => ({ ...prev, [candidate.id]: 0 }));
         }
-      } catch (err) {
+      } catch {
         setTestsCountMap(prev => ({ ...prev, [candidate.id]: 0 }));
       }
     });
-  }, [candidates]);
+  }, [candidates, testsCountMap]);
 
   const [customFields, setCustomFields] = useState<CustomFieldItem[]>([]);
 
   const handleAddCandidate = async () => {
     setEmailError(null);
     if (!formData.name.trim()) {
-      toast({ title: "Validation Error", description: "Name is required", variant: "destructive" });
+      toast({ title: "Error", description: "Name is required", variant: "destructive" });
       return;
     }
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(formData.email)) {
-      setEmailError("Invalid email format");
+    if (!formData.email.trim()) {
+      setEmailError("Email is required");
       return;
     }
-    if (!formData.password.trim() || formData.password.length < 8) {
-      toast({ title: "Validation Error", description: "Password must be at least 8 characters", variant: "destructive" });
+    if (!formData.password.trim()) {
+      toast({ title: "Error", description: "Password is required", variant: "destructive" });
       return;
     }
     if (!formData.organisationId) {
-      toast({ title: "Validation Error", description: "Please select an organisation", variant: "destructive" });
+      toast({ title: "Error", description: "Organisation is required", variant: "destructive" });
       return;
     }
 
     setSubmitting(true);
     try {
-      const extraFields: Record<string, string> = {};
-      Object.entries(formData.extraFields).forEach(([key, value]) => {
-        if (value && value.trim()) extraFields[key] = value.trim();
+      // Build extraFields JSON map from predefined + custom fields
+      const extraFieldsMap: Record<string, string> = {};
+      Object.entries(formData.extraFields).forEach(([k, v]) => {
+        if (v.trim()) extraFieldsMap[k] = v.trim();
       });
-      for (const cf of customFields) {
+      customFields.forEach(cf => {
         if (cf.key.trim() && cf.value.trim()) {
-          extraFields[cf.key.trim()] = cf.value.trim();
+          extraFieldsMap[cf.key.trim()] = cf.value.trim();
         }
-      }
+      });
 
       await createCandidateMutation.mutateAsync({
-        ...formData,
-        extraFields: Object.keys(extraFields).length > 0 ? extraFields : undefined,
+        name: formData.name,
+        email: formData.email,
+        password: formData.password,
+        phoneNumber: formData.phoneNumber || undefined,
+        organisationId: formData.organisationId,
+        extraFields: Object.keys(extraFieldsMap).length > 0 ? extraFieldsMap : undefined,
       });
 
-      toast({ title: "Success", description: "Candidate added successfully" });
+      toast({ title: "Success", description: "Candidate created successfully" });
       setIsAddDialogOpen(false);
-      setCustomFields([]);
       setFormData({
         name: "", email: "", password: "", phoneNumber: "", organisationId: "",
         extraFields: { college: "", course: "", year: "", skills: "", city: "" }
       });
+      setCustomFields([]);
     } catch (error) {
       const err = error as { response?: { data?: { message?: string } } };
-      toast({ 
-        title: "Error", 
-        description: err.response?.data?.message || "Failed to add candidate", 
-        variant: "destructive" 
-      });
+      const msg = err.response?.data?.message || "";
+      if (msg.toLowerCase().includes("email")) {
+        setEmailError(msg);
+      } else {
+        toast({ title: "Error", description: msg || "Failed to create candidate", variant: "destructive" });
+      }
     } finally {
       setSubmitting(false);
     }
@@ -431,7 +466,7 @@ export default function Students() {
         <div className="relative flex-1 max-w-md">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
-            placeholder="Search candidates..."
+            placeholder="Search candidates by name, email or phone..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="pl-10"
@@ -465,9 +500,9 @@ export default function Students() {
           <TableBody>
             {loading ? (
               <TableRow><TableCell colSpan={6} className="text-center py-10"><Loader2 className="w-6 h-6 animate-spin mx-auto" /></TableCell></TableRow>
-            ) : filteredCandidates.length === 0 ? (
+            ) : paginatedCandidates.length === 0 ? (
               <TableRow><TableCell colSpan={6} className="text-center py-10">No candidates found.</TableCell></TableRow>
-            ) : filteredCandidates.map((candidate) => (
+            ) : paginatedCandidates.map((candidate) => (
               <React.Fragment key={candidate.id}>
                 <TableRow className="hover:bg-muted/30 transition-colors cursor-pointer" onClick={() => setExpandedRow(expandedRow === candidate.id ? null : candidate.id)}>
                   <TableCell>
@@ -538,6 +573,87 @@ export default function Students() {
             ))}
           </TableBody>
         </Table>
+      </div>
+
+      {/* Pagination Controls Footer */}
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-card p-4 rounded-xl border border-border/60 shadow-sm text-xs">
+        <div className="flex items-center gap-3 text-muted-foreground">
+          <span>
+            Showing <strong className="text-foreground font-semibold">{totalFilteredCount > 0 ? startIndex + 1 : 0}</strong> to{" "}
+            <strong className="text-foreground font-semibold">{Math.min(startIndex + pageSize, totalFilteredCount)}</strong> of{" "}
+            <strong className="text-foreground font-semibold">{totalFilteredCount}</strong> candidates
+          </span>
+
+          <div className="flex items-center gap-1.5 ml-2">
+            <span className="hidden sm:inline text-muted-foreground">Rows per page:</span>
+            <Select
+              value={String(pageSize)}
+              onValueChange={(val) => {
+                setPageSize(Number(val));
+                setCurrentPage(1);
+              }}
+            >
+              <SelectTrigger className="h-8 w-20 text-xs bg-background">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="10">10</SelectItem>
+                <SelectItem value="15">15</SelectItem>
+                <SelectItem value="25">25</SelectItem>
+                <SelectItem value="50">50</SelectItem>
+                <SelectItem value="100">100</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-1.5">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setCurrentPage(1)}
+            disabled={currentPage <= 1}
+            className="h-8 w-8 p-0"
+            title="First Page"
+          >
+            <ChevronsLeft className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+            disabled={currentPage <= 1}
+            className="h-8 w-8 p-0"
+            title="Previous Page"
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+
+          <span className="px-2 font-medium text-foreground">
+            Page {currentPage} of {totalPages}
+          </span>
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+            disabled={currentPage >= totalPages}
+            className="h-8 w-8 p-0"
+            title="Next Page"
+          >
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setCurrentPage(totalPages)}
+            disabled={currentPage >= totalPages}
+            className="h-8 w-8 p-0"
+            title="Last Page"
+          >
+            <ChevronsRight className="h-4 w-4" />
+          </Button>
+        </div>
       </div>
 
       <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
