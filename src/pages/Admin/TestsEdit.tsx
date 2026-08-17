@@ -2286,14 +2286,15 @@ To refer to the FAQ document, you can click on the HELP button which is present 
     }
   };
 
-  const copyTestLink = (invitationId: string) => {
+  const copyTestLink = (invitationId: string, token?: string) => {
     const baseUrl = window.location.origin;
-    const testUrl = `${baseUrl}/test/access/${invitationId}`;
+    const tokenParam = token ? `?magicToken=${encodeURIComponent(token)}` : "";
+    const testUrl = `${baseUrl}/test/access/${invitationId}${tokenParam}`;
     navigator.clipboard.writeText(testUrl);
     setCopiedToken(invitationId);
     toast({
       title: "Link Copied!",
-      description: "Test URL copied to clipboard",
+      description: token ? "Magic access link copied to clipboard" : "Test URL copied to clipboard",
     });
     setTimeout(() => setCopiedToken(null), 2000);
   };
@@ -3629,7 +3630,7 @@ To refer to the FAQ document, you can click on the HELP button which is present 
                                       variant="ghost"
                                       size="sm"
                                       onClick={() =>
-                                        copyTestLink(invitation.id)
+                                        copyTestLink(invitation.id, invitation.token)
                                       }
                                       className="h-8 px-2"
                                       disabled={displayStatus === "EXPIRED"}
