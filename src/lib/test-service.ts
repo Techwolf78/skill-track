@@ -549,12 +549,16 @@ export const testService = {
   // ==================== Subject APIs ====================
   getAllSubjects: async (): Promise<Subject[]> => {
     const response = await apiClient.get<Subject[]>("/subjects");
-    return unwrapArrayResponse(response);
+    const subjects = unwrapArrayResponse(response);
+    console.log("[testService] Fetched Subjects (UUIDs):", subjects.map((s) => ({ id: s.id, name: s.name })));
+    return subjects;
   },
 
   getSubjectById: async (id: string): Promise<Subject> => {
     const response = await apiClient.get<Subject>(`/subjects/${id}`);
-    return unwrapResponse(response);
+    const subject = unwrapResponse(response);
+    console.log("[testService] Fetched Subject (UUID):", { id: subject.id, name: subject.name });
+    return subject;
   },
 
   createSubject: async (name: string): Promise<Subject> => {
