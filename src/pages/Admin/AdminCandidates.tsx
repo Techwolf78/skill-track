@@ -254,7 +254,7 @@ function CandidateInsightsSection({ candidateId, onInsightsLoaded }: { candidate
 export default function AdminCandidates() {
   const [searchTerm, setSearchTerm] = useState("");
   const [testsCountMap, setTestsCountMap] = useState<Record<string, number>>({});
-  const { data: unfilteredCandidates = [], isLoading: loading, refetch: refetchCandidates } = useCandidatesQuery();
+  const { data: unfilteredCandidates = [], isLoading: loading, isError: candidatesError, error: candidatesErrorObj, refetch: refetchCandidates } = useCandidatesQuery();
   const { user } = useAuth();
 
   const userExtra = user as { organisationId?: string; organisationName?: string } | null;
@@ -500,6 +500,21 @@ export default function AdminCandidates() {
           <TableBody>
             {loading ? (
               <TableRow><TableCell colSpan={4} className="text-center py-10"><Loader2 className="w-6 h-6 animate-spin mx-auto" /></TableCell></TableRow>
+            ) : candidatesError ? (
+              <TableRow>
+                <TableCell colSpan={4} className="text-center py-10">
+                  <div className="flex flex-col items-center justify-center gap-2 text-destructive">
+                    <AlertCircle className="w-8 h-8 text-destructive" />
+                    <p className="font-semibold text-sm">Failed to load candidates from server.</p>
+                    <p className="text-xs text-muted-foreground">
+                      {(candidatesErrorObj as { message?: string })?.message || "Server connection or resource limit error"}
+                    </p>
+                    <Button variant="outline" size="sm" onClick={() => refetchCandidates()} className="mt-2 text-xs">
+                      Retry Connection
+                    </Button>
+                  </div>
+                </TableCell>
+              </TableRow>
             ) : paginatedCandidates.length === 0 ? (
               <TableRow><TableCell colSpan={4} className="text-center py-10">No candidates found.</TableCell></TableRow>
             ) : paginatedCandidates.map((candidate) => (

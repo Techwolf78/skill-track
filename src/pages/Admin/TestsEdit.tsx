@@ -182,7 +182,7 @@ interface EnrichedTestQuestion extends TestQuestion {
     type?: string;
     avgTimeSeconds?: number;
     avg_time_seconds?: number;
-    options?: any[];
+    options?: unknown[];
   };
 }
 
@@ -811,7 +811,7 @@ To refer to the FAQ document, you can click on the HELP button which is present 
     } finally {
       setLoading(false);
     }
-  }, [id, navigate, toast]);
+  }, [id, navigate]);
 
   useEffect(() => {
     if (id) {
@@ -1487,7 +1487,7 @@ To refer to the FAQ document, you can click on the HELP button which is present 
     } finally {
       setLoadingReports(false);
     }
-  }, [id, toast]);
+  }, [id]);
 
   useEffect(() => {
     if (activeTab === "reports" && id) {
@@ -1865,7 +1865,7 @@ To refer to the FAQ document, you can click on the HELP button which is present 
           const isCoding = q.type === "CODING";
 
           // Build exact selected ID set & raw answers list
-          let selectedValues = new Set<string>();
+          const selectedValues = new Set<string>();
           if (sub?.selectedOptionIds && Array.isArray(sub.selectedOptionIds)) {
             sub.selectedOptionIds.forEach((id: string) => selectedValues.add(String(id).trim().toLowerCase()));
           }
@@ -1903,7 +1903,7 @@ To refer to the FAQ document, you can click on the HELP button which is present 
             minutes > 0 ? `${minutes}m ${seconds}s` : `${seconds}s`;
 
           // Build structured body rows
-          const bodyRows: any[] = [
+          const bodyRows: unknown[][] = [
             [
               {
                 content: `Question:\n${q.prompt || ""}`,
@@ -2378,7 +2378,7 @@ To refer to the FAQ document, you can click on the HELP button which is present 
         (inviteTab === "invited" && !!invitation);
       return matchesSearch && matchesTab;
     });
-  }, [candidates, inviteSearchTerm, inviteTab, invitations, selectedSchedule]);
+  }, [candidates, inviteSearchTerm, inviteTab, invitations, selectedSchedule, getInvitationForCandidate]);
 
   const inviteCounts = useMemo(() => {
     if (!selectedSchedule) {

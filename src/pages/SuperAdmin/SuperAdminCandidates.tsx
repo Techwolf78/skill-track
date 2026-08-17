@@ -37,6 +37,7 @@ import {
   ChevronsRight,
   Brain,
   MessageSquare,
+  AlertCircle,
 } from "lucide-react";
 import { CustomFieldsSection, CustomFieldItem } from "@/components/candidates/CustomFieldsSection";
 import {
@@ -250,7 +251,7 @@ export default function Students() {
   const [searchParams] = useSearchParams();
   const [searchTerm, setSearchTerm] = useState("");
   const [testsCountMap, setTestsCountMap] = useState<Record<string, number>>({});
-  const { data: candidates = [], isLoading: candidatesLoading, refetch: refetchCandidates } = useCandidatesQuery();
+  const { data: candidates = [], isLoading: candidatesLoading, isError: candidatesError, error: candidatesErrorObj, refetch: refetchCandidates } = useCandidatesQuery();
   const { data: organisations = [], isLoading: orgsLoading, refetch: refetchOrgs } = useOrganisationsQuery();
   const loading = candidatesLoading || orgsLoading;
 
@@ -323,25 +324,7 @@ export default function Students() {
   const startIndex = (currentPage - 1) * pageSize;
   const paginatedCandidates = filteredCandidates.slice(startIndex, startIndex + pageSize);
 
-  // Fetch tests count (from insights) for each candidate on mount / when candidates change
-  useEffect(() => {
-    if (!candidates || candidates.length === 0) return;
-    candidates.forEach(async (candidate) => {
-      // Avoid duplicate fetches if we already have a value in map
-      if (testsCountMap[candidate.id] !== undefined) return;
-      try {
-        const response = await apiClient.get(`/candidates/${candidate.id}/insights`);
-        const data = response.data?.data ?? response.data;
-        if (data && typeof data.totalTests === "number") {
-          setTestsCountMap(prev => ({ ...prev, [candidate.id]: data.totalTests }));
-        } else {
-          setTestsCountMap(prev => ({ ...prev, [candidate.id]: 0 }));
-        }
-      } catch {
-        setTestsCountMap(prev => ({ ...prev, [candidate.id]: 0 }));
-      }
-    });
-  }, [candidates, testsCountMap]);
+
 
   const [customFields, setCustomFields] = useState<CustomFieldItem[]>([]);
 
@@ -500,6 +483,21 @@ export default function Students() {
           <TableBody>
             {loading ? (
               <TableRow><TableCell colSpan={6} className="text-center py-10"><Loader2 className="w-6 h-6 animate-spin mx-auto" /></TableCell></TableRow>
+            ) : candidatesError ? (
+              <TableRow>
+                <TableCell colSpan={6} className="text-center py-10">
+                  <div className="flex flex-col items-center justify-center gap-2 text-destructive">
+                    <AlertCircle className="w-8 h-8 text-destructive" />
+                    <p className="font-semibold text-sm">Failed to load candidates from server.</p>
+                    <p className="text-xs text-muted-foreground">
+                      {(candidatesErrorObj as { message?: string })?.message || "Server connection or resource limit error"}
+                    </p>
+                    <Button variant="outline" size="sm" onClick={() => refetchCandidates()} className="mt-2 text-xs">
+                      Retry Connection
+                    </Button>
+                  </div>
+                </TableCell>
+              </TableRow>
             ) : paginatedCandidates.length === 0 ? (
               <TableRow><TableCell colSpan={6} className="text-center py-10">No candidates found.</TableCell></TableRow>
             ) : paginatedCandidates.map((candidate) => (
