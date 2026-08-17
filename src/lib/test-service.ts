@@ -578,17 +578,23 @@ export const testService = {
   // ==================== Topic APIs ====================
   getAllTopics: async (): Promise<Topic[]> => {
     const response = await apiClient.get<Topic[]>("/topics");
-    return unwrapArrayResponse(response);
+    const topics = unwrapArrayResponse(response);
+    console.log("[testService] Fetched Topics (UUIDs):", topics.map((t) => ({ id: t.id, name: t.name, subjectId: t.subjectId })));
+    return topics;
   },
 
   getTopicById: async (id: string): Promise<Topic> => {
     const response = await apiClient.get<Topic>(`/topics/${id}`);
-    return unwrapResponse(response);
+    const topic = unwrapResponse(response);
+    console.log("[testService] Fetched Topic (UUID):", { id: topic.id, name: topic.name, subjectId: topic.subjectId });
+    return topic;
   },
 
   getTopicsBySubject: async (subjectId: string): Promise<Topic[]> => {
     const response = await apiClient.get<Topic[]>(`/topics/subject/${subjectId}`);
-    return unwrapArrayResponse(response);
+    const topics = unwrapArrayResponse(response);
+    console.log(`[testService] Fetched Topics for Subject ${subjectId} (UUIDs):`, topics.map((t) => ({ id: t.id, name: t.name })));
+    return topics;
   },
 
   createTopic: async (name: string, subjectId: string): Promise<Topic> => {
