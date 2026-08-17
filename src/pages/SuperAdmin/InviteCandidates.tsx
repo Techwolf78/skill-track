@@ -174,6 +174,7 @@ export default function InviteCandidates() {
       const response = await apiClient.post("/candidate-invitations", {
         scheduleId: selectedSchedule,
         candidateId: selectedCandidate.id,
+        baseUrl: window.location.origin,
       });
 
       console.log("[InviteCandidates] Invitation sent successfully:", response.data);
@@ -243,6 +244,7 @@ export default function InviteCandidates() {
           await apiClient.post("/candidate-invitations", {
             scheduleId: selectedSchedule,
             candidateId: candidateId,
+            baseUrl: window.location.origin,
           });
           successCount++;
         } catch (err) {

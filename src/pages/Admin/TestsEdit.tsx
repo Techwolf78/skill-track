@@ -2137,6 +2137,7 @@ To refer to the FAQ document, you can click on the HELP button which is present 
       const response = await apiClient.post("/candidate-invitations", {
         scheduleId: selectedSchedule,
         candidateId: selectedCandidate.id,
+        baseUrl: window.location.origin,
       });
 
       console.log("Invitation created successfully. Response:", response.data);
@@ -2262,6 +2263,7 @@ To refer to the FAQ document, you can click on the HELP button which is present 
           await apiClient.post("/candidate-invitations", {
             scheduleId: selectedSchedule,
             candidateId: candidateId,
+            baseUrl: window.location.origin,
           });
           successCount++;
         } catch (err) {
