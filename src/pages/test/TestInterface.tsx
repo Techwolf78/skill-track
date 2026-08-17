@@ -268,7 +268,7 @@ function TestInterfaceContent({ testId, sessionId, navigate, toast }: { testId?:
   const lastWarnedCountRef = useRef(0);
   const hasWarnedFullscreenRef = useRef(false);
 
-  const [saveStatus, setSaveStatus] = useState<"Saving..." | "Saved" | "Offline" | "Failed">("Saved");
+  const [isDraftSynced, setIsDraftSynced] = useState(false);
   const saveVersionsRef = useRef<Record<string, number>>({});
   const getNextSaveVersion = useCallback((questionId: string) => {
     const current = saveVersionsRef.current[questionId] || 0;
@@ -309,7 +309,6 @@ function TestInterfaceContent({ testId, sessionId, navigate, toast }: { testId?:
   const [submitting, setSubmitting] = useState(false);
 
   const lastSavedHashes = useRef<Record<string, string>>({});
-  const pendingAutoSaveFlushRef = useRef<(() => Promise<void>) | null>(null);
 
 
 
@@ -343,16 +342,7 @@ function TestInterfaceContent({ testId, sessionId, navigate, toast }: { testId?:
     };
   }, [currentIndex, questions, flushQuestionTiming]);
 
-  const handleNavigateIndex = useCallback(async (targetIndex: number) => {
-    if (pendingAutoSaveFlushRef.current) {
-      const flushFn = pendingAutoSaveFlushRef.current;
-      pendingAutoSaveFlushRef.current = null;
-      try {
-        await flushFn();
-      } catch (err) {
-        console.warn("Failed to flush pending auto-save before navigation:", err);
-      }
-    }
+  const handleNavigateIndex = useCallback((targetIndex: number) => {
     setCurrentIndex(targetIndex);
   }, []);
 
@@ -661,7 +651,7 @@ useEffect(() => {
   }
 }, [currentIndex, questions, language, answers, sessionId]);
 
-// Save code draft on change with debounced database synchronization
+// Save code draft locally on change (instant local persistence, no background network load)
 useEffect(() => {
   if (questions.length === 0 || !sessionId) return;
   const currentQ = questions[currentIndex];
@@ -669,64 +659,8 @@ useEffect(() => {
 
   // Save to local draft buffer (immediate local feedback)
   AnswerStore.saveDraft(sessionId, currentQ.id, language, code);
-
-  setSaveStatus("Saving...");
-
-  const doSave = async () => {
-    const hash = await computeContentHash(code);
-    if (lastSavedHashes.current[currentQ.id] === hash) {
-      setSaveStatus("Saved");
-      return;
-    }
-
-    const clientTimestamp = Date.now();
-
-    if (!navigator.onLine) {
-      setSaveStatus("Offline");
-      AnswerStore.queueOfflineSubmission(sessionId, currentQ.id, "CODING", { code, language }, clientTimestamp);
-      setUnsyncedCount(AnswerStore.getOfflineQueue(sessionId).length);
-      lastSavedHashes.current[currentQ.id] = hash;
-      return;
-    }
-
-    try {
-      await testService.saveQuestionAnswer(sessionId, currentQ.id, {
-        answerText: code,
-        gradingLanguage: LANGUAGE_MAP[language]?.slug || "python3",
-        clientTimestamp
-      });
-      lastSavedHashes.current[currentQ.id] = hash;
-      setSaveStatus("Saved");
-    } catch (err: unknown) {
-      console.error("Autosave failed:", err);
-      const axiosErr = err as { response?: { status: number; data?: { message?: string } } };
-      if (axiosErr.response?.status === 400 && axiosErr.response?.data?.message?.includes("expired")) {
-        setSaveStatus("Failed");
-        toast({
-          title: "Session Expired",
-          description: "Your session duration has expired.",
-          variant: "destructive"
-        });
-        navigate(`/test/${testId}/results?session=${sessionId}`);
-      } else {
-        AnswerStore.queueOfflineSubmission(sessionId, currentQ.id, "CODING", { code, language }, clientTimestamp);
-        setUnsyncedCount(AnswerStore.getOfflineQueue(sessionId).length);
-        setSaveStatus("Failed");
-      }
-    }
-  };
-
-  pendingAutoSaveFlushRef.current = doSave;
-
-  const delayDebounceFn = setTimeout(async () => {
-    pendingAutoSaveFlushRef.current = null;
-    await doSave();
-  }, 2500);
-
-  return () => {
-    clearTimeout(delayDebounceFn);
-  };
-}, [code, language, currentIndex, questions, sessionId, testId, navigate, toast]);
+  setIsDraftSynced(false);
+}, [code, language, currentIndex, questions, sessionId]);
 
   // Set time left from session or test
   useEffect(() => {
@@ -808,6 +742,31 @@ useEffect(() => {
         await flushEvidence();
       } catch (evidenceErr) {
         console.warn("Evidence flush failed (non-blocking):", evidenceErr);
+      }
+
+      // Flush dirty coding drafts for questions where candidate only wrote/ran code (not formally submitted)
+      const codingQuestions = questions.filter(q => q.type === "CODING");
+      for (const codingQ of codingQuestions) {
+        const existingAnswer = answers[codingQ.id] as { result?: { status?: string } } | undefined;
+        const alreadyFormallySubmitted =
+          existingAnswer?.result?.status !== undefined &&
+          existingAnswer?.result?.status !== "PENDING_SYNC";
+
+        if (!alreadyFormallySubmitted) {
+          const draft = AnswerStore.getDraft(sessionId, codingQ.id, language);
+          if (draft && draft.trim().length > 0) {
+            try {
+              await testService.saveQuestionAnswer(sessionId, codingQ.id, {
+                answerText: draft,
+                gradingLanguage: LANGUAGE_MAP[language]?.slug || "python3",
+                clientTimestamp: Date.now()
+              });
+            } catch (flushErr) {
+              console.warn(`Failed to flush draft for question ${codingQ.id}:`, flushErr);
+              // Non-blocking: backend submitSessionInternal will fall back to CodeExecutionRun if it exists
+            }
+          }
+        }
       }
 
       // Use the new dedicated submit endpoint
@@ -1104,6 +1063,7 @@ useEffect(() => {
       } else {
          setOutput({ type: 'error', message: "No test cases returned." });
       }
+      setIsDraftSynced(true);
       setSubmissionPhase("result");
     } catch (error: unknown) {
       console.error("Run code error:", error);
@@ -1210,6 +1170,7 @@ useEffect(() => {
           const finalResult = { code: code, language: language, result: gradingResult };
           setAnswers({ ...answers, [currentQ.id]: finalResult });
           AnswerStore.saveAnswer(sessionId, currentQ.id, finalResult);
+          setIsDraftSynced(true);
           toast({ title: "Success", description: `Solution submitted! ${gradingResult.testCasesPassed}/${gradingResult.testCasesTotal} passed.` });
           setSubmissionPhase("result");
           
@@ -1778,7 +1739,16 @@ useEffect(() => {
 
                       <div className="rounded-lg border overflow-hidden">
                         <div className="flex justify-between items-center border-b px-4 py-2 bg-muted/30">
-                          <div className="text-sm font-medium">Code Editor</div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-medium">Code Editor</span>
+                            <span
+                              title={isDraftSynced ? "Synced to server" : "Draft saved locally"}
+                              className={cn(
+                                "w-2 h-2 rounded-full transition-colors duration-500",
+                                isDraftSynced ? "bg-emerald-500 shadow-sm shadow-emerald-500/50" : "bg-amber-400 shadow-sm shadow-amber-400/50"
+                              )}
+                            />
+                          </div>
                           <div className="flex items-center gap-2">
                             <select
                               value={language}
