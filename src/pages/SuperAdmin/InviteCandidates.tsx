@@ -1,50 +1,15 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Label } from "@/components/ui/label";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  Search,
-  Send,
-  Loader2,
-  Calendar,
-  Clock,
-  CheckCircle2,
-  XCircle,
-  ClockIcon,
-  Link2,
-  Check,
-  Trash2,
-  Users,
-  ChevronRight,
-  ShieldAlert,
-  Inbox,
-  ArrowLeft,
+  Search, Send, Loader2, Calendar, Clock, CheckCircle2, XCircle,
+  ClockIcon, Link2, Check, Trash2, Users, ChevronRight, ShieldAlert,
+  Inbox, Mail, AlertCircle, X, RefreshCw,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { testService, TestSchedule } from "@/lib/test-service";
@@ -61,6 +26,46 @@ interface CandidateInvitation {
   sentAt: string;
 }
 
+type FilterTab = "available" | "invited" | "all";
+
+function getInitials(name: string) {
+  return (name || "U").split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2);
+}
+
+const AVATAR_PALETTE = [
+  "bg-violet-500/15 text-violet-600",
+  "bg-blue-500/15 text-blue-600",
+  "bg-emerald-500/15 text-emerald-600",
+  "bg-amber-500/15 text-amber-600",
+  "bg-rose-500/15 text-rose-600",
+  "bg-cyan-500/15 text-cyan-600",
+  "bg-fuchsia-500/15 text-fuchsia-600",
+  "bg-orange-500/15 text-orange-600",
+];
+function avatarColour(name: string) {
+  return AVATAR_PALETTE[(name || "U").charCodeAt(0) % AVATAR_PALETTE.length];
+}
+
+function InviteStatusBadge({ status }: { status: string }) {
+  if (status === "ACCEPTED")
+    return (
+      <Badge className="text-[10px] bg-emerald-500/10 text-emerald-600 border border-emerald-500/25 gap-1 px-2 py-0.5">
+        <CheckCircle2 className="w-3 h-3" /> Accepted
+      </Badge>
+    );
+  if (status === "EXPIRED")
+    return (
+      <Badge className="text-[10px] bg-red-500/10 text-red-500 border border-red-500/25 gap-1 px-2 py-0.5">
+        <XCircle className="w-3 h-3" /> Expired
+      </Badge>
+    );
+  return (
+    <Badge className="text-[10px] bg-amber-500/10 text-amber-600 border border-amber-500/25 gap-1 px-2 py-0.5">
+      <ClockIcon className="w-3 h-3" /> Pending
+    </Badge>
+  );
+}
+
 export default function InviteCandidates() {
   const [schedules, setSchedules] = useState<TestSchedule[]>([]);
   const [candidates, setCandidates] = useState<Candidate[]>([]);
@@ -69,17 +74,40 @@ export default function InviteCandidates() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedSchedule, setSelectedSchedule] = useState<string>("");
   const [isInviteDialogOpen, setIsInviteDialogOpen] = useState(false);
-  const [selectedCandidate, setSelectedCandidate] = useState<Candidate | null>(
-    null,
-  );
+  const [selectedCandidate, setSelectedCandidate] = useState<Candidate | null>(null);
   const [selectedCandidates, setSelectedCandidates] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
+  const [resendingId, setResendingId] = useState<string | null>(null);
   const [copiedToken, setCopiedToken] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<string>("available");
+  const [activeTab, setActiveTab] = useState<FilterTab>("available");
   const { toast } = useToast();
   const navigate = useNavigate();
-
   const baseUrl = window.location.origin;
+
+  const handleResendEmail = async (invitationId: string, candidateName: string) => {
+    setResendingId(invitationId);
+    try {
+      await apiClient.post(`/candidate-invitations/${invitationId}/access/request`);
+      toast({
+        title: "Access email sent",
+        description: `A new magic access link has been sent to ${candidateName}.`,
+      });
+      fetchData();
+    } catch (error) {
+      const msg =
+        (error as { response?: { data?: { message?: string } }; message?: string })
+          .response?.data?.message ||
+        (error as { message?: string }).message ||
+        "Failed to resend access email";
+      toast({
+        title: "Resend failed",
+        description: msg,
+        variant: "destructive",
+      });
+    } finally {
+      setResendingId(null);
+    }
+  };
 
   const fetchData = useCallback(async () => {
     try {
@@ -88,7 +116,6 @@ export default function InviteCandidates() {
         testService.getAllTestSchedules(),
         candidateService.getCandidates(),
       ]);
-
       const schedulesWithTests = await Promise.all(
         schedulesData.map(async (schedule) => {
           try {
@@ -99,14 +126,10 @@ export default function InviteCandidates() {
           }
         }),
       );
-
       setSchedules(schedulesWithTests);
       setCandidates(candidatesData);
-
       try {
-        const response = await apiClient.get(
-          "/candidate-invitations?size=1000",
-        );
+        const response = await apiClient.get("/candidate-invitations?size=1000");
         const invData = response.data?.data;
         if (Array.isArray(invData)) {
           setInvitations(invData);
@@ -116,95 +139,44 @@ export default function InviteCandidates() {
           "content" in invData &&
           Array.isArray((invData as Record<string, unknown>).content)
         ) {
-          setInvitations(
-            (invData as Record<string, unknown>)
-              .content as CandidateInvitation[],
-          );
+          setInvitations((invData as Record<string, unknown>).content as CandidateInvitation[]);
         } else {
           setInvitations([]);
         }
-      } catch (error) {
-        console.log("No invitations data yet");
-      }
+      } catch { /* no invitations yet */ }
     } catch (error) {
       console.error("Failed to fetch data:", error);
-      toast({
-        title: "Error",
-        description: "Failed to load data",
-        variant: "destructive",
-      });
+      toast({ title: "Error", description: "Failed to load data", variant: "destructive" });
     } finally {
       setLoading(false);
     }
   }, [toast]);
 
-  // Do not auto-select schedule on initial page load to keep dropdown explicit
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+  useEffect(() => { fetchData(); }, [fetchData]);
 
   const handleInvite = async () => {
     if (!selectedSchedule) {
-      toast({
-        title: "Error",
-        description: "Please select a test schedule",
-        variant: "destructive",
-      });
+      toast({ title: "Select a schedule", description: "Choose a test schedule before sending an invite.", variant: "destructive" });
       return;
     }
-
-    if (!selectedCandidate) {
-      toast({
-        title: "Error",
-        description: "No candidate selected",
-        variant: "destructive",
-      });
-      return;
-    }
-
+    if (!selectedCandidate) return;
     setSubmitting(true);
-    console.log("[InviteCandidates] Sending invitation request...", {
-      scheduleId: selectedSchedule,
-      candidateId: selectedCandidate.id,
-      candidateName: selectedCandidate.user.name,
-      candidateEmail: selectedCandidate.user.email,
-    });
-
     try {
-      const response = await apiClient.post("/candidate-invitations", {
+      await apiClient.post("/candidate-invitations", {
         scheduleId: selectedSchedule,
         candidateId: selectedCandidate.id,
+        baseUrl: window.location.origin,
       });
-
-      console.log("[InviteCandidates] Invitation sent successfully:", response.data);
-
-      toast({
-        title: "Success",
-        description: `Invitation sent to ${selectedCandidate.user.name}`,
-      });
+      toast({ title: "Invitation sent", description: `${selectedCandidate.user.name} has been invited.` });
       setIsInviteDialogOpen(false);
       setSelectedCandidate(null);
       fetchData();
     } catch (error) {
-      console.error("[InviteCandidates] Invitation sending failed:", {
-        error,
-        candidateId: selectedCandidate.id,
-        candidateName: selectedCandidate.user.name,
-        candidateEmail: selectedCandidate.user.email,
-      });
-      toast({
-        title: "Error",
-        description:
-          (
-            error as {
-              response?: { data?: { message?: string } };
-              message?: string;
-            }
-          ).response?.data?.message ||
-          (error as { message?: string }).message ||
-          "Failed to send invitation",
-        variant: "destructive",
-      });
+      const msg =
+        (error as { response?: { data?: { message?: string } }; message?: string }).response?.data?.message ||
+        (error as { message?: string }).message ||
+        "Failed to send invitation";
+      toast({ title: "Couldn't send invite", description: msg, variant: "destructive" });
     } finally {
       setSubmitting(false);
     }
@@ -212,699 +184,484 @@ export default function InviteCandidates() {
 
   const handleBulkInvite = async () => {
     if (!selectedSchedule) {
-      toast({
-        title: "Error",
-        description: "Please select a test schedule",
-        variant: "destructive",
-      });
+      toast({ title: "Select a schedule", description: "Choose a test schedule first.", variant: "destructive" });
       return;
     }
-
-    if (selectedCandidates.length === 0) {
-      toast({
-        title: "Error",
-        description: "No candidates selected",
-        variant: "destructive",
-      });
-      return;
-    }
-
+    if (selectedCandidates.length === 0) return;
     setSubmitting(true);
-    let successCount = 0;
-    let failCount = 0;
-
-    console.log("[InviteCandidates] Starting bulk invitation for candidates:", selectedCandidates);
-
-    try {
-      for (const candidateId of selectedCandidates) {
-        const candidateDetails = candidates.find(c => c.id === candidateId);
-        try {
-          console.log(`[InviteCandidates] Bulk sending invitation to candidate: ${candidateDetails?.user?.name || candidateId}`);
-          await apiClient.post("/candidate-invitations", {
-            scheduleId: selectedSchedule,
-            candidateId: candidateId,
-          });
-          successCount++;
-        } catch (err) {
-          console.error(`[InviteCandidates] Bulk sending failed for candidate: ${candidateDetails?.user?.name || candidateId}`, err);
-          failCount++;
-        }
-      }
-
-      console.log("[InviteCandidates] Bulk invitation completed:", {
-        totalSelected: selectedCandidates.length,
-        successful: successCount,
-        failed: failCount,
-      });
-
-      toast({
-        title: "Bulk Invitation Complete",
-        description: `Successfully invited ${successCount} candidates. ${failCount > 0 ? `${failCount} failed.` : ""}`,
-      });
-
-      setSelectedCandidates([]);
-      fetchData();
-    } catch (error) {
-      console.error("Bulk invitation error:", error);
-    } finally {
-      setSubmitting(false);
+    let successCount = 0, failCount = 0;
+    for (const candidateId of selectedCandidates) {
+      try {
+        await apiClient.post("/candidate-invitations", { scheduleId: selectedSchedule, candidateId, baseUrl: window.location.origin });
+        successCount++;
+      } catch { failCount++; }
     }
-  };
-
-  const copyTestLink = (id: string) => {
-    const testUrl = `${baseUrl}/test/access/${id}`;
-    navigator.clipboard.writeText(testUrl);
-    setCopiedToken(id);
     toast({
-      title: "Link Copied!",
-      description: "Test URL copied to clipboard",
+      title: failCount === 0 ? "Bulk invite complete" : "Partial success",
+      description: `${successCount} invited.${failCount > 0 ? ` ${failCount} failed.` : ""}`,
+      variant: failCount > 0 && successCount === 0 ? "destructive" : "default",
     });
-    setTimeout(() => setCopiedToken(null), 2000);
+    setSelectedCandidates([]);
+    fetchData();
+    setSubmitting(false);
   };
 
-  const getActiveSchedules = () => {
-    return schedules.filter(
-      (s) => s.status === "SCHEDULED" || s.status === "LIVE",
-    );
-  };
+  const copyTestLink = (id: string, token?: string) => {
+    const url = `${baseUrl}/test/access/${id}${token ? `?magicToken=${encodeURIComponent(token)}` : ""}`;
+    console.log("[InviteCandidates] Copying link:", url, "| token:", token);
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case "ACCEPTED":
-        return (
-          <Badge className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 font-mono text-xs gap-1 py-0.5">
-            <CheckCircle2 className="w-3 h-3" />
-            Accepted
-          </Badge>
-        );
-      case "EXPIRED":
-        return (
-          <Badge className="bg-red-500/10 text-red-400 border border-red-500/30 font-mono text-xs gap-1 py-0.5">
-            <XCircle className="w-3 h-3" />
-            Expired
-          </Badge>
-        );
-      default:
-        return (
-          <Badge className="bg-yellow-500/10 text-yellow-400 border border-yellow-500/30 font-mono text-xs gap-1 py-0.5 animate-pulse">
-            <ClockIcon className="w-3 h-3" />
-            Pending
-          </Badge>
-        );
+    const doFallbackCopy = () => {
+      const el = document.createElement("textarea");
+      el.value = url;
+      el.style.position = "fixed";
+      el.style.opacity = "0";
+      document.body.appendChild(el);
+      el.select();
+      document.execCommand("copy");
+      document.body.removeChild(el);
+    };
+
+    if (navigator.clipboard && window.isSecureContext) {
+      navigator.clipboard.writeText(url).then(() => {
+        setCopiedToken(id);
+        toast({ title: token ? "Magic link copied!" : "Link copied", description: url });
+        setTimeout(() => setCopiedToken(null), 2000);
+      }).catch(() => {
+        doFallbackCopy();
+        setCopiedToken(id);
+        toast({ title: token ? "Magic link copied!" : "Link copied", description: url });
+        setTimeout(() => setCopiedToken(null), 2000);
+      });
+    } else {
+      doFallbackCopy();
+      setCopiedToken(id);
+      toast({ title: token ? "Magic link copied!" : "Link copied", description: url });
+      setTimeout(() => setCopiedToken(null), 2000);
     }
   };
 
-  const getInvitationForCandidate = (
-    candidateId: string,
-    scheduleId: string,
-  ) => {
-    return (
-      invitations.find(
-        (i) => i.candidateId === candidateId && i.scheduleId === scheduleId,
-      ) || null
-    );
-  };
+  const getInvitationForCandidate = (candidateId: string, scheduleId: string) =>
+    invitations.find((i) => i.candidateId === candidateId && i.scheduleId === scheduleId) || null;
 
   const formatDateTime = (dateStr: string) => {
-    if (!dateStr) return "-";
-    return new Date(dateStr).toLocaleString([], {
-      dateStyle: "short",
-      timeStyle: "short",
-    });
+    if (!dateStr) return "—";
+    return new Date(dateStr).toLocaleString([], { dateStyle: "medium", timeStyle: "short" });
   };
 
-  const activeSchedules = getActiveSchedules();
-  const allSchedules = schedules;
-  const selectedScheduleData = allSchedules.find(
-    (s) => s.id === selectedSchedule,
+  const selectedScheduleData = schedules.find((s) => s.id === selectedSchedule);
+  const isScheduleCompleted =
+    selectedScheduleData?.status === "COMPLETED" || selectedScheduleData?.status === "EXPIRED";
+
+  const candidatesMatchingSearch = useMemo(
+    () => candidates.filter((c) =>
+      c.user.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      c.user.email?.toLowerCase().includes(searchTerm.toLowerCase()),
+    ),
+    [candidates, searchTerm],
   );
 
-  const isScheduleCompleted =
-    selectedScheduleData?.status === "COMPLETED" ||
-    selectedScheduleData?.status === "EXPIRED";
+  const getInv = (cId: string) => selectedSchedule ? getInvitationForCandidate(cId, selectedSchedule) : null;
 
-  // Filter candidates matching search query
-  const candidatesMatchingSearch = candidates.filter((candidate) => {
-    return (
-      candidate.user.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      candidate.user.email?.toLowerCase().includes(searchTerm.toLowerCase())
-    );
-  });
+  const availableCount = useMemo(() => candidatesMatchingSearch.filter((c) => !getInv(c.id)).length, [candidatesMatchingSearch, selectedSchedule, invitations]); // eslint-disable-line react-hooks/exhaustive-deps
+  const invitedCount = useMemo(() => candidatesMatchingSearch.filter((c) => !!selectedSchedule && !!getInv(c.id)).length, [candidatesMatchingSearch, selectedSchedule, invitations]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Segregate based on invitation status for selected schedule
-  const filteredCandidates = candidatesMatchingSearch.filter((candidate) => {
+  const filteredCandidates = useMemo(() => candidatesMatchingSearch.filter((c) => {
     if (!selectedSchedule) return true;
+    const inv = getInv(c.id);
+    if (activeTab === "available") return !inv;
+    if (activeTab === "invited") return !!inv;
+    return true;
+  }), [candidatesMatchingSearch, selectedSchedule, activeTab, invitations]); // eslint-disable-line react-hooks/exhaustive-deps
 
-    const invitation = getInvitationForCandidate(
-      candidate.id,
-      selectedSchedule,
-    );
+  const allVisibleSelected = filteredCandidates.length > 0 && filteredCandidates.every((c) => selectedCandidates.includes(c.id));
+  const toggleSelectAll = (checked: boolean) => {
+    const ids = filteredCandidates.map((c) => c.id);
+    if (checked) setSelectedCandidates((prev) => Array.from(new Set([...prev, ...ids])));
+    else { const s = new Set(ids); setSelectedCandidates((prev) => prev.filter((id) => !s.has(id))); }
+  };
 
-    if (activeTab === "available") {
-      return !invitation;
-    } else if (activeTab === "invited") {
-      return !!invitation;
-    }
-    return true; // "all"
-  });
+  const TABS: { key: FilterTab; label: string; count: number }[] = [
+    { key: "available", label: "Available", count: availableCount },
+    { key: "invited", label: "Invited", count: invitedCount },
+    { key: "all", label: "All", count: candidatesMatchingSearch.length },
+  ];
 
   return (
-    <div className="space-y-6 w-full mx-auto p-1 animate-fade-in">
-      {/* 2-Column Split Workspace */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
-        {/* Left column: Control Panel / Active Schedule Selector */}
-        <div className="lg:col-span-3 space-y-3">
-          <div className="border border-border bg-card rounded-lg p-3.5 space-y-3 shadow-sm">
-            <div className="flex items-center justify-between border-b border-border pb-2">
-              <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground font-mono">
-                Control Center
-              </h2>
-              <Badge
-                variant="outline"
-                className="border-border text-muted-foreground font-mono text-[10px] px-1.5 py-0"
-              >
-                Schedules: {activeSchedules.length}
-              </Badge>
-            </div>
+    <div className="flex flex-col gap-0 animate-fade-in">
 
-            <div className="space-y-1.5">
-              <Label className="text-[10px] font-semibold text-muted-foreground font-mono uppercase tracking-wider">
-                Active Test Schedule
-              </Label>
-              <Select
-                value={selectedSchedule}
-                onValueChange={setSelectedSchedule}
-              >
-                <SelectTrigger className="w-full h-8 bg-background border-border font-mono text-xs focus:ring-1 focus:ring-ring text-foreground px-2">
-                  <SelectValue placeholder="Choose a schedule..." />
-                </SelectTrigger>
-                <SelectContent className="bg-popover border-border text-popover-foreground font-mono text-xs">
-                  {allSchedules.length === 0 ? (
-                    <div className="p-2 text-xs text-muted-foreground">
-                      No schedules found
-                    </div>
-                  ) : (
-                    allSchedules.map((schedule) => (
-                      <SelectItem
-                        key={schedule.id}
-                        value={schedule.id}
-                        className="focus:bg-accent focus:text-accent-foreground"
-                      >
-                        {schedule.test?.title || "Test"} ({schedule.status})
-                      </SelectItem>
-                    ))
-                  )}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {selectedScheduleData ? (
-              <div className="space-y-3 pt-2.5 border-t border-border">
-                <div className="bg-muted/40 border border-border/80 rounded-md p-2.5 space-y-2 font-mono">
-                  <div className="flex items-start justify-between gap-1.5">
-                    <div>
-                      <span className="text-[9px] text-muted-foreground uppercase font-semibold">
-                        Selected Test
-                      </span>
-                      <h3 className="font-semibold text-foreground text-xs leading-tight mt-0.5">
-                        {selectedScheduleData.test?.title || "Unknown Test"}
-                      </h3>
-                    </div>
-                    <Badge
-                      className={`text-[9px] font-bold tracking-wide uppercase px-1.5 py-0 shrink-0 ${
-                        selectedScheduleData.status === "LIVE"
-                          ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/30"
-                          : selectedScheduleData.status === "SCHEDULED"
-                            ? "bg-cyan-500/10 text-cyan-400 border border-cyan-500/30"
-                            : "bg-muted text-muted-foreground border border-border"
-                      }`}
-                    >
-                      {selectedScheduleData.status}
-                    </Badge>
-                  </div>
-
-                  <div className="grid grid-cols-1 gap-1.5 text-[10px] pt-1">
-                    <div className="flex items-center gap-1.5 text-muted-foreground">
-                      <Calendar className="w-3 h-3 text-muted-foreground/60 shrink-0" />
-                      <div className="truncate">
-                        <span className="text-muted-foreground/50 mr-0.5 font-semibold">
-                          START:
-                        </span>
-                        {formatDateTime(selectedScheduleData.startTime)}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-1.5 text-muted-foreground">
-                      <Clock className="w-3 h-3 text-muted-foreground/60 shrink-0" />
-                      <div className="truncate">
-                        <span className="text-muted-foreground/50 mr-0.5 font-semibold">
-                          END:
-                        </span>
-                        {formatDateTime(selectedScheduleData.endTime)}
-                      </div>
-                    </div>
-                  </div>
-
-                  {isScheduleCompleted && (
-                    <div className="flex items-center gap-1.5 p-1.5 bg-destructive/10 border border-destructive/20 text-destructive rounded text-[9px] leading-snug">
-                      <ShieldAlert className="w-3 h-3 shrink-0" />
-                      <span>Completed / expired. Cannot send invites.</span>
-                    </div>
-                  )}
-                </div>
-              </div>
-            ) : (
-              <div className="text-center py-4 text-[10px] text-muted-foreground font-mono border border-dashed border-border rounded-md">
-                No active schedule selected
-              </div>
-            )}
-
-            <Button
-              variant="outline"
-              onClick={() => navigate(`../invitations-history${selectedSchedule ? `?scheduleId=${selectedSchedule}` : ""}`)}
-              className="w-full h-8 justify-between border-border bg-muted/20 text-[10px] font-mono text-muted-foreground hover:text-foreground hover:bg-muted px-2.5"
-            >
-              <span className="flex items-center gap-1.5">
-                <Clock className="w-3 h-3 text-muted-foreground/70" />
-                History Log
-              </span>
-              <ChevronRight className="w-3 h-3" />
-            </Button>
+      {/* ── Header ── */}
+      <div className="flex flex-col gap-4 pb-4 border-b border-border">
+        <div className="flex items-start justify-between gap-4 flex-wrap">
+          <div>
+            <h1 className="text-lg font-bold text-foreground tracking-tight flex items-center gap-2">
+              <Mail className="w-5 h-5 text-primary" />
+              Invite Candidates
+            </h1>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Select a schedule, then invite candidates individually or in bulk.
+            </p>
           </div>
+          <Button
+            variant="ghost" size="sm"
+            onClick={() => navigate(`../invitations-history${selectedSchedule ? `?scheduleId=${selectedSchedule}` : ""}`)}
+            className="text-xs text-muted-foreground hover:text-foreground gap-1.5 h-8 border border-border/60 hover:border-border"
+          >
+            <Clock className="w-3.5 h-3.5" />
+            Invitation History
+            <ChevronRight className="w-3 h-3 opacity-50" />
+          </Button>
         </div>
 
-        {/* Right column: Workspace (Candidates Management) */}
-        <div className="lg:col-span-9 space-y-4">
-          {/* Action Bar */}
-          <div className="flex flex-col sm:flex-row gap-3 items-center justify-between">
-            <div className="relative w-full sm:max-w-md">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/70" />
-              <Input
-                placeholder="Search candidates by name or email..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-9 bg-background border-border text-foreground focus-visible:ring-1 focus-visible:ring-ring text-sm font-mono"
-              />
+        {/* Schedule Selector */}
+        <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
+          <div className="flex-1 max-w-sm">
+            <Select value={selectedSchedule} onValueChange={setSelectedSchedule}>
+              <SelectTrigger className="h-9 bg-background border-border text-sm">
+                <SelectValue placeholder="Choose a test schedule…" />
+              </SelectTrigger>
+              <SelectContent className="text-sm">
+                {schedules.length === 0
+                  ? <div className="p-3 text-xs text-muted-foreground text-center">No schedules found</div>
+                  : schedules.map((s) => (
+                    <SelectItem key={s.id} value={s.id}>
+                      {s.test?.title || "Untitled Test"} <span className="opacity-50">({s.status})</span>
+                    </SelectItem>
+                  ))}
+              </SelectContent>
+            </Select>
+          </div>
+          {selectedScheduleData && (
+            <div className="flex items-center gap-3 flex-wrap">
+              <Badge className={
+                "text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 " +
+                (selectedScheduleData.status === "LIVE"
+                  ? "bg-emerald-500/10 text-emerald-600 border border-emerald-500/30"
+                  : selectedScheduleData.status === "SCHEDULED"
+                    ? "bg-blue-500/10 text-blue-600 border border-blue-500/30"
+                    : "bg-muted text-muted-foreground border border-border")
+              }>
+                {selectedScheduleData.status === "LIVE" && (
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block mr-1.5 animate-pulse" />
+                )}
+                {selectedScheduleData.status}
+              </Badge>
+              <span className="text-xs text-muted-foreground flex items-center gap-1">
+                <Calendar className="w-3 h-3" />
+                {formatDateTime(selectedScheduleData.startTime)}
+                <span className="opacity-40 mx-0.5">→</span>
+                {formatDateTime(selectedScheduleData.endTime)}
+              </span>
+              {isScheduleCompleted && (
+                <span className="inline-flex items-center gap-1 text-[11px] text-destructive bg-destructive/10 border border-destructive/20 rounded px-2 py-0.5">
+                  <ShieldAlert className="w-3 h-3" />
+                  Invites disabled — schedule ended
+                </span>
+              )}
             </div>
-
-            {selectedCandidates.length > 0 && (
-              <Button
-                onClick={handleBulkInvite}
-                disabled={
-                  submitting || !selectedSchedule || isScheduleCompleted
-                }
-                className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-500 text-white font-mono text-xs gap-2 shrink-0 border border-emerald-500/20 shadow-sm"
-              >
-                {submitting ? (
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                ) : (
-                  <Send className="w-3.5 h-3.5" />
-                )}
-                Send Bulk Invites ({selectedCandidates.length})
-              </Button>
-            )}
-          </div>
-
-          {/* Tabs Filter */}
-          <Tabs
-            value={activeTab}
-            onValueChange={setActiveTab}
-            className="w-full"
-          >
-            <TabsList className="bg-muted/40 border border-border p-1 w-full justify-start rounded-md gap-1">
-              <TabsTrigger
-                value="available"
-                className="font-mono text-xs py-1.5 px-3 rounded-sm data-[state=active]:bg-background data-[state=active]:text-foreground text-muted-foreground"
-              >
-                Available to Invite
-              </TabsTrigger>
-              <TabsTrigger
-                value="invited"
-                className="font-mono text-xs py-1.5 px-3 rounded-sm data-[state=active]:bg-background data-[state=active]:text-foreground text-muted-foreground"
-              >
-                Invited Candidates
-              </TabsTrigger>
-              <TabsTrigger
-                value="all"
-                className="font-mono text-xs py-1.5 px-3 rounded-sm data-[state=active]:bg-background data-[state=active]:text-foreground text-muted-foreground"
-              >
-                All Candidates
-              </TabsTrigger>
-            </TabsList>
-          </Tabs>
-
-          {/* Table Container */}
-          <div className="border border-border bg-card rounded-lg overflow-hidden shadow-sm">
-            <Table>
-              <TableHeader className="bg-muted/40 border-b border-border">
-                <TableRow className="border-b border-border hover:bg-transparent">
-                  <TableHead className="w-[40px] px-3 py-1.5">
-                    {activeTab === "available" && (
-                      <Checkbox
-                        checked={
-                          filteredCandidates.length > 0 &&
-                          filteredCandidates.every((c) =>
-                            selectedCandidates.includes(c.id),
-                          )
-                        }
-                        onCheckedChange={(checked) => {
-                          if (checked) {
-                            const allIds = filteredCandidates.map((c) => c.id);
-                            setSelectedCandidates((prev) =>
-                              Array.from(new Set([...prev, ...allIds])),
-                            );
-                          } else {
-                            const filteredIds = new Set(
-                              filteredCandidates.map((c) => c.id),
-                            );
-                            setSelectedCandidates((prev) =>
-                              prev.filter((id) => !filteredIds.has(id)),
-                            );
-                          }
-                        }}
-                      />
-                    )}
-                  </TableHead>
-                  <TableHead className="w-[50px] text-center font-mono text-[10px] text-muted-foreground py-1.5">
-                    #
-                  </TableHead>
-                  <TableHead className="font-mono text-[10px] text-muted-foreground py-1.5">
-                    Candidate
-                  </TableHead>
-                  <TableHead className="font-mono text-[10px] text-muted-foreground py-1.5">
-                    Contact
-                  </TableHead>
-                  <TableHead className="font-mono text-[10px] text-muted-foreground py-1.5">
-                    Account
-                  </TableHead>
-                  <TableHead className="font-mono text-[10px] text-muted-foreground py-1.5">
-                    Invitation
-                  </TableHead>
-                  {activeTab !== "available" && (
-                    <TableHead className="font-mono text-[10px] text-muted-foreground py-1.5">
-                      Invite Link
-                    </TableHead>
-                  )}
-                  <TableHead className="text-right font-mono text-[10px] text-muted-foreground pr-3 py-1.5">
-                    Action
-                  </TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {loading ? (
-                  <TableRow className="hover:bg-transparent">
-                    <TableCell colSpan={8} className="text-center py-8">
-                      <div className="flex flex-col items-center justify-center gap-2">
-                        <Loader2 className="w-5 h-5 animate-spin text-emerald-500" />
-                        <span className="font-mono text-[10px] text-muted-foreground">
-                          Querying candidates database...
-                        </span>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ) : filteredCandidates.length === 0 ? (
-                  <TableRow className="hover:bg-transparent">
-                    <TableCell
-                      colSpan={8}
-                      className="text-center py-8 text-muted-foreground font-mono"
-                    >
-                      <div className="flex flex-col items-center justify-center gap-1.5">
-                        <Inbox className="w-6 h-6 text-muted-foreground/30" />
-                        <span className="text-[11px]">
-                          {activeTab === "available"
-                            ? "No candidates available to invite."
-                            : activeTab === "invited"
-                              ? "No invited candidates for this schedule."
-                              : "No candidates matching the criteria."}
-                        </span>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  filteredCandidates.map((candidate, index) => {
-                    const invitation = selectedSchedule
-                      ? getInvitationForCandidate(
-                          candidate.id,
-                          selectedSchedule,
-                        )
-                      : null;
-
-                    const displayStatus =
-                      invitation?.status === "PENDING" && isScheduleCompleted
-                        ? "EXPIRED"
-                        : invitation?.status;
-
-                    return (
-                      <TableRow
-                        key={candidate.id}
-                        className="border-b border-border/60 hover:bg-muted/30 transition-colors"
-                      >
-                        <TableCell className="px-3 py-1">
-                          {activeTab === "available" && (
-                            <Checkbox
-                              checked={selectedCandidates.includes(
-                                candidate.id,
-                              )}
-                              onCheckedChange={(checked) => {
-                                if (checked) {
-                                  setSelectedCandidates((prev) => [
-                                    ...prev,
-                                    candidate.id,
-                                  ]);
-                                } else {
-                                  setSelectedCandidates((prev) =>
-                                    prev.filter((id) => id !== candidate.id),
-                                  );
-                                }
-                              }}
-                            />
-                          )}
-                        </TableCell>
-                        <TableCell className="text-center font-mono text-[10px] text-muted-foreground/80 py-1">
-                          {index + 1}
-                        </TableCell>
-                        <TableCell className="py-1">
-                          <div className="flex items-center gap-2">
-                            <div className="w-6 h-6 rounded bg-muted border border-border flex items-center justify-center shrink-0">
-                              <span className="text-[9px] font-mono font-bold text-muted-foreground">
-                                {candidate.user.name
-                                  ?.split(" ")
-                                  .map((n) => n[0])
-                                  .join("")
-                                  .toUpperCase()
-                                  .slice(0, 2) || "U"}
-                              </span>
-                            </div>
-                            <div>
-                              <p className="font-semibold text-foreground text-xs leading-none">
-                                {candidate.user.name}
-                              </p>
-                              <p className="text-[8px] font-mono text-muted-foreground/60 mt-0.5">
-                                ID: {candidate.id.slice(0, 8)}
-                              </p>
-                            </div>
-                          </div>
-                        </TableCell>
-                        <TableCell className="py-1">
-                          <div className="font-mono text-[10px] text-foreground/90 leading-tight">
-                            <div>{candidate.user.email}</div>
-                            <div className="text-muted-foreground text-[9px]">
-                              {candidate.user.phoneNumber || "No phone"}
-                            </div>
-                          </div>
-                        </TableCell>
-                        <TableCell className="py-1">
-                          <Badge
-                            variant="outline"
-                            className={`font-mono text-[8px] uppercase border px-1 py-0 ${candidate.stale ? "border-destructive/20 bg-destructive/5 text-destructive" : "border-emerald-500/20 bg-emerald-500/5 text-emerald-400"}`}
-                          >
-                            {candidate.stale ? "Inactive" : "Active"}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="py-1">
-                          {invitation ? (
-                            getStatusBadge(displayStatus || "")
-                          ) : (
-                            <span className="font-mono text-[10px] text-muted-foreground/75">
-                              Not Invited
-                            </span>
-                          )}
-                        </TableCell>
-                        {activeTab !== "available" && (
-                          <TableCell className="py-1">
-                            {invitation ? (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => copyTestLink(invitation.id)}
-                                className="h-6 px-1.5 border border-border bg-muted/20 hover:bg-muted font-mono text-[9px] text-muted-foreground hover:text-foreground"
-                                disabled={displayStatus === "EXPIRED"}
-                              >
-                                {copiedToken === invitation.id ? (
-                                  <>
-                                    <Check className="w-2.5 h-2.5 mr-1 text-emerald-500" />
-                                    <span>Copied</span>
-                                  </>
-                                ) : (
-                                  <>
-                                    <Link2 className="w-2.5 h-2.5 mr-1 text-muted-foreground/70" />
-                                    <span>Copy</span>
-                                  </>
-                                )}
-                              </Button>
-                            ) : (
-                              <span className="font-mono text-[9px] text-muted-foreground/50">
-                                -
-                              </span>
-                            )}
-                          </TableCell>
-                        )}
-                        <TableCell className="text-right pr-3 py-1">
-                          {invitation ? (
-                            <div className="flex items-center justify-end gap-1">
-                              <Badge className="bg-green-500/10 text-green-400 border border-green-400/30 font-mono text-[10px] py-0.5 px-2 rounded-full shadow-sm shadow-green-500/10">
-                                Sent
-                              </Badge>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-6 w-6 text-destructive hover:text-destructive/80 hover:bg-destructive/10 border border-transparent hover:border-destructive/20"
-                                onClick={async (e) => {
-                                  e.stopPropagation();
-                                  if (
-                                    confirm(
-                                      `Revoke/Delete invitation for ${candidate.user.name}?`,
-                                    )
-                                  ) {
-                                    try {
-                                      console.log("[InviteCandidates] Revoking invitation:", {
-                                        invitationId: invitation.id,
-                                        candidateName: candidate.user.name,
-                                      });
-                                      await apiClient.delete(
-                                        `/candidate-invitations/${invitation.id}`,
-                                      );
-                                      console.log("[InviteCandidates] Invitation revoked successfully");
-                                      toast({
-                                        title: "Success",
-                                        description:
-                                          "Invitation revoked successfully.",
-                                      });
-                                      fetchData();
-                                    } catch (err) {
-                                      console.error("[InviteCandidates] Revocation failed:", {
-                                        error: err,
-                                        invitationId: invitation.id,
-                                        candidateName: candidate.user.name,
-                                      });
-                                      const axiosErr = err as {
-                                        response?: {
-                                          data?: {
-                                            message?: string;
-                                            error?: string;
-                                          };
-                                        };
-                                        message?: string;
-                                      };
-                                      const errorMessage =
-                                        axiosErr.response?.data?.message ||
-                                        axiosErr.response?.data?.error ||
-                                        axiosErr.message ||
-                                        "Failed to revoke invitation";
-                                      toast({
-                                        title: "Error",
-                                        description: errorMessage,
-                                        variant: "destructive",
-                                      });
-                                    }
-                                  }
-                                }}
-                              >
-                                <Trash2 className="w-3 h-3" />
-                              </Button>
-                            </div>
-                          ) : (
-                            <Button
-                              size="sm"
-                              className="h-6 bg-primary hover:bg-primary/95 text-primary-foreground font-mono text-[10px] px-2"
-                              onClick={() => {
-                                setSelectedCandidate(candidate);
-                                setIsInviteDialogOpen(true);
-                              }}
-                              disabled={
-                                !selectedSchedule || isScheduleCompleted
-                              }
-                            >
-                              <Send className="w-2.5 h-2.5 mr-1" />
-                              Invite
-                            </Button>
-                          )}
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })
-                )}
-              </TableBody>
-            </Table>
-          </div>
+          )}
         </div>
       </div>
 
-      {/* Invite Confirmation Dialog */}
-      <Dialog open={isInviteDialogOpen} onOpenChange={setIsInviteDialogOpen}>
-        <DialogContent className="bg-popover border border-border text-popover-foreground">
-          <DialogHeader>
-            <DialogTitle className="font-mono text-foreground">
-              Confirm Candidate Invitation
-            </DialogTitle>
-            <DialogDescription className="text-muted-foreground font-mono text-xs">
-              This triggers a direct test invitation and access link generation.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="py-4 space-y-4 font-mono text-xs">
-            <p className="text-foreground">
-              Send access token to candidate{" "}
-              <span className="text-emerald-500 font-bold">
-                {selectedCandidate?.user.name}
+      {/* ── Filter + Search ── */}
+      <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between pt-4">
+        <div className="flex items-center gap-1 bg-muted/50 border border-border rounded-md p-1">
+          {TABS.map((tab) => (
+            <button
+              key={tab.key}
+              onClick={() => { setActiveTab(tab.key); setSelectedCandidates([]); }}
+              className={
+                "flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium transition-all " +
+                (activeTab === tab.key
+                  ? "bg-background text-foreground shadow-sm border border-border/60"
+                  : "text-muted-foreground hover:text-foreground")
+              }
+            >
+              {tab.label}
+              <span className={
+                "inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded text-[10px] font-mono font-bold " +
+                (activeTab === tab.key ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground")
+              }>
+                {tab.count}
               </span>
-              ?
-            </p>
-            <div className="bg-muted border border-border/80 rounded-md p-3.5 space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">Test:</span>
-                <span className="text-foreground font-semibold">
-                  {selectedScheduleData?.test?.title || "Test"}
-                </span>
+            </button>
+          ))}
+        </div>
+        <div className="relative w-full sm:w-64">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+          <Input
+            placeholder="Search by name or email…"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-8 h-9 text-sm bg-background border-border"
+          />
+          {searchTerm && (
+            <button onClick={() => setSearchTerm("")} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+              <X className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* ── Table ── */}
+      <div className="border border-border rounded-lg overflow-hidden mt-3 bg-card">
+        <Table>
+          <TableHeader>
+            <TableRow className="bg-muted/40 hover:bg-muted/40 border-b border-border">
+              {activeTab === "available" && (
+                <TableHead className="w-10 px-3">
+                  <Checkbox checked={allVisibleSelected} onCheckedChange={toggleSelectAll} aria-label="Select all" />
+                </TableHead>
+              )}
+              <TableHead className="w-8 text-center text-[10px] font-mono text-muted-foreground uppercase tracking-wider px-2">#</TableHead>
+              <TableHead className="text-[10px] font-mono text-muted-foreground uppercase tracking-wider">Candidate</TableHead>
+              <TableHead className="text-[10px] font-mono text-muted-foreground uppercase tracking-wider hidden md:table-cell">Contact</TableHead>
+              <TableHead className="text-[10px] font-mono text-muted-foreground uppercase tracking-wider hidden sm:table-cell">Account</TableHead>
+              <TableHead className="text-[10px] font-mono text-muted-foreground uppercase tracking-wider hidden sm:table-cell">Invitation</TableHead>
+              {activeTab === "invited" && (
+                <TableHead className="text-[10px] font-mono text-muted-foreground uppercase tracking-wider hidden lg:table-cell">Link</TableHead>
+              )}
+              <TableHead className="text-right text-[10px] font-mono text-muted-foreground uppercase tracking-wider pr-4">Action</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {loading ? (
+              Array.from({ length: 6 }).map((_, i) => (
+                <TableRow key={i} className="hover:bg-transparent border-b border-border/40">
+                  {activeTab === "available" && <TableCell className="w-10 px-3"><div className="w-4 h-4 bg-muted animate-pulse rounded" /></TableCell>}
+                  <TableCell className="w-8 px-2"><div className="w-5 h-3 bg-muted animate-pulse rounded mx-auto" /></TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 rounded-full bg-muted animate-pulse" />
+                      <div className="space-y-1.5">
+                        <div className="w-28 h-3 bg-muted animate-pulse rounded" />
+                        <div className="w-20 h-2 bg-muted animate-pulse rounded" />
+                      </div>
+                    </div>
+                  </TableCell>
+                  <TableCell className="hidden md:table-cell"><div className="w-36 h-3 bg-muted animate-pulse rounded" /></TableCell>
+                  <TableCell className="hidden sm:table-cell"><div className="w-10 h-4 bg-muted animate-pulse rounded" /></TableCell>
+                  <TableCell className="hidden sm:table-cell"><div className="w-14 h-4 bg-muted animate-pulse rounded" /></TableCell>
+                  <TableCell className="text-right pr-4"><div className="w-14 h-6 bg-muted animate-pulse rounded ml-auto" /></TableCell>
+                </TableRow>
+              ))
+            ) : filteredCandidates.length === 0 ? (
+              <TableRow className="hover:bg-transparent">
+                <TableCell colSpan={8} className="py-16 text-center">
+                  <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                    <Inbox className="w-8 h-8 opacity-25" />
+                    <p className="text-sm font-medium">
+                      {activeTab === "available" ? "All candidates have been invited"
+                        : activeTab === "invited" ? "No candidates invited yet"
+                          : searchTerm ? `No candidates match "${searchTerm}"` : "No candidates found"}
+                    </p>
+                    {!selectedSchedule && <p className="text-xs">Select a schedule above first.</p>}
+                  </div>
+                </TableCell>
+              </TableRow>
+            ) : (
+              filteredCandidates.map((candidate, index) => {
+                const invitation = getInv(candidate.id);
+                const displayStatus =
+                  invitation?.status === "PENDING" && isScheduleCompleted ? "EXPIRED" : invitation?.status;
+                const isSelected = selectedCandidates.includes(candidate.id);
+
+                return (
+                  <TableRow
+                    key={candidate.id}
+                    className={
+                      "border-b border-border/40 transition-colors " +
+                      (isSelected ? "bg-primary/[0.04] hover:bg-primary/[0.06]" : "hover:bg-muted/30")
+                    }
+                  >
+                    {activeTab === "available" && (
+                      <TableCell className="w-10 px-3">
+                        <Checkbox
+                          checked={isSelected}
+                          onCheckedChange={(checked) =>
+                            setSelectedCandidates((prev) =>
+                              checked ? [...prev, candidate.id] : prev.filter((id) => id !== candidate.id),
+                            )
+                          }
+                          aria-label={`Select ${candidate.user.name}`}
+                        />
+                      </TableCell>
+                    )}
+                    <TableCell className="text-center text-xs font-mono text-muted-foreground/60 px-2 tabular-nums">
+                      {index + 1}
+                    </TableCell>
+                    <TableCell className="py-2.5">
+                      <div className="flex items-center gap-2.5">
+                        <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 text-[11px] font-bold ${avatarColour(candidate.user.name)}`}>
+                          {getInitials(candidate.user.name)}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="font-medium text-sm text-foreground leading-tight truncate">{candidate.user.name}</p>
+                          <p className="text-[10px] font-mono text-muted-foreground/60">ID: {candidate.id.slice(0, 8)}</p>
+                        </div>
+                      </div>
+                    </TableCell>
+                    <TableCell className="hidden md:table-cell py-2.5">
+                      <p className="text-xs text-foreground/80 truncate max-w-[200px]">{candidate.user.email}</p>
+                      <p className="text-[11px] text-muted-foreground mt-0.5">{candidate.user.phoneNumber || "No phone"}</p>
+                    </TableCell>
+                    <TableCell className="hidden sm:table-cell py-2.5">
+                      <Badge variant="outline" className={`font-mono text-[9px] uppercase border px-1.5 py-0 ${candidate.stale ? "border-destructive/20 bg-destructive/5 text-destructive" : "border-emerald-500/20 bg-emerald-500/5 text-emerald-600"}`}>
+                        {candidate.stale ? "Inactive" : "Active"}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="hidden sm:table-cell py-2.5">
+                      {invitation
+                        ? <InviteStatusBadge status={displayStatus || ""} />
+                        : <span className="text-[11px] text-muted-foreground/60">Not Invited</span>
+                      }
+                    </TableCell>
+                    {activeTab === "invited" && (
+                      <TableCell className="hidden lg:table-cell py-2.5">
+                        {invitation ? (
+                          <Button
+                            variant="ghost" size="sm"
+                            onClick={() => copyTestLink(invitation.id, invitation.token)}
+                            disabled={displayStatus === "EXPIRED"}
+                            className="h-7 px-2 text-[11px] border border-border/60 font-mono gap-1.5 text-muted-foreground hover:text-foreground hover:border-border"
+                          >
+                            {copiedToken === invitation.id
+                              ? <><Check className="w-3 h-3 text-emerald-500" />Copied</>
+                              : <><Link2 className="w-3 h-3" />Copy</>}
+                          </Button>
+                        ) : <span className="text-[11px] text-muted-foreground/40">—</span>}
+                      </TableCell>
+                    )}
+                    <TableCell className="text-right pr-4 py-2.5">
+                      {invitation ? (
+                        <div className="flex items-center justify-end gap-1.5">
+                          <Badge className="text-[10px] bg-emerald-500/10 text-emerald-600 border border-emerald-500/25 px-2 py-0.5">Sent</Badge>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            title="Resend magic link email"
+                            disabled={resendingId === invitation.id || displayStatus === "EXPIRED"}
+                            className="h-7 px-2 text-[11px] font-mono gap-1 border-border/80 text-muted-foreground hover:text-foreground"
+                            onClick={() => handleResendEmail(invitation.id, candidate.user.name)}
+                          >
+                            {resendingId === invitation.id ? (
+                              <Loader2 className="w-3 h-3 animate-spin" />
+                            ) : (
+                              <RefreshCw className="w-3 h-3 text-primary" />
+                            )}
+                            Resend
+                          </Button>
+                          <Button
+                            variant="ghost" size="icon" title="Revoke invitation"
+                            className="w-7 h-7 text-muted-foreground hover:text-destructive hover:bg-destructive/10 border border-transparent hover:border-destructive/20 rounded"
+                            onClick={async (e) => {
+                              e.stopPropagation();
+                              if (confirm(`Revoke invitation for ${candidate.user.name}?`)) {
+                                try {
+                                  await apiClient.delete(`/candidate-invitations/${invitation.id}`);
+                                  toast({ title: "Invitation revoked", description: `${candidate.user.name}'s invite removed.` });
+                                  fetchData();
+                                } catch (err) {
+                                  const e2 = err as { response?: { data?: { message?: string } }; message?: string };
+                                  toast({ title: "Couldn't revoke", description: e2.response?.data?.message || e2.message || "Failed", variant: "destructive" });
+                                }
+                              }
+                            }}
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </Button>
+                        </div>
+                      ) : (
+                        <Button
+                          size="sm"
+                          onClick={() => {
+                            if (!selectedSchedule) {
+                              toast({ title: "No schedule selected", description: "Choose a test schedule before inviting.", variant: "destructive" });
+                              return;
+                            }
+                            setSelectedCandidate(candidate);
+                            setIsInviteDialogOpen(true);
+                          }}
+                          disabled={!!selectedSchedule && isScheduleCompleted}
+                          className="h-7 text-xs px-3 gap-1.5 bg-primary hover:bg-primary/90 text-primary-foreground"
+                          title={!selectedSchedule ? "Select a schedule first" : undefined}
+                        >
+                          <Send className="w-3 h-3" />
+                          Invite
+                        </Button>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                );
+              })
+            )}
+          </TableBody>
+        </Table>
+      </div>
+
+      {/* ── Sticky Bulk Bar ── */}
+      {selectedCandidates.length > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 bg-foreground text-background rounded-xl px-4 py-2.5 shadow-xl border border-foreground/10">
+          <Users className="w-4 h-4 opacity-60 shrink-0" />
+          <span className="text-sm font-medium">
+            <span className="font-bold">{selectedCandidates.length}</span> candidate{selectedCandidates.length !== 1 && "s"} selected
+          </span>
+          <div className="w-px h-4 bg-background/20" />
+          {!selectedSchedule && (
+            <span className="text-xs opacity-60 flex items-center gap-1">
+              <AlertCircle className="w-3 h-3" /> Select a schedule
+            </span>
+          )}
+          <Button
+            size="sm" onClick={handleBulkInvite}
+            disabled={submitting || !selectedSchedule || isScheduleCompleted}
+            className="h-7 text-xs px-3 gap-1.5 bg-primary hover:bg-primary/90 text-primary-foreground"
+          >
+            {submitting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
+            Send Invites
+          </Button>
+          <button onClick={() => setSelectedCandidates([])} className="opacity-50 hover:opacity-80" aria-label="Clear selection">
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
+
+      {/* ── Invite Dialog ── */}
+      <Dialog open={isInviteDialogOpen} onOpenChange={setIsInviteDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Send className="w-4 h-4 text-primary" /> Send Invitation
+            </DialogTitle>
+            <DialogDescription>A unique access link will be emailed to this candidate.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="flex items-center gap-3 p-3 bg-muted/50 border border-border rounded-lg">
+              <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold ${selectedCandidate ? avatarColour(selectedCandidate.user.name) : ""}`}>
+                {selectedCandidate ? getInitials(selectedCandidate.user.name) : ""}
               </div>
-              <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">Starts:</span>
-                <span className="text-foreground">
-                  {formatDateTime(selectedScheduleData?.startTime || "")}
-                </span>
+              <div>
+                <p className="font-semibold text-sm">{selectedCandidate?.user.name}</p>
+                <p className="text-xs text-muted-foreground">{selectedCandidate?.user.email}</p>
               </div>
-              <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">Ends:</span>
-                <span className="text-foreground">
-                  {formatDateTime(selectedScheduleData?.endTime || "")}
-                </span>
-              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-2 text-xs">
+              {[
+                { label: "Test", value: selectedScheduleData?.test?.title || "—" },
+                { label: "Status", value: selectedScheduleData?.status || "—" },
+                { label: "Starts", value: formatDateTime(selectedScheduleData?.startTime || "") },
+                { label: "Ends", value: formatDateTime(selectedScheduleData?.endTime || "") },
+              ].map(({ label, value }) => (
+                <div key={label} className="p-2.5 bg-muted/40 border border-border rounded-md">
+                  <p className="text-muted-foreground mb-0.5">{label}</p>
+                  <p className="font-medium text-foreground truncate">{value}</p>
+                </div>
+              ))}
             </div>
           </div>
           <DialogFooter className="gap-2">
-            <Button
-              variant="outline"
-              onClick={() => setIsInviteDialogOpen(false)}
-              className="border-border bg-transparent text-muted-foreground font-mono text-xs hover:bg-muted hover:text-foreground"
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={handleInvite}
-              disabled={submitting}
-              className="bg-primary hover:bg-primary/95 text-primary-foreground font-mono text-xs"
-            >
-              {submitting && (
-                <Loader2 className="w-3 h-3 mr-1.5 animate-spin" />
-              )}
+            <Button variant="outline" onClick={() => { setIsInviteDialogOpen(false); setSelectedCandidate(null); }}>Cancel</Button>
+            <Button onClick={handleInvite} disabled={submitting} className="gap-2 bg-primary hover:bg-primary/90 text-primary-foreground">
+              {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
               Send Invitation
             </Button>
           </DialogFooter>

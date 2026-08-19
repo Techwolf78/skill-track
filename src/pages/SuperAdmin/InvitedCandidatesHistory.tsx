@@ -109,13 +109,14 @@ export default function InvitedCandidatesHistory() {
     fetchData();
   }, [fetchData]);
 
-  const copyTestLink = (id: string) => {
-    const testUrl = `${baseUrl}/test/access/${id}`;
+  const copyTestLink = (id: string, token?: string) => {
+    const tokenParam = token ? `?magicToken=${encodeURIComponent(token)}` : "";
+    const testUrl = `${baseUrl}/test/access/${id}${tokenParam}`;
     navigator.clipboard.writeText(testUrl);
     setCopiedToken(id);
     toast({
       title: "Link Copied!",
-      description: "Test URL copied to clipboard",
+      description: token ? "Magic access link copied to clipboard" : "Test URL copied to clipboard",
     });
     setTimeout(() => setCopiedToken(null), 2000);
   };
@@ -286,7 +287,7 @@ export default function InvitedCandidatesHistory() {
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => copyTestLink(inv.id)}
+                      onClick={() => copyTestLink(inv.id, inv.token)}
                       className="h-8 px-2"
                       disabled={inv.displayStatus === "EXPIRED"}
                     >

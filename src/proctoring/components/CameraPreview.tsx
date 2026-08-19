@@ -14,7 +14,7 @@ export const CameraPreview: React.FC<CameraPreviewProps> = ({
   size = "small",
   showOnHover = true
 }) => {
-  const { videoRef, isProctoringActive, trustScore } = useProctoring();
+  const { videoRef, isProctoringActive, trustScore, config } = useProctoring();
   const [isMinimized, setIsMinimized] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
 
@@ -31,7 +31,7 @@ export const CameraPreview: React.FC<CameraPreviewProps> = ({
     large: "w-80 h-60",
   };
 
-  if (!isProctoringActive) return null;
+  if (!isProctoringActive || !config?.requireWebcam) return null;
 
   return (
     <div 

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import axios from "axios";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
@@ -33,14 +33,24 @@ export default function Login() {
   const { toast } = useToast();
   const { login: loginToContext } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
+  const [cooldown, setCooldown] = useState(0);
+  const [failedAttempts, setFailedAttempts] = useState(0);
 
   const [adminEmail, setAdminEmail] = useState("superadmin@gryphonacademy.co.in");
   const [adminPassword, setAdminPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
 
+  useEffect(() => {
+    if (cooldown <= 0) return;
+    const timer = setInterval(() => {
+      setCooldown((prev) => prev - 1);
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [cooldown]);
+
   const handleAdminLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (isLoading) return;
+    if (isLoading || cooldown > 0) return;
     setIsLoading(true);
     try {
       const response = await authService.login({
@@ -49,6 +59,7 @@ export default function Login() {
       });
 
       console.log("Login response:", response);
+      setFailedAttempts(0);
       loginToContext(response.accessToken, response.user);
 
       toast({
@@ -60,9 +71,19 @@ export default function Login() {
       navigate(redirectPath);
     } catch (error: unknown) {
       console.error("Login failed:", error);
+      const nextFailedCount = failedAttempts + 1;
+      setFailedAttempts(nextFailedCount);
+
+      // Lockout logic: If 5 consecutive failures -> 30s cooldown; otherwise -> 3s cooldown
+      const waitTime = nextFailedCount >= 5 ? 30 : 3;
+      setCooldown(waitTime);
+
       let errorMessage = "Invalid credentials. Please try again.";
       let errorTitle = "Login Failed";
-      if (axios.isAxiosError(error)) {
+      if (nextFailedCount >= 5) {
+        errorTitle = "Too Many Failed Attempts";
+        errorMessage = "Maximum login attempts reached. Please wait 30 seconds before trying again.";
+      } else if (axios.isAxiosError(error)) {
         if (error.response?.status === 429) {
           errorTitle = "Rate Limit Exceeded";
         }
@@ -75,7 +96,7 @@ export default function Login() {
       }
       toast({
         title: errorTitle,
-        description: errorMessage,
+        description: `${errorMessage} (Please wait ${waitTime}s before retrying)`,
         variant: "destructive",
       });
     } finally {
@@ -248,13 +269,15 @@ export default function Login() {
                 variant="hero"
                 size="lg"
                 className="w-full"
-                disabled={isLoading}
+                disabled={isLoading || cooldown > 0}
               >
                 {isLoading ? (
                   <>
                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                     Signing in...
                   </>
+                ) : cooldown > 0 ? (
+                  `Please wait (${cooldown}s)...`
                 ) : (
                   "Sign in as Admin"
                 )}
