@@ -62,7 +62,7 @@ import { EditCandidateDialog } from "./EditCandidateDialog";
 import { DeleteConfirmDialog } from "./DeleteConfirmDialog";
 import { useAuth } from "@/lib/auth-context";
 import {
-  useCandidatesQuery,
+  useCandidatesPageQuery,
   useCreateCandidateMutation,
   useDeleteCandidateMutation,
 } from "@/hooks/use-query-hooks";
@@ -253,59 +253,76 @@ function CandidateInsightsSection({ candidateId, onInsightsLoaded }: { candidate
 
 export default function AdminCandidates() {
   const [searchTerm, setSearchTerm] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [testsCountMap, setTestsCountMap] = useState<Record<string, number>>({});
-  const { data: unfilteredCandidates = [], isLoading: loading, isError: candidatesError, error: candidatesErrorObj, refetch: refetchCandidates } = useCandidatesQuery();
+
+  // ----- Server-side pagination state (page is 0-indexed for backend) -----
+  const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState(15);
+
+  const {
+    data: pageData,
+    isLoading: loading,
+    isError: candidatesError,
+    error: candidatesErrorObj,
+    refetch: refetchCandidates,
+  } = useCandidatesPageQuery(page, pageSize);
+
   const { user } = useAuth();
+
+  // Debounce search: wait 400 ms after typing before applying filter and resetting to page 0
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchTerm);
+      setPage(0);
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
+  // All candidates on the current page (already scoped to admin's org by backend)
+  const allCandidates = pageData?.content ?? [];
+
+  // Client-side search filter applied on the current page only
+  const candidates = debouncedSearch
+    ? allCandidates.filter(
+        (c) =>
+          c.user.name?.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
+          c.user.email?.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
+          c.user.phoneNumber?.toLowerCase().includes(debouncedSearch.toLowerCase())
+      )
+    : allCandidates;
+
+  // Backend pagination metadata
+  const totalElements = pageData?.totalElements ?? 0;
+  const totalPages = pageData?.totalPages ?? 1;
+  const isFirstPage = pageData?.first ?? true;
+  const isLastPage = pageData?.last ?? true;
+
+  // Display range: based on what the backend returned for this page
+  const pageStart = totalElements === 0 ? 0 : page * pageSize + 1;
+  const pageEnd = Math.min(page * pageSize + pageSize, totalElements);
 
   const userExtra = user as { organisationId?: string; organisationName?: string } | null;
   const orgId = user?.organisationData?.id || userExtra?.organisationId;
 
-  // Filter candidates that belong to the current admin's organisation
-  const candidates = React.useMemo(() => {
-    return orgId
-      ? unfilteredCandidates.filter(c => c.organisation?.id === orgId)
-      : unfilteredCandidates;
-  }, [unfilteredCandidates, orgId]);
+  const adminOrgName =
+    user?.organisationData?.name ||
+    userExtra?.organisationName ||
+    candidates.find((c) => c.organisation?.id === orgId)?.organisation?.name ||
+    "Your Organisation";
 
-  const adminOrgName = user?.organisationData?.name || 
-                       userExtra?.organisationName || 
-                       candidates.find(c => c.organisation?.id === orgId)?.organisation?.name || 
-                       "Your Organisation";
-
-  const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(15);
-
-  // Reset pagination to page 1 on filter/search change
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [searchTerm]);
-
-  const filteredCandidates = candidates.filter((candidate) => {
-    return (
-      candidate.user.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      candidate.user.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      candidate.user.phoneNumber?.toLowerCase().includes(searchTerm.toLowerCase())
-    );
-  });
-
-  const totalFilteredCount = filteredCandidates.length;
-  const totalPages = Math.max(1, Math.ceil(totalFilteredCount / pageSize));
-  const startIndex = (currentPage - 1) * pageSize;
-  const paginatedCandidates = filteredCandidates.slice(startIndex, startIndex + pageSize);
-
-  // Initialize candidate tests count map to 0
+  // Initialize candidate tests count map to 0 for visible candidates
   useEffect(() => {
     if (!candidates || candidates.length === 0) return;
-    setTestsCountMap(prev => {
+    setTestsCountMap((prev) => {
       const next = { ...prev };
-      candidates.forEach(c => {
-        if (next[c.id] === undefined) {
-          next[c.id] = 0;
-        }
+      candidates.forEach((c) => {
+        if (next[c.id] === undefined) next[c.id] = 0;
       });
       return next;
     });
   }, [candidates]);
+
 
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isBulkUploadOpen, setIsBulkUploadOpen] = useState(false);
@@ -320,18 +337,18 @@ export default function AdminCandidates() {
   const [deleting, setDeleting] = useState(false);
 
   const currentDetailsIndex = detailsCandidate
-    ? filteredCandidates.findIndex((c) => c.id === detailsCandidate.id)
+    ? candidates.findIndex((c) => c.id === detailsCandidate.id)
     : -1;
 
   const handlePrevDetails = () => {
     if (currentDetailsIndex > 0) {
-      setDetailsCandidate(filteredCandidates[currentDetailsIndex - 1]);
+      setDetailsCandidate(candidates[currentDetailsIndex - 1]);
     }
   };
 
   const handleNextDetails = () => {
-    if (currentDetailsIndex >= 0 && currentDetailsIndex < filteredCandidates.length - 1) {
-      setDetailsCandidate(filteredCandidates[currentDetailsIndex + 1]);
+    if (currentDetailsIndex >= 0 && currentDetailsIndex < candidates.length - 1) {
+      setDetailsCandidate(candidates[currentDetailsIndex + 1]);
     }
   };
 
@@ -515,9 +532,11 @@ export default function AdminCandidates() {
                   </div>
                 </TableCell>
               </TableRow>
-            ) : paginatedCandidates.length === 0 ? (
-              <TableRow><TableCell colSpan={4} className="text-center py-10">No candidates found.</TableCell></TableRow>
-            ) : paginatedCandidates.map((candidate) => (
+            ) : candidates.length === 0 ? (
+              <TableRow><TableCell colSpan={4} className="text-center py-10">
+                {debouncedSearch ? `No candidates match "${debouncedSearch}" on this page.` : "No candidates found."}
+              </TableCell></TableRow>
+            ) : candidates.map((candidate) => (
               <React.Fragment key={candidate.id}>
                 <TableRow className="hover:bg-muted/30 transition-colors cursor-pointer" onClick={() => setDetailsCandidate(candidate)}>
                   <TableCell>
@@ -555,15 +574,21 @@ export default function AdminCandidates() {
             ))}
           </TableBody>
         </Table>
-      </div>
+    </div>
 
       {/* Pagination Controls Footer */}
       <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-card p-4 rounded-xl border border-border/60 shadow-sm text-xs">
         <div className="flex items-center gap-3 text-muted-foreground">
           <span>
-            Showing <strong className="text-foreground font-semibold">{totalFilteredCount > 0 ? startIndex + 1 : 0}</strong> to{" "}
-            <strong className="text-foreground font-semibold">{Math.min(startIndex + pageSize, totalFilteredCount)}</strong> of{" "}
-            <strong className="text-foreground font-semibold">{totalFilteredCount}</strong> candidates
+            Showing{" "}
+            <strong className="text-foreground font-semibold">{pageStart}</strong>
+            {" "}to{" "}
+            <strong className="text-foreground font-semibold">{pageEnd}</strong>
+            {" "}of{" "}
+            <strong className="text-foreground font-semibold">{totalElements}</strong> candidates
+            {debouncedSearch && (
+              <span className="ml-1 text-muted-foreground/70">(filtered on page)</span>
+            )}
           </span>
 
           <div className="flex items-center gap-1.5 ml-2">
@@ -572,7 +597,7 @@ export default function AdminCandidates() {
               value={String(pageSize)}
               onValueChange={(val) => {
                 setPageSize(Number(val));
-                setCurrentPage(1);
+                setPage(0);
               }}
             >
               <SelectTrigger className="h-8 w-20 text-xs bg-background">
@@ -593,8 +618,8 @@ export default function AdminCandidates() {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => setCurrentPage(1)}
-            disabled={currentPage <= 1}
+            onClick={() => setPage(0)}
+            disabled={isFirstPage || loading}
             className="h-8 w-8 p-0"
             title="First Page"
           >
@@ -603,8 +628,8 @@ export default function AdminCandidates() {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-            disabled={currentPage <= 1}
+            onClick={() => setPage((p) => Math.max(0, p - 1))}
+            disabled={isFirstPage || loading}
             className="h-8 w-8 p-0"
             title="Previous Page"
           >
@@ -612,14 +637,14 @@ export default function AdminCandidates() {
           </Button>
 
           <span className="px-2 font-medium text-foreground">
-            Page {currentPage} of {totalPages}
+            Page {page + 1} of {totalPages}
           </span>
 
           <Button
             variant="outline"
             size="sm"
-            onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-            disabled={currentPage >= totalPages}
+            onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
+            disabled={isLastPage || loading}
             className="h-8 w-8 p-0"
             title="Next Page"
           >
@@ -628,8 +653,8 @@ export default function AdminCandidates() {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => setCurrentPage(totalPages)}
-            disabled={currentPage >= totalPages}
+            onClick={() => setPage(totalPages - 1)}
+            disabled={isLastPage || loading}
             className="h-8 w-8 p-0"
             title="Last Page"
           >

@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import {
   testService,
   Subject,
@@ -15,7 +15,7 @@ import {
   CreateQuestionRequest,
   UpdateQuestionRequest,
 } from "@/lib/test-service";
-import { candidateService, Candidate, CreateCandidateRequest } from "@/lib/candidate-service";
+import { candidateService, Candidate, CreateCandidateRequest, SpringPage } from "@/lib/candidate-service";
 import { organisationService, OrganisationResponse, CreateOrganisationRequest } from "@/lib/organisation-service";
 
 // ==================== Subjects Hooks ====================
@@ -144,12 +144,28 @@ export function useCandidatesQuery() {
   });
 }
 
+/**
+ * Server-side paginated candidates query.
+ * page is 0-indexed (matches backend). size is the page size.
+ * Query key includes page + size so React Query refetches automatically on navigation.
+ * keepPreviousData keeps the current page visible while the next page loads.
+ */
+export function useCandidatesPageQuery(page: number, size: number) {
+  return useQuery<SpringPage<Candidate>>({
+    queryKey: ["candidates-page", page, size],
+    queryFn: () => candidateService.getCandidatesPage(page, size),
+    placeholderData: keepPreviousData,
+    staleTime: 60_000, // 60 seconds cache per page
+  });
+}
+
 export function useCreateCandidateMutation() {
   const queryClient = useQueryClient();
   return useMutation<string, Error, CreateCandidateRequest>({
     mutationFn: candidateService.createCandidate,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["candidates"] });
+      queryClient.invalidateQueries({ queryKey: ["candidates-page"] });
     },
   });
 }
@@ -160,6 +176,7 @@ export function useDeleteCandidateMutation() {
     mutationFn: candidateService.deleteCandidate,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["candidates"] });
+      queryClient.invalidateQueries({ queryKey: ["candidates-page"] });
     },
     throwOnError: false,
   });

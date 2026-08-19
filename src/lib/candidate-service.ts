@@ -2,6 +2,18 @@
 import { apiClient } from "./api-client";
 import { BaseResponse } from "./auth-service";
 
+// Spring Data Page response shape
+export interface SpringPage<T> {
+  content: T[];
+  totalElements: number;
+  totalPages: number;
+  size: number;
+  number: number; // 0-indexed current page
+  first: boolean;
+  last: boolean;
+  empty: boolean;
+}
+
 export interface Candidate {
   id: string;
   user: {
@@ -67,35 +79,85 @@ const unwrapArrayResponse = <T>(response: {
   return [];
 };
 
-export const candidateService = {
-  getCandidates: async (): Promise<Candidate[]> => {
-    const response = await apiClient.get<Candidate[]>("/candidates?size=5000");
-    const rawList = unwrapArrayResponse(response);
-    return rawList.map((c: Candidate & Record<string, unknown>) => {
-      if (c.user) return c;
-      return {
-        id: c.id,
-        user: {
-          id: c["userId"] as string,
-          name: c["name"] as string,
-          email: c["email"] as string,
-          phoneNumber: c["phoneNumber"] as string | undefined,
-          role: "CANDIDATE"
-        },
-        organisation: c.organisation ? {
+// Shared mapper from flat/nested CandidateResponse → Candidate
+const mapCandidate = (c: Candidate & Record<string, unknown>): Candidate => {
+  if (c.user) return c;
+  return {
+    id: c.id,
+    user: {
+      id: c["userId"] as string,
+      name: c["name"] as string,
+      email: c["email"] as string,
+      phoneNumber: c["phoneNumber"] as string | undefined,
+      role: "CANDIDATE",
+    },
+    organisation: c.organisation
+      ? {
           id: c.organisation.id,
           name: c.organisation.name,
           logoUrl: c.organisation.logoUrl,
           createdAt: c.organisation.createdAt,
-          updatedAt: c.organisation.updatedAt
-        } : { id: "", name: "" },
-        extraFields: c.extraFields,
-        stale: (c["isStale"] as boolean | undefined) ?? c.stale ?? false,
-        lastUpdated: (c["lastUpdated"] as string | undefined) || "",
-        createdAt: c.createdAt,
-        updatedAt: c.updatedAt
-      };
+          updatedAt: c.organisation.updatedAt,
+        }
+      : { id: "", name: "" },
+    extraFields: c.extraFields,
+    stale: (c["isStale"] as boolean | undefined) ?? c.stale ?? false,
+    lastUpdated: (c["lastUpdated"] as string | undefined) || "",
+    createdAt: c.createdAt,
+    updatedAt: c.updatedAt,
+  };
+};
+
+export const candidateService = {
+  /**
+   * Flat list used by non-management pages (InviteCandidates, Reports, etc.)
+   * that need a full candidate lookup map for name resolution.
+   * Continues to use size=5000 to load all records in one shot.
+   */
+  getCandidates: async (): Promise<Candidate[]> => {
+    const response = await apiClient.get<Candidate[]>("/candidates?size=5000");
+    const rawList = unwrapArrayResponse(response);
+    return rawList.map((c) => mapCandidate(c as Candidate & Record<string, unknown>));
+  },
+
+  /**
+   * True server-side paginated fetch.
+   * Used by AdminCandidates and SuperAdminCandidates management pages.
+   * Sends `page` (0-indexed) and `size` to the backend and returns
+   * the full Spring Page metadata (totalElements, totalPages, etc.).
+   */
+  getCandidatesPage: async (
+    page: number,
+    size: number
+  ): Promise<SpringPage<Candidate>> => {
+    const params = new URLSearchParams({
+      page: String(page),
+      size: String(size),
     });
+    const response = await apiClient.get<unknown>(`/candidates?${params.toString()}`);
+    const raw = response.data as Record<string, unknown>;
+
+    // Unwrap BaseResponse<Page<CandidateResponse>>
+    const pageData = (
+      raw && typeof raw === "object" && "data" in raw && "success" in raw
+        ? (raw as { data: Record<string, unknown> }).data
+        : raw
+    ) as Record<string, unknown>;
+
+    const rawContent = Array.isArray(pageData?.content)
+      ? (pageData.content as (Candidate & Record<string, unknown>)[])
+      : [];
+
+    return {
+      content: rawContent.map(mapCandidate),
+      totalElements: (pageData?.totalElements as number) ?? 0,
+      totalPages: (pageData?.totalPages as number) ?? 1,
+      size: (pageData?.size as number) ?? size,
+      number: (pageData?.number as number) ?? page,
+      first: (pageData?.first as boolean) ?? true,
+      last: (pageData?.last as boolean) ?? true,
+      empty: (pageData?.empty as boolean) ?? true,
+    };
   },
 
   // Create a new candidate
