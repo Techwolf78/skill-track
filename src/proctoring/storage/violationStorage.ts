@@ -65,7 +65,7 @@ async retryWithBackoff<T>(
 
   async syncToBackend(): Promise<number | null> {
     const violations = this.getAll();
-    const unsynced = violations.filter(v => !(v as any).synced);
+    const unsynced = violations.filter((v) => !(v as Violation & { synced?: boolean }).synced);
     if (unsynced.length === 0) return this.getScore();
     
     let lastScore: number | null = null;
@@ -73,16 +73,28 @@ async retryWithBackoff<T>(
     
     for (let i = 0; i < unsynced.length; i += chunkSize) {
       const chunk = unsynced.slice(i, i + chunkSize);
+      const batchKey = `v_batch_${this.sessionId}_${chunk[0]?.id || Date.now()}`;
       try {
         const response = await this.retryWithBackoff(async () => {
-          return await apiClient.post(`/test-sessions/${this.sessionId}/violations/batch`, {
-            violations: chunk.map(v => this.mapToBackendPayload(v)),
-          });
+          return await apiClient.post(
+            `/test-sessions/${this.sessionId}/violations/batch`,
+            {
+              violations: chunk.map((v) => this.mapToBackendPayload(v)),
+            },
+            {
+              headers: {
+                "Idempotency-Key": batchKey,
+                "X-Idempotency-Key": batchKey,
+              },
+            }
+          );
         });
-        const chunkIds = new Set(chunk.map(v => v.id));
-        const updated = this.getAll().map(v => chunkIds.has(v.id) ? { ...v, synced: true } : v);
+        const chunkIds = new Set(chunk.map((v) => v.id));
+        const updated = this.getAll().map((v) =>
+          chunkIds.has(v.id) ? { ...v, synced: true } : v
+        );
         this.save(updated);
-        
+
         const serverScore = response.data?.data?.score;
         if (typeof serverScore === "number") lastScore = serverScore;
       } catch (error) {
@@ -95,8 +107,18 @@ async retryWithBackoff<T>(
   async syncSingleViolation(violation: Violation): Promise<number | null> {
     try {
       const payload = this.mapToBackendPayload(violation);
+      const violationKey = `v_single_${this.sessionId}_${violation.id}`;
       const response = await this.retryWithBackoff(async () => {
-        return await apiClient.post(`/test-sessions/${this.sessionId}/violations`, payload);
+        return await apiClient.post(
+          `/test-sessions/${this.sessionId}/violations`,
+          payload,
+          {
+            headers: {
+              "Idempotency-Key": violationKey,
+              "X-Idempotency-Key": violationKey,
+            },
+          }
+        );
       });
       
       const all = this.getAll();

@@ -786,6 +786,30 @@ export const testService = {
   },
 
   // ==================== Code Execution APIs ====================
+  runCode: async (payload: {
+    language: string;
+    code: string;
+    questionId?: string;
+    sessionId?: string;
+    testCases?: Array<{ input: string; expectedOutput: string }>;
+  }): Promise<{ runGroupId: string }> => {
+    const submitResponse = await apiClient.post<BaseResponse<string>>("/api/code/execute/run", payload);
+    const runGroupId = unwrapResponse(submitResponse);
+    return { runGroupId };
+  },
+
+  pollRunResult: async (runGroupId: string): Promise<TestCaseResult[] | null> => {
+    try {
+      const pollResponse = await apiClient.get<BaseResponse<TestCaseResult[] | null>>(
+        `/api/code/execute/run/${runGroupId}`
+      );
+      return unwrapResponse(pollResponse);
+    } catch (err) {
+      console.warn("Error polling run result:", err);
+      return null;
+    }
+  },
+
   executeCode: async (request: CodeExecutionRequest): Promise<TestCaseResult[]> => {
     const payload = {
       ...request,

@@ -2,6 +2,8 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import axios from "axios";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
+import { IdempotentButton } from "@/components/ui/idempotent-button";
+
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -1770,33 +1772,37 @@ useEffect(() => {
                           }}
                         />
                         <div className="flex gap-2 p-3 border-t bg-muted/30">
-                          <Button 
-                            size="sm" 
-                            variant="outline" 
-                            onClick={handleRunCode} 
-                            disabled={isRunning || isSubmittingCode}
+                          <IdempotentButton
+                            size="sm"
+                            variant="outline"
+                            onClick={handleRunCode}
+                            isLoading={isRunning}
+                            loadingText="Running..."
+                            disabled={isSubmittingCode}
                           >
-                            {isRunning ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Play className="w-4 h-4 mr-2" />}
+                            <Play className="w-4 h-4 mr-2" />
                             Run Code
-                          </Button>
-                          <Button 
-                            size="sm" 
-                            onClick={handleSubmitQuestion} 
-                            disabled={isRunning || isSubmittingCode}
+                          </IdempotentButton>
+                          <IdempotentButton
+                            size="sm"
+                            onClick={handleSubmitQuestion}
+                            isLoading={isSubmittingCode}
+                            loadingText="Submitting..."
+                            disabled={isRunning}
                           >
-                            {isSubmittingCode ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
+                            <Save className="w-4 h-4 mr-2" />
                             Submit Solution
-                          </Button>
-                          <Button 
-                            size="sm" 
+                          </IdempotentButton>
+                          <IdempotentButton
+                            size="sm"
                             variant="ghost"
-                            onClick={handleResetCode} 
+                            onClick={handleResetCode}
                             disabled={isRunning || isSubmittingCode}
                             className="text-muted-foreground hover:text-foreground ml-auto"
                           >
                             <RotateCcw className="w-4 h-4 mr-2" />
                             Reset Code
-                          </Button>
+                          </IdempotentButton>
                         </div>
 
                         {(output || testCaseResults.length > 0) && (
@@ -2001,9 +2007,16 @@ useEffect(() => {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Go Back to Test</AlertDialogCancel>
-            <AlertDialogAction onClick={submitTest} disabled={submitting} className="bg-primary text-white">
-              {submitting ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
-              Submit Test
+            <AlertDialogAction asChild>
+              <IdempotentButton
+                onClick={submitTest}
+                isLoading={submitting}
+                loadingText="Submitting..."
+                className="bg-primary text-white"
+                preventDoubleClickMs={2000}
+              >
+                Submit Test
+              </IdempotentButton>
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

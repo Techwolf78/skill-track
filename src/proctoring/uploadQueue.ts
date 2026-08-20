@@ -55,13 +55,19 @@ export class UploadQueue {
       const token = localStorage.getItem("token");
       const authHeaders: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
 
-      // Step 1: Presign upload URL from backend
+      // Step 1: Presign upload URL from backend with deterministic idempotency key
       console.log(`[UploadQueue] Presigning evidence upload for type: ${item.evidenceType}...`);
+      const presignKey = `ev_presign_${this.sessionId}_${item.capturedAt}_${item.evidenceType}`;
       const res = await fetch(
         `/api/test-sessions/${this.sessionId}/evidence/presign`,
         {
           method: "POST",
-          headers: { "Content-Type": "application/json", ...authHeaders },
+          headers: {
+            "Content-Type": "application/json",
+            "Idempotency-Key": presignKey,
+            "X-Idempotency-Key": presignKey,
+            ...authHeaders,
+          },
           body: JSON.stringify({
             evidenceType: item.evidenceType,
             ...(item.violationType ? { violationType: item.violationType } : {}),
@@ -86,13 +92,19 @@ export class UploadQueue {
       if (!putRes.ok) throw new Error(`Storage PUT failed: ${putRes.status}`);
       console.log(`[UploadQueue] Supabase PUT upload success.`);
 
-      // Step 3: Confirm evidence record in DB
+      // Step 3: Confirm evidence record in DB with deterministic key
       console.log(`[UploadQueue] Confirming evidence with backend path: ${storagePath}...`);
+      const confirmKey = `ev_confirm_${this.sessionId}_${item.capturedAt}_${item.evidenceType}`;
       const confirmRes = await fetch(
         `/api/test-sessions/${this.sessionId}/evidence/confirm`,
         {
           method: "POST",
-          headers: { "Content-Type": "application/json", ...authHeaders },
+          headers: {
+            "Content-Type": "application/json",
+            "Idempotency-Key": confirmKey,
+            "X-Idempotency-Key": confirmKey,
+            ...authHeaders,
+          },
           body: JSON.stringify({
             storagePath,
             evidenceType: item.evidenceType,
