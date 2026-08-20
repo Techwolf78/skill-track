@@ -820,14 +820,7 @@ useEffect(() => {
         });
       }
       timer = setInterval(() => {
-        setFullscreenTimer(prev => {
-          if (prev <= 1) {
-            clearInterval(timer);
-            // Stopped auto-submit from proctoring violations
-            return 0;
-          }
-          return prev - 1;
-        });
+        setFullscreenTimer((prev) => (prev <= 1 ? 0 : prev - 1));
       }, 1000);
     } else {
       setFullscreenTimer(10);
@@ -991,17 +984,17 @@ useEffect(() => {
     if (timeLeft <= 0 || !sessionId) return;
     
     const timer = setInterval(() => {
-      setTimeLeft(prev => {
-        if (prev <= 1) {
-          clearInterval(timer);
-          handleAutoSubmit();
-          return 0;
-        }
-        return prev - 1;
-      });
+      setTimeLeft((prev) => Math.max(0, prev - 1));
     }, 1000);
     
     return () => clearInterval(timer);
+  }, [timeLeft, sessionId]);
+
+  // Handle auto-submit when timer reaches 0
+  useEffect(() => {
+    if (timeLeft === 0 && sessionId) {
+      handleAutoSubmit();
+    }
   }, [timeLeft, sessionId, handleAutoSubmit]);
 
   // Periodic server timer synchronization to prevent clock tampering
