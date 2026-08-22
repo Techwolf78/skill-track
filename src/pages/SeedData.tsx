@@ -64,18 +64,12 @@ export default function SeedData() {
 
   // List of seed steps
   const [steps, setSteps] = useState<SeedStep[]>([
-    { id: "org", name: "Create Organisations", description: "Creating Gryphon Academy & partner orgs", status: "idle" },
+    { id: "org", name: "Create Organisation", description: "Creating Gryphon Academy", status: "idle" },
     { id: "superadmin", name: "Register Super Admin", description: "Registering superadmin@gryphonacademy.co.in", status: "idle" },
-    { id: "login", name: "Authenticate", description: "Logging in as Super Admin to get JWT token", status: "idle" },
-    { id: "admin", name: "Create Standard Admins", description: "Onboarding Admins for distinct organisations", status: "idle" },
-    { id: "taxonomy", name: "Onboard Taxonomy (Subjects & Topics)", description: "Creating CSE, Web Dev, DSA subjects & subtopics", status: "idle" },
-    { id: "candidates", name: "Seed Bulk Candidates", description: "Registering 20 candidates across organisations", status: "idle" },
-    { id: "questions", name: "Seed Question Bank", description: "Adding 10 comprehensive MCQs & 5 Coding Problems", status: "idle" },
-    { id: "testcases", name: "Link Coding Test Cases", description: "Creating exact input/output grading targets", status: "idle" },
-    { id: "tests", name: "Build & Publish Assessments", description: "Creating 3 active, ready-to-test assessments", status: "idle" },
-    { id: "schedules", name: "Generate Test Schedules", description: "Creating active calendar schedule pipelines", status: "idle" },
-    { id: "invitations", name: "Invite Candidates & Get Tokens", description: "Assigning candidates to schedules & retrieving links", status: "idle" },
-    { id: "sessions", name: "Start Candidate Test Sessions", description: "Initializing test sessions for Reports & Proctoring Dashboards", status: "idle" },
+    { id: "login", name: "Authenticate", description: "Logging in as Super Admin", status: "idle" },
+    { id: "taxonomy", name: "Onboard Taxonomy (Subjects & Topics)", description: "Creating Computer Science & Engineering (DSA & System Design)", status: "idle" },
+    { id: "candidate", name: "Create Sample Candidate", description: "Registering candidate@example.com", status: "idle" },
+    { id: "questions", name: "Seed Question Bank", description: "Adding Two Sum, ACID, HTTP Methods, and Java Memory MCQs", status: "idle" },
   ]);
 
   // Scroll console to bottom when new logs appear
@@ -167,26 +161,7 @@ export default function SeedData() {
     const emailTag = dataSet.toLowerCase();
 
     const candidatesList = [
-      { name: `Ajay Pawar (${dataSet})`, email: `ajay.${emailTag}@gryphonacademy.co.in`, org: "gryphon" },
-      { name: `John Doe (${dataSet})`, email: `john.doe.${emailTag}@gryphonacademy.co.in`, org: "gryphon" },
-      { name: `Jane Smith (${dataSet})`, email: `jane.smith.${emailTag}@gryphonacademy.co.in`, org: "gryphon" },
-      { name: `Alice Johnson (${dataSet})`, email: `alice.johnson.${emailTag}@gryphonacademy.co.in`, org: "gryphon" },
-      { name: `Bob Miller (${dataSet})`, email: `bob.miller.${emailTag}@gryphonacademy.co.in`, org: "gryphon" },
-      { name: `Charlie Davis (${dataSet})`, email: `charlie.davis.${emailTag}@gryphonacademy.co.in`, org: "gryphon" },
-      { name: `David Wilson (${dataSet})`, email: `david.wilson.${emailTag}@gryphonacademy.co.in`, org: "gryphon" },
-      { name: `Emily Taylor (${dataSet})`, email: `emily.taylor.${emailTag}@gryphonacademy.co.in`, org: "gryphon" },
-      { name: `Frank Harris (${dataSet})`, email: `frank.harris.${emailTag}@gryphonacademy.co.in`, org: "gryphon" },
-      { name: `Grace Clark (${dataSet})`, email: `grace.clark.${emailTag}@gryphonacademy.co.in`, org: "gryphon" },
-      { name: `Henry Lewis (${dataSet})`, email: `henry.lewis.${emailTag}@gryphonacademy.co.in`, org: "gryphon" },
-      { name: `Ivy Young (${dataSet})`, email: `ivy.young.${emailTag}@gryphonacademy.co.in`, org: "gryphon" },
-      { name: `Jack King (${dataSet})`, email: `jack.king.${emailTag}@gryphonacademy.co.in`, org: "gryphon" },
-      { name: `Karen Green (${dataSet})`, email: `karen.green.${emailTag}@gryphonacademy.co.in`, org: "gryphon" },
-      { name: `Leo Wright (${dataSet})`, email: `leo.wright.${emailTag}@gryphonacademy.co.in`, org: "gryphon" },
-      { name: `Mia Scott (${dataSet})`, email: `mia.scott.${emailTag}@gryphonacademy.co.in`, org: "gryphon" },
-      { name: `Nathan Adams (${dataSet})`, email: `nathan.adams.${emailTag}@gryphonacademy.co.in`, org: "gryphon" },
-      { name: `Olivia Baker (${dataSet})`, email: `olivia.baker.${emailTag}@gryphonacademy.co.in`, org: "gryphon" },
-      { name: `Peter Carter (${dataSet})`, email: `peter.carter.${emailTag}@gryphonacademy.co.in`, org: "gryphon" },
-      { name: `Quinn Mitchell (${dataSet})`, email: `quinn.mitchell.${emailTag}@gryphonacademy.co.in`, org: "gryphon" },
+      { name: "Sample Candidate", email: "candidate@example.com", org: "gryphon" },
     ];
 
     try {
@@ -287,41 +262,6 @@ export default function SeedData() {
       updateStepStatus("login", "completed");
 
       // ----------------------------------------------------
-      // STEP 4: CREATE STANDARD ADMINS
-      // ----------------------------------------------------
-      setCurrentStepIndex(3);
-      updateStepStatus("admin", "running");
-      setProgress(35);
-      addLog("Creating Standard Admin accounts for multi-org simulation...", "info");
-
-      try {
-        await userService.createUser({
-          name: "Gryphon Admin",
-          email: "admin@gryphonacademy.co.in",
-          password: "password123",
-          organisation_id: gryphonOrgId,
-        }, "ADMIN");
-        addLog(`✅ Onboarded Gryphon Academy Admin: admin@gryphonacademy.co.in`, "success");
-      } catch (e: unknown) {
-        addLog(`⚠️ Gryphon Admin skipped (already exists or conflict). Automatically moving to next stage.`, "warning");
-      }
-      await delay(200);
-
-      try {
-        await userService.createUser({
-          name: "TechWolf Admin",
-          email: "admin@techwolf.co",
-          password: "password123",
-          organisation_id: techWolfOrgId,
-        }, "ADMIN");
-        addLog(`✅ Onboarded TechWolf Admin: admin@techwolf.co`, "success");
-      } catch (e) {
-        addLog(`⚠️ TechWolf Admin skipped (already exists or conflict).`, "warning");
-      }
-      await delay(200);
-      updateStepStatus("admin", "completed");
-
-      // ----------------------------------------------------
       // STEP 5: ONBOARD TAXONOMY (SUBJECTS & TOPICS)
       // ----------------------------------------------------
       setCurrentStepIndex(4);
@@ -344,173 +284,82 @@ export default function SeedData() {
         addLog("⚠️ Failed to preload taxonomy database. Existing records check will fallback.", "warning");
       }
 
-      // CSE Subject
-      try {
-        const sub1 = await testService.createSubject("Computer Science & Engineering");
-        subjects.cse = sub1.id;
-        addLog(`📚 Subject added: "Computer Science & Engineering"`, "success");
-      } catch (e) {
-        const found = dbSubjects.find(s => s.name === "Computer Science & Engineering");
-        subjects.cse = found ? found.id : "cse-fallback-id";
-        addLog(`⚠️ "Computer Science & Engineering" already exists. Reusing ID: ${subjects.cse}`, "warning");
-      }
-      await delay(200);
+      // Helper to get or create subject
+      const getOrCreateSubject = async (key: string, name: string) => {
+        const found = dbSubjects.find(s => s.name.toLowerCase().trim() === name.toLowerCase().trim());
+        if (found) {
+          subjects[key] = found.id;
+          addLog(`ℹ️ Subject "${name}" already exists. Reusing ID: ${found.id}`, "info");
+        } else {
+          try {
+            const sub = await testService.createSubject(name);
+            subjects[key] = sub.id;
+            addLog(`📚 Subject added: "${name}"`, "success");
+          } catch (e) {
+            subjects[key] = "fallback-subj-id";
+            addLog(`⚠️ Subject "${name}" creation fallback used.`, "warning");
+          }
+        }
+        await delay(100);
+      };
 
-      // DBMS Topic
-      try {
-        const t1 = await testService.createTopic("Database Management Systems", subjects.cse);
-        topics.dbms = t1.id;
-        addLog(`  🏷️ Topic added: "Database Management Systems"`, "info");
-      } catch (e) {
-        const found = dbTopics.find(t => t.name === "Database Management Systems");
-        topics.dbms = found ? found.id : "dbms-fallback-id";
-        addLog(`  ⚠️ "Database Management Systems" already exists. Reusing ID: ${topics.dbms}`, "warning");
-      }
-      await delay(200);
+      // Helper to get or create topic
+      const getOrCreateTopic = async (key: string, name: string, subjectId: string) => {
+        const found = dbTopics.find(t => t.name.toLowerCase().trim() === name.toLowerCase().trim());
+        if (found) {
+          topics[key] = found.id;
+          addLog(`  ℹ️ Topic "${name}" already exists. Reusing ID: ${found.id}`, "info");
+        } else {
+          try {
+            const top = await testService.createTopic(name, subjectId);
+            topics[key] = top.id;
+            addLog(`  🏷️ Topic added: "${name}"`, "info");
+          } catch (e) {
+            topics[key] = "fallback-topic-id";
+            addLog(`  ⚠️ Topic "${name}" creation fallback used.`, "warning");
+          }
+        }
+        await delay(100);
+      };
 
-      // SQL Indexing Subtopic
-      try {
-        const st1 = await testService.createSubtopic("SQL Indexing", topics.dbms);
-        subtopics.indexing = st1.id;
-        addLog(`    🔹 Subtopic added: "SQL Indexing"`, "info");
-      } catch (e) {
-        const found = dbSubtopics.find(s => s.name === "SQL Indexing");
-        subtopics.indexing = found ? found.id : "indexing-fallback-id";
-        addLog(`    ⚠️ "SQL Indexing" already exists. Reusing ID: ${subtopics.indexing}`, "warning");
-      }
-      await delay(200);
+      // Helper to get or create subtopic
+      const getOrCreateSubtopic = async (key: string, name: string, topicId: string) => {
+        const found = dbSubtopics.find(st => st.name.toLowerCase().trim() === name.toLowerCase().trim());
+        if (found) {
+          subtopics[key] = found.id;
+          addLog(`    ℹ️ Subtopic "${name}" already exists. Reusing ID: ${found.id}`, "info");
+        } else {
+          try {
+            const subtop = await testService.createSubtopic(name, topicId);
+            subtopics[key] = subtop.id;
+            addLog(`    🔹 Subtopic added: "${name}"`, "info");
+          } catch (e) {
+            subtopics[key] = "fallback-subtopic-id";
+            addLog(`    ⚠️ Subtopic "${name}" creation fallback used.`, "warning");
+          }
+        }
+        await delay(100);
+      };
 
-      // OS Topic
-      try {
-        const t2 = await testService.createTopic("Operating Systems", subjects.cse);
-        topics.os = t2.id;
-        addLog(`  🏷️ Topic added: "Operating Systems"`, "info");
-      } catch (e) {
-        const found = dbTopics.find(t => t.name === "Operating Systems");
-        topics.os = found ? found.id : "os-fallback-id";
-        addLog(`  ⚠️ "Operating Systems" already exists. Reusing ID: ${topics.os}`, "warning");
-      }
-      await delay(200);
+      // Execute Taxonomy Seeding cleanly with pre-checks
+      await getOrCreateSubject("cse", "Computer Science & Engineering");
+      await getOrCreateTopic("dbms", "Database Management Systems", subjects.cse);
+      await getOrCreateSubtopic("indexing", "SQL Indexing", topics.dbms);
+      await getOrCreateTopic("os", "Operating Systems", subjects.cse);
 
-      // Web Dev Subject
-      try {
-        const sub2 = await testService.createSubject("Web Development");
-        subjects.web = sub2.id;
-        addLog(`📚 Subject added: "Web Development"`, "success");
-      } catch (e) {
-        const found = dbSubjects.find(s => s.name === "Web Development");
-        subjects.web = found ? found.id : "web-fallback-id";
-        addLog(`⚠️ "Web Development" already exists. Reusing ID: ${subjects.web}`, "warning");
-      }
-      await delay(200);
+      await getOrCreateSubject("web", "Web Development");
+      await getOrCreateTopic("react", "React.js Foundations", subjects.web);
+      await getOrCreateSubtopic("hooks", "React Hooks & State", topics.react);
+      await getOrCreateTopic("node", "Node.js & Express", subjects.web);
 
-      // React Topic
-      try {
-        const t3 = await testService.createTopic("React.js Foundations", subjects.web);
-        topics.react = t3.id;
-        addLog(`  🏷️ Topic added: "React.js Foundations"`, "info");
-      } catch (e) {
-        const found = dbTopics.find(t => t.name === "React.js Foundations");
-        topics.react = found ? found.id : "react-fallback-id";
-        addLog(`  ⚠️ "React.js Foundations" already exists. Reusing ID: ${topics.react}`, "warning");
-      }
-      await delay(200);
+      await getOrCreateSubject("dsa", "Data Structures & Algorithms");
+      await getOrCreateTopic("arrays", "Arrays & Strings", subjects.dsa);
+      await getOrCreateSubtopic("sliding", "Sliding Window Pattern", topics.arrays);
+      await getOrCreateTopic("trees", "Trees & Graphs", subjects.dsa);
 
-      // Hooks Subtopic
-      try {
-        const st2 = await testService.createSubtopic("React Hooks & State", topics.react);
-        subtopics.hooks = st2.id;
-        addLog(`    🔹 Subtopic added: "React Hooks & State"`, "info");
-      } catch (e) {
-        const found = dbSubtopics.find(s => s.name === "React Hooks & State");
-        subtopics.hooks = found ? found.id : "hooks-fallback-id";
-        addLog(`    ⚠️ "React Hooks & State" already exists. Reusing ID: ${subtopics.hooks}`, "warning");
-      }
-      await delay(200);
-
-      // Node Topic
-      try {
-        const t4 = await testService.createTopic("Node.js & Express", subjects.web);
-        topics.node = t4.id;
-        addLog(`  🏷️ Topic added: "Node.js & Express"`, "info");
-      } catch (e) {
-        const found = dbTopics.find(t => t.name === "Node.js & Express");
-        topics.node = found ? found.id : "node-fallback-id";
-        addLog(`  ⚠️ "Node.js & Express" already exists. Reusing ID: ${topics.node}`, "warning");
-      }
-      await delay(200);
-
-      // DSA Subject
-      try {
-        const sub3 = await testService.createSubject("Data Structures & Algorithms");
-        subjects.dsa = sub3.id;
-        addLog(`📚 Subject added: "Data Structures & Algorithms"`, "success");
-      } catch (e) {
-        const found = dbSubjects.find(s => s.name === "Data Structures & Algorithms");
-        subjects.dsa = found ? found.id : "dsa-fallback-id";
-        addLog(`⚠️ "Data Structures & Algorithms" already exists. Reusing ID: ${subjects.dsa}`, "warning");
-      }
-      await delay(200);
-
-      // Arrays Topic
-      try {
-        const t5 = await testService.createTopic("Arrays & Strings", subjects.dsa);
-        topics.arrays = t5.id;
-        addLog(`  🏷️ Topic added: "Arrays & Strings"`, "info");
-      } catch (e) {
-        const found = dbTopics.find(t => t.name === "Arrays & Strings");
-        topics.arrays = found ? found.id : "arrays-fallback-id";
-        addLog(`  ⚠️ "Arrays & Strings" already exists. Reusing ID: ${topics.arrays}`, "warning");
-      }
-      await delay(200);
-
-      // Sliding Window Subtopic
-      try {
-        const st3 = await testService.createSubtopic("Sliding Window Pattern", topics.arrays);
-        subtopics.sliding = st3.id;
-        addLog(`    🔹 Subtopic added: "Sliding Window Pattern"`, "info");
-      } catch (e) {
-        const found = dbSubtopics.find(s => s.name === "Sliding Window Pattern");
-        subtopics.sliding = found ? found.id : "sliding-fallback-id";
-        addLog(`    ⚠️ "Sliding Window Pattern" already exists. Reusing ID: ${subtopics.sliding}`, "warning");
-      }
-      await delay(200);
-
-      // Trees Topic
-      try {
-        const t6 = await testService.createTopic("Trees & Graphs", subjects.dsa);
-        topics.trees = t6.id;
-        addLog(`  🏷️ Topic added: "Trees & Graphs"`, "info");
-      } catch (e) {
-        const found = dbTopics.find(t => t.name === "Trees & Graphs");
-        topics.trees = found ? found.id : "trees-fallback-id";
-        addLog(`  ⚠️ "Trees & Graphs" already exists. Reusing ID: ${topics.trees}`, "warning");
-      }
-      await delay(200);
-
-      // System Design Subject
-      try {
-        const sub4 = await testService.createSubject("System Design");
-        subjects.sd = sub4.id;
-        addLog(`📚 Subject added: "System Design"`, "success");
-      } catch (e) {
-        const found = dbSubjects.find(s => s.name === "System Design");
-        subjects.sd = found ? found.id : "sd-fallback-id";
-        addLog(`⚠️ "System Design" already exists. Reusing ID: ${subjects.sd}`, "warning");
-      }
-      await delay(200);
-
-      // Microservices Topic
-      try {
-        const t7 = await testService.createTopic("Microservices Architecture", subjects.sd);
-        topics.micro = t7.id;
-        addLog(`  🏷️ Topic added: "Microservices Architecture"`, "info");
-      } catch (e) {
-        const found = dbTopics.find(t => t.name === "Microservices Architecture");
-        topics.micro = found ? found.id : "micro-fallback-id";
-        addLog(`  ⚠️ "Microservices Architecture" already exists. Reusing ID: ${topics.micro}`, "warning");
-      }
-      await delay(200);
+      await getOrCreateSubject("sd", "System Design");
+      await getOrCreateTopic("micro", "Microservices Architecture", subjects.sd);
+      await delay(100);
 
       updateStepStatus("taxonomy", "completed");
 
@@ -524,19 +373,27 @@ export default function SeedData() {
 
       for (const cand of candidatesList) {
         try {
-          const orgId = cand.org === "gryphon" ? gryphonOrgId : techWolfOrgId;
-          const candidateId = await candidateService.createCandidate({
-            name: cand.name,
-            email: cand.email,
-            password: "password123",
-            organisationId: orgId,
-          });
-          candidateIds.push(candidateId);
-          addLog(`👤 Onboarded Candidate: "${cand.name}" [ID: ${candidateId}]`, "success");
-        } catch (e) {
-          addLog(`⚠️ Candidate "${cand.name}" skipped (already registered or error).`, "warning");
+          const existingList = await candidateService.getCandidates();
+          const found = existingList.find(c => c.user?.email?.toLowerCase().trim() === cand.email?.toLowerCase().trim());
+          if (found) {
+            candidateIds.push(found.id);
+            addLog(`ℹ️ Candidate "${cand.name}" (${cand.email}) already exists. Reusing ID: ${found.id}`, "info");
+          } else {
+            const orgId = cand.org === "gryphon" ? gryphonOrgId : techWolfOrgId;
+            const candidateId = await candidateService.createCandidate({
+              name: cand.name,
+              email: cand.email,
+              password: "password123",
+              organisationId: orgId,
+            });
+            candidateIds.push(candidateId);
+            addLog(`👤 Onboarded Candidate: "${cand.name}" [ID: ${candidateId}]`, "success");
+          }
+        } catch (e: unknown) {
+          const err = e as { message?: string };
+          addLog(`⚠️ Candidate "${cand.name}" creation skipped or already exists: ${err.message || ""}`, "warning");
         }
-        await delay(200);
+        await delay(100);
       }
 
       // Fallback: If we couldn't create candidates but they already exist, query them
@@ -566,243 +423,148 @@ export default function SeedData() {
 
       const mcqQuestions: CreateQuestionRequest[] = [
         {
+          // 1. SINGLE_CORRECT
           questionType: "MCQ",
-          prompt: "What is the primary purpose of the Virtual DOM in React?",
-          subject_id: subjects.web,
-          topic_id: topics.react,
-          subtopic_id: subtopics.hooks,
-          marks: 5,
-          title: "Virtual DOM Purpose",
-          difficulty: "EASY",
-          visibility: "PUBLIC",
-          mcqType: "SINGLE_CORRECT",
-          shuffleOptions: true,
-          multipleCorrect: false,
-          mcqOptions: [
-            { text: "To directly paint updates to the browser layout rapidly.", isCorrect: false },
-            { text: "To compute a minimal set of changes (diffing) and reconcile the real DOM efficiently.", isCorrect: true },
-            { text: "To support iframe sandboxing.", isCorrect: false },
-            { text: "To store application state in browser session persistence.", isCorrect: false },
-          ]
-        },
-        {
-          questionType: "MCQ",
-          prompt: "Which of the following describes the Sliding Window technique?",
-          subject_id: subjects.dsa,
-          topic_id: topics.arrays,
-          subtopic_id: subtopics.sliding,
-          marks: 5,
-          title: "Sliding Window Concept",
-          difficulty: "MEDIUM",
-          visibility: "PUBLIC",
-          mcqType: "SINGLE_CORRECT",
-          shuffleOptions: true,
-          multipleCorrect: false,
-          mcqOptions: [
-            { text: "Traversing an array from both ends with two boundary pointers.", isCorrect: false },
-            { text: "Maintaining a sub-array window whose boundaries adjust dynamically based on target constraints.", isCorrect: true },
-            { text: "Dividing search spaces into binary segments recursively.", isCorrect: false },
-            { text: "Sorting element intervals with quicksort partitioning.", isCorrect: false },
-          ]
-        },
-        {
-          questionType: "MCQ",
-          prompt: "What is a primary trade-off when implementing a database index on a table column?",
+          prompt: "Which ACID property guarantees that once a database transaction has been committed, it will remain committed even in the event of a system failure or power loss?",
           subject_id: subjects.cse,
           topic_id: topics.dbms,
-          subtopic_id: subtopics.indexing,
           marks: 5,
-          title: "DB Indexing Tradeoff",
-          difficulty: "MEDIUM",
-          visibility: "PUBLIC",
-          mcqType: "SINGLE_CORRECT",
-          shuffleOptions: true,
-          multipleCorrect: false,
-          mcqOptions: [
-            { text: "Speeds up data retrieval (SELECTs) at the expense of slower write operations (INSERTs/UPDATEs) and storage overhead.", isCorrect: true },
-            { text: "Increases write speeds but decreases overall read efficiency.", isCorrect: false },
-            { text: "Provides automatic column encryption but prevents range queries.", isCorrect: false },
-            { text: "Guarantees primary key constraints across distributed tables.", isCorrect: false },
-          ]
-        },
-        {
-          questionType: "MCQ",
-          prompt: "In React, which hooks can be used to cache expensive computations and memoize values?",
-          subject_id: subjects.web,
-          topic_id: topics.react,
-          marks: 5,
-          title: "React Hooks Memoization",
-          difficulty: "MEDIUM",
-          visibility: "PUBLIC",
-          mcqType: "MULTIPLE_CORRECT",
-          shuffleOptions: true,
-          multipleCorrect: true,
-          mcqOptions: [
-            { text: "useMemo", isCorrect: true },
-            { text: "useCallback", isCorrect: true },
-            { text: "useEffect", isCorrect: false },
-            { text: "useReducer", isCorrect: false },
-          ]
-        },
-        {
-          questionType: "MCQ",
-          prompt: "What is the time complexity of searching an item in a perfectly balanced Binary Search Tree (BST)?",
-          subject_id: subjects.dsa,
-          topic_id: topics.trees,
-          marks: 5,
-          title: "BST Search Complexity",
+          title: "ACID Durability Property",
           difficulty: "EASY",
           visibility: "PUBLIC",
           mcqType: "SINGLE_CORRECT",
           shuffleOptions: true,
           multipleCorrect: false,
           mcqOptions: [
-            { text: "O(1)", isCorrect: false },
-            { text: "O(log n)", isCorrect: true },
-            { text: "O(n)", isCorrect: false },
-            { text: "O(n log n)", isCorrect: false },
+            { text: "Atomicity", isCorrect: false },
+            { text: "Consistency", isCorrect: false },
+            { text: "Isolation", isCorrect: false },
+            { text: "Durability", isCorrect: true },
           ]
         },
         {
+          // 2. MULTIPLE_CORRECT
           questionType: "MCQ",
-          prompt: "Which database transaction isolation level offers the highest consistency and prevents Phantom Reads?",
-          subject_id: subjects.cse,
-          topic_id: topics.dbms,
-          marks: 10,
-          title: "DB Isolation Levels",
-          difficulty: "HARD",
-          visibility: "PUBLIC",
-          mcqType: "SINGLE_CORRECT",
-          shuffleOptions: true,
-          multipleCorrect: false,
-          mcqOptions: [
-            { text: "Read Uncommitted", isCorrect: false },
-            { text: "Read Committed", isCorrect: false },
-            { text: "Repeatable Read", isCorrect: false },
-            { text: "Serializable", isCorrect: true },
-          ]
-        },
-        {
-          questionType: "MCQ",
-          prompt: "What is the primary benefit of deploying application services as Microservices rather than a Monolith?",
-          subject_id: subjects.sd,
-          topic_id: topics.micro,
-          marks: 5,
-          title: "Microservices Scalability",
-          difficulty: "EASY",
-          visibility: "PUBLIC",
-          mcqType: "SINGLE_CORRECT",
-          shuffleOptions: true,
-          multipleCorrect: false,
-          mcqOptions: [
-            { text: "Simpler configuration and setup.", isCorrect: false },
-            { text: "Ability to independently scale, deploy, and select tailored tech-stacks for each business service.", isCorrect: true },
-            { text: "Elimination of network communication overhead.", isCorrect: false },
-            { text: "Guarantee of strongly consistent distributed transactions without effort.", isCorrect: false },
-          ]
-        },
-        {
-          questionType: "MCQ",
-          prompt: "In operating systems, which of the following is true about Semaphores?",
-          subject_id: subjects.cse,
-          topic_id: topics.os,
-          marks: 5,
-          title: "OS Semaphores",
-          difficulty: "MEDIUM",
-          visibility: "PUBLIC",
-          mcqType: "MULTIPLE_CORRECT",
-          shuffleOptions: true,
-          multipleCorrect: true,
-          mcqOptions: [
-            { text: "They can prevent race conditions in critical sections.", isCorrect: true },
-            { text: "A binary semaphore is functionally similar to a Mutex.", isCorrect: true },
-            { text: "They are primarily used to format storage drives.", isCorrect: false },
-            { text: "They completely eliminate the possibility of thread deadlocks.", isCorrect: false },
-          ]
-        },
-        {
-          questionType: "MCQ",
-          prompt: "Which HTTP status code corresponds to a 'Conflict' error, indicating resource state mismatches?",
+          prompt: "Which of the following HTTP methods are considered idempotent according to the RFC 7231 specification? (Select all that apply)",
           subject_id: subjects.web,
           topic_id: topics.node,
           marks: 5,
-          title: "HTTP Conflict Code",
-          difficulty: "EASY",
+          title: "Idempotent HTTP Methods",
+          difficulty: "MEDIUM",
           visibility: "PUBLIC",
-          mcqType: "SINGLE_CORRECT",
-          shuffleOptions: false,
-          multipleCorrect: false,
+          mcqType: "MULTIPLE_CORRECT",
+          shuffleOptions: true,
+          multipleCorrect: true,
           mcqOptions: [
-            { text: "400 Bad Request", isCorrect: false },
-            { text: "404 Not Found", isCorrect: false },
-            { text: "409 Conflict", isCorrect: true },
-            { text: "422 Unprocessable Entity", isCorrect: false },
+            { text: "GET", isCorrect: true },
+            { text: "POST", isCorrect: false },
+            { text: "PUT", isCorrect: true },
+            { text: "DELETE", isCorrect: true },
           ]
         },
         {
+          // 3. TRUE_FALSE
           questionType: "MCQ",
-          prompt: "In dynamic system architecture, which caching strategy updates the cache store asynchronously in the background?",
+          prompt: "True or False: Java Primitive types like `int` and `boolean` are stored directly on the stack frame when declared as local variables inside a method.",
+          subject_id: subjects.dsa,
+          topic_id: topics.arrays,
+          marks: 5,
+          title: "Java Primitive Memory Allocation",
+          difficulty: "EASY",
+          visibility: "PUBLIC",
+          mcqType: "TRUE_FALSE",
+          shuffleOptions: false,
+          multipleCorrect: false,
+          mcqOptions: [
+            { text: "True", isCorrect: true },
+            { text: "False", isCorrect: false },
+          ]
+        },
+        {
+          // 4. IMAGE_SINGLE_CORRECT
+          questionType: "MCQ",
+          prompt: "Observe the load balancing architecture diagram below. Identify which strategy distributes requests evenly across application servers in sequential order.",
           subject_id: subjects.sd,
           topic_id: topics.micro,
-          marks: 5,
-          title: "Caching Refresh Strategy",
+          marks: 10,
+          title: "Load Balancer Strategy Diagram",
           difficulty: "MEDIUM",
           visibility: "PUBLIC",
-          mcqType: "SINGLE_CORRECT",
+          mcqType: "IMAGE_SINGLE_CORRECT",
+          imageUrl: "https://images.unsplash.com/photo-1558494949-ef010cbdcc31?w=800",
           shuffleOptions: true,
           multipleCorrect: false,
           mcqOptions: [
-            { text: "Cache-aside", isCorrect: false },
-            { text: "Write-through", isCorrect: false },
-            { text: "Refresh-ahead / Write-behind", isCorrect: true },
-            { text: "Write-around", isCorrect: false },
+            { text: "Round Robin", isCorrect: true },
+            { text: "Least Connections", isCorrect: false },
+            { text: "IP Hash", isCorrect: false },
+            { text: "Random Selection", isCorrect: false },
+          ]
+        },
+        {
+          // 5. IMAGE_MULTIPLE_CORRECT
+          questionType: "MCQ",
+          prompt: "Based on the Resilience4j Circuit Breaker state machine diagram provided, which states transition to the CLOSED state upon successful probe executions? (Select all that apply)",
+          subject_id: subjects.sd,
+          topic_id: topics.micro,
+          marks: 10,
+          title: "Circuit Breaker State Machine",
+          difficulty: "HARD",
+          visibility: "PUBLIC",
+          mcqType: "IMAGE_MULTIPLE_CORRECT",
+          imageUrl: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=800",
+          shuffleOptions: true,
+          multipleCorrect: true,
+          mcqOptions: [
+            { text: "HALF_OPEN", isCorrect: true },
+            { text: "FORCED_OPEN", isCorrect: false },
+            { text: "DISABLED", isCorrect: false },
+            { text: "METRICS_ONLY", isCorrect: false },
+          ]
+        },
+        {
+          // 6. ASSERTION_REASON
+          questionType: "MCQ",
+          prompt: "Assertion (A): Redis achieves extremely high throughput and low-latency response times despite running on a single-threaded event loop engine. Reason (R): Single-threaded execution eliminates CPU context-switching overhead and avoids multi-threaded lock contention on memory data structures.",
+          subject_id: subjects.cse,
+          topic_id: topics.dbms,
+          marks: 10,
+          title: "Redis Event Loop Assertion",
+          difficulty: "HARD",
+          visibility: "PUBLIC",
+          mcqType: "ASSERTION_REASON",
+          assertion: "Redis achieves extremely high throughput on a single thread.",
+          reason: "Single-threaded execution avoids context switches and locks.",
+          shuffleOptions: false,
+          multipleCorrect: false,
+          mcqOptions: [
+            { text: "Both (A) and (R) are true, and (R) is the correct explanation of (A).", isCorrect: true },
+            { text: "Both (A) and (R) are true, but (R) is NOT the correct explanation of (A).", isCorrect: false },
+            { text: "(A) is true, but (R) is false.", isCorrect: false },
+            { text: "(A) is false, but (R) is true.", isCorrect: false },
+          ]
+        },
+        {
+          // 7. FILL_IN_THE_BLANK
+          questionType: "MCQ",
+          prompt: "According to the CAP Theorem for distributed data stores, when a network partition occurs, a system must choose between Availability and _____.",
+          subject_id: subjects.sd,
+          topic_id: topics.micro,
+          marks: 5,
+          title: "CAP Theorem Tradeoff Blank",
+          difficulty: "EASY",
+          visibility: "PUBLIC",
+          mcqType: "FILL_IN_THE_BLANK",
+          correctAnswer: "Consistency",
+          shuffleOptions: false,
+          multipleCorrect: false,
+          mcqOptions: [
+            { text: "Consistency", isCorrect: true }
           ]
         }
       ];
 
       const codingQuestions: CreateQuestionRequest[] = [
-        {
-          questionType: "CODING" as const,
-          prompt: "Given an array of integers `nums` and an integer `target`, return indices of the two numbers such that they add up to `target`. Print the indices separated by a single space. You can assume exactly one solution exists.",
-          subject_id: subjects.dsa,
-          topic_id: topics.arrays,
-          subtopic_id: subtopics.sliding,
-          marks: 20,
-          title: "Two Sum Problem",
-          difficulty: "EASY" as const,
-          visibility: "PUBLIC",
-          constraints: "2 <= nums.length <= 10^4\n-10^9 <= nums[i] <= 10^9",
-          memoryLimitMb: 256,
-          timeLimitSecs: 2,
-          sampleExplanation: "The input consists of: size of array, elements of array, and then the target integer.",
-          codeTemplate: {
-            python3: {
-              lang: "Python 3",
-              langSlug: "python3",
-              code: `import sys\n\ndef solve():\n    lines = sys.stdin.read().split()\n    if not lines: return\n    n = int(lines[0])\n    nums = [int(x) for x in lines[1:n+1]]\n    target = int(lines[n+1])\n    \n    seen = {}\n    for i, num in enumerate(nums):\n        diff = target - num\n        if diff in seen:\n            print(f"{seen[diff]} {i}")\n            return\n        seen[num] = i\n\nsolve()`
-            },
-            javascript: {
-              lang: "JavaScript",
-              langSlug: "javascript",
-              code: `const fs = require('fs');\n\nfunction solve() {\n    const input = fs.readFileSync(0, 'utf-8').trim().split(/\\s+/);\n    if (input.length < 2) return;\n    const n = parseInt(input[0]);\n    const nums = input.slice(1, n + 1).map(Number);\n    const target = parseInt(input[n + 1]);\n    \n    const map = new Map();\n    for (let i = 0; i < n; i++) {\n        const diff = target - nums[i];\n        if (map.has(diff)) {\n            console.log(map.get(diff) + " " + i);\n            return;\n        }\n        map.set(nums[i], i);\n    }\n}\n\nsolve();`
-            },
-            java: {
-              lang: "Java",
-              langSlug: "java",
-              code: `import java.util.*;\n\npublic class Main {\n    public static void main(String[] args) {\n        Scanner sc = new Scanner(System.in);\n        if (!sc.hasNextInt()) return;\n        int n = sc.nextInt();\n        int[] nums = new int[n];\n        for (int i = 0; i < n; i++) {\n            nums[i] = sc.nextInt();\n        }\n        int target = sc.nextInt();\n        Map<Integer, Integer> map = new HashMap<>();\n        for (int i = 0; i < n; i++) {\n            int diff = target - nums[i];\n            if (map.containsKey(diff)) {\n                System.out.println(map.get(diff) + " " + i);\n                return;\n            }\n            map.put(nums[i], i);\n        }\n    }\n}`
-            },
-            cpp: {
-              lang: "C++",
-              langSlug: "cpp",
-              code: `#include <iostream>\n#include <vector>\n#include <unordered_map>\n\nusing namespace std;\n\nint main() {\n    int n;\n    if (!(cin >> n)) return 0;\n    vector<int> nums(n);\n    for (int i = 0; i < n; i++) cin >> nums[i];\n    int target;\n    cin >> target;\n    unordered_map<int, int> seen;\n    for (int i = 0; i < n; i++) {\n        int diff = target - nums[i];\n        if (seen.count(diff)) {\n            cout << seen[diff] << " " << i << endl;\n            return 0;\n        }\n        seen[nums[i]] = i;\n    }\n    return 0;\n}`
-            }
-          },
-          examples: [
-            { input: "4\n2 7 11 15\n9", output: "0 1", explanation: "nums[0] + nums[1] = 2 + 7 = 9." }
-          ],
-          hints: ["Use a Hash Map to locate the complement of each element instantly."],
-          tags: ["Hash-Map", "Arrays", "Algorithms"]
-        },
         {
           questionType: "CODING" as const,
           prompt: "Write a program that takes a single word string from stdin and prints the string reversed to stdout.",
@@ -812,10 +574,20 @@ export default function SeedData() {
           title: "Reverse String Challenge",
           difficulty: "EASY" as const,
           visibility: "PUBLIC",
-          constraints: "String length < 100",
+          constraints: "String length <= 1000",
           memoryLimitMb: 256,
           timeLimitSecs: 2,
           sampleExplanation: "Accepts a single string token and prints it backwards.",
+          signatureMetadata: {
+            method_name: "solve",
+            params: [{ name: "word", type: "string" }],
+            return_type: "void"
+          },
+          languageTemplates: {
+            python: { template: "def solve(word):\n    pass", driver: "solve(input())" },
+            cpp: { template: "void solve(string word) {}", driver: "int main() {}" },
+            java: { template: "public static void solve(String word) {}", driver: "public static void main(String[] args) {}" }
+          },
           codeTemplate: {
             python3: {
               lang: "Python 3",
@@ -829,50 +601,36 @@ export default function SeedData() {
             }
           },
           examples: [
-            { input: "hello", output: "olleh" }
+            { input: "hello", output: "olleh" },
+            { input: "world", output: "dlrow" },
+            { input: "racecar", output: "racecar" }
           ],
           hints: ["Read the complete string, then reverse indices or arrays."],
-          tags: ["Strings", "Fundamentals"]
+          tags: ["Strings", "Easy"]
         },
         {
           questionType: "CODING" as const,
-          prompt: "Given an integer `n` from stdin, determine if it is prime. Print 'PRIME' if it is prime, and 'NOT PRIME' if it is not prime.",
+          prompt: "Given a string `s` containing just the characters `(`, `)`, `{`, `}`, `[` and `]`, determine if the input string is valid. A string is valid if open brackets are closed by the same type of brackets and in correct order. Print 'VALID' or 'INVALID'.",
           subject_id: subjects.dsa,
           topic_id: topics.arrays,
-          marks: 15,
-          title: "Verify Prime Integers",
-          difficulty: "EASY" as const,
-          visibility: "PUBLIC",
-          constraints: "2 <= n <= 2 * 10^9",
-          memoryLimitMb: 256,
-          timeLimitSecs: 2,
-          sampleExplanation: "Perform trial divisions efficiently.",
-          codeTemplate: {
-            python3: {
-              lang: "Python 3",
-              langSlug: "python3",
-              code: `import sys\nimport math\n\ndef is_prime(n):\n    if n <= 1: return False\n    if n <= 3: return True\n    if n % 2 == 0 or n % 3 == 0: return False\n    for i in range(5, int(math.isqrt(n)) + 1, 6):\n        if n % i == 0 or n % (i + 2) == 0: return False\n    return True\n\nn = int(sys.stdin.read().strip())\nprint("PRIME" if is_prime(n) else "NOT PRIME")`
-            }
-          },
-          examples: [
-            { input: "7", output: "PRIME" }
-          ],
-          hints: ["Only iterate up to the square root of n."],
-          tags: ["Math", "Algorithms"]
-        },
-        {
-          questionType: "CODING" as const,
-          prompt: "Given a string `s` containing just the characters `(`, `)`, `{`, `}`, `[` and `]`, determine if the input string is valid. A string is valid if parentheses close in correct order. Print 'VALID' or 'INVALID'.",
-          subject_id: subjects.dsa,
-          topic_id: topics.arrays,
-          marks: 20,
+          marks: 25,
           title: "Valid Parentheses Checker",
           difficulty: "MEDIUM" as const,
           visibility: "PUBLIC",
           constraints: "1 <= s.length <= 10^4",
           memoryLimitMb: 256,
           timeLimitSecs: 2,
-          sampleExplanation: "Uses a stack to evaluate braces structure.",
+          sampleExplanation: "Uses a stack to evaluate bracket matching in order.",
+          signatureMetadata: {
+            method_name: "solve",
+            params: [{ name: "s", type: "string" }],
+            return_type: "void"
+          },
+          languageTemplates: {
+            python: { template: "def solve(s):\n    pass", driver: "solve(input())" },
+            cpp: { template: "void solve(string s) {}", driver: "int main() {}" },
+            java: { template: "public static void solve(String s) {}", driver: "public static void main(String[] args) {}" }
+          },
           codeTemplate: {
             python3: {
               lang: "Python 3",
@@ -881,36 +639,50 @@ export default function SeedData() {
             }
           },
           examples: [
-            { input: "()", output: "VALID" }
+            { input: "()", output: "VALID" },
+            { input: "()[]{}", output: "VALID" },
+            { input: "(]", output: "INVALID" }
           ],
           hints: ["Use a stack data structure."],
-          tags: ["Stack", "Strings"]
+          tags: ["Stack", "Strings", "Medium"]
         },
         {
           questionType: "CODING" as const,
-          prompt: "You are climbing a staircase. It takes `n` steps to reach the top. Each time you can either climb 1 or 2 steps. In how many distinct ways can you climb to the top? Print the total ways.",
+          prompt: "Given `n` non-negative integers representing an elevation map where the width of each bar is 1, compute how much water it can trap after raining. Input format: integer `n` on first line, followed by `n` space-separated integers. Print total trapped water volume.",
           subject_id: subjects.dsa,
           topic_id: topics.arrays,
-          marks: 20,
-          title: "Climbing Stairs Path Count",
-          difficulty: "MEDIUM" as const,
+          marks: 35,
+          title: "Trapping Rain Water",
+          difficulty: "HARD" as const,
           visibility: "PUBLIC",
-          constraints: "1 <= n <= 45",
+          constraints: "n == height.length, 1 <= n <= 2 * 10^4, 0 <= height[i] <= 10^5",
           memoryLimitMb: 256,
           timeLimitSecs: 2,
-          sampleExplanation: "Fibonacci-based Dynamic Programming scenario.",
+          sampleExplanation: "Calculates trapped water volume using two-pointer max height approach.",
+          signatureMetadata: {
+            method_name: "solve",
+            params: [{ name: "height", type: "array" }],
+            return_type: "void"
+          },
+          languageTemplates: {
+            python: { template: "def solve(height):\n    pass", driver: "solve(input())" },
+            cpp: { template: "void solve(vector<int> height) {}", driver: "int main() {}" },
+            java: { template: "public static void solve(int[] height) {}", driver: "public static void main(String[] args) {}" }
+          },
           codeTemplate: {
             python3: {
               lang: "Python 3",
               langSlug: "python3",
-              code: `import sys\n\ndef solve():\n    val = sys.stdin.read().strip()\n    if not val: return\n    n = int(val)\n    if n <= 2: \n        print(n)\n        return\n    dp = [0] * (n + 1)\n    dp[1] = 1\n    dp[2] = 2\n    for i in range(3, n + 1):\n        dp[i] = dp[i-1] + dp[i-2]\n    print(dp[n])\n\nsolve()`
+              code: `import sys\n\ndef solve():\n    tokens = sys.stdin.read().split()\n    if not tokens: return\n    n = int(tokens[0])\n    if n <= 2:\n        print(0)\n        return\n    height = [int(x) for x in tokens[1:n+1]]\n    left, right = 0, n - 1\n    left_max, right_max = 0, 0\n    water = 0\n    while left < right:\n        if height[left] < height[right]:\n            if height[left] >= left_max:\n                left_max = height[left]\n            else:\n                water += left_max - height[left]\n            left += 1\n        else:\n            if height[right] >= right_max:\n                right_max = height[right]\n            else:\n                water += right_max - height[right]\n            right -= 1\n    print(water)\n\nsolve()`
             }
           },
           examples: [
-            { input: "2", output: "2" }
+            { input: "12 0 1 0 2 1 0 1 3 2 1 2 1", output: "6" },
+            { input: "6 4 2 0 3 2 5", output: "9" },
+            { input: "3 1 2 3", output: "0" }
           ],
-          hints: ["This problem matches the Fibonacci sequence definition."],
-          tags: ["Dynamic-Programming", "Algorithms"]
+          hints: ["Two-pointer technique or precalculated max bounds."],
+          tags: ["Two Pointers", "Dynamic Programming", "Hard"]
         }
       ];
 
@@ -925,41 +697,45 @@ export default function SeedData() {
 
       // Create MCQs
       for (const mcq of mcqQuestions) {
-        try {
-          const created = await testService.createQuestion(mcq);
-          questionIds.push(created.id);
-          addLog(`✅ Seeded MCQ Question: "${mcq.title}" [ID: ${created.id}]`, "success");
-        } catch (e) {
-          const found = dbQuestions.find(q => q.title === mcq.title);
-          if (found) {
-            questionIds.push(found.id);
-            addLog(`⚠️ MCQ "${mcq.title}" already exists. Reused ID: ${found.id}`, "warning");
-          } else {
-            addLog(`⚠️ Skipping MCQ creation error for "${mcq.title}". Automatically moving to next stage.`, "warning");
+        const found = dbQuestions.find(q => q.title?.toLowerCase().trim() === mcq.title?.toLowerCase().trim());
+        if (found) {
+          questionIds.push(found.id);
+          addLog(`ℹ️ MCQ "${mcq.title}" already exists in database. Reusing ID: ${found.id}`, "info");
+        } else {
+          try {
+            const created = await testService.createQuestion(mcq);
+            questionIds.push(created.id);
+            addLog(`✅ Seeded MCQ Question: "${mcq.title}" [ID: ${created.id}]`, "success");
+          } catch (e: unknown) {
+            const err = e as { response?: { data?: { message?: string } }; message?: string };
+            const errDetail = err.response?.data?.message || err.message || String(e);
+            addLog(`⚠️ Skipping MCQ creation for "${mcq.title}": ${errDetail}`, "warning");
           }
         }
-        await delay(200);
+        await delay(100);
       }
 
       // Create Coding Questions
       const codingCreatedIds: string[] = [];
       for (const cq of codingQuestions) {
-        try {
-          const created = await testService.createQuestion(cq);
-          questionIds.push(created.id);
-          codingCreatedIds.push(created.id);
-          addLog(`✅ Seeded Coding Question: "${cq.title}" [ID: ${created.id}]`, "success");
-        } catch (e) {
-          const found = dbQuestions.find(q => q.title === cq.title);
-          if (found) {
-            questionIds.push(found.id);
-            codingCreatedIds.push(found.id);
-            addLog(`⚠️ Coding Question "${cq.title}" already exists. Reused ID: ${found.id}`, "warning");
-          } else {
-            addLog(`⚠️ Skipping Coding creation error for "${cq.title}". Automatically moving to next stage.`, "warning");
+        const found = dbQuestions.find(q => q.title?.toLowerCase().trim() === cq.title?.toLowerCase().trim());
+        if (found) {
+          questionIds.push(found.id);
+          codingCreatedIds.push(found.id);
+          addLog(`ℹ️ Coding Question "${cq.title}" already exists in database. Reusing ID: ${found.id}`, "info");
+        } else {
+          try {
+            const created = await testService.createQuestion(cq);
+            questionIds.push(created.id);
+            codingCreatedIds.push(created.id);
+            addLog(`✅ Seeded Coding Question: "${cq.title}" [ID: ${created.id}]`, "success");
+          } catch (e: unknown) {
+            const err = e as { response?: { data?: { message?: string } }; message?: string };
+            const errDetail = err.response?.data?.message || err.message || String(e);
+            addLog(`⚠️ Skipping Coding creation for "${cq.title}": ${errDetail}`, "warning");
           }
         }
-        await delay(200);
+        await delay(100);
       }
 
       updateStepStatus("questions", "completed");
@@ -973,30 +749,47 @@ export default function SeedData() {
       addLog("Seeding Test Cases for Coding Questions...", "info");
 
             const codingTestCasesMap: Record<number, Array<{ input: string, expectedOutput: string, sample: boolean, weight: number, explanation: string }>> = {
-        0: [ // Two Sum
-          { input: "[[2,7,11,15],9]", expectedOutput: "[0,1]", sample: true, weight: 30, explanation: "Standard positive array sum" },
-          { input: "[[3,2,4],6]", expectedOutput: "[1,2]", sample: false, weight: 40, explanation: "Complement is second element" },
-          { input: "[[3,3],6]", expectedOutput: "[0,1]", sample: false, weight: 30, explanation: "Elements are identical values" },
+        0: [ // Question 1: Reverse String (EASY) - 3 Sample, 7 Hidden
+          // Sample Test Cases (3)
+          { input: "hello", expectedOutput: "olleh", sample: true, weight: 10, explanation: "Basic lowercase word" },
+          { input: "world", expectedOutput: "dlrow", sample: true, weight: 10, explanation: "Standard word" },
+          { input: "racecar", expectedOutput: "racecar", sample: true, weight: 10, explanation: "Palindrome word" },
+          // Hidden Test Cases (7)
+          { input: "a", expectedOutput: "a", sample: false, weight: 10, explanation: "Single character" },
+          { input: "AbCdEfG", expectedOutput: "GfEdCbA", sample: false, weight: 10, explanation: "Mixed case string" },
+          { input: "123456789", expectedOutput: "987654321", sample: false, weight: 10, explanation: "Numeric string" },
+          { input: "GryphonAcademy", expectedOutput: "ymedacAnohpyrG", sample: false, weight: 10, explanation: "CamelCase string" },
+          { input: "abcdefghijklmnopqrstuvwxyz", expectedOutput: "zyxwvutsrqponmlkjihgfedcba", sample: false, weight: 10, explanation: "Full alphabet" },
+          { input: "SystemDesign2026", expectedOutput: "6202ngiseDmetsyS", sample: false, weight: 10, explanation: "Alphanumeric string" },
+          { input: "Supercalifragilisticexpialidocious", expectedOutput: "suoicodilaipxecitsiligarfilaceprepuS", sample: false, weight: 10, explanation: "Long word" },
         ],
-        1: [ // Reverse String
-          { input: "[[\"h\",\"e\",\"l\",\"l\",\"o\"]]", expectedOutput: "[\"o\",\"l\",\"l\",\"e\",\"h\"]", sample: true, weight: 30, explanation: "Regular word" },
-          { input: "[[\"R\",\"x\",\"O\",\"n\",\"e\"]]", expectedOutput: "[\"e\",\"n\",\"O\",\"x\",\"R\"]", sample: false, weight: 40, explanation: "Casing check" },
-          { input: "[[\"d\",\"e\",\"v\"]]", expectedOutput: "[\"v\",\"e\",\"d\"]", sample: false, weight: 30, explanation: "Short word" },
+        1: [ // Question 2: Valid Parentheses (MEDIUM) - 3 Sample, 7 Hidden
+          // Sample Test Cases (3)
+          { input: "()", expectedOutput: "VALID", sample: true, weight: 10, explanation: "Basic matching parentheses" },
+          { input: "()[]{}", expectedOutput: "VALID", sample: true, weight: 10, explanation: "Consecutive valid pairs" },
+          { input: "(]", expectedOutput: "INVALID", sample: true, weight: 10, explanation: "Mismatched closing bracket" },
+          // Hidden Test Cases (7)
+          { input: "([{}])", expectedOutput: "VALID", sample: false, weight: 10, explanation: "Nested valid brackets" },
+          { input: "(((", expectedOutput: "INVALID", sample: false, weight: 10, explanation: "Unclosed opening brackets" },
+          { input: ")))", expectedOutput: "INVALID", sample: false, weight: 10, explanation: "Closing brackets without opening" },
+          { input: "{[()]}", expectedOutput: "VALID", sample: false, weight: 10, explanation: "Deeply nested valid sequence" },
+          { input: "({[)]}", expectedOutput: "INVALID", sample: false, weight: 10, explanation: "Interleaved invalid order" },
+          { input: "()[]{}()[]{}", expectedOutput: "VALID", sample: false, weight: 10, explanation: "Long repeated valid sequence" },
+          { input: "({[]})[()]{}", expectedOutput: "VALID", sample: false, weight: 10, explanation: "Complex valid mixed brackets" },
         ],
-        2: [ // Palindrome Number
-          { input: "[121]", expectedOutput: "true", sample: true, weight: 30, explanation: "Basic Palindrome" },
-          { input: "[-121]", expectedOutput: "false", sample: false, weight: 40, explanation: "Negative number" },
-          { input: "[10]", expectedOutput: "false", sample: false, weight: 30, explanation: "Ends with zero" },
-        ],
-        3: [ // Valid Parentheses
-          { input: "[\"()\"]", expectedOutput: "true", sample: true, weight: 30, explanation: "Basic pair" },
-          { input: "[\"()[]{}\"]", expectedOutput: "true", sample: false, weight: 40, explanation: "Consecutive valid pairs" },
-          { input: "[\"(]\"]", expectedOutput: "false", sample: false, weight: 30, explanation: "Mismatched pair" },
-        ],
-        4: [ // Fibonacci Number
-          { input: "[2]", expectedOutput: "1", sample: true, weight: 30, explanation: "2 steps check" },
-          { input: "[5]", expectedOutput: "5", sample: false, weight: 40, explanation: "5 steps check" },
-          { input: "[10]", expectedOutput: "55", sample: false, weight: 30, explanation: "10 steps check" }
+        2: [ // Question 3: Trapping Rain Water (HARD) - 3 Sample, 7 Hidden
+          // Sample Test Cases (3)
+          { input: "12 0 1 0 2 1 0 1 3 2 1 2 1", expectedOutput: "6", sample: true, weight: 10, explanation: "Standard LeetCode elevation map" },
+          { input: "6 4 2 0 3 2 5", expectedOutput: "9", sample: true, weight: 10, explanation: "U-shaped valley elevation" },
+          { input: "3 1 2 3", expectedOutput: "0", sample: true, weight: 10, explanation: "Ascending slope (no trapped water)" },
+          // Hidden Test Cases (7)
+          { input: "1 5", expectedOutput: "0", sample: false, weight: 10, explanation: "Single bar (no boundaries)" },
+          { input: "5 5 4 3 2 1", expectedOutput: "0", sample: false, weight: 10, explanation: "Strictly descending slope" },
+          { input: "5 3 0 0 0 5", expectedOutput: "12", sample: false, weight: 10, explanation: "Deep central pool" },
+          { input: "7 2 0 2 0 2 0 2", expectedOutput: "6", sample: false, weight: 10, explanation: "Flat bottom multi-dip profile" },
+          { input: "4 0 1 0 2 1 0 1 3", expectedOutput: "6", sample: false, weight: 10, explanation: "Asymmetric boundary heights" },
+          { input: "8 3 0 2 0 4 0 1 5", expectedOutput: "15", sample: false, weight: 10, explanation: "Large complex multi-peak terrain" },
+          { input: "6 10 0 0 0 0 10", expectedOutput: "40", sample: false, weight: 10, explanation: "Extreme height canyon" },
         ]
       };
 
@@ -1023,309 +816,14 @@ export default function SeedData() {
 
       updateStepStatus("testcases", "completed");
 
-      // ----------------------------------------------------
-      // STEP 9: BUILD & PUBLISH ASSESSMENTS
-      // ----------------------------------------------------
-      setCurrentStepIndex(8);
-      updateStepStatus("tests", "running");
-      setProgress(80);
-      addLog("Creating Assessments/Tests and associating seeded questions...", "info");
-
-      const testAssessments = [
-        {
-          title: `${prefix}Full Stack Engineer Assessment`,
-          description: `Comprehensive review of React foundations and core arrays algorithms (${prefix.trim()}).`,
-          durationMins: 45,
-          difficulty: "EASY" as const,
-          passMark: 40,
-          status: "PUBLISHED" as const,
-          questionIndexes: [0, 3, 4, 8, 10] // 4 MCQs, 1 Coding (Two Sum)
-        },
-        {
-          title: `${prefix}Problem Solving & DSA Challenge`,
-          description: `Core algorithms evaluations on String manipulations and Dynamic programming (${prefix.trim()}).`,
-          durationMins: 60,
-          difficulty: "MEDIUM" as const,
-          passMark: 50,
-          status: "PUBLISHED" as const,
-          questionIndexes: [1, 2, 5, 7, 11, 14] // 4 MCQs, 2 Coding (String, Prime)
-        },
-        {
-          title: `${prefix}Advanced Systems Engineer Assessment`,
-          description: `Rigorous test covering OS semaphores, Database isolations, stacks, and stairs DP (${prefix.trim()}).`,
-          durationMins: 90,
-          difficulty: "HARD" as const,
-          passMark: 60,
-          status: "PUBLISHED" as const,
-          questionIndexes: [6, 9, 12, 13] // 2 MCQs, 2 Coding (Parentheses, Climbing Stairs)
-        }
-      ];
-
-      let dbTests: Array<{ id: string; title: string }> = [];
-      try {
-        dbTests = await testService.getAllTests();
-      } catch (e) {
-        addLog("⚠️ Failed to load existing assessments database.", "warning");
-      }
-      await delay(200);
-
-      for (const ta of testAssessments) {
-        try {
-          const createdTest = await testService.createTest({
-            title: ta.title,
-            description: ta.description,
-            durationMins: ta.durationMins,
-            difficulty: ta.difficulty,
-            passMark: ta.passMark,
-            status: ta.status,
-            instructions: { note: "Please remain in fullscreen mode and avoid tab switching." },
-            questions: [],
-            isActive: true
-          });
-          await delay(200);
-
-          testIds.push(createdTest.id);
-          addLog(`🏆 Assessment Created: "${ta.title}" [ID: ${createdTest.id}]`, "success");
-
-          // Associate questions to the test
-          addLog(`  🔗 Associating questions with "${ta.title}"...`, "info");
-          let orderIndex = 1;
-          for (const idx of ta.questionIndexes) {
-            const qId = questionIds[idx];
-            if (qId) {
-              try {
-                await testService.addQuestionToTest(
-                  createdTest.id,
-                  qId,
-                  orderIndex++,
-                  10, // Default marks
-                  120 // Default time limits
-                );
-              } catch (linkErr) {
-                // Link already exists
-              }
-              await delay(200);
-            }
-          }
-        } catch (e) {
-          const found = dbTests.find(t => t.title === ta.title);
-          if (found) {
-            testIds.push(found.id);
-            addLog(`⚠️ Assessment "${ta.title}" already exists. Reused ID: ${found.id}`, "warning");
-          } else {
-            addLog(`⚠️ Skipping assessment error for "${ta.title}". Automatically moving to next stage.`, "warning");
-          }
-        }
-        await delay(200);
-      }
-
-      updateStepStatus("tests", "completed");
-
-      // ----------------------------------------------------
-      // STEP 10: GENERATE TEST SCHEDULES
-      // ----------------------------------------------------
-      setCurrentStepIndex(9);
-      updateStepStatus("schedules", "running");
-      setProgress(90);
-      addLog("Generating Active Test Schedules (valid for 7 days)...", "info");
-
-      const startTime = new Date().toISOString();
-      const endTime = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
-
-      let dbSchedules: Array<{ id: string; testId: string }> = [];
-      try {
-        const schedRes = await apiClient.get("/test-schedules?size=1000");
-        dbSchedules = schedRes.data?.data?.content || schedRes.data?.data || schedRes.data || [];
-      } catch (e) {
-        addLog("⚠️ Failed to load existing test schedules.", "warning");
-      }
-      await delay(200);
-
-      for (const tId of testIds) {
-        // Reuse existing schedule if one already exists for this test
-        const existingSchedule = dbSchedules.find(s => s.testId === tId);
-        if (existingSchedule) {
-          scheduleIds.push(existingSchedule.id);
-          addLog(`⚠️ Schedule for Test ID ${tId} already active. Reusing ID: ${existingSchedule.id}`, "warning");
-        } else {
-          try {
-            const schedule = await testService.createTestSchedule({
-              testId: tId,
-              startTime: startTime,
-              endTime: endTime,
-              maxCandidates: 100
-            });
-            scheduleIds.push(schedule.id);
-            addLog(`📅 Schedule Activated: [ID: ${schedule.id}] for Test: ${tId}`, "success");
-          } catch (e) {
-            addLog(`⚠️ Skipping Schedule error for Test ID ${tId}. Automatically moving to next stage.`, "warning");
-          }
-        }
-        await delay(200);
-      }
-
-      updateStepStatus("schedules", "completed");
-
-      // ----------------------------------------------------
-      // STEP 11: INVITE CANDIDATES & EXTRACT TOKENS
-      // ----------------------------------------------------
-      setCurrentStepIndex(10);
-      updateStepStatus("invitations", "running");
-      setProgress(95);
-      addLog("Generating direct Candidate Invitations & copying links...", "info");
-
-      const newSeededCandidates: SeededCandidate[] = [];
-      const testNames = [
-        `${prefix}Full Stack Engineer Assessment`,
-        `${prefix}Problem Solving & DSA Challenge`,
-        `${prefix}Advanced Systems Engineer Assessment`
-      ];
-
-      // Pre-fetch candidate invitations to prevent duplicates
-      let existingInvs: Array<{ candidateId: string; scheduleId: string }> = [];
-      try {
-        const invCheckRes = await apiClient.get("/candidate-invitations?size=1000");
-        existingInvs = invCheckRes.data?.data?.content || invCheckRes.data?.data || invCheckRes.data || [];
-      } catch { /* ignore fallback */ }
-
-      // Mapped pool distributions
-      for (let i = 0; i < candidateIds.length; i++) {
-        const cId = candidateIds[i];
-        const cName = candidatesList[i]?.name || `Candidate ${i}`;
-        
-        let scheduleIdx = 0;
-        if (i >= 7 && i < 14) scheduleIdx = 1;
-        else if (i >= 14) scheduleIdx = 2;
-
-        const schedId = scheduleIds[scheduleIdx];
-        const tTitle = testNames[scheduleIdx];
-
-        if (schedId) {
-          const alreadyInvited = existingInvs.some(inv => inv.candidateId === cId && inv.scheduleId === schedId);
-          if (alreadyInvited) {
-            addLog(`⚠️ Candidate "${cName}" already invited to "${tTitle}". Skipping duplicate.`, "warning");
-          } else {
-            try {
-              await apiClient.post("/candidate-invitations", {
-                scheduleId: schedId,
-                candidateId: cId
-              });
-              addLog(`📨 Invited candidate "${cName}" to "${tTitle}"`, "info");
-            } catch {
-              addLog(`⚠️ Candidate "${cName}" is already invited to schedule. Proceeding...`, "warning");
-            }
-          }
-          await delay(200);
-        }
-      }
-
-      // Fetch all candidate-invitations to extract tokens
-      addLog("Retrieving token hashes to generate direct test access links...", "info");
-      let listInv: Array<{ id: string; candidateId: string; scheduleId: string; token: string }> = [];
-      try {
-        const invResponse = await apiClient.get("/candidate-invitations?size=100");
-        await delay(200);
-        const invData = invResponse.data?.data as { content?: Array<{ id: string; candidateId: string; scheduleId: string; token: string }> } | Array<{ id: string; candidateId: string; scheduleId: string; token: string }> | undefined;
-        if (Array.isArray(invData)) {
-          listInv = invData;
-        } else if (invData && typeof invData === "object" && "content" in invData && Array.isArray(invData.content)) {
-          listInv = invData.content;
-        } else {
-          listInv = [];
-        }
-      } catch (invGetError) {
-        addLog("⚠️ Failed to query invitation lists.", "warning");
-      }
-
-      candidatesList.forEach((cand, idx) => {
-        const cId = candidateIds[idx];
-        let scheduleIdx = 0;
-        if (idx >= 7 && idx < 14) scheduleIdx = 1;
-        else if (idx >= 14) scheduleIdx = 2;
-
-        const schedId = scheduleIds[scheduleIdx];
-        const tTitle = testNames[scheduleIdx];
-
-        const matchInv = listInv.find(inv => inv.candidateId === cId && inv.scheduleId === schedId);
-        if (matchInv && matchInv.token) {
-          const testLink = `${window.location.origin}/test/access/${matchInv.id}`;
-          newSeededCandidates.push({
-            name: cand.name,
-            email: cand.email,
-            token: matchInv.token,
-            testTitle: tTitle,
-            link: testLink
-          });
-        }
-      });
-
-      // Safe fallback if token endpoints aren't yielding direct hashes
-      if (newSeededCandidates.length === 0) {
-        addLog("⚠️ Sandbox link generation was limited due to inactive token response. Pre-generating safe bypass mock-access keys.", "warning");
-        candidatesList.slice(0, 5).forEach((cand, idx) => {
-          newSeededCandidates.push({
-            name: cand.name,
-            email: cand.email,
-            token: `demo-invite-token-${idx}`,
-            testTitle: testNames[0],
-            link: `${window.location.origin}/test/access/demo-invite-id-${idx}`
-          });
-        });
-      }
-
-      setSeededCandidates(newSeededCandidates);
-      addLog(`✨ Sandbox ready! Onboarded ${newSeededCandidates.length} clickable sandbox testing links.`, "success");
-      updateStepStatus("invitations", "completed");
-
-      // ----------------------------------------------------
-      // STEP 12: START CANDIDATE TEST SESSIONS
-      // ----------------------------------------------------
-      setCurrentStepIndex(11);
-      updateStepStatus("sessions", "running");
-      setProgress(98);
-      addLog("Starting Test Sessions for candidates to populate Reports & Proctoring Dashboards...", "info");
-
-      // Pre-fetch existing sessions to prevent redundant session starts
-      let existingSessionInvIds: string[] = [];
-      try {
-        const sessCheckRes = await apiClient.get("/test-sessions?size=1000");
-        const sessList = sessCheckRes.data?.data?.content || sessCheckRes.data?.data || sessCheckRes.data || [];
-        if (Array.isArray(sessList)) {
-          existingSessionInvIds = sessList.map((s: { invitationId?: string; invitation?: { id?: string } }) => s.invitationId || s.invitation?.id || "");
-        }
-      } catch { /* ignore fallback */ }
-
-      let sessionCount = 0;
-      for (const inv of listInv) {
-        if (existingSessionInvIds.includes(inv.id)) {
-          addLog(`⚠️ Session already active for invitation ${inv.id.substring(0, 8)}. Skipping duplicate.`, "warning");
-        } else {
-          try {
-            await apiClient.post("/test-sessions/start", {
-              invitationId: inv.id,
-              ipAddress: "127.0.0.1"
-            });
-            sessionCount++;
-            addLog(`🚀 Started test session for invitation ${inv.id.substring(0, 8)}...`, "info");
-          } catch (sessErr) {
-            // Session may already be started/active
-          }
-        }
-        await delay(100);
-      }
-      addLog(`✅ Verified/Initialized ${sessionCount} live candidate test sessions for Reports & Proctoring!`, "success");
-      updateStepStatus("sessions", "completed");
-
       // Complete Seeding
       setProgress(100);
       setIsSeedingCompleted(true);
-      addLog("🏁 BULK DATABASE SEEDING COMPLETED SUCCESSFULLY!", "success");
+      addLog("🏁 DATABASE SEEDING COMPLETED SUCCESSFULLY!", "success");
       addLog("🔑 SUPER ADMIN LOGIN:", "success");
       addLog(`   Email: ${seedEmail || "superadmin@gryphonacademy.co.in"}`, "info");
       addLog(`   Password: ${seedPassword || "password123"}`, "info");
-      addLog("🎉 Seeder has auto-configured authentication state. Click 'Go to Dashboard' to log in!", "success");
 
-      // Force save authenticated Super Admin state so React Auth Store and dashboard open instantly
       if (superadminToken) {
         const adminUserData = {
           id: "00000000-0000-0000-0000-000000000001",
@@ -1339,7 +837,7 @@ export default function SeedData() {
 
       toast({
         title: "Database Seeded!",
-        description: "Standard data successfully populated in bulk.",
+        description: "Standard Taxonomy, Candidate, 7 MCQ Types, and 3 Coding Questions successfully populated.",
       });
 
     } catch (error: unknown) {
@@ -1360,115 +858,6 @@ export default function SeedData() {
     } finally {
       setIsSeeding(false);
     }
-  };
-
-  // Standalone Purge / Reset Database Action with SuperAdmin Authentication
-  const handlePurgeDatabase = async () => {
-    if (isSeeding) return;
-    setIsSeeding(true);
-    addLog("🔐 Authenticating Super Admin to acquire authorization token for purge...", "info");
-    
-    let tokenToUse = localStorage.getItem("token") || "";
-
-    try {
-      // Step A: Authenticate to get valid JWT token
-      if (seedEmail && seedPassword) {
-        try {
-          const authData = await authService.login({
-            email: seedEmail,
-            password: seedPassword,
-          });
-          tokenToUse = authData.accessToken;
-          useAuthStore.getState().login(tokenToUse, authData.user);
-          addLog(`✅ Super Admin authentication successful (${seedEmail}). Token acquired!`, "success");
-        } catch (loginErr: unknown) {
-          const err = loginErr as { response?: { data?: { message?: string } }; message?: string };
-          addLog(`⚠️ Auth warning for ${seedEmail}: ${err.response?.data?.message || err.message}`, "warning");
-        }
-      }
-
-      // Fallback auth
-      if (!tokenToUse) {
-        try {
-          const authData = await authService.login({
-            email: "superadmin@gryphonacademy.co.in",
-            password: "password123",
-          });
-          tokenToUse = authData.accessToken;
-          useAuthStore.getState().login(tokenToUse, authData.user);
-          addLog("✅ Master Super Admin authenticated. Token acquired!", "success");
-        } catch {
-          addLog("⚠️ Using existing session token...", "info");
-        }
-      }
-
-      addLog("🧹 Purging active test sessions, candidate invitations & test schedules...", "warning");
-
-      // 1. Purge Test Sessions first
-      try {
-        const sessRes = await apiClient.get("/test-sessions?size=1000");
-        const sessList = sessRes.data?.data?.content || sessRes.data?.data || sessRes.data || [];
-        if (Array.isArray(sessList)) {
-          for (const sess of sessList) {
-            if (sess.id) {
-              try { await apiClient.delete(`/test-sessions/${sess.id}`); } catch { /* ignore */ }
-            }
-          }
-          addLog(`🧹 Purged ${sessList.length} test sessions.`, "info");
-        }
-      } catch {
-        // sessions endpoint query fallback
-      }
-
-      // 2. Purge Candidate Invitations
-      const invRes = await apiClient.get("/candidate-invitations?size=1000");
-      const invList = invRes.data?.data?.content || invRes.data?.data || invRes.data || [];
-      if (Array.isArray(invList)) {
-        for (const inv of invList) {
-          if (inv.id) {
-            try { await apiClient.delete(`/candidate-invitations/${inv.id}`); } catch { /* ignore */ }
-          }
-        }
-        addLog(`🧹 Successfully purged ${invList.length} candidate invitations.`, "success");
-      }
-
-      // 3. Purge Test Schedules
-      const schedRes = await apiClient.get("/test-schedules?size=1000");
-      const schedList = schedRes.data?.data?.content || schedRes.data?.data || schedRes.data || [];
-      if (Array.isArray(schedList)) {
-        for (const s of schedList) {
-          if (s.id) {
-            try { await apiClient.delete(`/test-schedules/${s.id}`); } catch { /* ignore */ }
-          }
-        }
-        addLog(`🧹 Successfully purged ${schedList.length} test schedules.`, "success");
-      }
-
-      toast({
-        title: "Seed Data Reset Complete",
-        description: "Authenticated & purged all test schedules and candidate invitations.",
-      });
-    } catch (e: unknown) {
-      const err = e as { message?: string };
-      addLog(`❌ Purge operation failed: ${err.message}`, "error");
-      toast({
-        title: "Purge Failed",
-        description: err.message || "Failed to purge database data.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsSeeding(false);
-    }
-  };
-
-  const copyToClipboard = (text: string, identifier: string) => {
-    navigator.clipboard.writeText(text);
-    setCopiedEmail(identifier);
-    toast({
-      title: "Copied!",
-      description: "Link copied to clipboard",
-    });
-    setTimeout(() => setCopiedEmail(null), 2000);
   };
 
   return (
@@ -1553,30 +942,6 @@ export default function SeedData() {
 
                 <div className="space-y-3 p-4 bg-slate-950/40 rounded-xl border border-slate-800/40">
                   <div className="flex items-center gap-2 text-xs font-semibold text-slate-400 uppercase tracking-wider">
-                    <Database className="w-4 h-4 text-accent" />
-                    <span>Select Seed Data Target Set</span>
-                  </div>
-                  <div className="space-y-1">
-                    <Label htmlFor="seed-dataset" className="text-slate-400 text-xs font-medium">
-                      Data Batch / Set Profile
-                    </Label>
-                    <select
-                      id="seed-dataset"
-                      value={dataSet}
-                      onChange={(e) => setDataSet(e.target.value as "A" | "B" | "C" | "D")}
-                      disabled={isSeeding}
-                      className="w-full h-9 bg-slate-950/80 border border-slate-800 rounded-md text-slate-200 text-xs px-3 focus:outline-none focus:ring-1 focus:ring-primary"
-                    >
-                      <option value="A">Set A — Baseline Engineer Cohort</option>
-                      <option value="B">Set B — Batch 2 Candidate Pool</option>
-                      <option value="C">Set C — Full-Stack Evaluation Set</option>
-                      <option value="D">Set D — Systems & Performance Cohort</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div className="space-y-3 p-4 bg-slate-950/40 rounded-xl border border-slate-800/40">
-                  <div className="flex items-center gap-2 text-xs font-semibold text-slate-400 uppercase tracking-wider">
                     <Lock className="w-4 h-4 text-primary" />
                     <span>System Credentials (to authenticate seeder)</span>
                   </div>
@@ -1631,17 +996,6 @@ export default function SeedData() {
                           Begin Bulk Seed
                         </>
                       )}
-                    </Button>
-
-                    <Button
-                      onClick={handlePurgeDatabase}
-                      disabled={isSeeding}
-                      variant="outline"
-                      size="sm"
-                      className="w-full border-rose-800/50 bg-rose-950/20 hover:bg-rose-950/40 text-rose-300 hover:text-rose-100 flex items-center justify-center gap-2"
-                    >
-                      <XCircle className="w-4 h-4 text-rose-400" />
-                      Purge Schedules & Invitations
                     </Button>
                   </div>
                 ) : (
@@ -1754,94 +1108,6 @@ export default function SeedData() {
                 </div>
               </CardContent>
             </Card>
-
-            {/* Seeded Candidate Assess Links */}
-            <AnimatePresence>
-              {seededCandidates.length > 0 && (
-                <motion.div
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -20 }}
-                  className="space-y-4"
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-1">
-                      <h2 className="text-xl font-bold flex items-center gap-2 text-white">
-                        <FileSpreadsheet className="w-5 h-5 text-accent" />
-                        Candidate Invitation Sandbox
-                      </h2>
-                      <p className="text-slate-400 text-xs md:text-sm">
-                        Instantly emulate candidate logins. Copy any assessment link to bypass manual registrations!
-                      </p>
-                    </div>
-                  </div>
-
-                  <Card className="border-slate-800 bg-slate-900/30 backdrop-blur-xl">
-                    <CardContent className="p-0">
-                      <div className="overflow-x-auto">
-                        <Table>
-                          <TableHeader className="bg-slate-950/40">
-                            <TableRow className="border-slate-800 hover:bg-transparent">
-                              <TableHead className="text-slate-400 font-semibold w-1/4">Candidate Details</TableHead>
-                              <TableHead className="text-slate-400 font-semibold w-1/3">Target Assessment</TableHead>
-                              <TableHead className="text-slate-400 font-semibold text-right">Quick Testing Actions</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {seededCandidates.map((cand) => (
-                              <TableRow key={cand.email} className="border-slate-800/60 hover:bg-slate-900/20">
-                                <TableCell className="py-3">
-                                  <div className="space-y-0.5">
-                                    <p className="font-semibold text-white text-sm">{cand.name}</p>
-                                    <p className="text-xs text-slate-500 font-mono">{cand.email}</p>
-                                  </div>
-                                </TableCell>
-                                <TableCell className="py-3">
-                                  <Badge className="bg-slate-950 text-accent border border-slate-800 font-medium text-xs">
-                                    {cand.testTitle}
-                                  </Badge>
-                                </TableCell>
-                                <TableCell className="py-3 text-right">
-                                  <div className="flex items-center justify-end gap-2">
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      onClick={() => copyToClipboard(cand.link, cand.email)}
-                                      className="h-8 px-2 bg-slate-950/60 hover:bg-slate-800 border border-slate-900 text-slate-400 hover:text-white"
-                                    >
-                                      {copiedEmail === cand.email ? (
-                                        <>
-                                          <Check className="w-3.5 h-3.5 mr-1 text-green-400" />
-                                          <span className="text-[11px]">Copied</span>
-                                        </>
-                                      ) : (
-                                        <>
-                                          <Copy className="w-3.5 h-3.5 mr-1" />
-                                          <span className="text-[11px]">Copy Link</span>
-                                        </>
-                                      )}
-                                    </Button>
-                                    <a
-                                      href={cand.link}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="inline-flex items-center justify-center rounded-md text-xs font-medium h-8 px-2.5 bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20 transition-colors"
-                                    >
-                                      <ExternalLink className="w-3.5 h-3.5 mr-1" />
-                                      Take Test
-                                    </a>
-                                  </div>
-                                </TableCell>
-                              </TableRow>
-                            ))}
-                          </TableBody>
-                        </Table>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </motion.div>
-              )}
-            </AnimatePresence>
 
           </div>
 
