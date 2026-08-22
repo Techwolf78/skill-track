@@ -307,6 +307,7 @@ function TestInterfaceContent({ testId, sessionId, navigate, toast }: { testId?:
   const [answers, setAnswers] = useState<Record<string, unknown>>({});
   const [flagged, setFlagged] = useState<Set<string>>(new Set());
   const [timeLeft, setTimeLeft] = useState(0);
+  const [isTimerInitialized, setIsTimerInitialized] = useState(false);
   const [showSubmitDialog, setShowSubmitDialog] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
@@ -668,8 +669,10 @@ useEffect(() => {
   useEffect(() => {
     if (session && session.remainingTimeSecs > 0) {
       setTimeLeft(session.remainingTimeSecs);
+      setIsTimerInitialized(true);
     } else if (test?.durationMins) {
       setTimeLeft(test.durationMins * 60);
+      setIsTimerInitialized(true);
     }
   }, [session, test]);
 
@@ -983,21 +986,21 @@ useEffect(() => {
 
   // Local countdown timer
   useEffect(() => {
-    if (timeLeft <= 0 || !sessionId) return;
+    if (!isTimerInitialized || timeLeft <= 0 || !sessionId) return;
     
     const timer = setInterval(() => {
       setTimeLeft((prev) => Math.max(0, prev - 1));
     }, 1000);
     
     return () => clearInterval(timer);
-  }, [timeLeft, sessionId]);
+  }, [isTimerInitialized, timeLeft, sessionId]);
 
   // Handle auto-submit when timer reaches 0
   useEffect(() => {
-    if (timeLeft === 0 && sessionId) {
+    if (isTimerInitialized && timeLeft === 0 && sessionId && !loading) {
       handleAutoSubmit();
     }
-  }, [timeLeft, sessionId, handleAutoSubmit]);
+  }, [isTimerInitialized, timeLeft, sessionId, loading, handleAutoSubmit]);
 
   // Periodic server timer synchronization to prevent clock tampering
   useEffect(() => {
@@ -2022,7 +2025,7 @@ useEffect(() => {
         </AlertDialogContent>
       </AlertDialog>
 
-      <CameraPreview position="bottom-right" size="small" showOnHover />
+      {config?.camera && <CameraPreview position="bottom-right" size="small" showOnHover />}
       <ViolationToast />
       </div>
     </div>

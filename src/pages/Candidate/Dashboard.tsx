@@ -502,8 +502,11 @@ export default function CandidateDashboard() {
                   <span className="font-semibold text-foreground">{gradedResults.length}</span>
                 </div>
               </div>
-              <Button variant="outline" size="sm" asChild className="w-full mt-2 text-xs border-primary/30 text-primary hover:bg-primary/10">
-                <Link to="/candidate/results">View Full Report →</Link>
+              <Button variant="outline" size="sm" asChild className="w-full mt-2 text-xs border-primary/30 text-primary hover:bg-primary/10 group">
+                <Link to="/candidate/results" className="inline-flex items-center justify-center gap-1.5">
+                  View Full Report
+                  <ArrowRight className="w-3.5 h-3.5 transition-transform duration-200 group-hover:translate-x-1" />
+                </Link>
               </Button>
             </CardContent>
           </Card>
