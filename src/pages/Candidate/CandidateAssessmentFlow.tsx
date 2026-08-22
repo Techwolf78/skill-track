@@ -86,22 +86,21 @@ export default function CandidateAssessmentFlow() {
 
   // Countdown timer effect
   useEffect(() => {
-    if (step !== "test") return;
+    if (step !== "test" || timeLeft <= 0) return;
     
     const interval = setInterval(() => {
-      setTimeLeft((prev) => {
-        if (prev <= 1) {
-          clearInterval(interval);
-          // Auto submit
-          setStep("result");
-          return 0;
-        }
-        return prev - 1;
-      });
+      setTimeLeft((prev) => Math.max(0, prev - 1));
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [step]);
+  }, [step, timeLeft]);
+
+  // Auto submit when timer reaches 0
+  useEffect(() => {
+    if (step === "test" && timeLeft === 0) {
+      setStep("result");
+    }
+  }, [step, timeLeft]);
 
   // Format seconds to HH:MM:SS
   const formatTime = (secs: number) => {

@@ -187,13 +187,7 @@ export function BulkUploadCandidates({ open, onOpenChange, onSuccess, isSuperAdm
     setError(null);
 
     const progressInterval = setInterval(() => {
-      setProgress(prev => {
-        if (prev >= 90) {
-          clearInterval(progressInterval);
-          return 90;
-        }
-        return prev + 10;
-      });
+      setProgress((prev) => (prev >= 90 ? 90 : prev + 10));
     }, 500);
 
     try {

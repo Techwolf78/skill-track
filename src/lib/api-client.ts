@@ -1,5 +1,14 @@
-import axios, { AxiosError, InternalAxiosRequestConfig } from "axios";
+import axios, { AxiosError } from "axios";
+
 import { toast } from "sonner";
+import {
+  generateIdempotencyKey,
+  createRequestFingerprint,
+  getActiveRequestLock,
+  setActiveRequestLock,
+  releaseActiveRequestLock,
+} from "./idempotency";
+
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "/api";
 
@@ -13,13 +22,26 @@ export const apiClient = axios.create({
   },
 });
 
-// ✅ Request Interceptor (safe typing)
+// ✅ Request Interceptor (Idempotency-Key injection + in-flight deduplication)
 apiClient.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem("token");
+    if (token) config.headers.set("Authorization", `Bearer ${token}`);
 
-    if (token) {
-      config.headers.set("Authorization", `Bearer ${token}`);
+    const method = (config.method || "GET").toUpperCase();
+    const isMutation = ["POST", "PUT", "PATCH", "DELETE"].includes(method);
+
+    if (isMutation) {
+      const existingKey =
+        config.headers.get("Idempotency-Key") ||
+        config.headers.get("X-Idempotency-Key");
+
+      const keyToUse = existingKey
+        ? String(existingKey)
+        : generateIdempotencyKey(`op_${method.toLowerCase()}`);
+
+      config.headers.set("Idempotency-Key", keyToUse);
+      config.headers.set("X-Idempotency-Key", keyToUse);
     }
 
     return config;
@@ -141,3 +163,33 @@ apiClient.interceptors.response.use(
     return Promise.reject(error);
   },
 );
+
+// ✅ Transport-level deduplication for concurrent identical mutations.
+// If an identical POST/PUT/PATCH/DELETE is already in-flight, callers get
+// the same Promise back instead of firing a duplicate HTTP request.
+// The lock auto-releases when the original request settles (success or error).
+const _post = apiClient.post.bind(apiClient);
+const _put = apiClient.put.bind(apiClient);
+const _patch = apiClient.patch.bind(apiClient);
+const _del = apiClient.delete.bind(apiClient);
+
+/* eslint-disable @typescript-eslint/no-explicit-any */
+function withDedup(method: string, fn: (...a: any[]) => Promise<any>) {
+  return (...args: any[]) => {
+    const url: string = args[0] ?? "";
+    // POST/PUT/PATCH pass data as arg[1]; DELETE has no data arg.
+    const data = method === "DELETE" ? undefined : args[1];
+    const fp = createRequestFingerprint(method, url, data);
+    const inflight = getActiveRequestLock(fp);
+    if (inflight) return inflight;
+    const promise = fn(...args).finally(() => releaseActiveRequestLock(fp));
+    setActiveRequestLock(fp, promise);
+    return promise;
+  };
+}
+/* eslint-enable @typescript-eslint/no-explicit-any */
+
+apiClient.post = withDedup("POST", _post) as typeof apiClient.post;
+apiClient.put = withDedup("PUT", _put) as typeof apiClient.put;
+apiClient.patch = withDedup("PATCH", _patch) as typeof apiClient.patch;
+apiClient.delete = withDedup("DELETE", _del) as typeof apiClient.delete;

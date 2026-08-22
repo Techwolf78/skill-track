@@ -1889,8 +1889,8 @@ To refer to the FAQ document, you can click on the HELP button which is present 
             (tq) => tq.questionId === questionId,
           );
           const enrichedQuestion = enrichedTQ?.question;
-          const correctOptions =
-            enrichedQuestion?.options || enrichedQuestion?.mcqOptions || [];
+          const correctOptions: Array<{ id?: string; text?: string; isCorrect?: boolean }> =
+            (enrichedQuestion?.options || enrichedQuestion?.mcqOptions || []) as Array<{ id?: string; text?: string; isCorrect?: boolean }>;
 
           // Calculate time spent telemetry
           const timeItem = timingsList.find(
@@ -2299,16 +2299,16 @@ To refer to the FAQ document, you can click on the HELP button which is present 
     setTimeout(() => setCopiedToken(null), 2000);
   };
 
-  const getInvitationForCandidate = (
-    candidateId: string,
-    scheduleId: string,
-  ) => {
-    return (
-      invitations.find(
-        (i) => i.candidateId === candidateId && i.scheduleId === scheduleId,
-      ) || null
-    );
-  };
+  const getInvitationForCandidate = useCallback(
+    (candidateId: string, scheduleId: string) => {
+      return (
+        invitations.find(
+          (i) => i.candidateId === candidateId && i.scheduleId === scheduleId,
+        ) || null
+      );
+    },
+    [invitations],
+  );
 
   const formatDateTime = (dateStr: string) => {
     return new Date(dateStr).toLocaleString();
@@ -2379,7 +2379,7 @@ To refer to the FAQ document, you can click on the HELP button which is present 
         (inviteTab === "invited" && !!invitation);
       return matchesSearch && matchesTab;
     });
-  }, [candidates, inviteSearchTerm, inviteTab, invitations, selectedSchedule, getInvitationForCandidate]);
+  }, [candidates, inviteSearchTerm, inviteTab, selectedSchedule, getInvitationForCandidate]);
 
   const inviteCounts = useMemo(() => {
     if (!selectedSchedule) {
