@@ -59,11 +59,7 @@ const TestResults = React.lazy(() => import("./pages/test/TestResults"));
 const CandidateDashboard = React.lazy(() => import("./pages/Candidate/Dashboard"));
 const MyAssessments = React.lazy(() => import("./pages/Candidate/MyAssessments"));
 const ResultsReports = React.lazy(() => import("./pages/Candidate/ResultsReports"));
-const Certificates = React.lazy(() => import("./pages/Candidate/Certificates"));
 const Profile = React.lazy(() => import("./pages/Candidate/Profile"));
-const Notifications = React.lazy(() => import("./pages/Candidate/Notifications"));
-const Support = React.lazy(() => import("./pages/Candidate/Support"));
-const CandidateSettings = React.lazy(() => import("./pages/Candidate/Settings"));
 const CandidateAssessmentFlow = React.lazy(() => import("./pages/Candidate/CandidateAssessmentFlow"));
 
 const queryClient = new QueryClient({
@@ -213,11 +209,7 @@ const App = () => (
                 <Route index element={<CandidateDashboard />} />
                 <Route path="assessments" element={<MyAssessments />} />
                 <Route path="results" element={<ResultsReports />} />
-                <Route path="certificates" element={<Certificates />} />
                 <Route path="profile" element={<Profile />} />
-                <Route path="notifications" element={<Notifications />} />
-                <Route path="support" element={<Support />} />
-                <Route path="settings" element={<CandidateSettings />} />
                 <Route path="flow" element={<CandidateAssessmentFlow />} />
               </Route>
 

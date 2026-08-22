@@ -75,7 +75,14 @@ export const authService = {
       "/auth/reset-password",
       request,
     );
-    return (response.data as any).data || response.data;
+    const authData = (response.data as any)?.data || response.data;
+    if (authData?.accessToken) {
+      localStorage.setItem("token", authData.accessToken);
+      if (authData.user) {
+        localStorage.setItem("user", JSON.stringify(authData.user));
+      }
+    }
+    return authData;
   },
 
   // Helper method to get user

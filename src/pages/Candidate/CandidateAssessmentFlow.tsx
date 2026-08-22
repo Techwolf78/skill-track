@@ -609,9 +609,9 @@ export default function CandidateAssessmentFlow() {
               </Button>
               <Button 
                 className="w-full sm:flex-1 bg-gradient-primary text-white hover:opacity-95 shadow-primary gap-1.5"
-                onClick={() => navigate("/candidate/certificates")}
+                onClick={() => navigate("/candidate/results")}
               >
-                <Award className="w-4 h-4" /> View Certificate
+                <Award className="w-4 h-4" /> View Results
               </Button>
             </CardFooter>
           </Card>

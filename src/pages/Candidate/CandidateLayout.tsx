@@ -5,14 +5,10 @@ import {
   LayoutDashboard,
   ClipboardList,
   BarChart3,
-  Award,
   User,
-  Bell,
-  HelpCircle,
-  Settings,
   LogOut,
-  ChevronLeft,
-  ChevronRight,
+  PanelLeftOpen,
+  PanelLeftClose,
   GraduationCap
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -23,11 +19,7 @@ const navItems = [
   { icon: LayoutDashboard, label: "Dashboard", path: "/candidate", end: true },
   { icon: ClipboardList, label: "My Assessments", path: "/candidate/assessments" },
   { icon: BarChart3, label: "Results & Reports", path: "/candidate/results" },
-  { icon: Award, label: "Certificates", path: "/candidate/certificates" },
   { icon: User, label: "Profile", path: "/candidate/profile" },
-  { icon: Bell, label: "Notifications", path: "/candidate/notifications" },
-  { icon: HelpCircle, label: "Support & FAQs", path: "/candidate/support" },
-  { icon: Settings, label: "Settings", path: "/candidate/settings" },
 ];
 
 export function CandidateLayout() {
@@ -43,14 +35,6 @@ export function CandidateLayout() {
     return item.end ? location.pathname === item.path : location.pathname.startsWith(item.path);
   };
 
-  // Read real user from localStorage (set on login)
-  const storedUser = (() => {
-    try { return JSON.parse(localStorage.getItem("user") || "{}"); } catch { return {}; }
-  })();
-  const candidateName: string = storedUser?.name || "Candidate";
-  const candidateEmail: string = storedUser?.email || "";
-  const candidateAvatar: string = candidateName.split(" ").map((n: string) => n[0]).join("").slice(0, 2).toUpperCase();
-
   return (
     <div className="flex min-h-screen bg-background">
       <aside
@@ -59,25 +43,39 @@ export function CandidateLayout() {
           collapsed ? "w-20" : "w-64"
         )}
       >
-        {/* Logo */}
-        <div className="flex items-center gap-3 px-6 py-6 border-b border-sidebar-border">
-          <div className="w-10 h-10 rounded-xl bg-gradient-primary flex items-center justify-center shadow-primary flex-shrink-0 animate-pulse">
-            <span className="text-xl font-bold text-primary-foreground">R</span>
-          </div>
-          {!collapsed && (
-            <div className="flex flex-col">
-              <span className="font-heading font-bold text-xl text-sidebar-foreground">
-                RxOne
-              </span>
-              <span className="text-[10px] text-primary font-semibold tracking-wider uppercase">
-                Candidate
-              </span>
-            </div>
+        {/* Logo / Header */}
+        <div className={cn(
+          "flex px-6 py-6 border-b border-sidebar-border",
+          collapsed ? "flex-col items-center gap-4" : "items-center justify-between"
+        )}>
+          {collapsed ? (
+            <span className="font-heading font-extrabold text-2xl text-sidebar-foreground select-none">
+              Rx
+            </span>
+          ) : (
+            <span className="font-heading font-extrabold text-2xl text-sidebar-foreground select-none">
+              RxOne
+            </span>
           )}
+          
+          {/* Toggle Button */}
+          <button
+            onClick={() => setCollapsed(!collapsed)}
+            className={cn(
+              "h-8 w-8 text-sidebar-foreground border border-sidebar-border rounded-md flex items-center justify-center hover:opacity-80 transition-opacity bg-transparent focus:outline-none",
+              collapsed ? "mt-1" : ""
+            )}
+          >
+            {collapsed ? (
+              <PanelLeftOpen className="w-4 h-4" />
+            ) : (
+              <PanelLeftClose className="w-4 h-4" />
+            )}
+          </button>
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 py-6 px-3 space-y-1 overflow-y-auto">
+        <nav className="flex-1 py-6 px-3 space-y-1 overflow-y-auto scrollbar-none">
           {navItems.map((item) => {
             const active = isItemActive(item);
             return (
@@ -98,21 +96,8 @@ export function CandidateLayout() {
           })}
         </nav>
 
-        {/* User profile section */}
-        {!collapsed && (
-          <div className="p-4 mx-3 mb-2 rounded-xl bg-sidebar-accent/50 border border-sidebar-border flex items-center gap-3">
-            <div className="w-9 h-9 rounded-full bg-gradient-accent flex items-center justify-center text-accent-foreground font-bold shadow-sm">
-              {candidateAvatar}
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-semibold text-sidebar-foreground truncate">{candidateName}</p>
-              <p className="text-xs text-sidebar-foreground/60 truncate">{candidateEmail}</p>
-            </div>
-          </div>
-        )}
-
         {/* Bottom actions */}
-        <div className="p-3 border-t border-sidebar-border space-y-2">
+        <div className="p-3 border-t border-sidebar-border">
           <Button
             variant="ghost"
             onClick={handleLogout}
@@ -123,14 +108,6 @@ export function CandidateLayout() {
           >
             <LogOut className="w-5 h-5" />
             {!collapsed ? <span className="ml-3 text-sm font-medium">Logout</span> : null}
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setCollapsed(!collapsed)}
-            className="w-full text-sidebar-foreground hover:bg-sidebar-accent"
-          >
-            {collapsed ? <ChevronRight className="w-5 h-5" /> : <ChevronLeft className="w-5 h-5" />}
           </Button>
         </div>
       </aside>

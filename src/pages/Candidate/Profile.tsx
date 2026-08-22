@@ -15,9 +15,14 @@ import {
   Trash2, 
   CheckCircle2, 
   Plus, 
-  X
+  X,
+  Lock,
+  Eye,
+  EyeOff,
+  Loader2
 } from "lucide-react";
 import { toast } from "sonner";
+import { authService } from "@/lib/auth-service";
 
 export default function Profile() {
   // Read real user from localStorage
@@ -51,6 +56,17 @@ export default function Profile() {
   const [resume, setResume] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
 
+  // Password reset state
+  const [showCurrent, setShowCurrent] = useState(false);
+  const [showNew, setShowNew] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
+  const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
+  const [passwordForm, setPasswordForm] = useState({
+    current: "",
+    newPass: "",
+    confirm: ""
+  });
+
   // Profile completion calculations
   const calculateCompletion = () => {
     let completed = 0;
@@ -71,6 +87,47 @@ export default function Profile() {
       description: "Your candidate profile information has been updated.",
       duration: 3000
     });
+  };
+
+  const handlePasswordChange = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!passwordForm.current) {
+      toast.error("Current password is required");
+      return;
+    }
+    if (!passwordForm.newPass || passwordForm.newPass.length < 8) {
+      toast.error("New password must be at least 8 characters long");
+      return;
+    }
+    if (passwordForm.newPass !== passwordForm.confirm) {
+      toast.error("Passwords do not match!", {
+        description: "New Password and Confirm Password fields must be identical."
+      });
+      return;
+    }
+    if (passwordForm.newPass === passwordForm.current) {
+      toast.error("New password cannot be the same as current password");
+      return;
+    }
+
+    try {
+      setIsUpdatingPassword(true);
+      await authService.resetPassword({
+        oldPassword: passwordForm.current,
+        newPassword: passwordForm.newPass
+      });
+      toast.success("Password updated successfully!", {
+        description: "Your password has been changed securely."
+      });
+      setPasswordForm({ current: "", newPass: "", confirm: "" });
+    } catch (err: any) {
+      const errMsg = err?.response?.data?.message || err?.message || "Failed to update password. Please check your current password.";
+      toast.error("Password Update Failed", {
+        description: errMsg
+      });
+    } finally {
+      setIsUpdatingPassword(false);
+    }
   };
 
   const handleAddSkill = (e: React.FormEvent) => {
@@ -225,6 +282,96 @@ export default function Profile() {
               Save Changes
             </Button>
           </form>
+
+          {/* Change Password Card */}
+          <Card className="border border-border/60">
+            <CardHeader>
+              <CardTitle className="text-lg font-bold font-heading flex items-center gap-2">
+                <Lock className="w-5 h-5 text-primary" /> Change Password
+              </CardTitle>
+              <CardDescription>Keep your account secure by rotating your password regularly.</CardDescription>
+            </CardHeader>
+            <form onSubmit={handlePasswordChange}>
+              <CardContent className="space-y-4">
+                <div className="space-y-1.5">
+                  <Label htmlFor="current">Current Password</Label>
+                  <div className="relative">
+                    <Input 
+                      id="current" 
+                      type={showCurrent ? "text" : "password"} 
+                      placeholder="Enter your current password"
+                      value={passwordForm.current}
+                      onChange={(e) => setPasswordForm({ ...passwordForm, current: e.target.value })}
+                      required
+                    />
+                    <button 
+                      type="button" 
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                      onClick={() => setShowCurrent(!showCurrent)}
+                    >
+                      {showCurrent ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="newPass">New Password</Label>
+                  <div className="relative">
+                    <Input 
+                      id="newPass" 
+                      type={showNew ? "text" : "password"} 
+                      placeholder="Minimum 8 characters"
+                      value={passwordForm.newPass}
+                      onChange={(e) => setPasswordForm({ ...passwordForm, newPass: e.target.value })}
+                      required
+                    />
+                    <button 
+                      type="button" 
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                      onClick={() => setShowNew(!showNew)}
+                    >
+                      {showNew ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="confirm">Confirm New Password</Label>
+                  <div className="relative">
+                    <Input 
+                      id="confirm" 
+                      type={showConfirm ? "text" : "password"} 
+                      placeholder="Re-enter your new password"
+                      value={passwordForm.confirm}
+                      onChange={(e) => setPasswordForm({ ...passwordForm, confirm: e.target.value })}
+                      className="pr-10"
+                      required
+                    />
+                    <button 
+                      type="button" 
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                      onClick={() => setShowConfirm(!showConfirm)}
+                    >
+                      {showConfirm ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
+              </CardContent>
+              <CardFooter className="border-t border-border/40 p-6 flex justify-end">
+                <Button 
+                  type="submit" 
+                  disabled={isUpdatingPassword}
+                  className="bg-gradient-primary text-white shadow-primary"
+                >
+                  {isUpdatingPassword ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" /> Updating...
+                    </>
+                  ) : (
+                    "Update Password"
+                  )}
+                </Button>
+              </CardFooter>
+            </form>
+          </Card>
         </div>
 
         {/* Sidebar details (Resume & Skills) */}
