@@ -3,7 +3,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AdminLayout } from "./components/layout/AdminLayout";
 import { AssessmentsLayout } from "./components/layout/AssessmentsLayout";
 import { AuthProvider } from "./lib/auth-context";
@@ -50,6 +50,12 @@ const AdminTestCreate = React.lazy(() => import("./pages/Admin/TestCreate"));
 const AdminTestsEdit = React.lazy(() => import("./pages/Admin/TestsEdit"));
 const AdminTestDetails = React.lazy(() => import("./pages/Admin/TestDetails"));
 const AdminProfile = React.lazy(() => import("./pages/Admin/Profile"));
+
+// New-Admin pages
+const NewAdminLayout = React.lazy(() => import("./pages/New-Admin/NewAdminLayout"));
+const NewAdminTests = React.lazy(() => import("./pages/New-Admin/NewAdminTests"));
+const NewAdminHome = React.lazy(() => import("./pages/New-Admin/NewAdminHome"));
+const NewAdminLibrary = React.lazy(() => import("./pages/New-Admin/NewAdminLibrary"));
 
 // Test Taking
 const TestInterface = React.lazy(() => import("./pages/test/TestInterface"));
@@ -211,6 +217,14 @@ const App = () => (
                 <Route path="results" element={<ResultsReports />} />
                 <Route path="profile" element={<Profile />} />
                 <Route path="flow" element={<CandidateAssessmentFlow />} />
+              </Route>
+
+              {/* New-Admin Routes */}
+              <Route path="/new-admin" element={<NewAdminLayout />}>
+                <Route index element={<Navigate to="/new-admin/home" replace />} />
+                <Route path="home" element={<NewAdminHome />} />
+                <Route path="tests" element={<NewAdminTests />} />
+                <Route path="library" element={<NewAdminLibrary />} />
               </Route>
 
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

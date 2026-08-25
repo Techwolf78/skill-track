@@ -1,0 +1,202 @@
+const XLSX = require('xlsx');
+const path = require('path');
+
+const questions = [
+  {
+    Title: "Time Complexity of Binary Search",
+    Type: "MCQ",
+    Prompt: "What is the worst-case time complexity of binary search on a sorted array of size N?",
+    Subject: "Computer Science",
+    Topic: "Algorithms",
+    Subtopic: "Searching",
+    Difficulty: "Easy",
+    Marks: 2,
+    "Option 1": "O(1)",
+    "Option 2": "O(log N)",
+    "Option 3": "O(N)",
+    "Option 4": "O(N log N)",
+    "Correct Option": "2",
+    Tags: "algorithms, searching, complexity, dsa",
+    "Avg Time (s)": 45
+  },
+  {
+    Title: "Primary Key Constraints in SQL",
+    Type: "MCQ",
+    Prompt: "Which of the following is true about a Primary Key constraint in a relational database?",
+    Subject: "Computer Science",
+    Topic: "Databases",
+    Subtopic: "SQL",
+    Difficulty: "Easy",
+    Marks: 2,
+    "Option 1": "It allows multiple NULL values",
+    "Option 2": "A table can have multiple Primary Keys",
+    "Option 3": "It uniquely identifies each row and cannot contain NULL values",
+    "Option 4": "It automatically creates a non-clustered index only",
+    "Correct Option": "3",
+    Tags: "sql, dbms, database, constraints",
+    "Avg Time (s)": 60
+  },
+  {
+    Title: "Java Garbage Collection Mechanism",
+    Type: "MCQ",
+    Prompt: "Which JVM memory area is primarily responsible for storing object instances that are subject to garbage collection?",
+    Subject: "Computer Science",
+    Topic: "Java",
+    Subtopic: "JVM Architecture",
+    Difficulty: "Medium",
+    Marks: 3,
+    "Option 1": "Method Area",
+    "Option 2": "JVM Stack",
+    "Option 3": "Heap Memory",
+    "Option 4": "Program Counter Register",
+    "Correct Option": "3",
+    Tags: "java, jvm, memory, garbage-collection",
+    "Avg Time (s)": 75
+  },
+  {
+    Title: "TCP vs UDP Protocol Features",
+    Type: "MCQ",
+    Prompt: "Which protocol is connection-oriented, provides guaranteed in-order delivery, and includes error-checking with congestion control?",
+    Subject: "Computer Science",
+    Topic: "Networking",
+    Subtopic: "Transport Layer",
+    Difficulty: "Easy",
+    Marks: 2,
+    "Option 1": "UDP",
+    "Option 2": "TCP",
+    "Option 3": "ICMP",
+    "Option 4": "IP",
+    "Correct Option": "2",
+    Tags: "networking, tcp, protocols, transport-layer",
+    "Avg Time (s)": 45
+  },
+  {
+    Title: "RESTful HTTP Status Codes for Resource Creation",
+    Type: "MCQ",
+    Prompt: "Which standard HTTP status code should be returned by a REST API after successfully creating a new resource via a POST request?",
+    Subject: "Computer Science",
+    Topic: "Web Development",
+    Subtopic: "REST APIs",
+    Difficulty: "Easy",
+    Marks: 2,
+    "Option 1": "200 OK",
+    "Option 2": "201 Created",
+    "Option 3": "204 No Content",
+    "Option 4": "202 Accepted",
+    "Correct Option": "2",
+    Tags: "rest, http, api, web-development",
+    "Avg Time (s)": 45
+  },
+  {
+    Title: "React Hook Lifecycle Dependencies",
+    Type: "MCQ",
+    Prompt: "In React, when does the cleanup function returned by useEffect execute?",
+    Subject: "Computer Science",
+    Topic: "React",
+    Subtopic: "Hooks",
+    Difficulty: "Medium",
+    Marks: 3,
+    "Option 1": "Only when the browser window closes",
+    "Option 2": "Before the component re-renders with new dependencies and when unmounting",
+    "Option 3": "Immediately before every setState call",
+    "Option 4": "Only on initial component mount",
+    "Correct Option": "2",
+    Tags: "react, hooks, frontend, lifecycle",
+    "Avg Time (s)": 90
+  },
+  {
+    Title: "Git Branching and Commit Merge Strategies",
+    Type: "MCQ",
+    Prompt: "What does the command 'git rebase main' do when executed on a feature branch?",
+    Subject: "Computer Science",
+    Topic: "Version Control",
+    Subtopic: "Git",
+    Difficulty: "Medium",
+    Marks: 3,
+    "Option 1": "Deletes the feature branch and switches to main",
+    "Option 2": "Replays commits of the feature branch on top of the latest commit of main",
+    "Option 3": "Creates a three-way merge commit between main and feature",
+    "Option 4": "Discards uncommitted changes on the feature branch",
+    "Correct Option": "2",
+    Tags: "git, version-control, devops",
+    "Avg Time (s)": 60
+  },
+  {
+    Title: "Deadlock Prevention in Operating Systems",
+    Type: "MCQ",
+    Prompt: "Which of the following conditions is NOT one of Coffman's four necessary conditions for a deadlock to occur?",
+    Subject: "Computer Science",
+    Topic: "Operating Systems",
+    Subtopic: "Concurrency",
+    Difficulty: "Hard",
+    Marks: 4,
+    "Option 1": "Mutual Exclusion",
+    "Option 2": "Hold and Wait",
+    "Option 3": "Preemption Allowed",
+    "Option 4": "Circular Wait",
+    "Correct Option": "3",
+    Tags: "os, deadlock, concurrency, operating-systems",
+    "Avg Time (s)": 90
+  },
+  {
+    Title: "Docker Container Isolation Mechanism",
+    Type: "MCQ",
+    Prompt: "Which Linux kernel feature does Docker utilize to isolate process resources (such as CPU, Memory, and Disk I/O limits)?",
+    Subject: "Computer Science",
+    Topic: "DevOps",
+    Subtopic: "Containers",
+    Difficulty: "Medium",
+    Marks: 3,
+    "Option 1": "Namespaces",
+    "Option 2": "Control Groups (cgroups)",
+    "Option 3": "Chroot Jails",
+    "Option 4": "AppArmor",
+    "Correct Option": "2",
+    Tags: "docker, devops, containers, linux",
+    "Avg Time (s)": 75
+  },
+  {
+    Title: "Solid Principles - Dependency Inversion",
+    Type: "MCQ",
+    Prompt: "According to the Dependency Inversion Principle (DIP) in SOLID design principles, high-level modules should depend upon:",
+    Subject: "Computer Science",
+    Topic: "Software Engineering",
+    Subtopic: "Design Patterns",
+    Difficulty: "Medium",
+    Marks: 3,
+    "Option 1": "Low-level concrete implementation classes",
+    "Option 2": "Abstractions or Interfaces",
+    "Option 3": "Static singleton helper instances",
+    "Option 4": "Database access objects directly",
+    "Correct Option": "2",
+    Tags: "solid, software-engineering, architecture, oop",
+    "Avg Time (s)": 60
+  }
+];
+
+const targetPath = path.resolve(__dirname, '../public/mcq_questions_sample.xlsx');
+
+const ws = XLSX.utils.json_to_sheet(questions);
+ws['!cols'] = [
+  { wch: 35 },
+  { wch: 8 },
+  { wch: 60 },
+  { wch: 20 },
+  { wch: 18 },
+  { wch: 18 },
+  { wch: 12 },
+  { wch: 8 },
+  { wch: 30 },
+  { wch: 30 },
+  { wch: 30 },
+  { wch: 30 },
+  { wch: 15 },
+  { wch: 35 },
+  { wch: 12 }
+];
+
+const wb = XLSX.utils.book_new();
+XLSX.utils.book_append_sheet(wb, ws, "MCQ Questions");
+
+XLSX.writeFile(wb, targetPath);
+console.log('Successfully generated MCQ Excel file at:', targetPath);
