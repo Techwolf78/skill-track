@@ -141,6 +141,7 @@ export interface CreateQuestionRequest {
   mcqOptions?: McqOption[];
   shuffleOptions?: boolean;
   multipleCorrect?: boolean;
+  imageUrl?: string;
   // Assertion-Reason specific
   assertion?: string;
   reason?: string;
@@ -148,6 +149,8 @@ export interface CreateQuestionRequest {
   correctAnswer?: string;
   // Coding specific
   codeTemplate?: Record<string, CodeTemplateEntry>;
+  signatureMetadata?: SignatureMetadata;
+  languageTemplates?: LanguageTemplates;
   examples?: Array<{ input: string; output: string; explanation?: string }>;
   visibility?: "PUBLIC" | "ORG_OWNED";
   // Extended Enterprise Metadata

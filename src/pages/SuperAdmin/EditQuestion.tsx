@@ -42,6 +42,10 @@ import {
   Shield,
   Terminal,
   FolderTree,
+  ChevronLeft,
+  ChevronRight,
+  EyeOff,
+  LayoutGrid,
 } from "lucide-react";
 import {
   testService,
@@ -58,12 +62,12 @@ import {
 import { useAuth } from "@/lib/auth-context";
 import { authService } from "@/lib/auth-service";
 import { ROLES } from "@/lib/roles";
-import { 
-  SignatureMetadata, 
-  SignatureParameter, 
-  LanguageTemplates, 
-  mapFrontendToBackendLang, 
-  mapBackendToFrontendLang 
+import {
+  SignatureMetadata,
+  SignatureParameter,
+  LanguageTemplates,
+  mapFrontendToBackendLang,
+  mapBackendToFrontendLang,
 } from "../../types/question";
 import { useToast } from "@/hooks/use-toast";
 import QuickManageSubjects from "@/components/QuickManageSubjects";
@@ -269,21 +273,34 @@ export default function EditQuestion() {
   const [codeTemplate, setCodeTemplate] =
     useState<CodeTemplate>(defaultCodeTemplate);
   const [activeLanguageTab, setActiveLanguageTab] = useState<string>("python3");
+  const [activeTestCaseIndex, setActiveTestCaseIndex] = useState<number>(0);
+  const [testCaseViewMode, setTestCaseViewMode] = useState<"carousel" | "grid">(
+    "carousel",
+  );
 
   const [signature, setSignature] = useState<SignatureMetadata>({
     method_name: "twoSum",
-    params: [{ name: "nums", type: "list[int]" }, { name: "target", type: "int" }],
-    return_type: "list[int]"
+    params: [
+      { name: "nums", type: "list[int]" },
+      { name: "target", type: "int" },
+    ],
+    return_type: "list[int]",
   });
 
-  const [languageTemplates, setLanguageTemplates] = useState<LanguageTemplates>({
-    python3: { template: "", driver: "" },
-    javascript: { template: "", driver: "" },
-    java: { template: "", driver: "" },
-    cpp: { template: "", driver: "" }
-  });
+  const [languageTemplates, setLanguageTemplates] = useState<LanguageTemplates>(
+    {
+      python3: { template: "", driver: "" },
+      javascript: { template: "", driver: "" },
+      java: { template: "", driver: "" },
+      cpp: { template: "", driver: "" },
+    },
+  );
 
-  const handleParamChange = (index: number, field: keyof SignatureParameter, value: string) => {
+  const handleParamChange = (
+    index: number,
+    field: keyof SignatureParameter,
+    value: string,
+  ) => {
     const paramsList = signature.params || [];
     const updatedParams = [...paramsList];
     updatedParams[index] = { ...updatedParams[index], [field]: value };
@@ -294,7 +311,10 @@ export default function EditQuestion() {
     const paramsList = signature.params || [];
     setSignature({
       ...signature,
-      params: [...paramsList, { name: `param${paramsList.length + 1}`, type: "int" }]
+      params: [
+        ...paramsList,
+        { name: `param${paramsList.length + 1}`, type: "int" },
+      ],
     });
   };
 
@@ -302,7 +322,7 @@ export default function EditQuestion() {
     const paramsList = signature.params || [];
     setSignature({
       ...signature,
-      params: paramsList.filter((_, i) => i !== index)
+      params: paramsList.filter((_, i) => i !== index),
     });
   };
 
@@ -313,22 +333,29 @@ export default function EditQuestion() {
         python3: { template: "", driver: "" },
         javascript: { template: "", driver: "" },
         java: { template: "", driver: "" },
-        cpp: { template: "", driver: "" }
+        cpp: { template: "", driver: "" },
       };
       Object.entries(generated).forEach(([lang, data]) => {
         const frontendLang = mapBackendToFrontendLang(lang);
-        lTemplates[frontendLang] = data as any;
+        const entry = data as { template?: string; driver?: string };
+        lTemplates[frontendLang] = {
+          template: entry.template || "",
+          driver: entry.driver || "",
+        };
       });
       setLanguageTemplates(lTemplates);
       toast({
         title: "Success",
-        description: "Boilerplate templates and drivers generated successfully.",
+        description:
+          "Boilerplate templates and drivers generated successfully.",
       });
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const errorObj = err as { message?: string };
       toast({
         title: "Codegen Failed",
-        description: err.message || "Failed to auto-generate code templates.",
-        variant: "destructive"
+        description:
+          errorObj.message || "Failed to auto-generate code templates.",
+        variant: "destructive",
       });
     }
   };
@@ -342,9 +369,20 @@ export default function EditQuestion() {
   const [testCases, setTestCases] = useState<TestCaseForm[]>([]);
 
   // Extended Enterprise Metadata States
-  const [domain, setDomain] = useState<"ENGINEERING" | "BUSINESS" | "APTITUDE" | "CORPORATE" | "VERBAL_ABILITY" | "">("");
-  const [cognitiveLevel, setCognitiveLevel] = useState<"REMEMBER" | "UNDERSTAND" | "APPLY" | "ANALYZE" | "EVALUATE" | "CREATE" | "">("");
-  const [status, setStatus] = useState<"ACTIVE" | "UNDER_REVIEW" | "QUARANTINED">("ACTIVE");
+  const [domain, setDomain] = useState<
+    | "ENGINEERING"
+    | "BUSINESS"
+    | "APTITUDE"
+    | "CORPORATE"
+    | "VERBAL_ABILITY"
+    | ""
+  >("");
+  const [cognitiveLevel, setCognitiveLevel] = useState<
+    "REMEMBER" | "UNDERSTAND" | "APPLY" | "ANALYZE" | "EVALUATE" | "CREATE" | ""
+  >("");
+  const [status, setStatus] = useState<
+    "ACTIVE" | "UNDER_REVIEW" | "QUARANTINED"
+  >("ACTIVE");
   const [pValue, setPValue] = useState<string>("");
   const [discriminationIndex, setDiscriminationIndex] = useState<string>("");
   const [avgTimeSeconds, setAvgTimeSeconds] = useState<string>("");
@@ -385,14 +423,28 @@ export default function EditQuestion() {
       if (questionData.visibility) {
         setVisibility(questionData.visibility as "PUBLIC" | "ORG_OWNED");
       }
-      
+
       // Populate Enterprise Taxonomy & Calibration
       setDomain(questionData.domain || "");
       setCognitiveLevel(questionData.cognitiveLevel || "");
       setStatus(questionData.status || "ACTIVE");
-      setPValue(questionData.p_value !== undefined && questionData.p_value !== null ? questionData.p_value.toString() : "");
-      setDiscriminationIndex(questionData.discrimination_index !== undefined && questionData.discrimination_index !== null ? questionData.discrimination_index.toString() : "");
-      setAvgTimeSeconds(questionData.avg_time_seconds !== undefined && questionData.avg_time_seconds !== null ? questionData.avg_time_seconds.toString() : "");
+      setPValue(
+        questionData.p_value !== undefined && questionData.p_value !== null
+          ? questionData.p_value.toString()
+          : "",
+      );
+      setDiscriminationIndex(
+        questionData.discrimination_index !== undefined &&
+          questionData.discrimination_index !== null
+          ? questionData.discrimination_index.toString()
+          : "",
+      );
+      setAvgTimeSeconds(
+        questionData.avg_time_seconds !== undefined &&
+          questionData.avg_time_seconds !== null
+          ? questionData.avg_time_seconds.toString()
+          : "",
+      );
 
       const currentUser = authService.getCurrentUser();
       const userIsSuperAdmin = currentUser?.role === "SUPERADMIN";
@@ -460,12 +512,18 @@ export default function EditQuestion() {
             python3: { template: "", driver: "" },
             javascript: { template: "", driver: "" },
             java: { template: "", driver: "" },
-            cpp: { template: "", driver: "" }
+            cpp: { template: "", driver: "" },
           };
-          Object.entries(questionData.languageTemplates).forEach(([lang, data]) => {
-            const frontendLang = mapBackendToFrontendLang(lang);
-            lTemplates[frontendLang] = data as any;
-          });
+          Object.entries(questionData.languageTemplates).forEach(
+            ([lang, data]) => {
+              const frontendLang = mapBackendToFrontendLang(lang);
+              const entry = data as { template?: string; driver?: string };
+              lTemplates[frontendLang] = {
+                template: entry.template || "",
+                driver: entry.driver || "",
+              };
+            },
+          );
           setLanguageTemplates(lTemplates);
         }
       }
@@ -977,7 +1035,7 @@ export default function EditQuestion() {
 
     setSaving(true);
     try {
-      const questionData: any = {
+      const questionData: Record<string, any> = {
         questionType: questionType,
         prompt: prompt,
         subject_id: selectedSubject,
@@ -1062,14 +1120,17 @@ export default function EditQuestion() {
 
         // Populate new signature & templates structures
         questionData.signatureMetadata = signature;
-        
-        const backendTemplates: Record<string, { template: string; driver: string }> = {};
+
+        const backendTemplates: Record<
+          string,
+          { template: string; driver: string }
+        > = {};
         Object.entries(languageTemplates).forEach(([lang, data]) => {
           const backendLang = mapFrontendToBackendLang(lang);
           if (data.template?.trim() || data.driver?.trim()) {
             backendTemplates[backendLang] = {
               template: data.template || "",
-              driver: data.driver || ""
+              driver: data.driver || "",
             };
           }
         });
@@ -1348,11 +1409,7 @@ export default function EditQuestion() {
   return (
     <div className="p-8 space-y-6 animate-fade-in">
       <div className="flex items-center gap-4">
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => navigate(backRoute)}
-        >
+        <Button variant="ghost" size="icon" onClick={() => navigate(backRoute)}>
           <ArrowLeft className="w-5 h-5" />
         </Button>
         <div>
@@ -1807,31 +1864,71 @@ export default function EditQuestion() {
             <CardHeader>
               <CardTitle>Enterprise Taxonomy & Calibration</CardTitle>
               <CardDescription>
-                Configure enterprise domain categorization, cognitive levels, and psychometric metrics.
+                Configure enterprise domain categorization, cognitive levels,
+                and psychometric metrics.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="space-y-2">
                   <Label>Domain (Stream)</Label>
-                  <Select value={domain || "none"} onValueChange={(val) => setDomain(val === "none" ? "" : (val as "ENGINEERING" | "BUSINESS" | "APTITUDE" | "CORPORATE" | "VERBAL_ABILITY" | ""))}>
+                  <Select
+                    value={domain || "none"}
+                    onValueChange={(val) =>
+                      setDomain(
+                        val === "none"
+                          ? ""
+                          : (val as
+                              | "ENGINEERING"
+                              | "BUSINESS"
+                              | "APTITUDE"
+                              | "CORPORATE"
+                              | "VERBAL_ABILITY"
+                              | ""),
+                      )
+                    }
+                  >
                     <SelectTrigger>
                       <SelectValue placeholder="Select domain" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="none">None / Engineering Default</SelectItem>
-                      <SelectItem value="ENGINEERING">Engineering (CS/IT)</SelectItem>
-                      <SelectItem value="BUSINESS">MBA / BBA (Business)</SelectItem>
+                      <SelectItem value="none">
+                        None / Engineering Default
+                      </SelectItem>
+                      <SelectItem value="ENGINEERING">
+                        Engineering (CS/IT)
+                      </SelectItem>
+                      <SelectItem value="BUSINESS">
+                        MBA / BBA (Business)
+                      </SelectItem>
                       <SelectItem value="APTITUDE">Aptitude & Core</SelectItem>
                       <SelectItem value="CORPORATE">Corporate SJT</SelectItem>
-                      <SelectItem value="VERBAL_ABILITY">Verbal Ability & Communication</SelectItem>
+                      <SelectItem value="VERBAL_ABILITY">
+                        Verbal Ability & Communication
+                      </SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
 
                 <div className="space-y-2">
                   <Label>Cognitive Level (Bloom's)</Label>
-                  <Select value={cognitiveLevel || "none"} onValueChange={(val) => setCognitiveLevel(val === "none" ? "" : (val as "REMEMBER" | "UNDERSTAND" | "APPLY" | "ANALYZE" | "EVALUATE" | "CREATE" | ""))}>
+                  <Select
+                    value={cognitiveLevel || "none"}
+                    onValueChange={(val) =>
+                      setCognitiveLevel(
+                        val === "none"
+                          ? ""
+                          : (val as
+                              | "REMEMBER"
+                              | "UNDERSTAND"
+                              | "APPLY"
+                              | "ANALYZE"
+                              | "EVALUATE"
+                              | "CREATE"
+                              | ""),
+                      )
+                    }
+                  >
                     <SelectTrigger>
                       <SelectValue placeholder="Select cognitive level" />
                     </SelectTrigger>
@@ -1849,7 +1946,14 @@ export default function EditQuestion() {
 
                 <div className="space-y-2">
                   <Label>Status</Label>
-                  <Select value={status} onValueChange={(val) => setStatus(val as "ACTIVE" | "UNDER_REVIEW" | "QUARANTINED")}>
+                  <Select
+                    value={status}
+                    onValueChange={(val) =>
+                      setStatus(
+                        val as "ACTIVE" | "UNDER_REVIEW" | "QUARANTINED",
+                      )
+                    }
+                  >
                     <SelectTrigger>
                       <SelectValue placeholder="Select status" />
                     </SelectTrigger>
@@ -1874,7 +1978,9 @@ export default function EditQuestion() {
                     onChange={(e) => setPValue(e.target.value)}
                     placeholder="e.g., 0.42"
                   />
-                  <p className="text-[10px] text-muted-foreground font-normal">Proportion of correct solves (0.0 to 1.0)</p>
+                  <p className="text-[10px] text-muted-foreground font-normal">
+                    Proportion of correct solves (0.0 to 1.0)
+                  </p>
                 </div>
 
                 <div className="space-y-2">
@@ -1888,7 +1994,9 @@ export default function EditQuestion() {
                     onChange={(e) => setDiscriminationIndex(e.target.value)}
                     placeholder="e.g., 0.37"
                   />
-                  <p className="text-[10px] text-muted-foreground font-normal">Distinguishing power (-1.0 to 1.0)</p>
+                  <p className="text-[10px] text-muted-foreground font-normal">
+                    Distinguishing power (-1.0 to 1.0)
+                  </p>
                 </div>
 
                 <div className="space-y-2">
@@ -1900,7 +2008,9 @@ export default function EditQuestion() {
                     onChange={(e) => setAvgTimeSeconds(e.target.value)}
                     placeholder="e.g., 162"
                   />
-                  <p className="text-[10px] text-muted-foreground font-normal">Average execution time in seconds</p>
+                  <p className="text-[10px] text-muted-foreground font-normal">
+                    Average execution time in seconds
+                  </p>
                 </div>
               </div>
             </CardContent>
@@ -1929,7 +2039,8 @@ export default function EditQuestion() {
               <CardHeader>
                 <CardTitle>Method Signature Configuration</CardTitle>
                 <CardDescription>
-                  Configure the method signature metadata to enable automatic template generation
+                  Configure the method signature metadata to enable automatic
+                  template generation
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -1938,7 +2049,12 @@ export default function EditQuestion() {
                     <Label>Method Name</Label>
                     <Input
                       value={signature.method_name}
-                      onChange={(e) => setSignature({ ...signature, method_name: e.target.value })}
+                      onChange={(e) =>
+                        setSignature({
+                          ...signature,
+                          method_name: e.target.value,
+                        })
+                      }
                       placeholder="e.g., twoSum"
                     />
                   </div>
@@ -1946,7 +2062,12 @@ export default function EditQuestion() {
                     <Label>Return Type</Label>
                     <Input
                       value={signature.return_type}
-                      onChange={(e) => setSignature({ ...signature, return_type: e.target.value })}
+                      onChange={(e) =>
+                        setSignature({
+                          ...signature,
+                          return_type: e.target.value,
+                        })
+                      }
                       placeholder="e.g., list[int]"
                     />
                   </div>
@@ -1955,22 +2076,31 @@ export default function EditQuestion() {
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <Label>Parameters</Label>
-                    <Button type="button" variant="outline" size="sm" onClick={addParameter}>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={addParameter}
+                    >
                       <Plus className="w-3 h-3 mr-1" /> Add Parameter
                     </Button>
                   </div>
-                  
+
                   {(signature?.params || []).map((param, index) => (
                     <div key={index} className="flex gap-2 items-center">
                       <Input
                         value={param.name}
-                        onChange={(e) => handleParamChange(index, "name", e.target.value)}
+                        onChange={(e) =>
+                          handleParamChange(index, "name", e.target.value)
+                        }
                         placeholder="Parameter Name (e.g. nums)"
                         className="flex-1"
                       />
                       <Input
                         value={param.type}
-                        onChange={(e) => handleParamChange(index, "type", e.target.value)}
+                        onChange={(e) =>
+                          handleParamChange(index, "type", e.target.value)
+                        }
                         placeholder="Parameter Type (e.g. list[int])"
                         className="flex-1"
                       />
@@ -2007,7 +2137,8 @@ export default function EditQuestion() {
               <CardHeader>
                 <CardTitle>Code Templates & Drivers</CardTitle>
                 <CardDescription>
-                  Set starter code templates (candidate-facing) and execution drivers (hidden) for different programming languages
+                  Set starter code templates (candidate-facing) and execution
+                  drivers (hidden) for different programming languages
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -2023,10 +2154,28 @@ export default function EditQuestion() {
                   </TabsList>
 
                   {["python3", "javascript", "java", "cpp"].map((langKey) => {
-                    const langLabel = langKey === "python3" ? "Python 3" : langKey === "javascript" ? "JavaScript" : langKey === "java" ? "Java" : "C++";
-                    const langVersion = langKey === "python3" ? "Version: 3.9" : langKey === "javascript" ? "Version: Node.js 16" : langKey === "java" ? "Version: 17" : "Version: C++17";
+                    const langLabel =
+                      langKey === "python3"
+                        ? "Python 3"
+                        : langKey === "javascript"
+                          ? "JavaScript"
+                          : langKey === "java"
+                            ? "Java"
+                            : "C++";
+                    const langVersion =
+                      langKey === "python3"
+                        ? "Version: 3.9"
+                        : langKey === "javascript"
+                          ? "Version: Node.js 16"
+                          : langKey === "java"
+                            ? "Version: 17"
+                            : "Version: C++17";
                     return (
-                      <TabsContent key={langKey} value={langKey} className="space-y-4 mt-4">
+                      <TabsContent
+                        key={langKey}
+                        value={langKey}
+                        className="space-y-4 mt-4"
+                      >
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                           <div className="space-y-2">
                             <div className="flex items-center justify-between">
@@ -2040,8 +2189,8 @@ export default function EditQuestion() {
                                   ...languageTemplates,
                                   [langKey]: {
                                     ...languageTemplates[langKey],
-                                    template: e.target.value
-                                  }
+                                    template: e.target.value,
+                                  },
                                 })
                               }
                               placeholder={`${langLabel} starter template code...`}
@@ -2053,7 +2202,9 @@ export default function EditQuestion() {
                           <div className="space-y-2">
                             <div className="flex items-center justify-between">
                               <Label>{langLabel} Execution Driver</Label>
-                              <Badge variant="secondary">Admin Only / Hidden</Badge>
+                              <Badge variant="secondary">
+                                Admin Only / Hidden
+                              </Badge>
                             </div>
                             <Textarea
                               value={languageTemplates[langKey]?.driver || ""}
@@ -2062,8 +2213,8 @@ export default function EditQuestion() {
                                   ...languageTemplates,
                                   [langKey]: {
                                     ...languageTemplates[langKey],
-                                    driver: e.target.value
-                                  }
+                                    driver: e.target.value,
+                                  },
                                 })
                               }
                               placeholder={`${langLabel} execution driver code...`}
@@ -2085,7 +2236,10 @@ export default function EditQuestion() {
                         About Code Templates & Drivers
                       </p>
                       <p className="text-xs text-muted-foreground mt-1">
-                        Candidates will only see the Starter Code Template in their editor. The Execution Driver is appended by the backend during test execution to run test cases against the candidate's code.
+                        Candidates will only see the Starter Code Template in
+                        their editor. The Execution Driver is appended by the
+                        backend during test execution to run test cases against
+                        the candidate's code.
                       </p>
                     </div>
                   </div>
@@ -2096,159 +2250,421 @@ export default function EditQuestion() {
 
           {/* Coding Question Test Cases */}
           {questionType === "CODING" && (
-            <Card>
-              <CardHeader>
-                <div className="flex items-center justify-between">
+            <Card className="border border-orange-200 bg-orange-50/40 shadow-sm overflow-hidden">
+              <CardHeader className="bg-gradient-to-r from-orange-100/70 via-orange-50/50 to-amber-50/30 border-b border-orange-200/80 pb-4">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                   <div>
-                    <CardTitle>Test Cases</CardTitle>
-                    <CardDescription>
-                      Define test cases to validate candidate solutions
+                    <div className="flex items-center gap-2">
+                      <CardTitle className="text-lg font-bold text-slate-900">
+                        Test Cases ({testCases.length})
+                      </CardTitle>
+                      <Badge
+                        variant="outline"
+                        className="bg-emerald-50 text-emerald-800 border-emerald-300 font-bold text-xs"
+                      >
+                        {testCases.filter((tc) => tc.sample).length} Sample
+                      </Badge>
+                      <Badge
+                        variant="outline"
+                        className="bg-orange-100 text-orange-900 border-orange-300 font-bold text-xs"
+                      >
+                        {testCases.filter((tc) => !tc.sample).length} Hidden
+                      </Badge>
+                    </div>
+                    <CardDescription className="text-xs text-slate-600 mt-1 font-medium">
+                      Define sample (visible) and hidden test cases for
+                      candidate evaluation
                     </CardDescription>
                     {totalWeight !== 100 && testCases.length > 0 && (
-                      <p
-                        className={`text-sm mt-2 ${totalWeight !== 100 ? "text-yellow-600" : "text-green-600"}`}
-                      >
-                        Total weight: {totalWeight}%{" "}
-                        {totalWeight !== 100 && "(must be 100%)"}
+                      <p className="text-xs font-bold mt-1 text-orange-600">
+                        Total weight: {totalWeight}% (must equal 100%)
                       </p>
                     )}
                   </div>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={addTestCase}
-                  >
-                    <Plus className="w-4 h-4 mr-1" />
-                    Add Test Case
-                  </Button>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                {testCases.map((testCase, index) => (
-                  <div
-                    key={index}
-                    className="border rounded-lg p-4 space-y-3 relative"
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <Badge variant="outline">Test Case #{index + 1}</Badge>
-                        {testCase.sample && (
-                          <Badge
-                            variant="secondary"
-                            className="bg-green-500/10 text-green-500"
-                          >
-                            <Eye className="w-3 h-3 mr-1" />
-                            Sample
-                          </Badge>
-                        )}
-                      </div>
+
+                  <div className="flex items-center gap-2">
+                    <div className="flex items-center border border-orange-200 rounded-lg p-0.5 bg-orange-100/60">
                       <Button
                         type="button"
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => removeTestCase(index)}
+                        variant={
+                          testCaseViewMode === "carousel" ? "default" : "ghost"
+                        }
+                        size="sm"
+                        className={`px-2.5 py-1 h-7 text-xs flex items-center gap-1 font-semibold ${
+                          testCaseViewMode === "carousel"
+                            ? "bg-orange-500 text-white hover:bg-orange-600 shadow-sm"
+                            : "text-slate-700 hover:bg-orange-200/60"
+                        }`}
+                        onClick={() => setTestCaseViewMode("carousel")}
                       >
-                        <Trash2 className="w-4 h-4 text-destructive" />
+                        <Eye className="w-3.5 h-3.5" /> Carousel
+                      </Button>
+                      <Button
+                        type="button"
+                        variant={
+                          testCaseViewMode === "grid" ? "default" : "ghost"
+                        }
+                        size="sm"
+                        className={`px-2.5 py-1 h-7 text-xs flex items-center gap-1 font-semibold ${
+                          testCaseViewMode === "grid"
+                            ? "bg-orange-500 text-white hover:bg-orange-600 shadow-sm"
+                            : "text-slate-700 hover:bg-orange-200/60"
+                        }`}
+                        onClick={() => setTestCaseViewMode("grid")}
+                      >
+                        <LayoutGrid className="w-3.5 h-3.5" /> Grid
                       </Button>
                     </div>
 
-                    <div className="space-y-3">
-                      <div className="space-y-2">
-                        <Label>Input</Label>
-                        <Textarea
-                          value={testCase.input}
-                          onChange={(e) =>
-                            updateTestCase(index, "input", e.target.value)
-                          }
-                          placeholder="Enter test input (e.g., 2 3)"
-                          rows={2}
-                          className="font-mono text-sm"
-                        />
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label>Expected Output</Label>
-                        <Textarea
-                          value={testCase.expectedOutput}
-                          onChange={(e) =>
-                            updateTestCase(
-                              index,
-                              "expectedOutput",
-                              e.target.value,
-                            )
-                          }
-                          placeholder="Enter expected output (e.g., 5)"
-                          rows={2}
-                          className="font-mono text-sm"
-                        />
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="flex items-center space-x-2">
-                          <Checkbox
-                            id={`sample-${index}`}
-                            checked={testCase.sample}
-                            onCheckedChange={(checked) =>
-                              updateTestCase(
-                                index,
-                                "sample",
-                                checked as boolean,
-                              )
-                            }
-                          />
-                          <Label
-                            htmlFor={`sample-${index}`}
-                            className="cursor-pointer"
-                          >
-                            Sample Test Case (visible to candidates)
-                          </Label>
-                        </div>
-
-                        <div className="space-y-1">
-                          <Label>Weight (%)</Label>
-                          <Input
-                            type="number"
-                            value={testCase.weight}
-                            onChange={(e) =>
-                              updateTestCase(
-                                index,
-                                "weight",
-                                parseInt(e.target.value) || 0,
-                              )
-                            }
-                            min={0}
-                            max={100}
-                            step={5}
-                          />
-                        </div>
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label>Explanation (optional)</Label>
-                        <Textarea
-                          value={testCase.explanation || ""}
-                          onChange={(e) =>
-                            updateTestCase(index, "explanation", e.target.value)
-                          }
-                          placeholder="Explain why this output is expected for the given input"
-                          rows={2}
-                          className="text-sm"
-                        />
-                      </div>
-                    </div>
-                  </div>
-                ))}
-
-                {testCases.length === 0 && (
-                  <div className="text-center py-8 text-muted-foreground">
-                    <AlertCircle className="w-12 h-12 mx-auto mb-3" />
-                    <p>No test cases added</p>
                     <Button
                       type="button"
                       variant="outline"
-                      onClick={addTestCase}
-                      className="mt-4"
+                      size="sm"
+                      onClick={() => {
+                        addTestCase();
+                        setActiveTestCaseIndex(testCases.length);
+                      }}
+                      className="border-orange-500 bg-orange-500 text-white hover:bg-orange-600 font-bold shadow-sm"
+                    >
+                      <Plus className="w-4 h-4 mr-1" />
+                      Add Test Case
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Carousel Dots Navigation Bar */}
+                {testCases.length > 0 && (
+                  <div className="flex items-center justify-between pt-3 mt-3 border-t border-orange-200/80">
+                    {/* Dot Indicators */}
+                    <div className="flex items-center gap-1.5 flex-wrap max-w-full overflow-x-auto py-1">
+                      {testCases.map((tc, idx) => {
+                        const isActive = activeTestCaseIndex === idx;
+                        const isSample = tc.sample;
+                        return (
+                          <button
+                            key={idx}
+                            type="button"
+                            onClick={() => setActiveTestCaseIndex(idx)}
+                            className={`group relative flex items-center justify-center transition-all focus:outline-none ${
+                              isActive
+                                ? "scale-110"
+                                : "opacity-80 hover:opacity-100"
+                            }`}
+                            title={`Test Case #${idx + 1} (${isSample ? "Sample" : "Hidden"})`}
+                          >
+                            <span
+                              className={`h-6 min-w-[26px] px-1.5 rounded-full flex items-center justify-center text-[10px] font-bold transition-all border ${
+                                isActive
+                                  ? isSample
+                                    ? "bg-emerald-600 text-white border-emerald-700 shadow-md ring-2 ring-emerald-400/50"
+                                    : "bg-orange-500 text-white border-orange-600 shadow-md ring-2 ring-orange-400/50"
+                                  : isSample
+                                    ? "bg-emerald-100 text-emerald-900 border-emerald-300"
+                                    : "bg-orange-100 text-orange-950 border-orange-300"
+                              }`}
+                            >
+                              #{idx + 1}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    {/* Dot Legend & Arrow Steppers */}
+                    <div className="flex items-center gap-4 text-xs">
+                      <div className="hidden sm:flex items-center gap-3 text-slate-700 font-semibold">
+                        <span className="flex items-center gap-1">
+                          <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block" />
+                          Sample
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <span className="w-2.5 h-2.5 rounded-full bg-orange-500 inline-block" />
+                          Hidden
+                        </span>
+                      </div>
+
+                      {testCaseViewMode === "carousel" &&
+                        testCases.length > 1 && (
+                          <div className="flex items-center gap-1">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="icon"
+                              className="h-7 w-7 border-orange-300 bg-orange-100/80 text-slate-800 hover:bg-orange-200"
+                              onClick={() =>
+                                setActiveTestCaseIndex((prev) =>
+                                  prev > 0 ? prev - 1 : testCases.length - 1,
+                                )
+                              }
+                            >
+                              <ChevronLeft className="w-4 h-4" />
+                            </Button>
+                            <span className="text-slate-800 font-mono text-xs font-bold px-1">
+                              {activeTestCaseIndex + 1}/{testCases.length}
+                            </span>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="icon"
+                              className="h-7 w-7 border-orange-300 bg-orange-100/80 text-slate-800 hover:bg-orange-200"
+                              onClick={() =>
+                                setActiveTestCaseIndex((prev) =>
+                                  prev < testCases.length - 1 ? prev + 1 : 0,
+                                )
+                              }
+                            >
+                              <ChevronRight className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        )}
+                    </div>
+                  </div>
+                )}
+              </CardHeader>
+              <CardContent className="p-5 space-y-6 bg-white">
+                {testCases.length > 0 &&
+                  (testCaseViewMode === "carousel" ? (
+                    /* CAROUSEL SINGLE CARD VIEW */
+                    (() => {
+                      const idx = Math.min(
+                        activeTestCaseIndex,
+                        testCases.length - 1,
+                      );
+                      const testCase = testCases[idx] || testCases[0];
+                      if (!testCase) return null;
+                      return (
+                        <div className="border border-orange-200 bg-orange-50/20 rounded-xl p-5 space-y-4 relative shadow-sm">
+                          <div className="flex items-center justify-between border-b border-orange-200/80 pb-3">
+                            <div className="flex items-center gap-3">
+                              <Badge
+                                variant="outline"
+                                className="font-bold text-xs px-3 py-1 bg-orange-100 text-orange-950 border-orange-300"
+                              >
+                                Test Case #{idx + 1}
+                              </Badge>
+                              {testCase.sample ? (
+                                <Badge className="bg-emerald-100 text-emerald-900 border border-emerald-300 flex items-center gap-1 font-bold text-xs">
+                                  <Eye className="w-3.5 h-3.5" /> Sample Test
+                                  Case (Visible to Candidate)
+                                </Badge>
+                              ) : (
+                                <Badge className="bg-orange-100 text-orange-950 border border-orange-300 flex items-center gap-1 font-bold text-xs">
+                                  <EyeOff className="w-3.5 h-3.5" /> Hidden Test
+                                  Case (Evaluation Only)
+                                </Badge>
+                              )}
+                            </div>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                removeTestCase(idx);
+                                if (
+                                  activeTestCaseIndex >= testCases.length - 1 &&
+                                  activeTestCaseIndex > 0
+                                ) {
+                                  setActiveTestCaseIndex(
+                                    activeTestCaseIndex - 1,
+                                  );
+                                }
+                              }}
+                              className="text-rose-600 hover:text-rose-700 hover:bg-rose-100/60 font-semibold"
+                            >
+                              <Trash2 className="w-4 h-4 mr-1.5" /> Delete Test
+                              Case
+                            </Button>
+                          </div>
+
+                          <div className="space-y-4">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              <div className="space-y-2">
+                                <Label className="text-xs font-bold text-slate-800 uppercase tracking-wider">
+                                  Input STDIN
+                                </Label>
+                                <Textarea
+                                  value={testCase.input}
+                                  onChange={(e) =>
+                                    updateTestCase(idx, "input", e.target.value)
+                                  }
+                                  placeholder="Enter input (e.g. 5\n1 2 3 4 5)"
+                                  rows={4}
+                                  className="font-mono text-sm bg-white text-slate-900 border-slate-300 focus:border-orange-500"
+                                />
+                              </div>
+
+                              <div className="space-y-2">
+                                <Label className="text-xs font-bold text-slate-800 uppercase tracking-wider">
+                                  Expected Output STDOUT
+                                </Label>
+                                <Textarea
+                                  value={testCase.expectedOutput}
+                                  onChange={(e) =>
+                                    updateTestCase(
+                                      idx,
+                                      "expectedOutput",
+                                      e.target.value,
+                                    )
+                                  }
+                                  placeholder="Enter expected output"
+                                  rows={4}
+                                  className="font-mono text-sm bg-white text-slate-900 border-slate-300 focus:border-orange-500"
+                                />
+                              </div>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2 border-t border-orange-200/80">
+                              <div className="flex items-center space-x-2 bg-white p-3 rounded-lg border border-orange-200">
+                                <Checkbox
+                                  id={`sample-active-${idx}`}
+                                  checked={testCase.sample}
+                                  onCheckedChange={(checked) =>
+                                    updateTestCase(
+                                      idx,
+                                      "sample",
+                                      checked as boolean,
+                                    )
+                                  }
+                                />
+                                <Label
+                                  htmlFor={`sample-active-${idx}`}
+                                  className="cursor-pointer text-xs font-semibold text-slate-800"
+                                >
+                                  Mark as Sample Test Case (Visible to candidate
+                                  during test)
+                                </Label>
+                              </div>
+
+                              <div className="flex items-center gap-3 bg-white p-3 rounded-lg border border-orange-200">
+                                <Label className="whitespace-nowrap text-xs font-semibold text-slate-800">
+                                  Score Weight (%)
+                                </Label>
+                                <Input
+                                  type="number"
+                                  value={testCase.weight}
+                                  onChange={(e) =>
+                                    updateTestCase(
+                                      idx,
+                                      "weight",
+                                      parseInt(e.target.value) || 0,
+                                    )
+                                  }
+                                  min={0}
+                                  max={100}
+                                  step={5}
+                                  className="bg-white border-orange-300 font-bold text-orange-600 w-24"
+                                />
+                              </div>
+                            </div>
+
+                            <div className="space-y-2">
+                              <Label className="text-xs font-bold text-slate-800">
+                                Explanation (Optional)
+                              </Label>
+                              <Textarea
+                                value={testCase.explanation || ""}
+                                onChange={(e) =>
+                                  updateTestCase(
+                                    idx,
+                                    "explanation",
+                                    e.target.value,
+                                  )
+                                }
+                                placeholder="Explain why this output is expected..."
+                                rows={2}
+                                className="text-sm bg-white text-slate-900 border-slate-300 focus:border-orange-500"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })()
+                  ) : (
+                    /* ALL GRID VIEW */
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {testCases.map((testCase, index) => (
+                        <div
+                          key={index}
+                          className="border border-orange-200 bg-white rounded-xl p-4 space-y-3 relative hover:border-orange-400 transition-colors shadow-sm"
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <Badge
+                                variant="outline"
+                                className="font-bold text-xs bg-orange-100 text-orange-950 border-orange-300"
+                              >
+                                #{index + 1}
+                              </Badge>
+                              {testCase.sample ? (
+                                <Badge className="bg-emerald-100 text-emerald-900 border border-emerald-300 text-xs font-bold">
+                                  Sample
+                                </Badge>
+                              ) : (
+                                <Badge className="bg-orange-100 text-orange-950 border border-orange-300 text-xs font-bold">
+                                  Hidden
+                                </Badge>
+                              )}
+                              <span className="text-xs font-bold text-slate-700">
+                                Weight: {testCase.weight}%
+                              </span>
+                            </div>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => removeTestCase(index)}
+                              className="h-7 w-7 text-rose-600 hover:text-rose-700 hover:bg-rose-100/60"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </Button>
+                          </div>
+
+                          <div className="space-y-2 text-xs">
+                            <div>
+                              <span className="text-slate-800 font-mono font-bold">
+                                Input (STDIN):
+                              </span>
+                              <p className="font-mono bg-slate-50 text-slate-900 p-2.5 rounded border border-slate-200 truncate mt-0.5 font-medium">
+                                {testCase.input || (
+                                  <span className="text-slate-400 italic">
+                                    &lt;empty&gt;
+                                  </span>
+                                )}
+                              </p>
+                            </div>
+                            <div>
+                              <span className="text-slate-800 font-mono font-bold">
+                                Output (STDOUT):
+                              </span>
+                              <p className="font-mono bg-slate-50 text-slate-900 p-2.5 rounded border border-slate-200 truncate mt-0.5 font-medium">
+                                {testCase.expectedOutput || (
+                                  <span className="text-slate-400 italic">
+                                    &lt;empty&gt;
+                                  </span>
+                                )}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )
+                )}
+
+                {testCases.length === 0 && (
+                  <div className="text-center py-8 text-slate-500 border border-dashed border-orange-300 rounded-xl bg-orange-50/30">
+                    <AlertCircle className="w-12 h-12 mx-auto mb-3 text-orange-500" />
+                    <p className="text-slate-800 font-medium">
+                      No test cases added
+                    </p>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => {
+                        addTestCase();
+                        setActiveTestCaseIndex(0);
+                      }}
+                      className="mt-4 border-orange-500 bg-orange-500 text-white hover:bg-orange-600 font-bold"
                     >
                       <Plus className="w-4 h-4 mr-2" />
                       Add Your First Test Case

@@ -11,6 +11,7 @@ export default defineConfig(({ mode }) => {
     server: {
       host: "::",
       port: 5173,
+      strictPort: true,
       hmr: {
         overlay: false,
       },

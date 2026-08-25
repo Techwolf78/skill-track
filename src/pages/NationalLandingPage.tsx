@@ -762,7 +762,6 @@ export default function NationalLandingPage() {
                     <Play className="w-4 h-4 text-primary fill-primary/20" />
                     View Demo
                   </Button>
-
                 </div>
 
                 {/* Sleek inline Stats Row */}
@@ -996,34 +995,28 @@ export default function NationalLandingPage() {
             {/* Card 4: Custom Test Builder */}
             <BentoCard
               index={3}
-              borderRadiusClass="rounded-tl-[32px] rounded-br-[32px] rounded-tr-lg rounded-bl-lg"
-              className="md:col-span-1"
+              borderRadiusClass="rounded-[28px]"
+              className="md:col-span-1 overflow-hidden flex flex-col justify-between p-0 bg-[#fff1ec] border-orange-100/60 hover:shadow-xl transition-all duration-300 relative group"
             >
-              <div className="flex flex-col justify-between h-full">
+              {/* Full width image taking top space without padding */}
+              <div className="w-full h-64 sm:h-72 overflow-hidden flex items-center justify-center">
+                <img
+                  src="/skill-track-card-circle.avif"
+                  alt="Custom Test Builder Graphic"
+                  className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                />
+              </div>
+
+              {/* Overlapping text box overlaying the bottom part of the card */}
+              <div className="-mt-12 relative z-10 mx-3 mb-3 p-5 bg-white/95 backdrop-blur-md rounded-[20px] shadow-lg border border-white/60 flex flex-col justify-between">
                 <div>
-                  <div className="relative w-14 h-14 rounded-xl bg-gradient-to-br from-primary/5 to-accent/5 flex items-center justify-center mb-6 overflow-hidden transition-transform duration-300 group-hover:scale-110 group-hover:rotate-3 shadow-sm border border-border/40">
-                    <div className="absolute inset-0 bg-gradient-to-br from-primary/10 to-accent/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                    <Target className="w-7 h-7 text-primary" />
-                  </div>
-                  <h3 className="font-heading font-bold text-xl text-slate-800 mb-3 tracking-tight group-hover:text-primary transition-colors">
+                  <h3 className="font-heading font-bold text-lg text-slate-900 mb-1.5 tracking-tight group-hover:text-orange-600 transition-colors">
                     Custom Test Builder
                   </h3>
-                  <p className="text-muted-foreground leading-relaxed text-sm group-hover:text-slate-600 transition-colors">
+                  <p className="text-slate-600 leading-relaxed text-xs">
                     Create assessments with multiple question types, coding
                     challenges, and adaptive difficulty.
                   </p>
-                </div>
-                {/* Visual Mock */}
-                <div className="mt-6 flex flex-wrap gap-2">
-                  <span className="px-2.5 py-1 rounded-full bg-purple-50 text-purple-600 text-xs font-semibold border border-purple-100">
-                    Coding Qs
-                  </span>
-                  <span className="px-2.5 py-1 rounded-full bg-blue-50 text-blue-600 text-xs font-semibold border border-blue-100">
-                    MCQs
-                  </span>
-                  <span className="px-2.5 py-1 rounded-full bg-amber-50 text-amber-600 text-xs font-semibold border border-amber-100">
-                    Adaptive
-                  </span>
                 </div>
               </div>
             </BentoCard>
@@ -1654,26 +1647,26 @@ export default function NationalLandingPage() {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ duration: 0.7 }}
-            className="relative overflow-hidden rounded-[32px] bg-slate-950 border border-white/10 px-8 py-16 md:p-20 text-center shadow-2xl shadow-primary/5"
+            className="relative overflow-hidden rounded-[32px] text-center shadow-xl flex flex-col justify-between"
           >
-            {/* Glowing ambient dots inside the CTA card */}
-            <div className="absolute top-[-20%] left-[-10%] w-[350px] h-[350px] bg-primary/20 rounded-full blur-[100px] pointer-events-none" />
-            <div className="absolute bottom-[-20%] right-[-10%] w-[350px] h-[350px] bg-primary/10 rounded-full blur-[100px] pointer-events-none" />
+            {/* The entire graphic image set as full background without cover clipping */}
+            <img
+              src="/skill-track-footer-idea.avif"
+              alt="Footer illustration"
+              className="w-full h-auto block object-contain select-none pointer-events-none"
+            />
 
-            <div className="relative z-10 max-w-3xl mx-auto">
-              <h2 className="text-3xl md:text-5xl font-heading font-extrabold text-white mb-6 tracking-tight leading-tight">
-                Ready to Transform Your Assessment Process?
+            {/* Overlaid Content positioned precisely over the light top section of the image */}
+            <div className="absolute inset-0 z-10 flex flex-col items-center justify-start pt-10 sm:pt-14 md:pt-16 px-6">
+              <h2 className="text-3xl sm:text-4xl md:text-5xl font-heading font-bold text-slate-900 mb-4 tracking-tight leading-tight max-w-2xl">
+                Ready to <span className="text-orange-600">Transform</span> Your
+                Assessment Process?
               </h2>
-              <p className="text-base md:text-lg text-slate-300 max-w-2xl mx-auto mb-10 leading-relaxed">
-                Join India's leading institutions in adopting next-generation
-                assessment technology. Start your free trial today and
-                experience the difference.
-              </p>
 
-              <div className="flex flex-col sm:flex-row gap-4 justify-center">
+              <div className="mt-2">
                 <Button
                   size="lg"
-                  className="text-base px-8 py-6 rounded-xl bg-gradient-primary text-white hover:opacity-95 hover:scale-[1.02] shadow-lg shadow-primary/25 transition-all duration-300 border-0 font-semibold"
+                  className="text-base px-8 py-6 rounded-full bg-slate-950 text-white hover:bg-slate-800 hover:scale-[1.02] shadow-xl transition-all duration-300 border-0 font-medium"
                   onClick={() =>
                     document
                       .getElementById("contact")
@@ -1681,19 +1674,6 @@ export default function NationalLandingPage() {
                   }
                 >
                   Get Started Now
-                  <Zap className="w-4 h-4 ml-2 fill-current" />
-                </Button>
-                <Button
-                  size="lg"
-                  variant="outline"
-                  className="text-base px-8 py-6 rounded-xl border-slate-800 bg-transparent text-white hover:bg-slate-900 hover:text-white transition-all duration-300 hover:scale-[1.02] hover:border-slate-700"
-                  onClick={() =>
-                    document
-                      .getElementById("contact")
-                      ?.scrollIntoView({ behavior: "smooth" })
-                  }
-                >
-                  Schedule Demo
                 </Button>
               </div>
             </div>
@@ -2145,7 +2125,8 @@ export default function NationalLandingPage() {
                 Platform Demo & Video Tour
               </DialogTitle>
               <DialogDescription className="text-xs text-slate-400 mt-1">
-                Explore our automated skill evaluation and proctoring platform. (Placeholder video — official platform tour coming soon)
+                Explore our automated skill evaluation and proctoring platform.
+                (Placeholder video — official platform tour coming soon)
               </DialogDescription>
             </div>
           </DialogHeader>
