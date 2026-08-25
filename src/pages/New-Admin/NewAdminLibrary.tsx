@@ -42,7 +42,13 @@ import { toast } from "sonner";
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 type LibraryType = "PUBLIC" | "ORG_OWNED";
-type ProblemType = "ALL" | "CODING" | "MCQ";
+type ProblemType =
+  | "ALL"
+  | "CODING"
+  | "MCQ"
+  | "TRUE_FALSE"
+  | "ASSERTION_REASON"
+  | "FILL_IN_THE_BLANK";
 type SortOption = "NEWEST" | "OLDEST";
 
 interface FormState {
@@ -1241,8 +1247,16 @@ export default function NewAdminLibrary() {
       if (vis !== selectedLibrary) return false;
       if (problemType !== "ALL") {
         const qt = (q.questionType ?? "").toUpperCase();
-        if (problemType === "CODING" && qt !== "CODING") return false;
-        if (problemType === "MCQ" && qt !== "MCQ") return false;
+        if (problemType === "CODING") {
+          if (qt !== "CODING") return false;
+        } else if (problemType === "MCQ") {
+          if (qt !== "MCQ") return false;
+        } else {
+          // Specific MCQ Subtype filter
+          if (qt !== "MCQ") return false;
+          const mt = (q.mcqType ?? (q.multipleCorrect ? "MULTIPLE_CORRECT" : "SINGLE_CORRECT")).toUpperCase();
+          if (mt !== problemType) return false;
+        }
       }
       if (searchQuery.trim()) {
         const s = searchQuery.toLowerCase();
@@ -1353,19 +1367,26 @@ export default function NewAdminLibrary() {
           <div className="space-y-2">
             <p className="text-xs font-semibold text-slate-700">Problem type</p>
             <div className="flex flex-wrap gap-1.5">
-              {(["ALL", "CODING", "MCQ"] as ProblemType[]).map((t) => {
-                const active = problemType === t;
+              {[
+                { key: "ALL", label: "All" },
+                { key: "CODING", label: "Coding" },
+                { key: "MCQ", label: "Multiple-choice" },
+                { key: "TRUE_FALSE", label: "True / False" },
+                { key: "ASSERTION_REASON", label: "Assertion Reason" },
+                { key: "FILL_IN_THE_BLANK", label: "Fill in the blanks" },
+              ].map((item) => {
+                const active = problemType === item.key;
                 return (
                   <button
-                    key={t}
-                    onClick={() => setProblemType(t)}
-                    className={`px-3 py-1.5 text-xs rounded-md font-medium transition-all cursor-pointer ${
+                    key={item.key}
+                    onClick={() => setProblemType(item.key as ProblemType)}
+                    className={`px-2.5 py-1.5 text-xs rounded-md font-medium transition-all cursor-pointer ${
                       active
                         ? "bg-[#1E293B] text-white shadow-sm"
                         : "bg-slate-100 text-slate-600 hover:bg-slate-200 hover:text-slate-900"
                     }`}
                   >
-                    {t === "ALL" ? "All" : t === "CODING" ? "Coding" : "Multiple-choice"}
+                    {item.label}
                   </button>
                 );
               })}
