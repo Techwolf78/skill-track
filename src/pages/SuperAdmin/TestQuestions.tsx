@@ -118,6 +118,34 @@ export default function TestQuestions() {
     setSelectedQuestions(newSelected);
   };
 
+  const handleToggleSelectCurrentPage = () => {
+    const pageIds = paginatedQuestions.map((q) => q.id);
+    const allPageSelected = pageIds.every((id) => selectedQuestions.has(id));
+
+    const newSelected = new Set(selectedQuestions);
+    if (allPageSelected) {
+      pageIds.forEach((id) => newSelected.delete(id));
+    } else {
+      pageIds.forEach((id) => newSelected.add(id));
+    }
+    setSelectedQuestions(newSelected);
+  };
+
+  const handleToggleSelectAllFiltered = () => {
+    const allFilteredIds = filteredQuestions.map((q) => q.id);
+    const allFilteredSelected = allFilteredIds.every((id) =>
+      selectedQuestions.has(id),
+    );
+
+    const newSelected = new Set(selectedQuestions);
+    if (allFilteredSelected) {
+      allFilteredIds.forEach((id) => newSelected.delete(id));
+    } else {
+      allFilteredIds.forEach((id) => newSelected.add(id));
+    }
+    setSelectedQuestions(newSelected);
+  };
+
 const handleAddQuestions = async () => {
   if (selectedQuestions.size === 0) {
     toast({
@@ -391,9 +419,49 @@ const handleAddQuestions = async () => {
               </div>
             ) : (
               <div className="space-y-3">
-                <div className="text-sm text-muted-foreground mb-2">
-                  Showing {filteredQuestions.length} available questions
+                {/* Global Select All Toolbar */}
+                <div className="flex items-center justify-between p-3.5 bg-muted/40 rounded-lg border flex-wrap gap-3">
+                  <div className="flex items-center gap-3">
+                    <Checkbox
+                      id="select-page-checkbox"
+                      checked={
+                        paginatedQuestions.length > 0 &&
+                        paginatedQuestions.every((q) =>
+                          selectedQuestions.has(q.id),
+                        )
+                      }
+                      onCheckedChange={handleToggleSelectCurrentPage}
+                    />
+                    <Label
+                      htmlFor="select-page-checkbox"
+                      className="text-sm font-semibold cursor-pointer select-none"
+                    >
+                      Select All on this Page ({paginatedQuestions.length})
+                    </Label>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    {filteredQuestions.length > paginatedQuestions.length && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={handleToggleSelectAllFiltered}
+                        className="text-xs font-semibold text-primary hover:text-primary hover:bg-primary/10 h-8"
+                      >
+                        {filteredQuestions.every((q) =>
+                          selectedQuestions.has(q.id),
+                        )
+                          ? `Deselect All Filtered (${filteredQuestions.length})`
+                          : `Select All Filtered (${filteredQuestions.length})`}
+                      </Button>
+                    )}
+                    <span className="text-xs text-muted-foreground font-mono">
+                      Showing {filteredQuestions.length} available
+                    </span>
+                  </div>
                 </div>
+
                 {paginatedQuestions.map((question) => (
                   <div
                     key={question.id}

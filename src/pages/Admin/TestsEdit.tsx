@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { useParams, useNavigate, Link, useLocation } from "react-router-dom";
+import { useParams, useNavigate, Link, useLocation, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -76,7 +76,13 @@ import {
   RefreshCw,
   Eye,
   Upload,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
+  FileSpreadsheet,
 } from "lucide-react";
+import * as XLSX from "xlsx";
 import {
   testService,
   Test,
@@ -86,9 +92,12 @@ import {
   ProctoringMode,
   TestScheduleExtended,
 } from "@/lib/test-service";
-import { candidateService, Candidate } from "@/lib/candidate-service";
+import { candidateService, Candidate, CandidateInvitation } from "@/lib/candidate-service";
 import { apiClient } from "@/lib/api-client";
-import { BulkUploadCandidates } from "./BulkUploadCandidates";
+import { InvitedCandidatesTable } from "@/components/invite/InvitedCandidatesTable";
+import { AddCandidatesModal } from "@/components/invite/AddCandidatesModal";
+import { BulkInviteModal } from "@/components/invite/BulkInviteModal";
+import { TestCandidatePreviewModal } from "@/components/admin/TestCandidatePreviewModal";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 
@@ -101,14 +110,6 @@ import {
   MaterialDatePickerDialog,
   MaterialTimePickerDialog,
 } from "@/components/ui/material-pickers";
-
-interface CandidateInvitation {
-  id: string;
-  scheduleId?: string;
-  candidateId?: string;
-  status?: string;
-  token?: string;
-}
 
 // Report data shapes
 interface ReportCandidate {
@@ -315,63 +316,55 @@ export default function AdminTestsEdit() {
   );
   const [selectedQuestion, setSelectedQuestion] =
     useState<EnrichedTestQuestion | null>(null);
-  const [activeTab, setActiveTab] = useState<string>(() => {
-    const searchParams = new URLSearchParams(window.location.search);
-    const tabParam = searchParams.get("tab");
-    if (tabParam) return tabParam;
-    return location.state?.activeTab || "details";
-  });
+  const [searchParams, setSearchParams] = useSearchParams();
+  const activeTab = searchParams.get("tab") || location.state?.activeTab || "details";
+  const isPreviewOpen = searchParams.get("preview") === "true";
 
-  useEffect(() => {
-    const searchParams = new URLSearchParams(window.location.search);
-    const tabParam = searchParams.get("tab");
-    if (tabParam) {
-      setActiveTab(tabParam);
-    } else if (location.state?.activeTab) {
-      setActiveTab(location.state.activeTab);
-    }
-  }, [location.state, location.search]);
-
-  // Invitation states
-  const [candidates, setCandidates] = useState<Candidate[]>([]);
-  const [invitations, setInvitations] = useState<CandidateInvitation[]>([]);
-  const [inviteSearchTerm, setInviteSearchTerm] = useState("");
-  const [inviteTab, setInviteTab] = useState<"available" | "invited" | "all">(
-    "all",
-  );
-  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
-  const [isBulkUploadOpen, setIsBulkUploadOpen] = useState(false);
-  const [candidateFormData, setCandidateFormData] = useState({
-    name: "",
-    email: "",
-    password: "",
-    phoneNumber: "",
-    organisationId: "",
-    extraFields: {
-      college: "",
-      course: "",
-      year: "",
-      skills: "",
-      city: "",
+  const setIsPreviewOpen = useCallback(
+    (open: boolean) => {
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev);
+          if (open) {
+            next.set("preview", "true");
+          } else {
+            next.delete("preview");
+          }
+          return next;
+        },
+        { replace: true },
+      );
     },
-  });
-  const [candidateSubmitting, setCandidateSubmitting] = useState(false);
-  const [candidateEmailError, setCandidateEmailError] = useState<string | null>(
-    null,
+    [setSearchParams],
   );
+
+  const changeTab = useCallback(
+    (newTab: string) => {
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev);
+          next.set("tab", newTab);
+          return next;
+        },
+        { replace: true },
+      );
+    },
+    [setSearchParams],
+  );
+
+  // Invitation & schedule states
+  const [invitations, setInvitations] = useState<CandidateInvitation[]>([]);
   const [selectedSchedule, setSelectedSchedule] = useState<string>("");
   const [selectedScheduleData, setSelectedScheduleData] =
     useState<TestScheduleExtended | null>(null);
-  const [isInviteDialogOpen, setIsInviteDialogOpen] = useState(false);
-  const [selectedCandidate, setSelectedCandidate] = useState<Candidate | null>(
-    null,
-  );
-  const [selectedCandidates, setSelectedCandidates] = useState<string[]>([]);
-  const [inviteSubmitting, setInviteSubmitting] = useState(false);
-  const [copiedToken, setCopiedToken] = useState<string | null>(null);
-  const [loadingInvitations, setLoadingInvitations] = useState(false);
+  const [isAddCandidatesOpen, setIsAddCandidatesOpen] = useState(false);
+  const [isBulkInviteOpen, setIsBulkInviteOpen] = useState(false);
   const [scheduleStartTime, setScheduleStartTime] = useState("");
   const [scheduleEndTime, setScheduleEndTime] = useState("");
+
+  const alreadyInvitedCandidateIds = useMemo(() => {
+    return new Set(invitations.map((i) => i.candidateId));
+  }, [invitations]);
   const [formData, setFormData] = useState<Partial<CreateTestRequest>>({
     title: "",
     description: "",
@@ -439,6 +432,7 @@ export default function AdminTestsEdit() {
     Record<string, unknown>[]
   >([]);
   const [isAdvancedReportOpen, setIsAdvancedReportOpen] = useState(false);
+  const [exportingExcel, setExportingExcel] = useState(false);
 
   const displayedCandidates = useMemo(() => {
     // Only show candidates who actually appeared (status is not NOT_STARTED)
@@ -1206,7 +1200,7 @@ To refer to the FAQ document, you can click on the HELP button which is present 
       });
 
       // Refresh invitation/schedule data (does not trigger full screen loader)
-      await fetchInvitationsData();
+      await fetchScheduleData();
       return true;
     } catch (error: unknown) {
       console.error("Failed to save schedule:", error);
@@ -1221,7 +1215,7 @@ To refer to the FAQ document, you can click on the HELP button which is present 
       setPendingTab(value);
       setUnsavedScheduleDialogOpen(true);
     } else {
-      setActiveTab(value);
+      changeTab(value);
     }
   };
 
@@ -1242,7 +1236,7 @@ To refer to the FAQ document, you can click on the HELP button which is present 
       setScheduleEndTime("");
     }
     if (pendingTab) {
-      setActiveTab(pendingTab);
+      changeTab(pendingTab);
       setPendingTab(null);
     }
     setUnsavedScheduleDialogOpen(false);
@@ -1251,7 +1245,7 @@ To refer to the FAQ document, you can click on the HELP button which is present 
   const handleSaveAndSwitch = async () => {
     const success = await handleSaveSchedule();
     if (success && pendingTab) {
-      setActiveTab(pendingTab);
+      changeTab(pendingTab);
       setPendingTab(null);
       setUnsavedScheduleDialogOpen(false);
     }
@@ -1339,75 +1333,31 @@ To refer to the FAQ document, you can click on the HELP button which is present 
     }
   };
 
-  const fetchInvitationsData = useCallback(async () => {
+  const fetchScheduleData = useCallback(async () => {
     try {
-      setLoadingInvitations(true);
-      const [schedulesData, candidatesData] = await Promise.all([
-        testService.getAllTestSchedules(),
-        candidateService.getCandidates(),
-      ]);
-
-      // Filter schedules to only keep the ones for THIS test
+      const schedulesData = await testService.getAllTestSchedules();
       const testSchedules = schedulesData.filter((s) => s.testId === id);
 
-      // Auto-select the first schedule if available
       if (testSchedules.length > 0) {
         const activeOrFirst =
           testSchedules.find(
             (s) => s.status === "SCHEDULED" || s.status === "LIVE",
           ) || testSchedules[0];
-        setSelectedSchedule(activeOrFirst.id);
-        setSelectedScheduleData(activeOrFirst);
-        if (activeOrFirst.startTime) {
-          setScheduleStartTime(activeOrFirst.startTime.slice(0, 16));
-        }
-        if (activeOrFirst.endTime) {
-          setScheduleEndTime(activeOrFirst.endTime.slice(0, 16));
-        }
-      } else {
-        setSelectedSchedule("");
-        setSelectedScheduleData(null);
-        setScheduleStartTime("");
-        setScheduleEndTime("");
-      }
-
-      setCandidates(candidatesData);
-
-      try {
-        const response = await apiClient.get(
-          "/candidate-invitations?size=1000",
-        );
-        const invData = response.data?.data;
-        if (Array.isArray(invData)) {
-          setInvitations(invData);
-        } else if (
-          invData &&
-          typeof invData === "object" &&
-          "content" in invData &&
-          Array.isArray((invData as Record<string, unknown>).content)
-        ) {
-          setInvitations(
-            (invData as Record<string, unknown>)
-              .content as CandidateInvitation[],
-          );
-        } else {
-          setInvitations([]);
-        }
-      } catch (error) {
-        console.log("No invitations data yet");
+        setSelectedSchedule((prev) => prev || activeOrFirst.id);
+        setSelectedScheduleData((prev) => prev || activeOrFirst);
+        if (activeOrFirst.startTime) setScheduleStartTime(activeOrFirst.startTime.slice(0, 16));
+        if (activeOrFirst.endTime) setScheduleEndTime(activeOrFirst.endTime.slice(0, 16));
       }
     } catch (error) {
-      console.error("Failed to fetch invitation data:", error);
-    } finally {
-      setLoadingInvitations(false);
+      console.error("Failed to fetch schedule data:", error);
     }
   }, [id]);
 
   useEffect(() => {
     if (id) {
-      fetchInvitationsData();
+      fetchScheduleData();
     }
-  }, [id, fetchInvitationsData]);
+  }, [id, fetchScheduleData]);
 
   const loadReportData = useCallback(async () => {
     if (!id) return;
@@ -2121,290 +2071,367 @@ To refer to the FAQ document, you can click on the HELP button which is present 
     }
   };
 
-  const handleInvite = async () => {
-    if (!selectedSchedule) {
-      console.error("Error: Please create a schedule for this test first.");
-      return;
-    }
-
-    if (!selectedCandidate) {
-      console.error("Error: No candidate selected");
-      return;
-    }
-
-    setInviteSubmitting(true);
-    try {
-      const response = await apiClient.post("/candidate-invitations", {
-        scheduleId: selectedSchedule,
-        candidateId: selectedCandidate.id,
-        baseUrl: window.location.origin,
-      });
-
-      console.log("Invitation created successfully. Response:", response.data);
-
+  const exportBulkExcelReport = async () => {
+    if (displayedCandidates.length === 0) {
       toast({
-        title: "Success",
-        description: `Invitation sent to ${selectedCandidate.user.name}`,
+        title: "No Data to Export",
+        description: "There are no appeared candidates to export.",
+        variant: "destructive",
       });
-      setIsInviteDialogOpen(false);
-      setSelectedCandidate(null);
-      fetchInvitationsData();
-    } catch (error) {
-      console.error("Failed to send invitation:", error);
-    } finally {
-      setInviteSubmitting(false);
-    }
-  };
-
-  const [candidateCustomFields, setCandidateCustomFields] = useState<
-    CustomFieldItem[]
-  >([]);
-
-  useEffect(() => {
-    if (isAddDialogOpen && orgId) {
-      setCandidateFormData((prev) => ({
-        ...prev,
-        organisationId: orgId,
-      }));
-    }
-  }, [isAddDialogOpen, orgId]);
-
-  const handleAddCandidate = async () => {
-    setCandidateEmailError(null);
-    if (!candidateFormData.name.trim()) {
-      console.error("Validation Error: Name is required");
-      return;
-    }
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(candidateFormData.email)) {
-      setCandidateEmailError("Invalid email format");
-      return;
-    }
-    if (
-      !candidateFormData.password.trim() ||
-      candidateFormData.password.length < 8
-    ) {
-      console.error("Validation Error: Password must be at least 8 characters");
-      return;
-    }
-    if (!candidateFormData.organisationId && orgId) {
-      candidateFormData.organisationId = orgId;
-    }
-    if (!candidateFormData.organisationId) {
-      console.error("Validation Error: Organisation ID is missing");
       return;
     }
 
-    setCandidateSubmitting(true);
-    try {
-      const extraFields: Record<string, string> = {};
-      Object.entries(candidateFormData.extraFields).forEach(([key, value]) => {
-        if (value && value.trim()) extraFields[key] = value.trim();
-      });
-      for (const cf of candidateCustomFields) {
-        if (cf.key.trim() && cf.value.trim()) {
-          extraFields[cf.key.trim()] = cf.value.trim();
-        }
-      }
-
-      await candidateService.createCandidate({
-        ...candidateFormData,
-        extraFields:
-          Object.keys(extraFields).length > 0 ? extraFields : undefined,
-      });
-
-      toast({ title: "Success", description: "Candidate added successfully" });
-      setIsAddDialogOpen(false);
-      setCandidateCustomFields([]);
-      setCandidateFormData({
-        name: "",
-        email: "",
-        password: "",
-        phoneNumber: "",
-        organisationId: orgId || "",
-        extraFields: {
-          college: "",
-          course: "",
-          year: "",
-          skills: "",
-          city: "",
-        },
-      });
-      fetchInvitationsData();
-    } catch (error) {
-      const err = error as { response?: { data?: { message?: string } } };
-      console.error(
-        "Failed to add candidate:",
-        err.response?.data?.message || err,
-      );
-    } finally {
-      setCandidateSubmitting(false);
-    }
-  };
-
-  const handleBulkInvite = async () => {
-    if (!selectedSchedule) {
-      console.error("Error: Please create a schedule for this test first.");
-      return;
-    }
-
-    if (selectedCandidates.length === 0) {
-      console.error("Error: No candidates selected");
-      return;
-    }
-
-    setInviteSubmitting(true);
-    let successCount = 0;
-    let failCount = 0;
-
-    try {
-      for (const candidateId of selectedCandidates) {
-        try {
-          await apiClient.post("/candidate-invitations", {
-            scheduleId: selectedSchedule,
-            candidateId: candidateId,
-            baseUrl: window.location.origin,
-          });
-          successCount++;
-        } catch (err) {
-          console.error(`Failed to invite candidate ${candidateId}:`, err);
-          failCount++;
-        }
-      }
-
-      toast({
-        title: "Bulk Invitation Complete",
-        description: `Successfully invited ${successCount} candidates. ${failCount > 0 ? `${failCount} failed.` : ""}`,
-      });
-
-      setSelectedCandidates([]);
-      fetchInvitationsData();
-    } catch (error) {
-      console.error("Bulk invitation error:", error);
-    } finally {
-      setInviteSubmitting(false);
-    }
-  };
-
-  const copyTestLink = (invitationId: string, token?: string) => {
-    const baseUrl = window.location.origin;
-    const tokenParam = token ? `?magicToken=${encodeURIComponent(token)}` : "";
-    const testUrl = `${baseUrl}/test/access/${invitationId}${tokenParam}`;
-    navigator.clipboard.writeText(testUrl);
-    setCopiedToken(invitationId);
+    setExportingExcel(true);
     toast({
-      title: "Link Copied!",
-      description: token ? "Magic access link copied to clipboard" : "Test URL copied to clipboard",
+      title: "Generating Bulk Excel Export",
+      description: "Gathering candidate telemetry, scores, and submissions...",
     });
-    setTimeout(() => setCopiedToken(null), 2000);
-  };
 
-  const getInvitationForCandidate = useCallback(
-    (candidateId: string, scheduleId: string) => {
-      return (
-        invitations.find(
-          (i) => i.candidateId === candidateId && i.scheduleId === scheduleId,
-        ) || null
+    try {
+      // 1. Fetch detailed information for all displayed candidates
+      const detailedCandidateDataList = await Promise.all(
+        displayedCandidates.map(async (candidate) => {
+          const reportKey = getReportCandidateKey(candidate);
+          const scoreData = candidateResults[reportKey];
+          const sessionId = scoreData?.sessionId;
+
+          let detailData = scoreData?.detail;
+          let paperData = null;
+          let resumeData = null;
+          let timingsList: Array<{ questionId: string; activeSeconds?: number }> = [];
+
+          try {
+            if (!detailData) {
+              const detailRes = await apiClient.get(
+                `/api/admin/proctoring/candidates/${candidate.candidateId}/details?scheduleId=${candidate.scheduleId || reportScheduleId}`,
+              );
+              detailData = detailRes.data?.data ?? detailRes.data;
+            }
+
+            if (sessionId) {
+              const [paperRes, resumeRes, timingsRes] = await Promise.all([
+                apiClient.get(`/test-sessions/${sessionId}/paper`).catch(() => ({ data: null })),
+                apiClient.get(`/test-sessions/${sessionId}/resume`).catch(() => ({ data: null })),
+                apiClient.get(`/test-sessions/${sessionId}/question-timings`).catch(() => ({ data: null })),
+              ]);
+
+              paperData = paperRes.data?.data || paperRes.data;
+              resumeData = resumeRes.data?.data || resumeRes.data;
+              timingsList = timingsRes.data?.data || timingsRes.data || [];
+            }
+          } catch (err) {
+            console.warn(`Could not fetch full details for ${candidate.candidateName}:`, err);
+          }
+
+          return {
+            candidate,
+            scoreData,
+            detailData,
+            paperData,
+            resumeData,
+            timingsList,
+          };
+        }),
       );
-    },
-    [invitations],
-  );
+
+      // Build Summary Sheet Rows
+      const summaryRows = detailedCandidateDataList.map((item, idx) => {
+        const { candidate, scoreData, detailData } = item;
+        const totalScore = scoreData?.result?.totalScore;
+        const maxScore = scoreData?.result?.maxScore ?? totalTestMarks;
+        const percentage =
+          totalScore !== undefined && maxScore > 0
+            ? `${((totalScore / maxScore) * 100).toFixed(1)}%`
+            : "-";
+        const passed = scoreData?.result?.passed;
+        const passStatus =
+          passed !== undefined ? (passed ? "Passed" : "Failed") : "Pending";
+        const risk = detailData?.riskLevel || candidate.riskLevel || "NONE";
+        const violationCount = candidate.violationCount || detailData?.violations?.length || 0;
+        const ip = detailData?.systemInfo?.ipAddress || detailData?.ipAddress || "N/A";
+        const browser = detailData?.systemInfo?.browser || detailData?.browser || "N/A";
+        const os = detailData?.systemInfo?.os || detailData?.os || "N/A";
+        const fullscreenViolations =
+          detailData?.systemInfo?.fullscreenViolations ?? detailData?.fullscreenViolations ?? 0;
+
+        return {
+          "S.No": idx + 1,
+          "Candidate Name": candidate.candidateName || "N/A",
+          "Email Address": candidate.email || "N/A",
+          "Test Status": (candidate.testStatus || "N/A").replace(/_/g, " "),
+          "Score": totalScore !== undefined ? totalScore : 0,
+          "Max Score": maxScore,
+          "Percentage": percentage,
+          "Result": passStatus,
+          "Proctoring Risk": risk,
+          "Total Violations": violationCount,
+          "Fullscreen Exits": fullscreenViolations,
+          "IP Address": ip,
+          "Browser": browser,
+          "Operating System": os,
+          "Schedule ID": candidate.scheduleId || "N/A",
+        };
+      });
+
+      // Build Question Submissions Sheet Rows
+      const submissionRows: Array<Record<string, unknown>> = [];
+      detailedCandidateDataList.forEach((item) => {
+        const { candidate, scoreData, paperData, resumeData, timingsList } = item;
+        const questionsList =
+          paperData?.paper?.questions ||
+          questionsData.map((tq) => tq.question).filter(Boolean) ||
+          [];
+        const submissionsList = resumeData?.submissions || [];
+
+        if (questionsList.length === 0) {
+          submissionRows.push({
+            "Candidate Name": candidate.candidateName,
+            "Email Address": candidate.email,
+            "Question #": "-",
+            "Question Title / Prompt": "No questions recorded",
+            "Question Type": "-",
+            "Time Spent": "-",
+            "Candidate Answer / Code": "-",
+            "Correct Options": "-",
+            "Evaluation Status": "-",
+          });
+          return;
+        }
+
+        questionsList.forEach((q: {
+          id: string;
+          sourceQuestionId?: string;
+          prompt?: string;
+          title?: string;
+          type?: string;
+          coding?: { title?: string };
+          options?: Array<{ id: string; text: string; isCorrect: boolean }>;
+          mcqOptions?: Array<{
+            id: string;
+            text: string;
+            isCorrect: boolean;
+          }>;
+        }, qIdx: number) => {
+          const questionId = q.sourceQuestionId || q.id;
+          const sub = submissionsList.find(
+            (s: { questionId: string; answerText?: string; selectedOptionIds?: string[] }) => s.questionId === questionId,
+          ) as { questionId: string; answerText?: string; selectedOptionIds?: string[] } | undefined;
+          const isCoding = q.type === "CODING";
+
+          // Calculate time spent
+          const timeItem = timingsList.find(
+            (t) => t.questionId === questionId,
+          );
+          const activeSeconds = timeItem?.activeSeconds || 0;
+          const mins = Math.floor(activeSeconds / 60);
+          const secs = activeSeconds % 60;
+          const timeSpentText = mins > 0 ? `${mins}m ${secs}s` : `${secs}s`;
+
+          // Selected answers
+          const selectedValues = new Set<string>();
+          if (sub?.selectedOptionIds && Array.isArray(sub.selectedOptionIds)) {
+            sub.selectedOptionIds.forEach((id: string) =>
+              selectedValues.add(String(id).trim().toLowerCase()),
+            );
+          }
+          if (sub?.answerText) {
+            const rawAns = String(sub.answerText).trim();
+            selectedValues.add(rawAns.toLowerCase());
+            try {
+              const parsed = JSON.parse(sub.answerText);
+              if (Array.isArray(parsed)) {
+                parsed.forEach((id: string) =>
+                  selectedValues.add(String(id).trim().toLowerCase()),
+                );
+              } else if (typeof parsed === "string") {
+                selectedValues.add(parsed.trim().toLowerCase());
+              }
+            } catch {
+              /* raw text */
+            }
+          }
+
+          // Enriched question for correct options
+          const enrichedTQ = questionsData.find(
+            (tq) => tq.questionId === questionId,
+          );
+          const enrichedQuestion = enrichedTQ?.question;
+          const correctOptionsList =
+            (enrichedQuestion?.options ||
+              enrichedQuestion?.mcqOptions ||
+              q.options ||
+              q.mcqOptions ||
+              []) as Array<{ id?: string; text?: string; isCorrect?: boolean }>;
+
+          let candidateAnswerText = "Not Attempted";
+          let correctOptionText = "-";
+          let isCorrectSubmission = "N/A";
+
+          if (isCoding) {
+            candidateAnswerText = sub?.answerText || "No code submitted";
+            correctOptionText = "Coding Problem";
+            isCorrectSubmission = sub?.answerText ? "Submitted" : "No Submission";
+          } else {
+            const optionsList = q.options || q.mcqOptions || [];
+            const correctNames: string[] = [];
+            const selectedNames: string[] = [];
+            let anyCorrectSelected = false;
+            let anyIncorrectSelected = false;
+
+            optionsList.forEach((opt: { id?: string; text?: string; isCorrect?: boolean }, oIdx: number) => {
+              const optionLetter = String.fromCharCode(65 + oIdx);
+              const correctOpt = correctOptionsList.find(
+                (co) =>
+                  (co.id && opt.id && co.id === opt.id) ||
+                  (co.text &&
+                    opt.text &&
+                    co.text.trim().toLowerCase() ===
+                      opt.text.trim().toLowerCase()),
+              );
+              const isOptionCorrect = correctOpt
+                ? Boolean(correctOpt.isCorrect)
+                : Boolean(opt.isCorrect);
+
+              if (isOptionCorrect) {
+                correctNames.push(`(${optionLetter}) ${opt.text}`);
+              }
+
+              const optIdStr = String(opt.id || "").trim().toLowerCase();
+              const optTextStr = String(opt.text || "").trim().toLowerCase();
+              const letterStr = optionLetter.toLowerCase();
+              const idxStr = String(oIdx);
+
+              const isSelected =
+                (optIdStr !== "" && selectedValues.has(optIdStr)) ||
+                selectedValues.has(letterStr) ||
+                selectedValues.has(idxStr) ||
+                (optTextStr !== "" && selectedValues.has(optTextStr)) ||
+                Array.from(selectedValues).some(
+                  (val) =>
+                    val === optTextStr ||
+                    val.startsWith(`${letterStr}.`) ||
+                    val.startsWith(`${letterStr} `),
+                );
+
+              if (isSelected) {
+                selectedNames.push(`(${optionLetter}) ${opt.text}`);
+                if (isOptionCorrect) {
+                  anyCorrectSelected = true;
+                } else {
+                  anyIncorrectSelected = true;
+                }
+              }
+            });
+
+            correctOptionText = correctNames.join(", ") || "N/A";
+            if (selectedNames.length > 0) {
+              candidateAnswerText = selectedNames.join(", ");
+              if (anyCorrectSelected && !anyIncorrectSelected) {
+                isCorrectSubmission = "CORRECT";
+              } else {
+                isCorrectSubmission = "INCORRECT";
+              }
+            } else if (sub?.answerText) {
+              candidateAnswerText = sub.answerText;
+              isCorrectSubmission = "SUBMITTED";
+            }
+          }
+
+          submissionRows.push({
+            "Candidate Name": candidate.candidateName,
+            "Email Address": candidate.email,
+            "Question #": `Q${qIdx + 1}`,
+            "Question Title / Prompt": q.prompt || q.title || `Question ${qIdx + 1}`,
+            "Question Type": q.type || "MCQ",
+            "Time Spent": timeSpentText,
+            "Candidate Answer / Code": candidateAnswerText,
+            "Correct Answer(s)": correctOptionText,
+            "Answer Status": isCorrectSubmission,
+          });
+        });
+      });
+
+      // Build Proctoring Violations Sheet Rows
+      const violationRows: Array<Record<string, unknown>> = [];
+      detailedCandidateDataList.forEach((item) => {
+        const { candidate, detailData } = item;
+        const violations = detailData?.violations || [];
+
+        if (violations.length === 0) {
+          violationRows.push({
+            "Candidate Name": candidate.candidateName,
+            "Email Address": candidate.email,
+            "Timestamp": "-",
+            "Violation Type": "None",
+            "Severity": "INFO",
+            "Description": "Clean session - no violations recorded",
+          });
+        } else {
+          violations.forEach((v) => {
+            violationRows.push({
+              "Candidate Name": candidate.candidateName,
+              "Email Address": candidate.email,
+              "Timestamp": v.occurredAt || v.time ? new Date(v.occurredAt || v.time || "").toLocaleString() : "N/A",
+              "Violation Type": (v.eventType || "VIOLATION").replace(/_/g, " "),
+              "Severity": v.severity || "MEDIUM",
+              "Description": v.metadata?.description || v.description || "Violation recorded",
+            });
+          });
+        }
+      });
+
+      // Create Workbook and Sheets
+      const wb = XLSX.utils.book_new();
+
+      const wsSummary = XLSX.utils.json_to_sheet(summaryRows);
+      const wsSubmissions = XLSX.utils.json_to_sheet(submissionRows);
+      const wsViolations = XLSX.utils.json_to_sheet(violationRows);
+
+      // Auto-fit column widths for clear presentation
+      const autoFitCols = (rows: Array<Record<string, unknown>>) => {
+        if (!rows || rows.length === 0) return [];
+        const keys = Object.keys(rows[0]);
+        return keys.map((key) => {
+          const maxLen = rows.reduce((max, row) => {
+            const cellVal = String(row[key] ?? "");
+            return Math.max(max, cellVal.length);
+          }, key.length);
+          return { wch: Math.min(Math.max(maxLen + 3, 12), 60) };
+        });
+      };
+
+      wsSummary["!cols"] = autoFitCols(summaryRows);
+      wsSubmissions["!cols"] = autoFitCols(submissionRows);
+      wsViolations["!cols"] = autoFitCols(violationRows);
+
+      XLSX.utils.book_append_sheet(wb, wsSummary, "Candidate Performance");
+      XLSX.utils.book_append_sheet(wb, wsSubmissions, "Question Submissions");
+      XLSX.utils.book_append_sheet(wb, wsViolations, "Proctoring Violations");
+
+      const testTitleSafe = (test?.title || "Test").replace(/[^a-zA-Z0-9_-]/g, "_");
+      const dateStr = new Date().toISOString().slice(0, 10);
+      XLSX.writeFile(wb, `${testTitleSafe}_Candidate_Reports_${dateStr}.xlsx`);
+
+      toast({
+        title: "Export Completed",
+        description: `Successfully exported bulk report for ${displayedCandidates.length} candidate(s).`,
+      });
+    } catch (err) {
+      console.error("Failed to export bulk excel report:", err);
+      toast({
+        title: "Export Failed",
+        description: "An error occurred while generating the Excel report.",
+        variant: "destructive",
+      });
+    } finally {
+      setExportingExcel(false);
+    }
+  };
 
   const formatDateTime = (dateStr: string) => {
+    if (!dateStr) return "";
     return new Date(dateStr).toLocaleString();
   };
-
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case "ACCEPTED":
-        return <CheckCircle2 className="w-3 h-3 text-green-500" />;
-      case "EXPIRED":
-        return <XCircle className="w-3 h-3 text-red-500" />;
-      default:
-        return <Clock className="w-3 h-3 text-yellow-500" />;
-    }
-  };
-
-  const getInvitationStatusBadge = (status: string) => {
-    switch (status) {
-      case "ACCEPTED":
-        return (
-          <Badge
-            variant="outline"
-            className="border-emerald-500/20 bg-emerald-500/10 text-emerald-600 text-xs"
-          >
-            Accepted
-          </Badge>
-        );
-      case "EXPIRED":
-        return (
-          <Badge
-            variant="outline"
-            className="border-red-500/20 bg-red-500/10 text-red-600 text-xs"
-          >
-            Expired
-          </Badge>
-        );
-      case "PENDING":
-        return (
-          <Badge
-            variant="outline"
-            className="border-amber-500/20 bg-amber-500/10 text-amber-600 text-xs"
-          >
-            Pending
-          </Badge>
-        );
-      default:
-        return (
-          <Badge variant="outline" className="text-xs">
-            {status.toLowerCase()}
-          </Badge>
-        );
-    }
-  };
-
-  const filteredCandidates = useMemo(() => {
-    return candidates.filter((candidate) => {
-      const name = candidate.user?.name || "";
-      const email = candidate.user?.email || "";
-      const invitation = selectedSchedule
-        ? getInvitationForCandidate(candidate.id, selectedSchedule)
-        : null;
-      const matchesSearch =
-        name.toLowerCase().includes(inviteSearchTerm.toLowerCase()) ||
-        email.toLowerCase().includes(inviteSearchTerm.toLowerCase());
-      const matchesTab =
-        inviteTab === "all" ||
-        (inviteTab === "available" && !invitation) ||
-        (inviteTab === "invited" && !!invitation);
-      return matchesSearch && matchesTab;
-    });
-  }, [candidates, inviteSearchTerm, inviteTab, selectedSchedule, getInvitationForCandidate]);
-
-  const inviteCounts = useMemo(() => {
-    if (!selectedSchedule) {
-      return {
-        available: candidates.length,
-        invited: 0,
-        all: candidates.length,
-      };
-    }
-
-    const invitedIds = new Set(
-      invitations
-        .filter((invitation) => invitation.scheduleId === selectedSchedule)
-        .map((invitation) => invitation.candidateId)
-        .filter(Boolean),
-    );
-
-    return {
-      available: candidates.filter((candidate) => !invitedIds.has(candidate.id))
-        .length,
-      invited: candidates.filter((candidate) => invitedIds.has(candidate.id))
-        .length,
-      all: candidates.length,
-    };
-  }, [candidates, invitations, selectedSchedule]);
 
   const handleAddQuestions = () => {
     navigate(`/admin/tests/${id}/questions`);
@@ -2454,6 +2481,15 @@ To refer to the FAQ document, you can click on the HELP button which is present 
           </div>
         </div>
         <div className="flex gap-2">
+          <Button
+            variant="outline"
+            onClick={() => setIsPreviewOpen(true)}
+            className="border-indigo-500/30 text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-950/20 font-semibold gap-1.5"
+            title="Preview the exact assessment experience as seen by candidates"
+          >
+            <Eye className="w-4 h-4 text-indigo-500" />
+            Preview Test
+          </Button>
           <Button
             variant="outline"
             onClick={() => setDeleteDialogOpen(true)}
@@ -3384,38 +3420,11 @@ To refer to the FAQ document, you can click on the HELP button which is present 
               <div>
                 <CardTitle className="flex items-center gap-2">
                   <Send className="w-5 h-5 text-primary" />
-                  Invite Candidates
+                  Candidate Invitations
                 </CardTitle>
                 <CardDescription>
-                  Invite students or candidates to take this specific assessment
+                  Manage candidate invitations, test access links, and live assessment progress
                 </CardDescription>
-              </div>
-              <div className="flex items-center gap-3 shrink-0">
-                <Button
-                  variant="outline"
-                  onClick={() => setIsBulkUploadOpen(true)}
-                >
-                  <Upload className="w-4 h-4 mr-2" />
-                  Bulk Upload
-                </Button>
-                <Button variant="hero" onClick={() => setIsAddDialogOpen(true)}>
-                  <Plus className="w-4 h-4 mr-2" />
-                  Add Candidate
-                </Button>
-                {selectedCandidates.length > 0 && selectedSchedule && (
-                  <Button
-                    onClick={handleBulkInvite}
-                    disabled={inviteSubmitting}
-                    className="gap-2"
-                  >
-                    {inviteSubmitting ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : (
-                      <Send className="w-4 h-4" />
-                    )}
-                    Invite Selected ({selectedCandidates.length})
-                  </Button>
-                )}
               </div>
             </CardHeader>
             <CardContent className="space-y-6">
@@ -3426,8 +3435,8 @@ To refer to the FAQ document, you can click on the HELP button which is present 
                     No Active Schedules
                   </h3>
                   <p className="text-muted-foreground max-w-md mx-auto mt-2 text-sm">
-                    This test has not been scheduled yet. You must create a
-                    schedule under Test Schedules before inviting candidates.
+                    This test has not been scheduled yet. You must configure a
+                    schedule under the Settings tab before inviting candidates.
                   </p>
                 </div>
               ) : (
@@ -3435,7 +3444,7 @@ To refer to the FAQ document, you can click on the HELP button which is present 
                   <div className="rounded-lg border border-primary/10 bg-primary/5 p-4 text-sm">
                     <div>
                       <p className="font-semibold text-primary">
-                        Schedule connected for this test
+                        Connected Assessment Schedule
                       </p>
                       <p className="text-xs text-muted-foreground mt-1">
                         {formatDateTime(selectedScheduleData?.startTime || "")}{" "}
@@ -3444,246 +3453,14 @@ To refer to the FAQ document, you can click on the HELP button which is present 
                     </div>
                   </div>
 
-                  <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                    <div className="relative w-full md:max-w-md">
-                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                      <Input
-                        placeholder="Search candidates by name or email..."
-                        value={inviteSearchTerm}
-                        onChange={(e) => setInviteSearchTerm(e.target.value)}
-                        className="pl-10 w-full"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Candidates Table */}
-                  <div className="border rounded-lg overflow-hidden bg-card">
-                    <Table>
-                      <TableHeader className="bg-muted/40">
-                        <TableRow className="hover:bg-transparent">
-                          <TableHead className="w-[42px]">
-                            {inviteTab !== "invited" && (
-                              <Checkbox
-                                checked={
-                                  filteredCandidates.length > 0 &&
-                                  filteredCandidates.every((c) =>
-                                    selectedCandidates.includes(c.id),
-                                  )
-                                }
-                                onCheckedChange={(checked) => {
-                                  if (checked) {
-                                    const allIds = filteredCandidates.map(
-                                      (c) => c.id,
-                                    );
-                                    setSelectedCandidates((prev) =>
-                                      Array.from(new Set([...prev, ...allIds])),
-                                    );
-                                  } else {
-                                    const filteredIds = new Set(
-                                      filteredCandidates.map((c) => c.id),
-                                    );
-                                    setSelectedCandidates((prev) =>
-                                      prev.filter((id) => !filteredIds.has(id)),
-                                    );
-                                  }
-                                }}
-                              />
-                            )}
-                          </TableHead>
-                          <TableHead className="w-[50px] text-center text-xs text-muted-foreground">
-                            #
-                          </TableHead>
-                          <TableHead className="text-xs text-muted-foreground">
-                            Candidate
-                          </TableHead>
-                          <TableHead className="text-xs text-muted-foreground">
-                            Contact
-                          </TableHead>
-                          <TableHead className="text-xs text-muted-foreground">
-                            Account
-                          </TableHead>
-                          <TableHead className="text-xs text-muted-foreground">
-                            Invitation
-                          </TableHead>
-                          <TableHead className="text-xs text-muted-foreground">
-                            Test Link
-                          </TableHead>
-                          <TableHead className="text-right text-xs text-muted-foreground">
-                            Action
-                          </TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {loadingInvitations ? (
-                          <TableRow className="hover:bg-transparent">
-                            <TableCell
-                              colSpan={8}
-                              className="text-center py-10"
-                            >
-                              <Loader2 className="w-6 h-6 animate-spin mx-auto text-primary" />
-                            </TableCell>
-                          </TableRow>
-                        ) : filteredCandidates.length === 0 ? (
-                          <TableRow className="hover:bg-transparent">
-                            <TableCell
-                              colSpan={8}
-                              className="text-center py-10 text-muted-foreground"
-                            >
-                              {inviteTab === "available"
-                                ? "No candidates available to invite."
-                                : inviteTab === "invited"
-                                  ? "No invited candidates for this schedule."
-                                  : "No candidates found."}
-                            </TableCell>
-                          </TableRow>
-                        ) : (
-                          filteredCandidates.map((candidate, index) => {
-                            const invitation = getInvitationForCandidate(
-                              candidate.id,
-                              selectedSchedule,
-                            );
-                            const isScheduleCompleted =
-                              selectedScheduleData?.status === "COMPLETED" ||
-                              selectedScheduleData?.status === "EXPIRED";
-                            const displayStatus =
-                              invitation?.status === "PENDING" &&
-                              isScheduleCompleted
-                                ? "EXPIRED"
-                                : invitation?.status;
-
-                            return (
-                              <TableRow
-                                key={candidate.id}
-                                className="hover:bg-muted/30"
-                              >
-                                <TableCell>
-                                  {!invitation && (
-                                    <Checkbox
-                                      checked={selectedCandidates.includes(
-                                        candidate.id,
-                                      )}
-                                      onCheckedChange={(checked) => {
-                                        if (checked) {
-                                          setSelectedCandidates((prev) => [
-                                            ...prev,
-                                            candidate.id,
-                                          ]);
-                                        } else {
-                                          setSelectedCandidates((prev) =>
-                                            prev.filter(
-                                              (id) => id !== candidate.id,
-                                            ),
-                                          );
-                                        }
-                                      }}
-                                    />
-                                  )}
-                                </TableCell>
-                                <TableCell className="text-center text-muted-foreground text-sm">
-                                  {index + 1}
-                                </TableCell>
-                                <TableCell>
-                                  <div className="flex items-center gap-3">
-                                    <div className="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center font-semibold text-xs">
-                                      {candidate.user.name
-                                        ?.split(" ")
-                                        .map((n: string) => n[0])
-                                        .join("")
-                                        .toUpperCase()
-                                        .slice(0, 2) || "C"}
-                                    </div>
-                                    <div>
-                                      <p className="font-medium text-sm">
-                                        {candidate.user.name}
-                                      </p>
-                                      <p className="text-[10px] text-muted-foreground">
-                                        ID: {candidate.id.slice(0, 8)}
-                                      </p>
-                                    </div>
-                                  </div>
-                                </TableCell>
-                                <TableCell className="text-sm">
-                                  <div>{candidate.user.email}</div>
-                                  <div className="text-xs text-muted-foreground">
-                                    {candidate.user.phoneNumber}
-                                  </div>
-                                </TableCell>
-                                <TableCell>
-                                  <Badge variant="outline" className="text-xs">
-                                    {candidate.stale ? "Inactive" : "Active"}
-                                  </Badge>
-                                </TableCell>
-                                <TableCell>
-                                  {invitation ? (
-                                    getInvitationStatusBadge(
-                                      displayStatus || "",
-                                    )
-                                  ) : (
-                                    <span className="text-xs text-muted-foreground">
-                                      Not invited
-                                    </span>
-                                  )}
-                                </TableCell>
-                                <TableCell>
-                                  {invitation ? (
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      onClick={() =>
-                                        copyTestLink(invitation.id, invitation.token)
-                                      }
-                                      className="h-8 px-2"
-                                      disabled={displayStatus === "EXPIRED"}
-                                    >
-                                      {copiedToken === invitation.id ? (
-                                        <>
-                                          <Check className="w-3 h-3 mr-1 text-green-500" />
-                                          <span className="text-xs">
-                                            Copied!
-                                          </span>
-                                        </>
-                                      ) : (
-                                        <>
-                                          <Link2 className="w-3 h-3 mr-1" />
-                                          <span className="text-xs">
-                                            Copy Link
-                                          </span>
-                                        </>
-                                      )}
-                                    </Button>
-                                  ) : (
-                                    <span className="text-xs text-muted-foreground">
-                                      -
-                                    </span>
-                                  )}
-                                </TableCell>
-                                <TableCell className="text-right">
-                                  {invitation ? (
-                                    <Badge className="bg-emerald-500/10 text-emerald-600 border border-emerald-500/20">
-                                      Invited
-                                    </Badge>
-                                  ) : (
-                                    <Button
-                                      size="sm"
-                                      className="h-8"
-                                      onClick={() => {
-                                        setSelectedCandidate(candidate);
-                                        setIsInviteDialogOpen(true);
-                                      }}
-                                      disabled={isScheduleCompleted}
-                                    >
-                                      <Send className="w-4 h-4 mr-2" />
-                                      Send Invite
-                                    </Button>
-                                  )}
-                                </TableCell>
-                              </TableRow>
-                            );
-                          })
-                        )}
-                      </TableBody>
-                    </Table>
-                  </div>
+                  <InvitedCandidatesTable
+                    key={selectedSchedule}
+                    scheduleId={selectedSchedule}
+                    scheduleData={selectedScheduleData}
+                    onOpenAddModal={() => setIsAddCandidatesOpen(true)}
+                    onOpenBulkModal={() => setIsBulkInviteOpen(true)}
+                    onInvitationsLoaded={setInvitations}
+                  />
                 </>
               )}
             </CardContent>
@@ -3730,13 +3507,26 @@ To refer to the FAQ document, you can click on the HELP button which is present 
                   variant="outline"
                   size="icon"
                   onClick={() => loadReportData()}
-                  disabled={loadingReports}
+                  disabled={loadingReports || exportingExcel}
                   className="shrink-0"
                   title="Refresh Reports"
                 >
                   <RefreshCw
                     className={`w-4 h-4 ${loadingReports ? "animate-spin" : ""}`}
                   />
+                </Button>
+                <Button
+                  onClick={exportBulkExcelReport}
+                  disabled={loadingReports || exportingExcel || displayedCandidates.length === 0}
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white gap-2 shrink-0 font-semibold shadow-sm"
+                  title="Export all candidate reports, scores, submissions, and proctoring telemetry to a single Excel file"
+                >
+                  {exportingExcel ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <FileSpreadsheet className="w-4 h-4" />
+                  )}
+                  {exportingExcel ? "Exporting..." : "Export Excel"}
                 </Button>
               </div>
             </CardHeader>
@@ -4000,59 +3790,6 @@ To refer to the FAQ document, you can click on the HELP button which is present 
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Invite Confirmation Dialog */}
-      <Dialog open={isInviteDialogOpen} onOpenChange={setIsInviteDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Confirm Invitation</DialogTitle>
-            <DialogDescription>
-              Send test invitation to candidate?
-            </DialogDescription>
-          </DialogHeader>
-          <div className="py-4">
-            <p className="text-sm">
-              This will send an invitation to{" "}
-              <span className="font-semibold text-slate-900">
-                {selectedCandidate?.user.name}
-              </span>{" "}
-              for the test{" "}
-              <span className="font-semibold text-slate-900">
-                {test?.title || "Test"}
-              </span>
-            </p>
-            {selectedScheduleData && (
-              <div className="mt-3 p-3 bg-muted/30 rounded-lg text-xs">
-                <div className="flex items-center gap-2">
-                  <Calendar className="w-3 h-3" />
-                  <span>
-                    Start: {formatDateTime(selectedScheduleData.startTime)}
-                  </span>
-                </div>
-                <div className="flex items-center gap-2 mt-1">
-                  <Clock className="w-3 h-3" />
-                  <span>
-                    End: {formatDateTime(selectedScheduleData.endTime)}
-                  </span>
-                </div>
-              </div>
-            )}
-          </div>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setIsInviteDialogOpen(false)}
-            >
-              Cancel
-            </Button>
-            <Button onClick={handleInvite} disabled={inviteSubmitting}>
-              {inviteSubmitting ? (
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              ) : null}
-              Send Invitation
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
       {/* Unsaved Changes Dialog */}
       <AlertDialog
         open={unsavedChangesDialogOpen}
@@ -4497,147 +4234,37 @@ To refer to the FAQ document, you can click on the HELP button which is present 
         </DialogContent>
       </Dialog>
 
-      <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Add New Candidate</DialogTitle>
-            <DialogDescription>
-              Create a new candidate record in {adminOrgName}.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-6 py-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Full Name*</label>
-                <Input
-                  placeholder="John Doe"
-                  value={candidateFormData.name}
-                  onChange={(e) =>
-                    setCandidateFormData({
-                      ...candidateFormData,
-                      name: e.target.value,
-                    })
-                  }
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Email Address*</label>
-                <Input
-                  type="email"
-                  placeholder="john@example.com"
-                  value={candidateFormData.email}
-                  onChange={(e) =>
-                    setCandidateFormData({
-                      ...candidateFormData,
-                      email: e.target.value,
-                    })
-                  }
-                />
-                {candidateEmailError ? (
-                  <p className="text-xs text-destructive">
-                    {candidateEmailError}
-                  </p>
-                ) : null}
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Password*</label>
-                <Input
-                  type="password"
-                  value={candidateFormData.password}
-                  onChange={(e) =>
-                    setCandidateFormData({
-                      ...candidateFormData,
-                      password: e.target.value,
-                    })
-                  }
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Phone Number</label>
-                <Input
-                  placeholder="+91 1234567890"
-                  value={candidateFormData.phoneNumber}
-                  onChange={(e) =>
-                    setCandidateFormData({
-                      ...candidateFormData,
-                      phoneNumber: e.target.value,
-                    })
-                  }
-                />
-              </div>
-            </div>
-            <div className="space-y-4 border-t pt-4">
-              <h4 className="font-medium text-sm">Additional Information</h4>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">College</label>
-                  <Input
-                    value={candidateFormData.extraFields.college}
-                    onChange={(e) =>
-                      setCandidateFormData({
-                        ...candidateFormData,
-                        extraFields: {
-                          ...candidateFormData.extraFields,
-                          college: e.target.value,
-                        },
-                      })
-                    }
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Course</label>
-                  <Input
-                    value={candidateFormData.extraFields.course}
-                    onChange={(e) =>
-                      setCandidateFormData({
-                        ...candidateFormData,
-                        extraFields: {
-                          ...candidateFormData.extraFields,
-                          course: e.target.value,
-                        },
-                      })
-                    }
-                  />
-                </div>
-              </div>
-              <CustomFieldsSection
-                customFields={candidateCustomFields}
-                onChange={setCandidateCustomFields}
-              />
-            </div>
-            <div className="flex justify-end gap-3 mt-4">
-              <Button
-                variant="outline"
-                onClick={() => setIsAddDialogOpen(false)}
-              >
-                Cancel
-              </Button>
-              <Button
-                variant="hero"
-                onClick={handleAddCandidate}
-                disabled={candidateSubmitting}
-              >
-                {candidateSubmitting ? (
-                  <Loader2 className="w-4 h-4 animate-spin mr-2" />
-                ) : (
-                  <Plus className="w-4 h-4 mr-2" />
-                )}
-                Add Candidate
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+      {selectedSchedule && (
+        <>
+          <AddCandidatesModal
+            open={isAddCandidatesOpen}
+            onOpenChange={setIsAddCandidatesOpen}
+            scheduleId={selectedSchedule}
+            alreadyInvitedIds={alreadyInvitedCandidateIds}
+            onSuccess={() => {
+              // Trigger reload in table
+              setInvitations((prev) => [...prev]);
+            }}
+          />
 
-      {isBulkUploadOpen && (
-        <BulkUploadCandidates
-          open={isBulkUploadOpen}
-          onOpenChange={setIsBulkUploadOpen}
-          onSuccess={fetchInvitationsData}
-        />
+          <BulkInviteModal
+            open={isBulkInviteOpen}
+            onOpenChange={setIsBulkInviteOpen}
+            scheduleId={selectedSchedule}
+            onSuccess={() => {
+              // Trigger reload in table
+              setInvitations((prev) => [...prev]);
+            }}
+          />
+        </>
       )}
+
+      <TestCandidatePreviewModal
+        isOpen={isPreviewOpen}
+        onClose={() => setIsPreviewOpen(false)}
+        test={test}
+        questions={questionsData}
+      />
     </div>
   );
 }

@@ -683,7 +683,7 @@ export default function AdminCandidates() {
                 variant="ghost"
                 size="icon"
                 onClick={(e) => { e.stopPropagation(); handleNextDetails(); }}
-                disabled={currentDetailsIndex === -1 || currentDetailsIndex >= filteredCandidates.length - 1}
+                disabled={currentDetailsIndex === -1 || currentDetailsIndex >= candidates.length - 1}
                 className="h-8 w-8 rounded-md"
               >
                 <ChevronRight className="h-4 w-4" />

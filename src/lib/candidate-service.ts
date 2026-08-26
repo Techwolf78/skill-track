@@ -39,6 +39,21 @@ export interface Candidate {
   updatedAt?: string;
 }
 
+export interface CandidateInvitation {
+  id: string;
+  scheduleId: string;
+  candidateId: string;
+  candidate?: Candidate;
+  candidateName?: string;
+  candidateEmail?: string;
+  candidatePhone?: string;
+  status: "PENDING" | "ACCEPTED" | "EXPIRED" | string;
+  sessionStatus?: "NOT_STARTED" | "IN_PROGRESS" | "SUBMITTED" | "AUTO_SUBMITTED" | "EVALUATED" | string;
+  sentAt?: string;
+  token?: string;
+  inviteLink?: string;
+}
+
 export interface CreateCandidateRequest {
   name: string;
   email: string;
@@ -128,12 +143,16 @@ export const candidateService = {
    */
   getCandidatesPage: async (
     page: number,
-    size: number
+    size: number,
+    search?: string
   ): Promise<SpringPage<Candidate>> => {
     const params = new URLSearchParams({
       page: String(page),
       size: String(size),
     });
+    if (search && search.trim()) {
+      params.set("search", search.trim());
+    }
     const response = await apiClient.get<unknown>(`/candidates?${params.toString()}`);
     const raw = response.data as Record<string, unknown>;
 
@@ -202,6 +221,84 @@ export const candidateService = {
       return all.find((c) => c.user?.id === userId) ?? null;
     } catch {
       return null;
+    }
+  },
+
+  // Get candidate by specific candidate ID
+  getCandidateById: async (id: string): Promise<Candidate | null> => {
+    try {
+      const response = await apiClient.get<Candidate>(`/candidates/${id}`);
+      const data = unwrapResponse(response);
+      return mapCandidate(data as Candidate & Record<string, unknown>);
+    } catch {
+      return null;
+    }
+  },
+
+  // Get all invitations for a specific test schedule
+  getInvitationsBySchedule: async (scheduleId: string): Promise<CandidateInvitation[]> => {
+    try {
+      // 1. Fetch invitations for this schedule
+      const response = await apiClient.get<unknown>(`/candidate-invitations/schedule/${scheduleId}`);
+      const invitationsRaw = unwrapArrayResponse(response as { data: BaseResponse<CandidateInvitation[]> | CandidateInvitation[] });
+
+      // 2. Fetch proctoring records for this schedule to get names, emails, and sessionStatus in one batch
+      let proctoringRecords: Array<{
+        candidateId: string;
+        candidateName?: string;
+        email?: string;
+        testStatus?: string;
+      }> = [];
+
+      try {
+        const procRes = await apiClient.get<unknown>(`/api/admin/proctoring/assessment-schedules/${scheduleId}/candidates`);
+        proctoringRecords = unwrapArrayResponse(procRes as { data: BaseResponse<typeof proctoringRecords> | typeof proctoringRecords });
+      } catch {
+        // proctoring records optional
+      }
+
+      const procMap = new Map(proctoringRecords.map((r) => [r.candidateId, r]));
+
+      return invitationsRaw.map((inv) => {
+        const proc = procMap.get(inv.candidateId);
+        return {
+          ...inv,
+          candidateName: inv.candidateName || proc?.candidateName || inv.candidate?.user?.name || "Candidate",
+          candidateEmail: inv.candidateEmail || proc?.email || inv.candidate?.user?.email || "—",
+          candidatePhone: inv.candidatePhone || inv.candidate?.user?.phoneNumber,
+          sessionStatus: (proc?.testStatus as CandidateInvitation["sessionStatus"]) || inv.sessionStatus || "NOT_STARTED",
+        };
+      });
+    } catch (error) {
+      console.error("Failed to fetch schedule invitations:", error);
+      return [];
+    }
+  },
+
+  // Send an invitation to a candidate for a test schedule
+  createInvitation: async (dto: { scheduleId: string; candidateId?: string; candidateEmail?: string }): Promise<CandidateInvitation> => {
+    const response = await apiClient.post<CandidateInvitation>("/candidate-invitations", dto);
+    return unwrapResponse(response);
+  },
+
+  // Revoke/delete an invitation
+  deleteInvitation: async (id: string): Promise<void> => {
+    await apiClient.delete(`/candidate-invitations/${id}`);
+  },
+
+  // Reissue an invitation (Revoke old and issue fresh token & link atomically)
+  reissueInvitation: async (scheduleId: string, candidateId: string, oldInvitationId: string): Promise<CandidateInvitation> => {
+    try {
+      const response = await apiClient.post<CandidateInvitation>(`/candidate-invitations/${oldInvitationId}/reissue`);
+      return unwrapResponse(response);
+    } catch {
+      // Fallback for environments without the atomic reissue endpoint
+      await apiClient.delete(`/candidate-invitations/${oldInvitationId}`);
+      const response = await apiClient.post<CandidateInvitation>("/candidate-invitations", {
+        scheduleId,
+        candidateId,
+      });
+      return unwrapResponse(response);
     }
   },
 };
