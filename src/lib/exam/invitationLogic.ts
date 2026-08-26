@@ -3,7 +3,7 @@
  * Used by the TestAccess gateway page.
  */
 
-export type InvitationStatus = "PENDING" | "ACCEPTED" | "EXPIRED" | "CANCELLED";
+export type InvitationStatus = "PENDING" | "ACCEPTED" | "EXPIRED" | "CANCELLED" | "SUPERSEDED";
 
 /** Returns true only for PENDING invitations (the only usable state). */
 export const isInvitationUsable = (status: InvitationStatus): boolean =>
@@ -14,6 +14,7 @@ export const getInvitationErrorMessage = (status: InvitationStatus): string | nu
   if (status === "ACCEPTED") return "This invitation has already been used.";
   if (status === "EXPIRED") return "This invitation link has expired. Please contact your administrator.";
   if (status === "CANCELLED") return "This invitation has been cancelled.";
+  if (status === "SUPERSEDED") return "This invitation link has been replaced with a newer one. Please use the most recent email link.";
   return null;
 };
 
