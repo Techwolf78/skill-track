@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { useParams, useNavigate, Link, useLocation } from "react-router-dom";
+import { useParams, useNavigate, Link, useLocation, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -80,7 +80,9 @@ import {
   ChevronRight,
   ChevronsLeft,
   ChevronsRight,
+  FileSpreadsheet,
 } from "lucide-react";
+import * as XLSX from "xlsx";
 import {
   testService,
   Test,
@@ -95,6 +97,7 @@ import { apiClient } from "@/lib/api-client";
 import { InvitedCandidatesTable } from "@/components/invite/InvitedCandidatesTable";
 import { AddCandidatesModal } from "@/components/invite/AddCandidatesModal";
 import { BulkInviteModal } from "@/components/invite/BulkInviteModal";
+import { TestCandidatePreviewModal } from "@/components/admin/TestCandidatePreviewModal";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 
@@ -107,14 +110,6 @@ import {
   MaterialDatePickerDialog,
   MaterialTimePickerDialog,
 } from "@/components/ui/material-pickers";
-
-interface CandidateInvitation {
-  id: string;
-  scheduleId?: string;
-  candidateId?: string;
-  status?: string;
-  token?: string;
-}
 
 // Report data shapes
 interface ReportCandidate {
@@ -321,22 +316,41 @@ export default function AdminTestsEdit() {
   );
   const [selectedQuestion, setSelectedQuestion] =
     useState<EnrichedTestQuestion | null>(null);
-  const [activeTab, setActiveTab] = useState<string>(() => {
-    const searchParams = new URLSearchParams(window.location.search);
-    const tabParam = searchParams.get("tab");
-    if (tabParam) return tabParam;
-    return location.state?.activeTab || "details";
-  });
+  const [searchParams, setSearchParams] = useSearchParams();
+  const activeTab = searchParams.get("tab") || location.state?.activeTab || "details";
+  const isPreviewOpen = searchParams.get("preview") === "true";
 
-  useEffect(() => {
-    const searchParams = new URLSearchParams(window.location.search);
-    const tabParam = searchParams.get("tab");
-    if (tabParam) {
-      setActiveTab(tabParam);
-    } else if (location.state?.activeTab) {
-      setActiveTab(location.state.activeTab);
-    }
-  }, [location.state, location.search]);
+  const setIsPreviewOpen = useCallback(
+    (open: boolean) => {
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev);
+          if (open) {
+            next.set("preview", "true");
+          } else {
+            next.delete("preview");
+          }
+          return next;
+        },
+        { replace: true },
+      );
+    },
+    [setSearchParams],
+  );
+
+  const changeTab = useCallback(
+    (newTab: string) => {
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev);
+          next.set("tab", newTab);
+          return next;
+        },
+        { replace: true },
+      );
+    },
+    [setSearchParams],
+  );
 
   // Invitation & schedule states
   const [invitations, setInvitations] = useState<CandidateInvitation[]>([]);
@@ -418,6 +432,7 @@ export default function AdminTestsEdit() {
     Record<string, unknown>[]
   >([]);
   const [isAdvancedReportOpen, setIsAdvancedReportOpen] = useState(false);
+  const [exportingExcel, setExportingExcel] = useState(false);
 
   const displayedCandidates = useMemo(() => {
     // Only show candidates who actually appeared (status is not NOT_STARTED)
@@ -1185,7 +1200,7 @@ To refer to the FAQ document, you can click on the HELP button which is present 
       });
 
       // Refresh invitation/schedule data (does not trigger full screen loader)
-      await fetchInvitationsData();
+      await fetchScheduleData();
       return true;
     } catch (error: unknown) {
       console.error("Failed to save schedule:", error);
@@ -1200,7 +1215,7 @@ To refer to the FAQ document, you can click on the HELP button which is present 
       setPendingTab(value);
       setUnsavedScheduleDialogOpen(true);
     } else {
-      setActiveTab(value);
+      changeTab(value);
     }
   };
 
@@ -1221,7 +1236,7 @@ To refer to the FAQ document, you can click on the HELP button which is present 
       setScheduleEndTime("");
     }
     if (pendingTab) {
-      setActiveTab(pendingTab);
+      changeTab(pendingTab);
       setPendingTab(null);
     }
     setUnsavedScheduleDialogOpen(false);
@@ -1230,7 +1245,7 @@ To refer to the FAQ document, you can click on the HELP button which is present 
   const handleSaveAndSwitch = async () => {
     const success = await handleSaveSchedule();
     if (success && pendingTab) {
-      setActiveTab(pendingTab);
+      changeTab(pendingTab);
       setPendingTab(null);
       setUnsavedScheduleDialogOpen(false);
     }
@@ -2056,6 +2071,363 @@ To refer to the FAQ document, you can click on the HELP button which is present 
     }
   };
 
+  const exportBulkExcelReport = async () => {
+    if (displayedCandidates.length === 0) {
+      toast({
+        title: "No Data to Export",
+        description: "There are no appeared candidates to export.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setExportingExcel(true);
+    toast({
+      title: "Generating Bulk Excel Export",
+      description: "Gathering candidate telemetry, scores, and submissions...",
+    });
+
+    try {
+      // 1. Fetch detailed information for all displayed candidates
+      const detailedCandidateDataList = await Promise.all(
+        displayedCandidates.map(async (candidate) => {
+          const reportKey = getReportCandidateKey(candidate);
+          const scoreData = candidateResults[reportKey];
+          const sessionId = scoreData?.sessionId;
+
+          let detailData = scoreData?.detail;
+          let paperData = null;
+          let resumeData = null;
+          let timingsList: Array<{ questionId: string; activeSeconds?: number }> = [];
+
+          try {
+            if (!detailData) {
+              const detailRes = await apiClient.get(
+                `/api/admin/proctoring/candidates/${candidate.candidateId}/details?scheduleId=${candidate.scheduleId || reportScheduleId}`,
+              );
+              detailData = detailRes.data?.data ?? detailRes.data;
+            }
+
+            if (sessionId) {
+              const [paperRes, resumeRes, timingsRes] = await Promise.all([
+                apiClient.get(`/test-sessions/${sessionId}/paper`).catch(() => ({ data: null })),
+                apiClient.get(`/test-sessions/${sessionId}/resume`).catch(() => ({ data: null })),
+                apiClient.get(`/test-sessions/${sessionId}/question-timings`).catch(() => ({ data: null })),
+              ]);
+
+              paperData = paperRes.data?.data || paperRes.data;
+              resumeData = resumeRes.data?.data || resumeRes.data;
+              timingsList = timingsRes.data?.data || timingsRes.data || [];
+            }
+          } catch (err) {
+            console.warn(`Could not fetch full details for ${candidate.candidateName}:`, err);
+          }
+
+          return {
+            candidate,
+            scoreData,
+            detailData,
+            paperData,
+            resumeData,
+            timingsList,
+          };
+        }),
+      );
+
+      // Build Summary Sheet Rows
+      const summaryRows = detailedCandidateDataList.map((item, idx) => {
+        const { candidate, scoreData, detailData } = item;
+        const totalScore = scoreData?.result?.totalScore;
+        const maxScore = scoreData?.result?.maxScore ?? totalTestMarks;
+        const percentage =
+          totalScore !== undefined && maxScore > 0
+            ? `${((totalScore / maxScore) * 100).toFixed(1)}%`
+            : "-";
+        const passed = scoreData?.result?.passed;
+        const passStatus =
+          passed !== undefined ? (passed ? "Passed" : "Failed") : "Pending";
+        const risk = detailData?.riskLevel || candidate.riskLevel || "NONE";
+        const violationCount = candidate.violationCount || detailData?.violations?.length || 0;
+        const ip = detailData?.systemInfo?.ipAddress || detailData?.ipAddress || "N/A";
+        const browser = detailData?.systemInfo?.browser || detailData?.browser || "N/A";
+        const os = detailData?.systemInfo?.os || detailData?.os || "N/A";
+        const fullscreenViolations =
+          detailData?.systemInfo?.fullscreenViolations ?? detailData?.fullscreenViolations ?? 0;
+
+        return {
+          "S.No": idx + 1,
+          "Candidate Name": candidate.candidateName || "N/A",
+          "Email Address": candidate.email || "N/A",
+          "Test Status": (candidate.testStatus || "N/A").replace(/_/g, " "),
+          "Score": totalScore !== undefined ? totalScore : 0,
+          "Max Score": maxScore,
+          "Percentage": percentage,
+          "Result": passStatus,
+          "Proctoring Risk": risk,
+          "Total Violations": violationCount,
+          "Fullscreen Exits": fullscreenViolations,
+          "IP Address": ip,
+          "Browser": browser,
+          "Operating System": os,
+          "Schedule ID": candidate.scheduleId || "N/A",
+        };
+      });
+
+      // Build Question Submissions Sheet Rows
+      const submissionRows: Array<Record<string, unknown>> = [];
+      detailedCandidateDataList.forEach((item) => {
+        const { candidate, scoreData, paperData, resumeData, timingsList } = item;
+        const questionsList =
+          paperData?.paper?.questions ||
+          questionsData.map((tq) => tq.question).filter(Boolean) ||
+          [];
+        const submissionsList = resumeData?.submissions || [];
+
+        if (questionsList.length === 0) {
+          submissionRows.push({
+            "Candidate Name": candidate.candidateName,
+            "Email Address": candidate.email,
+            "Question #": "-",
+            "Question Title / Prompt": "No questions recorded",
+            "Question Type": "-",
+            "Time Spent": "-",
+            "Candidate Answer / Code": "-",
+            "Correct Options": "-",
+            "Evaluation Status": "-",
+          });
+          return;
+        }
+
+        questionsList.forEach((q: {
+          id: string;
+          sourceQuestionId?: string;
+          prompt?: string;
+          title?: string;
+          type?: string;
+          coding?: { title?: string };
+          options?: Array<{ id: string; text: string; isCorrect: boolean }>;
+          mcqOptions?: Array<{
+            id: string;
+            text: string;
+            isCorrect: boolean;
+          }>;
+        }, qIdx: number) => {
+          const questionId = q.sourceQuestionId || q.id;
+          const sub = submissionsList.find(
+            (s: { questionId: string; answerText?: string; selectedOptionIds?: string[] }) => s.questionId === questionId,
+          ) as { questionId: string; answerText?: string; selectedOptionIds?: string[] } | undefined;
+          const isCoding = q.type === "CODING";
+
+          // Calculate time spent
+          const timeItem = timingsList.find(
+            (t) => t.questionId === questionId,
+          );
+          const activeSeconds = timeItem?.activeSeconds || 0;
+          const mins = Math.floor(activeSeconds / 60);
+          const secs = activeSeconds % 60;
+          const timeSpentText = mins > 0 ? `${mins}m ${secs}s` : `${secs}s`;
+
+          // Selected answers
+          const selectedValues = new Set<string>();
+          if (sub?.selectedOptionIds && Array.isArray(sub.selectedOptionIds)) {
+            sub.selectedOptionIds.forEach((id: string) =>
+              selectedValues.add(String(id).trim().toLowerCase()),
+            );
+          }
+          if (sub?.answerText) {
+            const rawAns = String(sub.answerText).trim();
+            selectedValues.add(rawAns.toLowerCase());
+            try {
+              const parsed = JSON.parse(sub.answerText);
+              if (Array.isArray(parsed)) {
+                parsed.forEach((id: string) =>
+                  selectedValues.add(String(id).trim().toLowerCase()),
+                );
+              } else if (typeof parsed === "string") {
+                selectedValues.add(parsed.trim().toLowerCase());
+              }
+            } catch {
+              /* raw text */
+            }
+          }
+
+          // Enriched question for correct options
+          const enrichedTQ = questionsData.find(
+            (tq) => tq.questionId === questionId,
+          );
+          const enrichedQuestion = enrichedTQ?.question;
+          const correctOptionsList =
+            (enrichedQuestion?.options ||
+              enrichedQuestion?.mcqOptions ||
+              q.options ||
+              q.mcqOptions ||
+              []) as Array<{ id?: string; text?: string; isCorrect?: boolean }>;
+
+          let candidateAnswerText = "Not Attempted";
+          let correctOptionText = "-";
+          let isCorrectSubmission = "N/A";
+
+          if (isCoding) {
+            candidateAnswerText = sub?.answerText || "No code submitted";
+            correctOptionText = "Coding Problem";
+            isCorrectSubmission = sub?.answerText ? "Submitted" : "No Submission";
+          } else {
+            const optionsList = q.options || q.mcqOptions || [];
+            const correctNames: string[] = [];
+            const selectedNames: string[] = [];
+            let anyCorrectSelected = false;
+            let anyIncorrectSelected = false;
+
+            optionsList.forEach((opt: { id?: string; text?: string; isCorrect?: boolean }, oIdx: number) => {
+              const optionLetter = String.fromCharCode(65 + oIdx);
+              const correctOpt = correctOptionsList.find(
+                (co) =>
+                  (co.id && opt.id && co.id === opt.id) ||
+                  (co.text &&
+                    opt.text &&
+                    co.text.trim().toLowerCase() ===
+                      opt.text.trim().toLowerCase()),
+              );
+              const isOptionCorrect = correctOpt
+                ? Boolean(correctOpt.isCorrect)
+                : Boolean(opt.isCorrect);
+
+              if (isOptionCorrect) {
+                correctNames.push(`(${optionLetter}) ${opt.text}`);
+              }
+
+              const optIdStr = String(opt.id || "").trim().toLowerCase();
+              const optTextStr = String(opt.text || "").trim().toLowerCase();
+              const letterStr = optionLetter.toLowerCase();
+              const idxStr = String(oIdx);
+
+              const isSelected =
+                (optIdStr !== "" && selectedValues.has(optIdStr)) ||
+                selectedValues.has(letterStr) ||
+                selectedValues.has(idxStr) ||
+                (optTextStr !== "" && selectedValues.has(optTextStr)) ||
+                Array.from(selectedValues).some(
+                  (val) =>
+                    val === optTextStr ||
+                    val.startsWith(`${letterStr}.`) ||
+                    val.startsWith(`${letterStr} `),
+                );
+
+              if (isSelected) {
+                selectedNames.push(`(${optionLetter}) ${opt.text}`);
+                if (isOptionCorrect) {
+                  anyCorrectSelected = true;
+                } else {
+                  anyIncorrectSelected = true;
+                }
+              }
+            });
+
+            correctOptionText = correctNames.join(", ") || "N/A";
+            if (selectedNames.length > 0) {
+              candidateAnswerText = selectedNames.join(", ");
+              if (anyCorrectSelected && !anyIncorrectSelected) {
+                isCorrectSubmission = "CORRECT";
+              } else {
+                isCorrectSubmission = "INCORRECT";
+              }
+            } else if (sub?.answerText) {
+              candidateAnswerText = sub.answerText;
+              isCorrectSubmission = "SUBMITTED";
+            }
+          }
+
+          submissionRows.push({
+            "Candidate Name": candidate.candidateName,
+            "Email Address": candidate.email,
+            "Question #": `Q${qIdx + 1}`,
+            "Question Title / Prompt": q.prompt || q.title || `Question ${qIdx + 1}`,
+            "Question Type": q.type || "MCQ",
+            "Time Spent": timeSpentText,
+            "Candidate Answer / Code": candidateAnswerText,
+            "Correct Answer(s)": correctOptionText,
+            "Answer Status": isCorrectSubmission,
+          });
+        });
+      });
+
+      // Build Proctoring Violations Sheet Rows
+      const violationRows: Array<Record<string, unknown>> = [];
+      detailedCandidateDataList.forEach((item) => {
+        const { candidate, detailData } = item;
+        const violations = detailData?.violations || [];
+
+        if (violations.length === 0) {
+          violationRows.push({
+            "Candidate Name": candidate.candidateName,
+            "Email Address": candidate.email,
+            "Timestamp": "-",
+            "Violation Type": "None",
+            "Severity": "INFO",
+            "Description": "Clean session - no violations recorded",
+          });
+        } else {
+          violations.forEach((v) => {
+            violationRows.push({
+              "Candidate Name": candidate.candidateName,
+              "Email Address": candidate.email,
+              "Timestamp": v.occurredAt || v.time ? new Date(v.occurredAt || v.time || "").toLocaleString() : "N/A",
+              "Violation Type": (v.eventType || "VIOLATION").replace(/_/g, " "),
+              "Severity": v.severity || "MEDIUM",
+              "Description": v.metadata?.description || v.description || "Violation recorded",
+            });
+          });
+        }
+      });
+
+      // Create Workbook and Sheets
+      const wb = XLSX.utils.book_new();
+
+      const wsSummary = XLSX.utils.json_to_sheet(summaryRows);
+      const wsSubmissions = XLSX.utils.json_to_sheet(submissionRows);
+      const wsViolations = XLSX.utils.json_to_sheet(violationRows);
+
+      // Auto-fit column widths for clear presentation
+      const autoFitCols = (rows: Array<Record<string, unknown>>) => {
+        if (!rows || rows.length === 0) return [];
+        const keys = Object.keys(rows[0]);
+        return keys.map((key) => {
+          const maxLen = rows.reduce((max, row) => {
+            const cellVal = String(row[key] ?? "");
+            return Math.max(max, cellVal.length);
+          }, key.length);
+          return { wch: Math.min(Math.max(maxLen + 3, 12), 60) };
+        });
+      };
+
+      wsSummary["!cols"] = autoFitCols(summaryRows);
+      wsSubmissions["!cols"] = autoFitCols(submissionRows);
+      wsViolations["!cols"] = autoFitCols(violationRows);
+
+      XLSX.utils.book_append_sheet(wb, wsSummary, "Candidate Performance");
+      XLSX.utils.book_append_sheet(wb, wsSubmissions, "Question Submissions");
+      XLSX.utils.book_append_sheet(wb, wsViolations, "Proctoring Violations");
+
+      const testTitleSafe = (test?.title || "Test").replace(/[^a-zA-Z0-9_-]/g, "_");
+      const dateStr = new Date().toISOString().slice(0, 10);
+      XLSX.writeFile(wb, `${testTitleSafe}_Candidate_Reports_${dateStr}.xlsx`);
+
+      toast({
+        title: "Export Completed",
+        description: `Successfully exported bulk report for ${displayedCandidates.length} candidate(s).`,
+      });
+    } catch (err) {
+      console.error("Failed to export bulk excel report:", err);
+      toast({
+        title: "Export Failed",
+        description: "An error occurred while generating the Excel report.",
+        variant: "destructive",
+      });
+    } finally {
+      setExportingExcel(false);
+    }
+  };
+
   const formatDateTime = (dateStr: string) => {
     if (!dateStr) return "";
     return new Date(dateStr).toLocaleString();
@@ -2109,6 +2481,15 @@ To refer to the FAQ document, you can click on the HELP button which is present 
           </div>
         </div>
         <div className="flex gap-2">
+          <Button
+            variant="outline"
+            onClick={() => setIsPreviewOpen(true)}
+            className="border-indigo-500/30 text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-950/20 font-semibold gap-1.5"
+            title="Preview the exact assessment experience as seen by candidates"
+          >
+            <Eye className="w-4 h-4 text-indigo-500" />
+            Preview Test
+          </Button>
           <Button
             variant="outline"
             onClick={() => setDeleteDialogOpen(true)}
@@ -3126,13 +3507,26 @@ To refer to the FAQ document, you can click on the HELP button which is present 
                   variant="outline"
                   size="icon"
                   onClick={() => loadReportData()}
-                  disabled={loadingReports}
+                  disabled={loadingReports || exportingExcel}
                   className="shrink-0"
                   title="Refresh Reports"
                 >
                   <RefreshCw
                     className={`w-4 h-4 ${loadingReports ? "animate-spin" : ""}`}
                   />
+                </Button>
+                <Button
+                  onClick={exportBulkExcelReport}
+                  disabled={loadingReports || exportingExcel || displayedCandidates.length === 0}
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white gap-2 shrink-0 font-semibold shadow-sm"
+                  title="Export all candidate reports, scores, submissions, and proctoring telemetry to a single Excel file"
+                >
+                  {exportingExcel ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <FileSpreadsheet className="w-4 h-4" />
+                  )}
+                  {exportingExcel ? "Exporting..." : "Export Excel"}
                 </Button>
               </div>
             </CardHeader>
@@ -3864,6 +4258,13 @@ To refer to the FAQ document, you can click on the HELP button which is present 
           />
         </>
       )}
+
+      <TestCandidatePreviewModal
+        isOpen={isPreviewOpen}
+        onClose={() => setIsPreviewOpen(false)}
+        test={test}
+        questions={questionsData}
+      />
     </div>
   );
 }
