@@ -56,6 +56,7 @@ const NewAdminLayout = React.lazy(() => import("./pages/New-Admin/NewAdminLayout
 const NewAdminTests = React.lazy(() => import("./pages/New-Admin/NewAdminTests"));
 const NewAdminHome = React.lazy(() => import("./pages/New-Admin/NewAdminHome"));
 const NewAdminLibrary = React.lazy(() => import("./pages/New-Admin/NewAdminLibrary"));
+const NewAdminQuestionCreate = React.lazy(() => import("./pages/New-Admin/NewAdminQuestionCreate"));
 
 // Test Taking
 const TestInterface = React.lazy(() => import("./pages/test/TestInterface"));
@@ -226,6 +227,14 @@ const App = () => (
                 <Route path="tests" element={<NewAdminTests />} />
                 <Route path="library" element={<NewAdminLibrary />} />
               </Route>
+
+              {/* Standalone Full-Screen Question Create / Edit for New-Admin (No 2nd Navbar) */}
+              <Route path="/new-admin/questions/create" element={<NewAdminQuestionCreate />} />
+              <Route path="/new-admin/library/create" element={<NewAdminQuestionCreate />} />
+
+              {/* Standalone Full-Screen Playground for New-Admin (No Sidebars) */}
+              <Route path="/new-admin/playground/:id" element={<DSAPlayground />} />
+              <Route path="/new-admin/questions/playground/:id" element={<DSAPlayground />} />
 
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />

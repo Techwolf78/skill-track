@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Search,
   ShoppingBag,
@@ -24,6 +25,10 @@ import {
   FileCode,
   CheckCircle2,
   AlertCircle,
+  Terminal,
+  Info,
+  Save,
+  Copy,
 } from "lucide-react";
 import * as XLSX from "xlsx";
 import {
@@ -98,6 +103,39 @@ const DEFAULT_FORM: FormState = {
 
 const fmt = (s?: string) =>
   s ? s.charAt(0).toUpperCase() + s.slice(1).toLowerCase() : "—";
+
+const getQuestionMcqType = (q: any): string => {
+  if (q.mcqType) {
+    const raw = String(q.mcqType).toUpperCase();
+    if (raw !== "SINGLE_CORRECT" && raw !== "MCQ") return raw;
+  }
+  const opts = (q.mcqOptions || q.options || []).map((o: any) =>
+    (typeof o === "string" ? o : o.text || "").toLowerCase().trim()
+  );
+  if (
+    opts.length === 2 &&
+    ((opts[0] === "true" && opts[1] === "false") ||
+      (opts[0] === "false" && opts[1] === "true"))
+  ) {
+    return "TRUE_FALSE";
+  }
+  const fullText = `${q.title || ""} ${q.prompt || ""}`.toLowerCase();
+  if (
+    fullText.includes("assertion") ||
+    fullText.includes("reason (r)") ||
+    fullText.includes("(a) and (r)")
+  ) {
+    return "ASSERTION_REASON";
+  }
+  if (
+    fullText.includes("fill in the blank") ||
+    fullText.includes("_____") ||
+    fullText.includes("__________")
+  ) {
+    return "FILL_IN_THE_BLANK";
+  }
+  return q.multipleCorrect ? "MULTIPLE_CORRECT" : "SINGLE_CORRECT";
+};
 
 const fmtMcqType = (t?: string) => {
   if (!t) return null;
@@ -176,339 +214,156 @@ const Sel = ({
   </div>
 );
 
-// ─── Create Question Panel ────────────────────────────────────────────────────
+// ─── Step 1: Create Problem Initial Modal (DoSelect Style) ───────────────────
 
-function CreateQuestionPanel({
+function CreateProblemModal({
+  isOpen,
   onClose,
-  onCreated,
+  onCreate,
+  onOpenBulkUploader,
 }: {
+  isOpen: boolean;
   onClose: () => void;
-  onCreated?: (vis: LibraryType) => void;
+  onCreate: (initialData: {
+    title: string;
+    questionType: "CODING" | "MCQ";
+    mcqType: McqType;
+    difficulty: "EASY" | "MEDIUM" | "HARD";
+  }) => void;
+  onOpenBulkUploader: () => void;
 }) {
-  const [form, setForm] = useState<FormState>(DEFAULT_FORM);
-  const [tagInput, setTagInput] = useState("");
-  const [subtopics, setSubtopics] = useState<{ id: string; name: string }[]>([]);
-  const [topicsForSubject, setTopicsForSubject] = useState<{ id: string; name: string }[]>([]);
+  const [name, setName] = useState("");
+  const [problemCategory, setProblemCategory] = useState<string>("MCQ");
+  const [level, setLevel] = useState<"EASY" | "MEDIUM" | "HARD">("MEDIUM");
 
-  const { data: subjects = [] } = useSubjectsQuery();
-  const { data: allTopics = [] } = useTopicsQuery();
-  const createMutation = useCreateQuestionMutation();
+  if (!isOpen) return null;
 
-  // Cascade: subject → topics
-  useEffect(() => {
-    if (!form.subject_id) { setTopicsForSubject([]); return; }
-    const filtered = allTopics.filter((t) => t.subjectId === form.subject_id);
-    setTopicsForSubject(filtered);
-    setForm((f) => ({ ...f, topic_id: "", subtopic_id: "" }));
-    setSubtopics([]);
-  }, [form.subject_id, allTopics]);
-
-  // Cascade: topic → subtopics
-  useEffect(() => {
-    if (!form.topic_id) { setSubtopics([]); return; }
-    testService.getSubtopicsByTopic(form.topic_id)
-      .then(setSubtopics)
-      .catch(() => setSubtopics([]));
-    setForm((f) => ({ ...f, subtopic_id: "" }));
-  }, [form.topic_id]);
-
-  const set = (field: Partial<FormState>) => setForm((f) => ({ ...f, ...field }));
-
-  // MCQ option helpers
-  const setOption = (i: number, text: string) =>
-    set({ mcqOptions: form.mcqOptions.map((o, j) => (j === i ? { ...o, text } : o)) });
-  const toggleCorrect = (i: number) => {
-    const single = !form.multipleCorrect;
-    set({
-      mcqOptions: form.mcqOptions.map((o, j) => ({
-        ...o,
-        isCorrect: single ? j === i : j === i ? !o.isCorrect : o.isCorrect,
-      })),
-    });
-  };
-  const addOption = () => set({ mcqOptions: [...form.mcqOptions, { text: "", isCorrect: false }] });
-  const removeOption = (i: number) =>
-    set({ mcqOptions: form.mcqOptions.filter((_, j) => j !== i) });
-
-  // Tags
-  const addTag = () => {
-    const t = tagInput.trim();
-    if (t && !form.tags.includes(t)) set({ tags: [...form.tags, t] });
-    setTagInput("");
-  };
-  const removeTag = (t: string) => set({ tags: form.tags.filter((x) => x !== t) });
-
-  const handleSubmit = async () => {
-    if (!form.subject_id) { toast.error("Subject is required"); return; }
-    if (!form.prompt.trim()) { toast.error("Prompt is required"); return; }
-
-    const filledOptions = form.mcqOptions.filter((o) => o.text.trim());
-    if (filledOptions.length < 2) { toast.error("At least 2 non-empty options required"); return; }
-    if (!filledOptions.some((o) => o.isCorrect)) { toast.error("Mark at least one correct answer"); return; }
-
-    const dto: CreateQuestionRequest = {
-      questionType: "MCQ",
-      prompt: form.prompt.trim(),
-      subject_id: form.subject_id,
-      topic_id: form.topic_id || undefined,
-      subtopic_id: form.subtopic_id || undefined,
-      marks: form.marks,
-      difficulty: form.difficulty,
-      visibility: form.visibility || "ORG_OWNED",
-      avg_time_seconds: form.avg_time_seconds !== "" ? Number(form.avg_time_seconds) : 90,
-      domain: "ENGINEERING",
-      cognitiveLevel: "APPLY",
-      p_value: 0.45,
-      discrimination_index: 0.35,
-      status: "ACTIVE",
-      mcqType: form.mcqType,
-      multipleCorrect: form.multipleCorrect,
-      shuffleOptions: form.shuffleOptions,
-      mcqOptions: filledOptions,
-      title: form.title.trim() || undefined,
-      tags: form.tags.length ? form.tags : undefined,
-    };
-
-    console.log("[CreateQuestion] Submitting MCQ payload:", dto);
-
-    try {
-      const created = await createMutation.mutateAsync(dto);
-      console.log("[CreateQuestion] Server returned created question:", created);
-      toast.success("Question created successfully");
-      if (onCreated) {
-        onCreated(form.visibility || "ORG_OWNED");
-      }
-      onClose();
-    } catch (err) {
-      console.error("[CreateQuestion] Error creating question:", err);
-      toast.error("Failed to create question. Please try again.");
+  const handleCreate = () => {
+    if (!name.trim()) {
+      toast.error("Please enter a question name");
+      return;
     }
+
+    const isCoding = problemCategory === "CODING";
+    let mcqType: McqType = "SINGLE_CORRECT";
+    if (problemCategory === "TRUE_FALSE") mcqType = "TRUE_FALSE";
+    else if (problemCategory === "ASSERTION_REASON") mcqType = "ASSERTION_REASON";
+    else if (problemCategory === "FILL_IN_THE_BLANK") mcqType = "FILL_IN_THE_BLANK";
+    else if (problemCategory === "MULTIPLE_CORRECT") mcqType = "MULTIPLE_CORRECT";
+
+    onCreate({
+      title: name.trim(),
+      questionType: isCoding ? "CODING" : "MCQ",
+      mcqType,
+      difficulty: level,
+    });
+    setName("");
   };
 
   return (
-    <div className="flex flex-col h-full overflow-hidden bg-white">
-      {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 shrink-0 bg-slate-50/50">
-        <div>
-          <p className="text-sm font-semibold text-slate-800">New MCQ Question</p>
-          <p className="text-[11px] text-slate-400">Add a multiple choice question to the bank</p>
-        </div>
-        <button onClick={onClose} className="p-1 rounded-md hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition-colors">
-          <X className="w-4 h-4" />
-        </button>
-      </div>
-
-      {/* Scrollable body */}
-      <div className="overflow-y-auto flex-1 px-4 py-4 space-y-4 text-xs">
-        {/* Title */}
-        <div>
-          <label className="block text-[11px] font-medium text-slate-500 mb-1">Title</label>
-          <input
-            className="w-full border border-slate-200 rounded-md px-3 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-400"
-            placeholder="Short descriptive title"
-            value={form.title}
-            onChange={(e) => set({ title: e.target.value })}
-          />
-        </div>
-
-        {/* Subject / Topic / Subtopic */}
-        <div className="grid grid-cols-1 gap-2">
-          <div>
-            <label className="block text-[11px] font-medium text-slate-500 mb-1">Subject *</label>
-            <Sel value={form.subject_id} onChange={(v) => set({ subject_id: v })}>
-              <option value="">Select subject</option>
-              {subjects.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-            </Sel>
-          </div>
-          <div className="grid grid-cols-2 gap-2">
-            <div>
-              <label className="block text-[11px] font-medium text-slate-500 mb-1">Topic</label>
-              <Sel value={form.topic_id} onChange={(v) => set({ topic_id: v })}>
-                <option value="">None</option>
-                {topicsForSubject.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-              </Sel>
-            </div>
-            <div>
-              <label className="block text-[11px] font-medium text-slate-500 mb-1">Subtopic</label>
-              <Sel value={form.subtopic_id} onChange={(v) => set({ subtopic_id: v })}>
-                <option value="">None</option>
-                {subtopics.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-              </Sel>
-            </div>
-          </div>
-        </div>
-
-        {/* Marks / Difficulty */}
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="block text-[11px] font-medium text-slate-500 mb-1">Marks *</label>
-            <input
-              type="number"
-              min={1}
-              value={form.marks}
-              onChange={(e) => set({ marks: Number(e.target.value) })}
-              className="w-full border border-slate-200 rounded-md px-3 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-400"
-            />
-          </div>
-          <div>
-            <label className="block text-[11px] font-medium text-slate-500 mb-1">Difficulty</label>
-            <Sel value={form.difficulty} onChange={(v) => set({ difficulty: v as any })}>
-              <option value="EASY">Easy</option>
-              <option value="MEDIUM">Medium</option>
-              <option value="HARD">Hard</option>
-            </Sel>
-          </div>
-        </div>
-
-        {/* Description (Prompt) */}
-        <div>
-          <label className="block text-[11px] font-medium text-slate-500 mb-1">Description *</label>
-          <textarea
-            rows={4}
-            className="w-full border border-slate-200 rounded-md px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-400 resize-none"
-            placeholder="Enter the question description here..."
-            value={form.prompt}
-            onChange={(e) => set({ prompt: e.target.value })}
-          />
-        </div>
-
-        {/* ── MCQ Settings & Options ── */}
-        <div>
-          <label className="block text-[11px] font-medium text-slate-500 mb-1">MCQ Subtype</label>
-          <Sel value={form.mcqType} onChange={(v) => {
-            const multi = v === "MULTIPLE_CORRECT";
-            set({ mcqType: v as McqType, multipleCorrect: multi });
-          }}>
-            <option value="SINGLE_CORRECT">Single Correct</option>
-            <option value="MULTIPLE_CORRECT">Multiple Correct</option>
-            <option value="TRUE_FALSE">True / False</option>
-            <option value="ASSERTION_REASON">Assertion Reason</option>
-            <option value="FILL_IN_THE_BLANK">Fill in Blank</option>
-          </Sel>
-        </div>
-
-        {/* Shuffle options toggle card */}
-        <div className="flex items-center justify-between p-2.5 rounded-md border border-slate-200/80 bg-slate-50/50">
-          <div>
-            <span className="block text-[11px] font-medium text-slate-700">Shuffle options</span>
-            <span className="block text-[10px] text-slate-400">Randomize option order for test takers</span>
-          </div>
-          <input
-            type="checkbox"
-            checked={form.shuffleOptions}
-            onChange={(e) => set({ shuffleOptions: e.target.checked })}
-            className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
-          />
-        </div>
-
-        {/* Options */}
-        <div>
-          <label className="block text-[11px] font-medium text-slate-500 mb-2">
-            Options — {form.multipleCorrect ? "click checkboxes" : "click radio"} to mark correct
-          </label>
-          <div className="space-y-2">
-            {form.mcqOptions.map((opt, i) => (
-              <div key={i} className="flex items-center gap-2">
-                <button
-                  onClick={() => toggleCorrect(i)}
-                  className={`shrink-0 w-4 h-4 rounded-${form.multipleCorrect ? "sm" : "full"} border-2 flex items-center justify-center transition-colors ${
-                    opt.isCorrect
-                      ? "border-emerald-500 bg-emerald-500 text-white"
-                      : "border-slate-300 hover:border-emerald-400"
-                  }`}
-                >
-                  {opt.isCorrect && <Check className="w-2.5 h-2.5" />}
-                </button>
-                <input
-                  className="flex-1 border border-slate-200 rounded-md px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-400"
-                  placeholder={`Option ${i + 1}`}
-                  value={opt.text}
-                  onChange={(e) => setOption(i, e.target.value)}
-                />
-                {form.mcqOptions.length > 2 && (
-                  <button onClick={() => removeOption(i)} className="text-slate-300 hover:text-rose-500 transition-colors">
-                    <X className="w-3.5 h-3.5" />
-                  </button>
-                )}
-              </div>
-            ))}
-          </div>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 animate-in fade-in duration-150">
+      <div className="w-full max-w-xl bg-white shadow-2xl overflow-hidden border border-slate-200">
+        {/* Blue Header Bar */}
+        <div className="bg-[#4353a4] text-white px-6 py-4 flex items-center justify-between">
+          <h2 className="text-base font-semibold tracking-wide">Create new problem</h2>
           <button
-            onClick={addOption}
-            className="mt-2 flex items-center gap-1 text-[11px] text-indigo-600 hover:text-indigo-700 font-medium"
+            onClick={onClose}
+            className="text-white/80 hover:text-white transition-colors p-1 hover:bg-white/10"
           >
-            <Plus className="w-3 h-3" /> Add Option
+            <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* Tags */}
-        <div>
-          <label className="block text-[11px] font-medium text-slate-500 mb-1">Tags</label>
-          <div className="flex gap-2">
+        {/* Modal Form Body */}
+        <div className="p-6 space-y-6">
+          {/* Name Field */}
+          <div className="space-y-1">
+            <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider">
+              Name
+            </label>
             <input
-              className="flex-1 border border-slate-200 rounded-md px-3 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-400"
-              placeholder="e.g. arrays, dp, sorting"
-              value={tagInput}
-              onChange={(e) => setTagInput(e.target.value)}
-              onKeyDown={(e) => { if (e.key === "Enter" || e.key === ",") { e.preventDefault(); addTag(); } }}
+              type="text"
+              placeholder="e.g. Find Peak Element"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleCreate()}
+              autoFocus
+              className="w-full border-b-2 border-slate-200 focus:border-[#4353a4] px-1 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none transition-colors"
             />
-            <button onClick={addTag} className="px-3 py-1.5 rounded-md bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs font-medium transition-colors">
-              Add
-            </button>
+            <p className="text-[11px] text-slate-400">A descriptive name helps.</p>
           </div>
-          {form.tags.length > 0 && (
-            <div className="flex flex-wrap gap-1.5 mt-2">
-              {form.tags.map((t) => (
-                <span key={t} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-200 text-[11px] font-medium">
-                  {t}
-                  <button onClick={() => removeTag(t)}><X className="w-2.5 h-2.5" /></button>
-                </span>
-              ))}
+
+          {/* Type & Level Dropdowns */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
+            <div className="space-y-1">
+              <label className="block text-xs font-semibold text-[#4353a4]">
+                Problem type
+              </label>
+              <div className="relative border-b-2 border-[#4353a4]">
+                <select
+                  value={problemCategory}
+                  onChange={(e) => setProblemCategory(e.target.value)}
+                  className="w-full appearance-none bg-transparent py-2 pr-8 text-sm text-slate-800 font-medium focus:outline-none cursor-pointer"
+                >
+                  <option value="CODING">Coding</option>
+                  <option value="MCQ">Multiple-choice</option>
+                  <option value="TRUE_FALSE">True / False</option>
+                  <option value="ASSERTION_REASON">Assertion Reason</option>
+                  <option value="FILL_IN_THE_BLANK">Fill in the blanks</option>
+                </select>
+                <ChevronDown className="pointer-events-none absolute right-1 top-1/2 -translate-y-1/2 w-4 h-4 text-[#4353a4]" />
+              </div>
             </div>
-          )}
-        </div>
 
-        {/* Visibility & Avg Solve Time */}
-        <div className="grid grid-cols-2 gap-2">
-          <div>
-            <label className="block text-[11px] font-medium text-slate-500 mb-1">Visibility</label>
-            <Sel value={form.visibility} onChange={(v) => set({ visibility: v as any })}>
-              <option value="ORG_OWNED">Org Owned</option>
-            </Sel>
+            <div className="space-y-1">
+              <label className="block text-xs font-semibold text-slate-500">
+                Level
+              </label>
+              <div className="relative border-b-2 border-slate-200 focus-within:border-[#4353a4]">
+                <select
+                  value={level}
+                  onChange={(e) => setLevel(e.target.value as any)}
+                  className="w-full appearance-none bg-transparent py-2 pr-8 text-sm text-slate-800 font-medium focus:outline-none cursor-pointer"
+                >
+                  <option value="EASY">Easy</option>
+                  <option value="MEDIUM">Medium</option>
+                  <option value="HARD">Hard</option>
+                </select>
+                <ChevronDown className="pointer-events-none absolute right-1 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+              </div>
+            </div>
           </div>
-          <div>
-            <label className="block text-[11px] font-medium text-slate-500 mb-1">Avg Solve Time (s)</label>
-            <input
-              type="number"
-              min={0}
-              placeholder="e.g. 90"
-              value={form.avg_time_seconds}
-              onChange={(e) => set({ avg_time_seconds: e.target.value === "" ? "" : Number(e.target.value) })}
-              className="w-full border border-slate-200 rounded-md px-3 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-400"
-            />
+
+          {/* Bottom Actions Row */}
+          <div className="flex items-center justify-between pt-6 border-t border-slate-100">
+            <button
+              onClick={() => {
+                onClose();
+                onOpenBulkUploader();
+              }}
+              className="flex items-center gap-2 text-xs font-medium text-slate-600 hover:text-[#4353a4] transition-colors cursor-pointer"
+            >
+              <Upload className="w-4 h-4 text-slate-400" />
+              <span>Use the bulk uploader</span>
+            </button>
+
+            <div className="flex items-center gap-3">
+              <button
+                onClick={onClose}
+                className="px-4 py-2 text-xs font-bold text-rose-500 hover:text-rose-600 uppercase tracking-wider transition-colors cursor-pointer"
+              >
+                CANCEL
+              </button>
+              <button
+                onClick={handleCreate}
+                disabled={!name.trim()}
+                className="px-5 py-2 text-xs font-bold rounded bg-slate-200 text-slate-700 hover:bg-[#4353a4] hover:text-white disabled:opacity-40 disabled:hover:bg-slate-200 disabled:hover:text-slate-700 uppercase tracking-wider transition-all cursor-pointer shadow-xs"
+              >
+                CREATE
+              </button>
+            </div>
           </div>
         </div>
-      </div>
-
-      {/* Sticky Footer */}
-      <div className="px-4 py-3 border-t border-slate-100 flex gap-2 shrink-0 bg-white shadow-[0_-2px_10px_rgba(0,0,0,0.03)] z-10">
-        <button
-          onClick={onClose}
-          className="flex-1 py-2 rounded-md border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition-colors"
-        >
-          Cancel
-        </button>
-        <button
-          onClick={handleSubmit}
-          disabled={createMutation.isPending}
-          className="flex-1 py-2 rounded-md bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
-        >
-          {createMutation.isPending ? (
-            <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Saving...</>
-          ) : (
-            <><Check className="w-3.5 h-3.5" /> Save Question</>
-          )}
-        </button>
       </div>
     </div>
   );
@@ -636,20 +491,183 @@ function ImportQuestionsDialog({
 
       const multipleCorrect = options.filter((o) => o.isCorrect).length > 1;
 
+      let mcqType: "SINGLE_CORRECT" | "MULTIPLE_CORRECT" | "TRUE_FALSE" | "ASSERTION_REASON" | "FILL_IN_THE_BLANK" =
+        multipleCorrect ? "MULTIPLE_CORRECT" : "SINGLE_CORRECT";
+
+      const optTexts = options.map((o) => o.text.toLowerCase().trim());
+      const isTF =
+        optTexts.length === 2 &&
+        ((optTexts[0] === "true" && optTexts[1] === "false") ||
+          (optTexts[0] === "false" && optTexts[1] === "true"));
+
+      const rawSubtype = String(norm.subtype || norm.mcqtype || norm.type || "").toUpperCase();
+      const fullText = `${norm.title || ""} ${prompt || ""}`.toLowerCase();
+
+      if (isTF || rawSubtype.includes("TRUE") || rawSubtype.includes("FALSE")) {
+        mcqType = "TRUE_FALSE";
+      } else if (
+        rawSubtype.includes("ASSERT") ||
+        fullText.includes("assertion") ||
+        fullText.includes("reason (r)") ||
+        fullText.includes("(a) and (r)")
+      ) {
+        mcqType = "ASSERTION_REASON";
+      } else if (
+        rawSubtype.includes("BLANK") ||
+        rawSubtype.includes("FILL") ||
+        fullText.includes("fill in the blank") ||
+        fullText.includes("_____") ||
+        fullText.includes("__________")
+      ) {
+        mcqType = "FILL_IN_THE_BLANK";
+      }
+
       return {
         ...(base as CreateQuestionRequest),
-        mcqType: multipleCorrect ? "MULTIPLE_CORRECT" : "SINGLE_CORRECT",
+        mcqType,
         multipleCorrect,
-        shuffleOptions: true,
+        shuffleOptions: mcqType !== "TRUE_FALSE" && mcqType !== "ASSERTION_REASON",
         mcqOptions: options,
       };
     } else {
+      // ─── Extract or Generate 2-3 Sample Test Cases + 6-7 Hidden Test Cases ───
+      const rawTestCases: Array<{
+        input: string;
+        expectedOutput: string;
+        sample: boolean;
+        weight: number;
+        explanation?: string;
+      }> = [];
+
+      // 1. Check explicit columns in spreadsheet (e.g. Sample Input 1..3, Hidden Input 1..7)
+      for (let i = 1; i <= 5; i++) {
+        const inVal = norm[`sampleinput${i}`] || norm[`sample_input_${i}`] || norm[`sample_input${i}`] || (i === 1 ? (norm.sampleinput || norm.sample_input || norm.input) : null);
+        const outVal = norm[`sampleoutput${i}`] || norm[`sample_output_${i}`] || norm[`sample_output${i}`] || (i === 1 ? (norm.sampleoutput || norm.sample_output || norm.output || norm.expectedoutput || norm.expected_output) : null);
+        const expVal = norm[`sampleexplanation${i}`] || norm[`sample_explanation_${i}`] || (i === 1 ? (norm.sampleexplanation || norm.explanation) : undefined);
+        if (inVal && outVal) {
+          rawTestCases.push({
+            input: String(inVal).trim(),
+            expectedOutput: String(outVal).trim(),
+            sample: true,
+            weight: 10,
+            explanation: expVal ? String(expVal).trim() : undefined,
+          });
+        }
+      }
+
+      for (let i = 1; i <= 10; i++) {
+        const inVal = norm[`hiddeninput${i}`] || norm[`hidden_input_${i}`] || norm[`hidden_input${i}`] || norm[`testcase${i}input`] || norm[`testcase_${i}_input`];
+        const outVal = norm[`hiddenoutput${i}`] || norm[`hidden_output_${i}`] || norm[`hidden_output${i}`] || norm[`testcase${i}output`] || norm[`testcase_${i}_output`];
+        if (inVal && outVal) {
+          rawTestCases.push({
+            input: String(inVal).trim(),
+            expectedOutput: String(outVal).trim(),
+            sample: false,
+            weight: 10,
+          });
+        }
+      }
+
+      // 2. If no explicit columns, parse from prompt & explanation text (e.g. Example 1, Example 2, Input: ... Output: ...)
+      if (rawTestCases.length === 0) {
+        const fullText = `${norm.prompt || prompt || ""}\n${norm.sampleexplanation || ""}\n${norm.constraints || ""}`;
+        const exampleRegex = /(?:Example\s*(\d+)|\*\*Example\s*(\d+)\*\*|###\s*Example\s*(\d+))[\s\S]*?(?:Input|\*\*Input:\*\*)\s*[:\.]?\s*`?([^`\n\r]+)`?[\s\S]*?(?:Output|\*\*Output:\*\*)\s*[:\.]?\s*`?([^`\n\r]+)`?(?:[\s\S]*?(?:Explanation|\*\*Explanation:\*\*)\s*[:\.]?\s*([^\n\r]+))?/gi;
+        
+        let match;
+        while ((match = exampleRegex.exec(fullText)) !== null && rawTestCases.length < 3) {
+          const rawIn = match[4]?.trim();
+          const rawOut = match[5]?.trim();
+          const rawExp = match[6]?.trim();
+          if (rawIn && rawOut) {
+            rawTestCases.push({
+              input: rawIn.replace(/^nums\s*=\s*/i, "").replace(/^coins\s*=\s*/i, "").trim(),
+              expectedOutput: rawOut.trim(),
+              sample: true,
+              weight: 15,
+              explanation: rawExp || undefined,
+            });
+          }
+        }
+      }
+
+      // 3. Ensure at least 2-3 sample test cases and 6-7 hidden test cases for robust grading
+      const pLower = (norm.title || prompt || "").toLowerCase();
+      
+      // Fallback base examples tailored for common standard problems if empty
+      if (rawTestCases.filter((t) => t.sample).length < 2) {
+        if (pLower.includes("coin") || pLower.includes("change") || pLower.includes("amount")) {
+          rawTestCases.push(
+            { input: "[1, 2, 5]\n11", expectedOutput: "3", sample: true, weight: 10, explanation: "11 = 5 + 5 + 1 (3 coins)" },
+            { input: "[2]\n3", expectedOutput: "-1", sample: true, weight: 10, explanation: "Cannot make amount 3 with denomination 2" },
+            { input: "[1]\n0", expectedOutput: "0", sample: true, weight: 10, explanation: "0 amount requires 0 coins" }
+          );
+        } else if (pLower.includes("subarray") || pLower.includes("k elements") || pLower.includes("sliding")) {
+          rawTestCases.push(
+            { input: "[2, 1, 5, 1, 3, 2]\n3", expectedOutput: "9", sample: true, weight: 10, explanation: "Subarray [5, 1, 3] gives max sum 9" },
+            { input: "[2, 3, 4, 1, 5]\n2", expectedOutput: "7", sample: true, weight: 10, explanation: "Subarray [3, 4] gives sum 7" },
+            { input: "[1, 2, 3]\n1", expectedOutput: "3", sample: true, weight: 10, explanation: "Max single element is 3" }
+          );
+        } else {
+          rawTestCases.push(
+            { input: "[2, 7, 11, 15]\n9", expectedOutput: "[0, 1]", sample: true, weight: 10, explanation: "nums[0] + nums[1] == 9" },
+            { input: "[3, 2, 4]\n6", expectedOutput: "[1, 2]", sample: true, weight: 10, explanation: "nums[1] + nums[2] == 6" },
+            { input: "[3, 3]\n6", expectedOutput: "[0, 1]", sample: true, weight: 10, explanation: "nums[0] + nums[1] == 6" }
+          );
+        }
+      }
+
+      // Add 6-7 hidden test cases for edge cases, large numbers, boundary tests
+      const currentHidden = rawTestCases.filter((t) => !t.sample);
+      if (currentHidden.length < 6) {
+        if (pLower.includes("coin") || pLower.includes("change")) {
+          rawTestCases.push(
+            { input: "[1, 3, 4, 5]\n7", expectedOutput: "2", sample: false, weight: 10 },
+            { input: "[186, 419, 83, 408]\n6249", expectedOutput: "20", sample: false, weight: 10 },
+            { input: "[2, 4, 6, 8]\n15", expectedOutput: "-1", sample: false, weight: 10 },
+            { input: "[1]\n10000", expectedOutput: "10000", sample: false, weight: 10 },
+            { input: "[1, 2, 5, 10, 20, 50, 100]\n999", expectedOutput: "14", sample: false, weight: 10 },
+            { input: "[3, 7, 405, 436]\n8839", expectedOutput: "25", sample: false, weight: 10 },
+            { input: "[2, 5, 10, 1]\n27", expectedOutput: "4", sample: false, weight: 10 }
+          );
+        } else if (pLower.includes("subarray") || pLower.includes("sliding")) {
+          rawTestCases.push(
+            { input: "[-1, -2, -3, -4]\n2", expectedOutput: "-3", sample: false, weight: 10 },
+            { input: "[10, 20, 30, 40, 50]\n5", expectedOutput: "150", sample: false, weight: 10 },
+            { input: "[1, 4, 2, 10, 23, 3, 1, 0, 20]\n4", expectedOutput: "39", sample: false, weight: 10 },
+            { input: "[100, 200, 300, 400]\n2", expectedOutput: "700", sample: false, weight: 10 },
+            { input: "[5, -10, 20, -5, 30, 40]\n3", expectedOutput: "65", sample: false, weight: 10 },
+            { input: "[0, 0, 0, 0, 0]\n3", expectedOutput: "0", sample: false, weight: 10 },
+            { input: "[9, 1, 8, 2, 7, 3, 6, 4, 5]\n3", expectedOutput: "18", sample: false, weight: 10 }
+          );
+        } else {
+          rawTestCases.push(
+            { input: "[1, 5, 9, 13, 17]\n22", expectedOutput: "[1, 3]", sample: false, weight: 10 },
+            { input: "[-3, 4, 3, 90]\n0", expectedOutput: "[0, 2]", sample: false, weight: 10 },
+            { input: "[0, 4, 3, 0]\n0", expectedOutput: "[0, 3]", sample: false, weight: 10 },
+            { input: "[-1, -2, -3, -4, -5]\n-8", expectedOutput: "[2, 4]", sample: false, weight: 10 },
+            { input: "[1000000, 500, 2000000]\n3000000", expectedOutput: "[0, 2]", sample: false, weight: 10 },
+            { input: "[2, 5, 5, 11]\n10", expectedOutput: "[1, 2]", sample: false, weight: 10 },
+            { input: "[1, 2, 3, 4, 5, 6, 7, 8, 9, 10]\n19", expectedOutput: "[8, 9]", sample: false, weight: 10 }
+          );
+        }
+      }
+
+      // Balance weights to sum exactly 100
+      const totalCount = rawTestCases.length;
+      const baseWeight = Math.floor(100 / totalCount);
+      const remainder = 100 - baseWeight * totalCount;
+      const finalTestCases = rawTestCases.map((tc, idx) => ({
+        ...tc,
+        weight: baseWeight + (idx === 0 ? remainder : 0),
+      }));
+
       return {
         ...(base as CreateQuestionRequest),
         constraints: norm.constraints || undefined,
         timeLimitSecs: Number(norm.timelimit || norm.timelimitsecs) || 2,
         memoryLimitMb: Number(norm.memorylimit || norm.memorylimitmb) || 256,
         sampleExplanation: norm.sampleexplanation || norm.explanation || undefined,
+        testCases: finalTestCases,
         languageTemplates: {
           java: { code: "// Write your code here", lang: "java", langSlug: "java" },
           python: { code: "# Write your code here", lang: "python", langSlug: "python" },
@@ -757,13 +775,36 @@ function ImportQuestionsDialog({
       {
         Title: "Two Sum Problem",
         Type: "Coding",
-        Prompt: "Given an array of integers nums and an integer target, return indices of the two numbers such that they add up to target.",
+        Prompt: "You are given an array of integers `nums` and an integer `target`, return indices of the two numbers such that they add up to `target`.",
         Difficulty: "Easy",
-        Marks: 5,
+        Marks: 10,
         "Time Limit (s)": 2,
         "Memory Limit (MB)": 256,
-        Tags: "arrays, hashmap, algorithms",
-        "Avg Time (s)": 300,
+        Constraints: "2 <= nums.length <= 10^4\n-10^9 <= nums[i] <= 10^9\n-10^9 <= target <= 10^9\nOnly one valid answer exists.",
+        "Sample Explanation": "Input: nums = [2,7,11,15], target = 9\nOutput: [0,1]\nExplanation: Because nums[0] + nums[1] == 9, we return [0, 1].",
+        Tags: "arrays, hash-table, algorithms",
+        "Avg Time (s)": 600,
+        "Sample Input 1": "[2, 7, 11, 15]\n9",
+        "Sample Output 1": "[0, 1]",
+        "Sample Explanation 1": "Because nums[0] + nums[1] == 9, we return [0, 1].",
+        "Sample Input 2": "[3, 2, 4]\n6",
+        "Sample Output 2": "[1, 2]",
+        "Sample Input 3": "[3, 3]\n6",
+        "Sample Output 3": "[0, 1]",
+        "Hidden Input 1": "[1, 5, 9, 13, 17]\n22",
+        "Hidden Output 1": "[1, 3]",
+        "Hidden Input 2": "[-3, 4, 3, 90]\n0",
+        "Hidden Output 2": "[0, 2]",
+        "Hidden Input 3": "[0, 4, 3, 0]\n0",
+        "Hidden Output 3": "[0, 3]",
+        "Hidden Input 4": "[-1, -2, -3, -4, -5]\n-8",
+        "Hidden Output 4": "[2, 4]",
+        "Hidden Input 5": "[1000000, 500, 2000000]\n3000000",
+        "Hidden Output 5": "[0, 2]",
+        "Hidden Input 6": "[2, 5, 5, 11]\n10",
+        "Hidden Output 6": "[1, 2]",
+        "Hidden Input 7": "[1, 2, 3, 4, 5, 6, 7, 8, 9, 10]\n19",
+        "Hidden Output 7": "[8, 9]",
       },
       {
         Title: "Thread Safety in Java HashMap",
@@ -887,7 +928,7 @@ function ImportQuestionsDialog({
           topic_id,
           subtopic_id,
           visibility: "ORG_OWNED" as const,
-          mcqType: multipleCorrect ? ("MULTIPLE_CORRECT" as const) : ("SINGLE_CORRECT" as const),
+          mcqType: q.mcqType || (multipleCorrect ? "MULTIPLE_CORRECT" : "SINGLE_CORRECT"),
           multipleCorrect,
           shuffleOptions: q.shuffleOptions ?? true,
           marks: Math.max(1, Number(q.marks) || 1),
@@ -929,6 +970,7 @@ function ImportQuestionsDialog({
             javascript: { code: "// Write your code here", lang: "javascript", langSlug: "javascript" },
           },
           signatureMetadata: q.signatureMetadata || { functionName: "solve" },
+          testCases: q.testCases || [],
         };
       }
     });
@@ -948,7 +990,7 @@ function ImportQuestionsDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="w-[94vw] max-w-3xl bg-white rounded-xl border border-slate-200/90 p-5 sm:p-6 space-y-4 max-h-[88vh] overflow-y-auto overflow-x-hidden box-border shadow-2xl">
+      <DialogContent className="w-[94vw] max-w-3xl bg-white border border-slate-200/90 p-5 sm:p-6 space-y-4 max-h-[88vh] overflow-y-auto overflow-x-hidden box-border shadow-2xl">
         <DialogHeader className="pr-8 pb-3 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5">
           <div className="min-w-0 flex-1">
             <DialogTitle className="text-base font-bold text-slate-900 leading-tight">
@@ -961,7 +1003,7 @@ function ImportQuestionsDialog({
           <div className="flex flex-wrap items-center gap-1.5 shrink-0">
             <button
               onClick={downloadSampleExcel}
-              className="flex items-center gap-1 px-2 py-1.5 rounded-md border border-slate-200 text-[11px] font-medium text-slate-700 hover:bg-slate-50 transition-colors cursor-pointer"
+              className="flex items-center gap-1 px-2 py-1.5 border border-slate-200 text-[11px] font-medium text-slate-700 hover:bg-slate-50 transition-colors cursor-pointer"
               title="Download Sample MCQ Excel Template"
             >
               <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
@@ -969,7 +1011,7 @@ function ImportQuestionsDialog({
             </button>
             <button
               onClick={downloadSampleCodingExcel}
-              className="flex items-center gap-1 px-2 py-1.5 rounded-md border border-slate-200 text-[11px] font-medium text-slate-700 hover:bg-slate-50 transition-colors cursor-pointer"
+              className="flex items-center gap-1 px-2 py-1.5 border border-slate-200 text-[11px] font-medium text-slate-700 hover:bg-slate-50 transition-colors cursor-pointer"
               title="Download Sample Coding Questions Excel Template"
             >
               <FileSpreadsheet className="w-3.5 h-3.5 text-blue-600" />
@@ -977,7 +1019,7 @@ function ImportQuestionsDialog({
             </button>
             <button
               onClick={downloadSampleJson}
-              className="flex items-center gap-1 px-2 py-1.5 rounded-md border border-slate-200 text-[11px] font-medium text-slate-700 hover:bg-slate-50 transition-colors cursor-pointer"
+              className="flex items-center gap-1 px-2 py-1.5 border border-slate-200 text-[11px] font-medium text-slate-700 hover:bg-slate-50 transition-colors cursor-pointer"
               title="Download Sample JSON Template"
             >
               <FileCode className="w-3.5 h-3.5 text-amber-600" />
@@ -990,7 +1032,7 @@ function ImportQuestionsDialog({
         <div className="flex items-center gap-2 border-b border-slate-100 pb-2.5">
           <button
             onClick={() => setActiveTab("FILE")}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all cursor-pointer ${
+            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold transition-all cursor-pointer ${
               activeTab === "FILE"
                 ? "bg-indigo-50 text-indigo-700 border border-indigo-200"
                 : "text-slate-600 hover:bg-slate-100"
@@ -1001,7 +1043,7 @@ function ImportQuestionsDialog({
           </button>
           <button
             onClick={() => setActiveTab("JSON")}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all cursor-pointer ${
+            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold transition-all cursor-pointer ${
               activeTab === "JSON"
                 ? "bg-indigo-50 text-indigo-700 border border-indigo-200"
                 : "text-slate-600 hover:bg-slate-100"
@@ -1013,14 +1055,14 @@ function ImportQuestionsDialog({
         </div>
 
         {/* Default Subject Fallback */}
-        <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 p-3 bg-slate-50 rounded-lg border border-slate-200/80">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 p-3 bg-slate-50 border border-slate-200/80">
           <label className="text-xs font-semibold text-slate-700 shrink-0">
             Default Subject:
           </label>
           <select
             value={defaultSubjectId}
             onChange={(e) => setDefaultSubjectId(e.target.value)}
-            className="flex-1 min-w-0 bg-white border border-slate-200 rounded-md px-2.5 py-1.5 text-xs text-slate-800 focus:outline-none cursor-pointer"
+            className="flex-1 min-w-0 bg-white border border-slate-200 px-2.5 py-1.5 text-xs text-slate-800 focus:outline-none cursor-pointer"
           >
             {subjects.map((s) => (
               <option key={s.id} value={s.id}>
@@ -1036,7 +1078,7 @@ function ImportQuestionsDialog({
         {/* Tab Content */}
         {activeTab === "FILE" ? (
           <div className="w-full">
-            <label className="flex flex-col items-center justify-center p-6 sm:p-8 border-2 border-dashed border-slate-200 hover:border-indigo-400 rounded-xl bg-slate-50/50 hover:bg-slate-50 cursor-pointer transition-colors w-full">
+            <label className="flex flex-col items-center justify-center p-6 sm:p-8 border-2 border-dashed border-slate-200 hover:border-indigo-400 bg-slate-50/50 hover:bg-slate-50 cursor-pointer transition-colors w-full">
               <Upload className="w-8 h-8 text-slate-400 mb-2" />
               <p className="text-xs font-semibold text-slate-700 text-center truncate max-w-full px-2">
                 {fileName ? fileName : "Click to select or drag & drop questions file"}
@@ -1062,14 +1104,14 @@ function ImportQuestionsDialog({
               value={jsonText}
               onChange={(e) => handleJsonChange(e.target.value)}
               placeholder="[ { &quot;questionType&quot;: &quot;MCQ&quot;, &quot;prompt&quot;: &quot;...&quot;, &quot;title&quot;: &quot;...&quot; } ]"
-              className="w-full font-mono text-xs p-3 border border-slate-200 rounded-lg bg-slate-50 focus:outline-none focus:bg-white focus:ring-1 focus:ring-indigo-400 box-border"
+              className="w-full font-mono text-xs p-3 border border-slate-200 bg-slate-50 focus:outline-none focus:bg-white focus:ring-1 focus:ring-indigo-400 box-border"
             />
           </div>
         )}
 
         {/* Error Alert */}
         {parseError && (
-          <div className="flex items-center gap-2 p-3 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 text-xs">
+          <div className="flex items-center gap-2 p-3 bg-rose-50 border border-rose-200 text-rose-700 text-xs">
             <AlertCircle className="w-4 h-4 shrink-0" />
             <span className="flex-1 break-words">{parseError}</span>
           </div>
@@ -1084,7 +1126,7 @@ function ImportQuestionsDialog({
                 Parsed {parsedQuestions.length} Questions Ready for Import:
               </span>
             </div>
-            <div className="max-h-48 overflow-y-auto overflow-x-hidden border border-slate-200 rounded-lg divide-y divide-slate-100 bg-white w-full">
+            <div className="max-h-48 overflow-y-auto overflow-x-hidden border border-slate-200 divide-y divide-slate-100 bg-white w-full">
               {parsedQuestions.map((q, idx) => (
                 <div key={idx} className="p-3 text-xs flex items-start justify-between gap-3 hover:bg-slate-50/70 transition-colors w-full">
                   <div className="min-w-0 flex-1 space-y-0.5">
@@ -1096,10 +1138,10 @@ function ImportQuestionsDialog({
                     </p>
                   </div>
                   <div className="flex items-center gap-1.5 shrink-0 pt-0.5">
-                    <span className="px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 text-[10px] font-semibold">
+                    <span className="px-1.5 py-0.5 bg-slate-100 text-slate-600 text-[10px] font-semibold">
                       {q.questionType}
                     </span>
-                    <span className="px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 text-[10px]">
+                    <span className="px-1.5 py-0.5 bg-slate-100 text-slate-600 text-[10px]">
                       {q.difficulty || "MEDIUM"}
                     </span>
                     <span className="text-[11px] text-slate-500 font-mono">
@@ -1116,14 +1158,14 @@ function ImportQuestionsDialog({
         <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
           <button
             onClick={onClose}
-            className="px-4 py-2 rounded-lg border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition-colors cursor-pointer"
+            className="px-4 py-2 border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition-colors cursor-pointer"
           >
             Cancel
           </button>
           <button
             onClick={handleBulkSubmit}
             disabled={bulkCreateMutation.isPending || parsedQuestions.length === 0}
-            className="px-4 py-2 rounded-lg bg-[#6366F1] hover:bg-[#4F46E5] disabled:opacity-50 text-white text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-sm cursor-pointer"
+            className="px-4 py-2 bg-[#6366F1] hover:bg-[#4F46E5] disabled:opacity-50 text-white text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-sm cursor-pointer"
           >
             {bulkCreateMutation.isPending ? (
               <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Importing...</>
@@ -1146,22 +1188,37 @@ function PreviewDialog({
   question: Question | null;
   onClose: () => void;
 }) {
+  const navigate = useNavigate();
   if (!question) return null;
+  const isCoding = (question.questionType ?? "").toUpperCase() === "CODING";
+
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-xl bg-white rounded-md border border-slate-200 p-5 space-y-4 max-h-[80vh] overflow-y-auto">
-        <DialogHeader>
+      <DialogContent className="max-w-xl bg-white border border-slate-200 p-5 space-y-4 max-h-[80vh] overflow-y-auto">
+        <DialogHeader className="flex flex-row items-center justify-between gap-3">
           <DialogTitle className="text-sm font-bold text-slate-900">
             {question.title || "Question Preview"}
           </DialogTitle>
+          {isCoding && (
+            <button
+              onClick={() => {
+                onClose();
+                navigate(`/new-admin/playground/${question.id}`);
+              }}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#6366F1] hover:bg-[#4F46E5] text-white text-xs font-semibold shadow-sm transition-colors cursor-pointer shrink-0 mr-4"
+            >
+              <Terminal className="w-3.5 h-3.5" />
+              <span>Open Playground</span>
+            </button>
+          )}
         </DialogHeader>
         <div className="space-y-3 text-xs">
           <div className="flex gap-2 flex-wrap">
-            <Badge variant="outline" className="rounded-md">{question.questionType}</Badge>
-            {question.difficulty && <Badge variant="secondary" className="rounded-md">{fmt(question.difficulty)}</Badge>}
-            {question.mcqType && <Badge variant="outline" className="rounded-md">{fmtMcqType(question.mcqType)}</Badge>}
+            <Badge variant="outline">{question.questionType}</Badge>
+            {question.difficulty && <Badge variant="secondary">{fmt(question.difficulty)}</Badge>}
+            {question.mcqType && <Badge variant="outline">{fmtMcqType(question.mcqType)}</Badge>}
           </div>
-          <div className="p-3 rounded-md bg-slate-50 border border-slate-200 text-slate-800">
+          <div className="p-3 bg-slate-50 border border-slate-200 text-slate-800">
             <p className="font-semibold text-slate-600 mb-1.5">Problem Statement</p>
             <p className="whitespace-pre-wrap leading-relaxed">{question.prompt || "—"}</p>
           </div>
@@ -1172,7 +1229,7 @@ function PreviewDialog({
                 {question.mcqOptions.map((opt, i) => (
                   <div
                     key={i}
-                    className={`px-3 py-2 rounded-md border text-xs flex items-center justify-between ${
+                    className={`px-3 py-2 border text-xs flex items-center justify-between ${
                       opt.isCorrect
                         ? "bg-emerald-50 border-emerald-300 text-emerald-900 font-medium"
                         : "bg-white border-slate-200 text-slate-700"
@@ -1188,7 +1245,7 @@ function PreviewDialog({
           {question.tags && question.tags.length > 0 && (
             <div className="flex flex-wrap gap-1.5">
               {question.tags.map((t, i) => (
-                <span key={i} className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 border border-slate-200 text-[11px]">{t}</span>
+                <span key={i} className="px-2 py-0.5 bg-slate-100 text-slate-600 border border-slate-200 text-[11px]">{t}</span>
               ))}
             </div>
           )}
@@ -1201,14 +1258,18 @@ function PreviewDialog({
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export default function NewAdminLibrary() {
+  const navigate = useNavigate();
   const { data: dbQuestions = [], isLoading, isError, refetch } = useQuestionsQuery();
 
   const [selectedLibrary, setSelectedLibrary] = useState<LibraryType>("PUBLIC");
   const [problemType, setProblemType] = useState<ProblemType>("ALL");
   const [sortBy, setSortBy] = useState<SortOption>("NEWEST");
   const [searchQuery, setSearchQuery] = useState("");
+  const [techSearch, setTechSearch] = useState("");
+  const [tagSearch, setTagSearch] = useState("");
+  const [selectedLevel, setSelectedLevel] = useState<"ALL" | "EASY" | "MEDIUM" | "HARD">("ALL");
   const [previewQuestion, setPreviewQuestion] = useState<Question | null>(null);
-  const [showCreate, setShowCreate] = useState(false);
+  const [createModalOpen, setCreateModalOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
@@ -1252,11 +1313,30 @@ export default function NewAdminLibrary() {
         } else if (problemType === "MCQ") {
           if (qt !== "MCQ") return false;
         } else {
-          // Specific MCQ Subtype filter
+          // Specific MCQ Subtype filter (TRUE_FALSE, ASSERTION_REASON, FILL_IN_THE_BLANK)
           if (qt !== "MCQ") return false;
-          const mt = (q.mcqType ?? (q.multipleCorrect ? "MULTIPLE_CORRECT" : "SINGLE_CORRECT")).toUpperCase();
+          const mt = getQuestionMcqType(q);
           if (mt !== problemType) return false;
         }
+      }
+      if (selectedLevel !== "ALL") {
+        const diff = (q.difficulty ?? "").toUpperCase();
+        if (diff !== selectedLevel) return false;
+      }
+      if (techSearch.trim()) {
+        const ts = techSearch.trim().toLowerCase();
+        const hit =
+          (q.subject?.name ?? "").toLowerCase().includes(ts) ||
+          (q.topic?.name ?? "").toLowerCase().includes(ts) ||
+          (q.subtopic?.name ?? "").toLowerCase().includes(ts) ||
+          (q.tags ?? []).some((t) => t.toLowerCase().includes(ts)) ||
+          (q.title ?? "").toLowerCase().includes(ts);
+        if (!hit) return false;
+      }
+      if (tagSearch.trim()) {
+        const ts = tagSearch.trim().toLowerCase();
+        const hasTag = (q.tags ?? []).some((t) => t.toLowerCase().includes(ts));
+        if (!hasTag) return false;
       }
       if (searchQuery.trim()) {
         const s = searchQuery.toLowerCase();
@@ -1285,12 +1365,12 @@ export default function NewAdminLibrary() {
       }
       return 0;
     });
-  }, [dbQuestions, selectedLibrary, problemType, searchQuery, sortBy]);
+  }, [dbQuestions, selectedLibrary, problemType, selectedLevel, techSearch, tagSearch, searchQuery, sortBy]);
 
   // Reset page when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [selectedLibrary, problemType, searchQuery, sortBy, pageSize]);
+  }, [selectedLibrary, problemType, selectedLevel, techSearch, tagSearch, searchQuery, sortBy, pageSize]);
 
   const totalQuestions = filteredQuestions.length;
   const totalPages = Math.ceil(totalQuestions / pageSize) || 1;
@@ -1308,7 +1388,7 @@ export default function NewAdminLibrary() {
       {/* ── Left Sidebar ── */}
       <aside className="w-full lg:w-56 shrink-0 space-y-4">
         {/* Available Libraries Card (DoSelect Style) */}
-        <div className="bg-white rounded-md border border-slate-200/80 shadow-[0_1px_3px_rgba(0,0,0,0.04)] py-4 overflow-hidden space-y-4">
+        <div className="bg-white border border-slate-200/80 shadow-[0_1px_3px_rgba(0,0,0,0.04)] py-4 overflow-hidden space-y-4">
           <p className="text-xs font-normal text-slate-500 px-4">Available libraries</p>
           <div className="space-y-3">
             {/* RxOne Public Questions */}
@@ -1354,11 +1434,17 @@ export default function NewAdminLibrary() {
         </div>
 
         {/* Filters Card */}
-        <div className="bg-white rounded-lg border border-slate-200/80 shadow-[0_1px_3px_rgba(0,0,0,0.03)] p-4 space-y-3.5">
+        <div className="bg-white border border-slate-200/80 shadow-[0_1px_3px_rgba(0,0,0,0.03)] p-4 space-y-3.5">
           <div className="flex items-center justify-between pb-2 border-b border-slate-100">
             <span className="text-xs font-semibold text-slate-800">Filters</span>
             <button
-              onClick={() => { setProblemType("ALL"); setSearchQuery(""); }}
+              onClick={() => {
+                setProblemType("ALL");
+                setSearchQuery("");
+                setTechSearch("");
+                setTagSearch("");
+                setSelectedLevel("ALL");
+              }}
               className="text-[11px] font-semibold text-blue-600 hover:text-blue-700 uppercase tracking-wider transition-colors cursor-pointer"
             >
               Clear All
@@ -1380,7 +1466,7 @@ export default function NewAdminLibrary() {
                   <button
                     key={item.key}
                     onClick={() => setProblemType(item.key as ProblemType)}
-                    className={`px-2.5 py-1.5 text-xs rounded-md font-medium transition-all cursor-pointer ${
+                    className={`px-2.5 py-1.5 text-xs font-medium transition-all cursor-pointer ${
                       active
                         ? "bg-[#1E293B] text-white shadow-sm"
                         : "bg-slate-100 text-slate-600 hover:bg-slate-200 hover:text-slate-900"
@@ -1393,14 +1479,79 @@ export default function NewAdminLibrary() {
             </div>
           </div>
         </div>
+
+        {/* Technologies Card (DoSelect Style) */}
+        <div className="bg-white border border-slate-200/80 shadow-[0_1px_3px_rgba(0,0,0,0.03)] p-4 space-y-2.5">
+          <p className="text-xs font-semibold text-slate-700">Technologies</p>
+          <div className="relative">
+            <input
+              type="text"
+              placeholder="Search for a technology..."
+              value={techSearch}
+              onChange={(e) => setTechSearch(e.target.value)}
+              className="w-full border-b border-slate-200 focus:border-[#4353a4] text-xs text-slate-800 placeholder-slate-400 py-1.5 focus:outline-none bg-transparent"
+            />
+            {techSearch && (
+              <button
+                onClick={() => setTechSearch("")}
+                className="absolute right-0 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Tags Card (DoSelect Style) */}
+        <div className="bg-white border border-slate-200/80 shadow-[0_1px_3px_rgba(0,0,0,0.03)] p-4 space-y-2.5">
+          <p className="text-xs font-semibold text-slate-700">Tags</p>
+          <div className="relative">
+            <input
+              type="text"
+              placeholder="Search for a tag..."
+              value={tagSearch}
+              onChange={(e) => setTagSearch(e.target.value)}
+              className="w-full border-b border-slate-200 focus:border-[#4353a4] text-xs text-slate-800 placeholder-slate-400 py-1.5 focus:outline-none bg-transparent"
+            />
+            {tagSearch && (
+              <button
+                onClick={() => setTagSearch("")}
+                className="absolute right-0 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Other Filters Card (Level Dropdown) */}
+        <div className="bg-white border border-slate-200/80 shadow-[0_1px_3px_rgba(0,0,0,0.03)] p-4 space-y-3">
+          <p className="text-xs font-semibold text-slate-700">Other filters</p>
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-slate-600 font-medium">Level</span>
+            <div className="relative flex items-center">
+              <select
+                value={selectedLevel}
+                onChange={(e) => setSelectedLevel(e.target.value as any)}
+                className="appearance-none bg-transparent pr-5 pl-1 py-1 text-xs font-medium text-slate-700 focus:outline-none cursor-pointer"
+              >
+                <option value="ALL">All</option>
+                <option value="EASY">Easy</option>
+                <option value="MEDIUM">Medium</option>
+                <option value="HARD">Hard</option>
+              </select>
+              <ChevronDown className="pointer-events-none absolute right-0 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-600" />
+            </div>
+          </div>
+        </div>
       </aside>
 
       {/* ── Right Main Area ── */}
-      <main className={`flex-1 w-full space-y-4 transition-all min-w-0 ${showCreate ? "lg:max-w-[calc(100%-14rem-27rem-1.25rem)]" : ""}`}>
+      <main className="flex-1 w-full space-y-4 min-w-0">
         {/* Search + Sort + Create Button (DoSelect Style) */}
-        <div className="bg-white rounded-lg border border-slate-200/80 shadow-[0_1px_3px_rgba(0,0,0,0.03)] p-3 flex flex-wrap items-center gap-3">
+        <div className="bg-white border border-slate-200/80 shadow-[0_1px_3px_rgba(0,0,0,0.03)] p-3 flex flex-wrap items-center gap-3">
           {/* Search Input */}
-          <div className="flex-1 min-w-[240px] flex items-center gap-2.5 border border-slate-200/90 rounded-lg px-3.5 py-2.5 bg-white text-xs">
+          <div className="flex-1 min-w-[240px] flex items-center gap-2.5 border border-slate-200/90 px-3.5 py-2.5 bg-white text-xs">
             <Search className="w-4 h-4 text-slate-400 shrink-0" />
             <input
               type="text"
@@ -1410,14 +1561,14 @@ export default function NewAdminLibrary() {
               className="flex-1 text-xs text-slate-800 placeholder-slate-400 focus:outline-none bg-transparent min-w-0"
             />
             {searchQuery && (
-              <button onClick={() => setSearchQuery("")} className="text-slate-400 hover:text-slate-600">
+              <button onClick={() => setSearchQuery("")} className="text-slate-400 hover:text-slate-600 cursor-pointer">
                 <X className="w-3.5 h-3.5" />
               </button>
             )}
           </div>
 
           {/* Sort Dropdown Button */}
-          <div className="relative flex items-center border border-slate-200/90 rounded-lg px-3.5 py-2.5 bg-white text-xs text-slate-700 font-normal hover:bg-slate-50/50 transition-colors">
+          <div className="relative flex items-center border border-slate-200/90 px-3.5 py-2.5 bg-white text-xs text-slate-700 font-normal hover:bg-slate-50/50 transition-colors">
             <ArrowUpDown className="w-3.5 h-3.5 text-slate-500 mr-2 shrink-0" />
             <select
               value={sortBy}
@@ -1432,7 +1583,7 @@ export default function NewAdminLibrary() {
           {/* Import Questions Button */}
           <button
             onClick={() => setImportOpen(true)}
-            className="shrink-0 flex items-center gap-1.5 px-3.5 py-2.5 rounded-lg text-xs font-semibold border border-slate-200/90 text-slate-700 bg-white hover:bg-slate-50 transition-all shadow-none cursor-pointer"
+            className="shrink-0 flex items-center gap-1.5 px-3.5 py-2.5 text-xs font-semibold border border-slate-200/90 text-slate-700 bg-white hover:bg-slate-50 transition-all shadow-none cursor-pointer"
           >
             <Upload className="w-3.5 h-3.5 text-slate-500" />
             <span>Import Questions</span>
@@ -1440,20 +1591,16 @@ export default function NewAdminLibrary() {
 
           {/* Create Question Button */}
           <button
-            onClick={() => setShowCreate((v) => !v)}
-            className={`shrink-0 flex items-center gap-1.5 px-4 py-2.5 rounded-lg text-xs font-semibold shadow-sm transition-all cursor-pointer ${
-              showCreate
-                ? "bg-slate-100 text-slate-700 hover:bg-slate-200"
-                : "bg-[#6366F1] hover:bg-[#4F46E5] text-white"
-            }`}
+            onClick={() => setCreateModalOpen(true)}
+            className="shrink-0 flex items-center gap-1.5 px-4 py-2.5 text-xs font-semibold shadow-sm bg-[#6366F1] hover:bg-[#4F46E5] text-white transition-all cursor-pointer"
           >
-            {showCreate ? <X className="w-3.5 h-3.5" /> : <Plus className="w-3.5 h-3.5" />}
-            {showCreate ? "Close" : "Create Question"}
+            <Plus className="w-3.5 h-3.5" />
+            <span>Create Question</span>
           </button>
         </div>
 
         {/* Questions List */}
-        <div className="bg-white rounded-md border border-slate-200 overflow-hidden">
+        <div className="bg-white border border-slate-200 overflow-hidden">
           {isLoading ? (
             <div className="py-16 flex justify-center items-center gap-2 text-slate-400 text-xs">
               <Loader2 className="w-4 h-4 animate-spin text-indigo-500" />
@@ -1464,7 +1611,7 @@ export default function NewAdminLibrary() {
               <p className="text-slate-600 font-medium">Failed to load questions from server.</p>
               <button
                 onClick={() => refetch()}
-                className="px-3 py-1.5 rounded-md bg-indigo-600 text-white text-xs font-semibold hover:bg-indigo-700 transition-colors"
+                className="px-3 py-1.5 bg-indigo-600 text-white text-xs font-semibold hover:bg-indigo-700 transition-colors cursor-pointer"
               >
                 Retry
               </button>
@@ -1474,7 +1621,7 @@ export default function NewAdminLibrary() {
               <p>No questions match the current filters.</p>
               <button
                 onClick={() => { setProblemType("ALL"); setSearchQuery(""); }}
-                className="px-3 py-1.5 rounded-md bg-slate-100 text-slate-700 text-xs font-semibold hover:bg-slate-200"
+                className="px-3 py-1.5 bg-slate-100 text-slate-700 text-xs font-semibold hover:bg-slate-200 cursor-pointer"
               >
                 Reset Filters
               </button>
@@ -1492,15 +1639,24 @@ export default function NewAdminLibrary() {
                         {q.title || "Not available"}
                       </h3>
                       <div className="flex items-center gap-3 shrink-0 text-slate-400">
+                        {isCoding && (
+                          <button
+                            onClick={() => navigate(`/new-admin/playground/${q.id}`)}
+                            className="p-0.5 hover:text-indigo-600 transition-colors cursor-pointer"
+                            title="Open Playground"
+                          >
+                            <Terminal className="w-4 h-4" />
+                          </button>
+                        )}
                         <button
                           onClick={() => setPreviewQuestion(q)}
-                          className="p-0.5 hover:text-slate-700 transition-colors"
+                          className="p-0.5 hover:text-slate-700 transition-colors cursor-pointer"
                           title="Preview Question"
                         >
                           <Monitor className="w-4 h-4" />
                         </button>
                         <button
-                          className="p-0.5 hover:text-slate-700 transition-colors"
+                          className="p-0.5 hover:text-slate-700 transition-colors cursor-pointer"
                           title="Question Statistics"
                         >
                           <BarChart2 className="w-4 h-4" />
@@ -1515,10 +1671,10 @@ export default function NewAdminLibrary() {
                         <span>{isCoding ? "Coding" : "MCQ"}</span>
                       </div>
 
-                      {!isCoding && q.mcqType && (
+                      {!isCoding && (
                         <div className="flex items-center gap-1">
                           <span className="text-slate-400 text-[11px] leading-none">⊙</span>
-                          <span>{fmtMcqType(q.mcqType)}</span>
+                          <span>{fmtMcqType(getQuestionMcqType(q))}</span>
                         </div>
                       )}
 
@@ -1543,7 +1699,7 @@ export default function NewAdminLibrary() {
                         q.tags.map((t, idx) => (
                           <span
                             key={idx}
-                            className="text-[11px] px-2 py-0.5 rounded bg-slate-100/90 text-slate-600 font-normal"
+                            className="text-[11px] px-2 py-0.5 bg-slate-100/90 text-slate-600 font-normal border border-slate-200"
                           >
                             {t}
                           </span>
@@ -1566,10 +1722,10 @@ export default function NewAdminLibrary() {
 
         {/* Pagination Card (DoSelect Style) */}
         {!isLoading && !isError && totalQuestions > 0 && (
-          <div className="bg-white rounded-md border border-slate-200/80 shadow-[0_1px_3px_rgba(0,0,0,0.04)] p-3 flex flex-wrap items-center justify-end gap-5 text-xs text-slate-600">
+          <div className="bg-white border border-slate-200/80 shadow-[0_1px_3px_rgba(0,0,0,0.04)] p-3 flex flex-wrap items-center justify-end gap-5 text-xs text-slate-600">
             {/* Page Selector */}
             <div className="flex items-center gap-1.5">
-              <span className="px-1.5 py-0.5 rounded bg-slate-100 text-[10px] font-semibold text-slate-500 tracking-wider">
+              <span className="px-1.5 py-0.5 bg-slate-100 text-[10px] font-semibold text-slate-500 tracking-wider">
                 PAGE:
               </span>
               <div className="relative flex items-center">
@@ -1590,7 +1746,7 @@ export default function NewAdminLibrary() {
 
             {/* Rows per page selector */}
             <div className="flex items-center gap-1.5">
-              <span className="px-1.5 py-0.5 rounded bg-slate-100 text-[10px] font-semibold text-slate-500 tracking-wider">
+              <span className="px-1.5 py-0.5 bg-slate-100 text-[10px] font-semibold text-slate-500 tracking-wider">
                 ROWS PER PAGE:
               </span>
               <div className="relative flex items-center">
@@ -1612,7 +1768,7 @@ export default function NewAdminLibrary() {
             </div>
 
             {/* Record range badge */}
-            <span className="px-2 py-0.5 rounded bg-slate-100 text-[11px] font-medium text-slate-600">
+            <span className="px-2 py-0.5 bg-slate-100 text-[11px] font-medium text-slate-600">
               {startRecord} - {endRecord} OF {totalQuestions}
             </span>
 
@@ -1621,7 +1777,7 @@ export default function NewAdminLibrary() {
               <button
                 onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
                 disabled={currentPage <= 1}
-                className="p-1 rounded hover:bg-slate-100 text-slate-500 hover:text-slate-800 disabled:opacity-30 disabled:hover:bg-transparent transition-colors cursor-pointer disabled:cursor-not-allowed"
+                className="p-1 hover:bg-slate-100 text-slate-500 hover:text-slate-800 disabled:opacity-30 disabled:hover:bg-transparent transition-colors cursor-pointer disabled:cursor-not-allowed"
                 title="Previous page"
               >
                 <ChevronLeft className="w-4 h-4" />
@@ -1629,7 +1785,7 @@ export default function NewAdminLibrary() {
               <button
                 onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
                 disabled={currentPage >= totalPages}
-                className="p-1 rounded hover:bg-slate-100 text-slate-500 hover:text-slate-800 disabled:opacity-30 disabled:hover:bg-transparent transition-colors cursor-pointer disabled:cursor-not-allowed"
+                className="p-1 hover:bg-slate-100 text-slate-500 hover:text-slate-800 disabled:opacity-30 disabled:hover:bg-transparent transition-colors cursor-pointer disabled:cursor-not-allowed"
                 title="Next page"
               >
                 <ChevronRight className="w-4 h-4" />
@@ -1639,18 +1795,16 @@ export default function NewAdminLibrary() {
         )}
       </main>
 
-      {/* ── Create Panel (slide in from right) ── */}
-      {showCreate && (
-        <div className="w-full lg:w-[420px] shrink-0 bg-white rounded-md border border-slate-200 flex flex-col h-[calc(100vh-120px)] sticky top-4 shadow-sm overflow-hidden z-20">
-          <CreateQuestionPanel
-            onClose={() => setShowCreate(false)}
-            onCreated={(vis) => {
-              setSelectedLibrary(vis);
-              setSortBy("NEWEST");
-            }}
-          />
-        </div>
-      )}
+      {/* Step 1: Create Problem Modal (DoSelect Style) */}
+      <CreateProblemModal
+        isOpen={createModalOpen}
+        onClose={() => setCreateModalOpen(false)}
+        onCreate={(initialData) => {
+          setCreateModalOpen(false);
+          navigate("/new-admin/questions/create", { state: initialData });
+        }}
+        onOpenBulkUploader={() => setImportOpen(true)}
+      />
 
       {/* Preview Dialog */}
       <PreviewDialog question={previewQuestion} onClose={() => setPreviewQuestion(null)} />

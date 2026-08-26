@@ -152,6 +152,13 @@ export interface CreateQuestionRequest {
   signatureMetadata?: SignatureMetadata;
   languageTemplates?: LanguageTemplates;
   examples?: Array<{ input: string; output: string; explanation?: string }>;
+  testCases?: Array<{
+    input: string;
+    expectedOutput: string;
+    sample?: boolean;
+    weight?: number;
+    explanation?: string;
+  }>;
   visibility?: "PUBLIC" | "ORG_OWNED";
   // Extended Enterprise Metadata
   domain?: "ENGINEERING" | "BUSINESS" | "APTITUDE" | "CORPORATE" | "VERBAL_ABILITY";

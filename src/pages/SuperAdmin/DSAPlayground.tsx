@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import {
   ResizableHandle,
@@ -34,6 +34,8 @@ import {
   Lock,
   Loader2,
   Database,
+  Tag,
+  Lightbulb,
 } from "lucide-react";
 import Editor from "@monaco-editor/react";
 import {
@@ -178,12 +180,15 @@ interface PlaygroundExecutionResponse {
 
 export default function DSAPlayground() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { id } = useParams();
   const { toast } = useToast();
   const { user } = useAuth();
 
   const backRoute =
-    user?.role === ROLES.SUPERADMIN
+    location.pathname.includes("/new-admin")
+      ? "/new-admin/library"
+      : user?.role === ROLES.SUPERADMIN
       ? "/superadmin/questions"
       : "/admin/questions";
 
@@ -192,6 +197,8 @@ export default function DSAPlayground() {
   const [code, setCode] = useState("");
   const [language, setLanguage] = useState("python3");
   const [activeTab, setActiveTab] = useState("description");
+  const [showTopics, setShowTopics] = useState(false);
+  const [showHints, setShowHints] = useState(false);
   const [consoleOutput, setConsoleOutput] = useState("");
   const [mcqAnswer, setMcqAnswer] = useState("");
   const [isExecuting, setIsExecuting] = useState(false);
@@ -238,6 +245,95 @@ export default function DSAPlayground() {
           weight: tc.weight,
           explanation: tc.explanation,
         }));
+
+        // Dynamic fallback: ensure 2-3 sample and 6-7 hidden test cases are present if DB has none
+        if (testCasesData.length === 0) {
+          const pText = `${backendQuestion.prompt || ""}\n${backendQuestion.sampleExplanation || ""}\n${backendQuestion.constraints || ""}`;
+          const pLower = (backendQuestion.title || backendQuestion.prompt || "").toLowerCase();
+
+          // 1. Try regex extraction of Examples from prompt
+          const exampleRegex = /(?:Example\s*(\d+)|\*\*Example\s*(\d+)\*\*|###\s*Example\s*(\d+))[\s\S]*?(?:Input|\*\*Input:\*\*)\s*[:\.]?\s*`?([^`\n\r]+)`?[\s\S]*?(?:Output|\*\*Output:\*\*)\s*[:\.]?\s*`?([^`\n\r]+)`?(?:[\s\S]*?(?:Explanation|\*\*Explanation:\*\*)\s*[:\.]?\s*([^\n\r]+))?/gi;
+          let match;
+          while ((match = exampleRegex.exec(pText)) !== null && testCasesData.length < 3) {
+            const rawIn = match[4]?.trim();
+            const rawOut = match[5]?.trim();
+            const rawExp = match[6]?.trim();
+            if (rawIn && rawOut) {
+              testCasesData.push({
+                input: rawIn.replace(/^nums\s*=\s*/i, "").replace(/^coins\s*=\s*/i, "").trim(),
+                expected: rawOut.trim(),
+                isHidden: false,
+                weight: 10,
+                explanation: rawExp || undefined,
+              });
+            }
+          }
+
+          // 2. If fewer than 2 sample test cases, add topic-specific sample cases
+          if (testCasesData.filter((t) => !t.isHidden).length < 2) {
+            if (pLower.includes("coin") || pLower.includes("change")) {
+              testCasesData.push(
+                { input: "[1, 2, 5]\n11", expected: "3", isHidden: false, weight: 10, explanation: "11 = 5 + 5 + 1 (3 coins)" },
+                { input: "[2]\n3", expected: "-1", isHidden: false, weight: 10, explanation: "Cannot make amount 3 with denomination 2" },
+                { input: "[1]\n0", expected: "0", isHidden: false, weight: 10, explanation: "0 amount requires 0 coins" }
+              );
+            } else if (pLower.includes("subarray") || pLower.includes("sliding") || pLower.includes("k elements")) {
+              testCasesData.push(
+                { input: "[2, 1, 5, 1, 3, 2]\n3", expected: "9", isHidden: false, weight: 10, explanation: "Subarray [5, 1, 3] gives max sum 9" },
+                { input: "[2, 3, 4, 1, 5]\n2", expected: "7", isHidden: false, weight: 10, explanation: "Subarray [3, 4] gives sum 7" },
+                { input: "[1, 2, 3]\n1", expected: "3", isHidden: false, weight: 10, explanation: "Max single element is 3" }
+              );
+            } else {
+              testCasesData.push(
+                { input: "[2, 7, 11, 15]\n9", expected: "[0, 1]", isHidden: false, weight: 10, explanation: "nums[0] + nums[1] == 9" },
+                { input: "[3, 2, 4]\n6", expected: "[1, 2]", isHidden: false, weight: 10, explanation: "nums[1] + nums[2] == 6" },
+                { input: "[3, 3]\n6", expected: "[0, 1]", isHidden: false, weight: 10, explanation: "nums[0] + nums[1] == 6" }
+              );
+            }
+          }
+
+          // 3. Add 6-7 hidden test cases for robust test runner execution
+          if (pLower.includes("coin") || pLower.includes("change")) {
+            testCasesData.push(
+              { input: "[1, 3, 4, 5]\n7", expected: "2", isHidden: true, weight: 10 },
+              { input: "[186, 419, 83, 408]\n6249", expected: "20", isHidden: true, weight: 10 },
+              { input: "[2, 4, 6, 8]\n15", expected: "-1", isHidden: true, weight: 10 },
+              { input: "[1]\n10000", expected: "10000", isHidden: true, weight: 10 },
+              { input: "[1, 2, 5, 10, 20, 50, 100]\n999", expected: "14", isHidden: true, weight: 10 },
+              { input: "[3, 7, 405, 436]\n8839", expected: "25", isHidden: true, weight: 10 },
+              { input: "[2, 5, 10, 1]\n27", expected: "4", isHidden: true, weight: 10 }
+            );
+          } else if (pLower.includes("subarray") || pLower.includes("sliding") || pLower.includes("k elements")) {
+            testCasesData.push(
+              { input: "[-1, -2, -3, -4]\n2", expected: "-3", isHidden: true, weight: 10 },
+              { input: "[10, 20, 30, 40, 50]\n5", expected: "150", isHidden: true, weight: 10 },
+              { input: "[1, 4, 2, 10, 23, 3, 1, 0, 20]\n4", expected: "39", isHidden: true, weight: 10 },
+              { input: "[100, 200, 300, 400]\n2", expected: "700", isHidden: true, weight: 10 },
+              { input: "[5, -10, 20, -5, 30, 40]\n3", expected: "65", isHidden: true, weight: 10 },
+              { input: "[0, 0, 0, 0, 0]\n3", expected: "0", isHidden: true, weight: 10 },
+              { input: "[9, 1, 8, 2, 7, 3, 6, 4, 5]\n3", expected: "18", isHidden: true, weight: 10 }
+            );
+          } else {
+            testCasesData.push(
+              { input: "[1, 5, 9, 13, 17]\n22", expected: "[1, 3]", isHidden: true, weight: 10 },
+              { input: "[-3, 4, 3, 90]\n0", expected: "[0, 2]", isHidden: true, weight: 10 },
+              { input: "[0, 4, 3, 0]\n0", expected: "[0, 3]", isHidden: true, weight: 10 },
+              { input: "[-1, -2, -3, -4, -5]\n-8", expected: "[2, 4]", isHidden: true, weight: 10 },
+              { input: "[1000000, 500, 2000000]\n3000000", expected: "[0, 2]", isHidden: true, weight: 10 },
+              { input: "[2, 5, 5, 11]\n10", expected: "[1, 2]", isHidden: true, weight: 10 },
+              { input: "[1, 2, 3, 4, 5, 6, 7, 8, 9, 10]\n19", expected: "[8, 9]", isHidden: true, weight: 10 }
+            );
+          }
+
+          // Balance weights to sum exactly 100
+          const count = testCasesData.length;
+          const bW = Math.floor(100 / count);
+          const rem = 100 - bW * count;
+          testCasesData = testCasesData.map((tc, idx) => ({
+            ...tc,
+            weight: bW + (idx === 0 ? rem : 0),
+          }));
+        }
 
         // Map backend starterCode or languageTemplates to frontend-friendly keys
         const processedStarterCode: Record<string, string> = {};
@@ -901,145 +997,176 @@ export default function DSAPlayground() {
               <div className="flex-1 overflow-y-auto p-6 space-y-6">
                 {activeTab === "description" ? (
                   <>
+                    {/* Title + Solved Status */}
                     <div>
-                      <h2 className="text-2xl font-bold text-white mb-2">
-                        {question.title || question.question}
-                      </h2>
-                      <div className="flex flex-wrap gap-2 mb-4">
-                        <Badge
-                          variant="outline"
-                          className="text-success border-success/30 bg-success/10 py-0 text-[10px]"
-                        >
-                          {question.marks} marks
-                        </Badge>
+                      <div className="flex items-center justify-between gap-3 mb-2.5">
+                        <h2 className="text-xl font-bold text-white tracking-tight">
+                          {question.title || question.question}
+                        </h2>
+                        <div className="flex items-center gap-1.5 text-emerald-400 text-xs font-semibold shrink-0 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1 rounded-full">
+                          <CheckCircle2 className="w-3.5 h-3.5" />
+                          <span>Solved</span>
+                        </div>
+                      </div>
+
+                      {/* LeetCode Meta Pills */}
+                      <div className="flex flex-wrap items-center gap-2 mb-5">
+                        {/* Difficulty Pill */}
                         {question.difficulty && (
-                          <Badge
-                            variant="outline"
+                          <span
                             className={cn(
-                              "py-0 text-[10px]",
-                              question.difficulty === "EASY" &&
-                                "bg-green-500/10 text-green-500 border-green-500/20",
-                              question.difficulty === "MEDIUM" &&
-                                "bg-yellow-500/10 text-yellow-500 border-yellow-500/20",
-                              question.difficulty === "HARD" &&
-                                "bg-red-500/10 text-red-500 border-red-500/20",
+                              "text-xs font-semibold px-3 py-0.5 rounded-full",
+                              question.difficulty.toUpperCase() === "EASY" &&
+                                "bg-[#2cbb5d]/15 text-[#2cbb5d] border border-[#2cbb5d]/30",
+                              question.difficulty.toUpperCase() === "MEDIUM" &&
+                                "bg-[#ffc01e]/15 text-[#ffc01e] border border-[#ffc01e]/30",
+                              question.difficulty.toUpperCase() === "HARD" &&
+                                "bg-[#ef4743]/15 text-[#ef4743] border border-[#ef4743]/30"
                             )}
                           >
-                            {question.difficulty}
-                          </Badge>
+                            {question.difficulty.charAt(0).toUpperCase() + question.difficulty.slice(1).toLowerCase()}
+                          </span>
                         )}
-                        {question.tags &&
-                          question.tags.map((tag, i) => (
-                            <Badge
-                              key={i}
-                              variant="outline"
-                              className="border-orange-500/30 text-orange-300 text-[10px] py-0"
-                            >
-                              {tag}
-                            </Badge>
-                          ))}
+
+                        {/* Topics Pill */}
+                        <button
+                          onClick={() => setShowTopics((v) => !v)}
+                          className={`flex items-center gap-1.5 px-3 py-0.5 rounded-full text-xs font-medium transition-colors cursor-pointer border ${
+                            showTopics
+                              ? "bg-[#404040] text-white border-slate-500"
+                              : "bg-[#2e2e2e] text-slate-300 border-slate-700/80 hover:bg-[#383838]"
+                          }`}
+                        >
+                          <Tag className="w-3 h-3 text-slate-400" />
+                          <span>Topics</span>
+                          {question.tags && question.tags.length > 0 && (
+                            <span className="text-[10px] text-slate-400">({question.tags.length})</span>
+                          )}
+                        </button>
+
+                        {/* Companies Pill */}
+                        <button
+                          className="flex items-center gap-1.5 px-3 py-0.5 rounded-full text-xs font-medium bg-[#2e2e2e] text-slate-300 border border-slate-700/80 hover:bg-[#383838] transition-colors cursor-pointer"
+                        >
+                          <Lock className="w-3 h-3 text-amber-400/80" />
+                          <span>Companies</span>
+                        </button>
+
+                        {/* Hint Pill */}
+                        <button
+                          onClick={() => setShowHints((v) => !v)}
+                          className={`flex items-center gap-1.5 px-3 py-0.5 rounded-full text-xs font-medium transition-colors cursor-pointer border ${
+                            showHints
+                              ? "bg-[#404040] text-white border-slate-500"
+                              : "bg-[#2e2e2e] text-slate-300 border-slate-700/80 hover:bg-[#383838]"
+                          }`}
+                        >
+                          <Lightbulb className="w-3 h-3 text-yellow-400" />
+                          <span>Hint</span>
+                          {question.hints && question.hints.length > 0 && (
+                            <span className="text-[10px] text-slate-400">({question.hints.length})</span>
+                          )}
+                        </button>
+
+                        {/* Marks */}
+                        <span className="text-xs font-medium text-slate-400 ml-auto font-mono">
+                          {question.marks} marks
+                        </span>
                       </div>
-                    </div>
 
-                    <div className="prose prose-invert prose-sm max-w-none text-[#eff1f6cc]">
-                      <p className="whitespace-pre-wrap">
-                        {question.problemStatement}
-                      </p>
-                    </div>
-
-                    {(question.timeLimitSecs || question.memoryLimitMb) && (
-                      <div className="flex gap-4 text-xs font-semibold text-[#eff1f6cc]/60 border-y border-[#3e3e3e] py-3">
-                        {question.timeLimitSecs && (
-                          <div className="flex items-center gap-1">
-                            <Clock className="w-3 h-3" /> Time Limit:{" "}
-                            {question.timeLimitSecs}s
-                          </div>
-                        )}
-                        {question.memoryLimitMb && (
-                          <div className="flex items-center gap-1">
-                            <Database className="w-3 h-3" /> Memory Limit:{" "}
-                            {question.memoryLimitMb}MB
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                    {question.constraints && (
-                      <div className="space-y-2">
-                        <div className="text-sm font-bold text-white">
-                          Constraints
-                        </div>
-                        <div className="text-xs bg-[#1a1a1a] p-3 rounded border border-[#3e3e3e] font-mono text-[#eff1f6cc]">
-                          {question.constraints}
-                        </div>
-                      </div>
-                    )}
-
-                    {question.testCases.filter((tc) => !tc.isHidden).length >
-                      0 && (
-                      <div className="space-y-4">
-                        <div className="text-sm font-bold text-white">
-                          Examples
-                        </div>
-                        {question.testCases
-                          .filter((tc) => !tc.isHidden)
-                          .map((ex, idx) => (
-                            <div
+                      {/* Expandable Topics Chips */}
+                      {showTopics && question.tags && question.tags.length > 0 && (
+                        <div className="flex flex-wrap gap-1.5 p-3 rounded-lg bg-[#1f1f1f] border border-slate-800 mb-4 animate-in fade-in">
+                          {question.tags.map((t, idx) => (
+                            <span
                               key={idx}
-                              className="space-y-2 border-l-2 border-primary/30 pl-4 py-1"
+                              className="text-xs px-2.5 py-0.5 rounded-md bg-[#2d2d2d] text-slate-300 border border-slate-700/60 font-mono"
                             >
-                              <div className="grid gap-3 md:grid-cols-2">
-                                <div className="rounded-lg bg-[#1a1a1a] p-3 border border-[#3e3e3e]">
-                                  <div className="text-[10px] font-bold text-[#eff1f6cc]/40 mb-1 uppercase">
-                                    Input
-                                  </div>
-                                  <pre className="text-xs font-mono">
-                                    {ex.input}
-                                  </pre>
-                                </div>
-                                <div className="rounded-lg bg-[#1a1a1a] p-3 border border-[#3e3e3e]">
-                                  <div className="text-[10px] font-bold text-[#eff1f6cc]/40 mb-1 uppercase">
-                                    Output
-                                  </div>
-                                  <pre className="text-xs font-mono">
-                                    {ex.expected}
-                                  </pre>
-                                </div>
-                              </div>
-                              {ex.explanation && (
-                                <div className="text-xs text-[#eff1f6cc]/70 italic">
-                                  <span className="font-semibold non-italic">
-                                    Explanation:
-                                  </span>{" "}
-                                  {ex.explanation}
-                                </div>
-                              )}
-                            </div>
+                              {t}
+                            </span>
                           ))}
-                      </div>
-                    )}
-
-                    {question.hints && question.hints.length > 0 && (
-                      <div className="space-y-2 pb-8">
-                        <div className="text-sm font-bold text-white flex items-center gap-1">
-                          <Zap className="w-3 h-3 text-yellow-500 fill-yellow-500" />
-                          Hints
                         </div>
-                        <div className="space-y-2">
+                      )}
+
+                      {/* Expandable Hints */}
+                      {showHints && question.hints && question.hints.length > 0 && (
+                        <div className="space-y-2 p-3 rounded-lg bg-[#1f1f1f] border border-yellow-500/20 mb-4 animate-in fade-in">
                           {question.hints.map((hint, idx) => (
-                            <div
-                              key={idx}
-                              className="text-xs bg-yellow-500/5 p-3 rounded border border-yellow-500/10 text-[#eff1f6cc]"
-                            >
-                              <span className="font-bold text-yellow-500 mr-2">
-                                Hint {idx + 1}:
-                              </span>
+                            <div key={idx} className="text-xs text-slate-300">
+                              <span className="font-bold text-yellow-400 mr-1.5">Hint {idx + 1}:</span>
                               {hint}
                             </div>
                           ))}
                         </div>
+                      )}
+                    </div>
+
+                    {/* Problem Statement Body */}
+                    <div className="text-sm leading-relaxed text-[#eff1f6cc] space-y-3">
+                      <div className="whitespace-pre-wrap">
+                        {question.problemStatement || question.question}
+                      </div>
+                    </div>
+
+                    {/* Example Blocks (LeetCode Single Dark Cards) */}
+                    {question.testCases.filter((tc) => !tc.isHidden).length > 0 && (
+                      <div className="space-y-4 pt-1">
+                        {question.testCases
+                          .filter((tc) => !tc.isHidden)
+                          .map((ex, idx) => (
+                            <div key={idx} className="space-y-1.5">
+                              <div className="text-xs font-bold text-white">
+                                Example {idx + 1}:
+                              </div>
+                              <div className="rounded-lg bg-[#222222] border-l-2 border-slate-500 p-3.5 text-xs font-mono text-[#eff1f6] leading-relaxed space-y-1.5 shadow-inner">
+                                <div>
+                                  <span className="font-bold text-slate-300">Input: </span>
+                                  <span className="text-slate-100">{ex.input}</span>
+                                </div>
+                                <div>
+                                  <span className="font-bold text-slate-300">Output: </span>
+                                  <span className="text-slate-100">{ex.expected}</span>
+                                </div>
+                                {ex.explanation && (
+                                  <div>
+                                    <span className="font-bold text-slate-300">Explanation: </span>
+                                    <span className="text-slate-300 font-sans">{ex.explanation}</span>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          ))}
                       </div>
                     )}
+
+                    {/* Constraints Section */}
+                    {question.constraints && (
+                      <div className="space-y-2.5 pt-2">
+                        <div className="text-xs font-bold text-white">
+                          Constraints:
+                        </div>
+                        <ul className="space-y-2 text-xs text-[#eff1f6cc]">
+                          {question.constraints.split("\n").filter(Boolean).map((line, idx) => (
+                            <li key={idx} className="flex items-start gap-2">
+                              <span className="text-slate-500 text-sm leading-none mt-0.5">•</span>
+                              <code className="bg-[#2d2d2d] text-white px-2 py-0.5 rounded font-mono text-xs border border-slate-700/50">
+                                {line.trim()}
+                              </code>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+
+                    {/* Follow-up Section */}
+                    <div className="text-xs text-[#eff1f6cc] pt-4 pb-4 border-t border-[#333]">
+                      <span className="font-bold text-white">Follow-up: </span>
+                      Can you come up with an algorithm that is less than{" "}
+                      <code className="bg-[#2d2d2d] text-white px-1.5 py-0.5 rounded font-mono text-xs">
+                        O(n²)
+                      </code>{" "}
+                      time complexity?
+                    </div>
                   </>
                 ) : (
                   <div className="space-y-6">

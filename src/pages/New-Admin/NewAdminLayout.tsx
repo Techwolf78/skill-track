@@ -4,7 +4,7 @@ import {
   Search,
   GraduationCap,
   ClipboardList,
-  Library,
+  BookOpen,
   ChevronRight,
   LogOut,
   User as UserIcon,
@@ -48,7 +48,7 @@ export default function NewAdminLayout() {
     {
       label: "Library",
       path: "/new-admin/library",
-      icon: Library,
+      icon: BookOpen,
     },
   ];
 
@@ -90,46 +90,38 @@ export default function NewAdminLayout() {
           </div>
         </div>
 
-        {/* Right Side: ONLY Search and Profile */}
-        <div className="flex items-center space-x-3 md:space-x-4">
-          {/* Search */}
-          <div className="relative flex items-center">
-            <input
-              type="text"
-              placeholder="Search..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-40 md:w-56 bg-[#111C33] border border-slate-700/80 rounded-full py-1.5 pl-8 pr-3 text-xs text-white placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-all"
-            />
-            <Search className="w-4 h-4 text-slate-400 absolute left-2.5 top-2 pointer-events-none" />
-          </div>
-
-          {/* Profile Avatar */}
+        {/* Right Side: Profile Section */}
+        <div className="flex items-center space-x-3">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <button className="flex items-center focus:outline-none ring-2 ring-transparent hover:ring-blue-500 rounded-full transition-all">
-                <Avatar className="w-8 h-8 border border-slate-700 cursor-pointer">
+              <button className="flex items-center gap-2.5 px-2 py-1 hover:bg-white/5 transition-colors focus:outline-none cursor-pointer">
+                <Avatar className="w-8 h-8 border border-slate-700 bg-slate-800 text-slate-200">
                   <AvatarImage
-                    src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80"
+                    src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=120&auto=format&fit=crop&q=80"
                     alt={user?.name || "Admin"}
                   />
-                  <AvatarFallback className="bg-amber-600 text-white text-xs font-semibold">
+                  <AvatarFallback className="bg-[#4353a4] text-white text-xs font-bold">
                     {user?.name ? user.name.slice(0, 2).toUpperCase() : "AD"}
                   </AvatarFallback>
                 </Avatar>
+                <div className="hidden sm:flex items-center">
+                  <span className="text-xs font-semibold text-slate-200">
+                    {user?.name || "Admin User"}
+                  </span>
+                </div>
               </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-52 bg-white border border-slate-200 shadow-xl rounded-lg mt-1 p-1">
+            <DropdownMenuContent align="end" className="w-56 bg-white border border-slate-200 shadow-2xl p-1 text-xs">
               <DropdownMenuLabel className="font-normal px-3 py-2">
                 <div className="flex flex-col space-y-0.5">
-                  <p className="text-sm font-semibold text-slate-900 leading-none">{user?.name || "Admin User"}</p>
+                  <p className="text-sm font-bold text-slate-900 leading-none">{user?.name || "Admin User"}</p>
                   <p className="text-xs text-slate-500 leading-none truncate mt-1">{user?.email || "admin@rxone.com"}</p>
                 </div>
               </DropdownMenuLabel>
               <DropdownMenuSeparator className="bg-slate-100" />
               <DropdownMenuItem
                 onClick={() => navigate("/admin/profile")}
-                className="cursor-pointer text-slate-700 hover:bg-slate-50 rounded-md px-3 py-2 text-xs flex items-center gap-2"
+                className="cursor-pointer text-slate-700 hover:bg-slate-50 px-3 py-2 text-xs flex items-center gap-2"
               >
                 <UserIcon className="w-4 h-4 text-slate-500" />
                 Profile Settings
@@ -137,7 +129,7 @@ export default function NewAdminLayout() {
               <DropdownMenuSeparator className="bg-slate-100" />
               <DropdownMenuItem
                 onClick={() => logout && logout()}
-                className="cursor-pointer text-red-600 hover:bg-red-50 rounded-md px-3 py-2 text-xs flex items-center gap-2"
+                className="cursor-pointer text-red-600 hover:bg-red-50 px-3 py-2 text-xs flex items-center gap-2"
               >
                 <LogOut className="w-4 h-4 text-red-500" />
                 Sign Out

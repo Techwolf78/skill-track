@@ -32,7 +32,13 @@ import {
   UserCheck,
   Zap,
   Terminal,
+  Upload,
+  FileCode,
+  AlertCircle,
+  CheckCircle2,
+  Sparkles,
 } from "lucide-react";
+import * as XLSX from "xlsx";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -57,12 +63,13 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
-import { Question } from "@/lib/test-service";
+import { Question, CreateQuestionRequest, McqOption } from "@/lib/test-service";
 import { authService } from "@/lib/auth-service";
 import {
   useQuestionsQuery,
   useSubjectsQuery,
   useDeleteQuestionMutation,
+  useBulkCreateQuestionsMutation,
 } from "@/hooks/use-query-hooks";
 import { QuestionPreview } from "./QuestionPreview";
 
@@ -104,6 +111,7 @@ export default function SuperAdminQuestionBank() {
   const ITEMS_PER_PAGE = 8;
 
   const [selectedAdvancedQuestion, setSelectedAdvancedQuestion] = useState<ExtendedQuestion | null>(null);
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
 
   // Mock questions for Business, Corporate, and Aptitude taxonomy representation
   const [mockQuestions, setMockQuestions] = useState<ExtendedQuestion[]>([]);
@@ -301,6 +309,14 @@ export default function SuperAdminQuestionBank() {
           >
             <FolderTree className="w-4 h-4" />
             Manage Subjects
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => setImportDialogOpen(true)}
+            className="gap-2"
+          >
+            <Upload className="w-4 h-4" />
+            Import Questions
           </Button>
           <Button variant="hero" onClick={handleAdd}>
             <Plus className="w-4 h-4 mr-2" />
@@ -834,6 +850,706 @@ export default function SuperAdminQuestionBank() {
         open={previewOpen}
         onOpenChange={setPreviewOpen}
       />
+
+      {/* SuperAdmin Bulk Import Questions Dialog */}
+      <SuperAdminImportQuestionsDialog
+        isOpen={importDialogOpen}
+        onClose={() => setImportDialogOpen(false)}
+        onImportSuccess={() => {
+          // Questions query will automatically refetch
+        }}
+      />
     </div>
   );
 }
+
+// ─── SuperAdmin Import Questions Dialog (PUBLIC Visibility) ──────────────────
+
+function SuperAdminImportQuestionsDialog({
+  isOpen,
+  onClose,
+  onImportSuccess,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  onImportSuccess: () => void;
+}) {
+  const { data: subjects = [] } = useSubjectsQuery();
+  const bulkCreateMutation = useBulkCreateQuestionsMutation();
+  const { toast } = useToast();
+
+  const [activeTab, setActiveTab] = useState<"FILE" | "JSON">("FILE");
+  const [defaultSubjectId, setDefaultSubjectId] = useState<string>("");
+  const [jsonText, setJsonText] = useState("");
+  const [parsedQuestions, setParsedQuestions] = useState<CreateQuestionRequest[]>([]);
+  const [parseError, setParseError] = useState<string | null>(null);
+  const [fileName, setFileName] = useState<string | null>(null);
+
+  // Set initial default subject
+  useEffect(() => {
+    if (subjects.length > 0 && !defaultSubjectId) {
+      setDefaultSubjectId(subjects[0].id);
+    }
+  }, [subjects, defaultSubjectId]);
+
+  // UUID validation helper
+  const isUUID = (val?: any): boolean =>
+    typeof val === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val.trim());
+
+  // Helper to parse Excel row with PUBLIC visibility
+  const parseExcelRow = (row: any, fallbackSubId: string): CreateQuestionRequest | null => {
+    const norm: Record<string, any> = {};
+    for (const [k, v] of Object.entries(row)) {
+      norm[k.toLowerCase().replace(/[^a-z0-9]/g, "")] = v;
+    }
+
+    const prompt = norm.prompt || norm.description || norm.question || norm.problem || norm.questiontext;
+    if (!prompt) return null;
+
+    const rawType = (norm.type || norm.questiontype || "MCQ").toString().toUpperCase();
+    const isCoding = rawType.includes("COD");
+    const questionType = isCoding ? "CODING" : "MCQ";
+
+    // Match subject by name or id
+    let subId = fallbackSubId;
+    const rawSub = (norm.subject || norm.subjectid || norm.subjectname || "").toString().trim();
+    if (rawSub) {
+      if (isUUID(rawSub)) {
+        subId = rawSub;
+      } else {
+        const match = subjects.find(
+          (s) => s.id.toLowerCase() === rawSub.toLowerCase() || s.name.toLowerCase() === rawSub.toLowerCase()
+        );
+        if (match) subId = match.id;
+      }
+    }
+
+    const rawTopic = (norm.topic || norm.topicid || norm.topicname || "").toString().trim();
+    const rawSubtopic = (norm.subtopic || norm.subtopicid || norm.subtopicname || "").toString().trim();
+
+    const title = norm.title || (String(prompt).length > 50 ? String(prompt).slice(0, 50) + "..." : String(prompt));
+    const marks = Math.max(1, Number(norm.marks || norm.points || norm.score) || 1);
+    const rawDiff = (norm.difficulty || "MEDIUM").toString().toUpperCase();
+    const difficulty = rawDiff === "EASY" ? "EASY" : rawDiff === "HARD" ? "HARD" : rawDiff === "EXPERT" ? "EXPERT" : "MEDIUM";
+    const avg_time_seconds = Math.max(0, Number(norm.avgtimeseconds || norm.time || norm.avgtime) || 90);
+
+    let tags: string[] = [];
+    const rawTags = norm.tags || norm.tag || norm.categories;
+    if (Array.isArray(rawTags)) {
+      tags = rawTags.map((t) => String(t).trim()).filter(Boolean);
+    } else if (typeof rawTags === "string") {
+      tags = rawTags.split(",").map((t) => t.trim()).filter(Boolean);
+    }
+
+    const base: Partial<CreateQuestionRequest> = {
+      questionType,
+      prompt: String(prompt).trim(),
+      title: String(title).trim(),
+      subject_id: isUUID(subId) ? subId : fallbackSubId,
+      topic_id: isUUID(rawTopic) ? rawTopic : undefined,
+      subtopic_id: isUUID(rawSubtopic) ? rawSubtopic : undefined,
+      marks,
+      difficulty,
+      visibility: "PUBLIC", // SuperAdmin imported questions are always PUBLIC
+      avg_time_seconds,
+      domain: (norm.domain || "ENGINEERING").toUpperCase(),
+      cognitiveLevel: (norm.cognitivelevel || norm.cognitive || "APPLY").toUpperCase(),
+      p_value: Number(norm.pvalue) || 0.45,
+      discrimination_index: Number(norm.discriminationindex) || 0.35,
+      status: "ACTIVE",
+      tags: tags.length ? tags : undefined,
+    };
+
+    if (questionType === "MCQ") {
+      const options: McqOption[] = [];
+      const correctRaw = String(norm.correctoption || norm.correctanswer || norm.answer || norm.correct || "1").toLowerCase();
+
+      for (let i = 1; i <= 10; i++) {
+        const optVal = norm[`option${i}`] || norm[`opt${i}`] || norm[`choice${i}`];
+        if (optVal != null && String(optVal).trim()) {
+          const optText = String(optVal).trim();
+          const isNumMatch = correctRaw.includes(String(i));
+          const isLetterMatch = correctRaw.includes(String.fromCharCode(96 + i));
+          const isTextMatch = correctRaw === optText.toLowerCase();
+          options.push({
+            text: optText,
+            isCorrect: isNumMatch || isLetterMatch || isTextMatch,
+          });
+        }
+      }
+
+      if (options.length < 2) {
+        options.push({ text: "Option A", isCorrect: true }, { text: "Option B", isCorrect: false });
+      } else if (!options.some((o) => o.isCorrect)) {
+        options[0].isCorrect = true;
+      }
+
+      const multipleCorrect = options.filter((o) => o.isCorrect).length > 1;
+
+      return {
+        ...(base as CreateQuestionRequest),
+        mcqType: multipleCorrect ? "MULTIPLE_CORRECT" : "SINGLE_CORRECT",
+        multipleCorrect,
+        shuffleOptions: true,
+        mcqOptions: options,
+      };
+    } else {
+      return {
+        ...(base as CreateQuestionRequest),
+        constraints: norm.constraints || undefined,
+        timeLimitSecs: Number(norm.timelimit || norm.timelimitsecs) || 2,
+        memoryLimitMb: Number(norm.memorylimit || norm.memorylimitmb) || 256,
+        sampleExplanation: norm.sampleexplanation || norm.explanation || undefined,
+        languageTemplates: {
+          java: { code: "// Write your code here", lang: "java", langSlug: "java" },
+          python: { code: "# Write your code here", lang: "python", langSlug: "python" },
+          javascript: { code: "// Write your code here", lang: "javascript", langSlug: "javascript" },
+        },
+        signatureMetadata: { functionName: "solve" },
+      };
+    }
+  };
+
+  // Handle File Upload
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setFileName(file.name);
+    setParseError(null);
+
+    const isJson = file.name.endsWith(".json");
+    const reader = new FileReader();
+
+    if (isJson) {
+      reader.onload = (evt) => {
+        try {
+          const raw = JSON.parse(evt.target?.result as string);
+          const list = Array.isArray(raw) ? raw : [raw];
+          const questions: CreateQuestionRequest[] = list.map((item) => ({
+            ...item,
+            subject_id: item.subject_id || item.subjectId || defaultSubjectId,
+            visibility: "PUBLIC",
+            marks: item.marks ? Math.max(1, Number(item.marks)) : 1,
+            domain: item.domain || "ENGINEERING",
+            cognitiveLevel: item.cognitiveLevel || "APPLY",
+            status: item.status || "ACTIVE",
+          }));
+          setParsedQuestions(questions);
+          setJsonText(JSON.stringify(questions, null, 2));
+        } catch (err: any) {
+          setParseError("Invalid JSON file: " + err.message);
+        }
+      };
+      reader.readAsText(file);
+    } else {
+      reader.onload = (evt) => {
+        try {
+          const data = new Uint8Array(evt.target?.result as ArrayBuffer);
+          const workbook = XLSX.read(data, { type: "array" });
+          const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+          const rows: any[] = XLSX.utils.sheet_to_json(firstSheet);
+
+          if (!rows.length) {
+            setParseError("The uploaded Excel sheet contains no rows.");
+            return;
+          }
+
+          const questions: CreateQuestionRequest[] = [];
+          for (const row of rows) {
+            const parsed = parseExcelRow(row, defaultSubjectId);
+            if (parsed) questions.push(parsed);
+          }
+
+          if (questions.length === 0) {
+            setParseError("Could not extract any valid questions from the Excel file. Please check column headers.");
+            return;
+          }
+
+          setParsedQuestions(questions);
+          setJsonText(JSON.stringify(questions, null, 2));
+        } catch (err: any) {
+          setParseError("Failed to parse Excel file: " + err.message);
+        }
+      };
+      reader.readAsArrayBuffer(file);
+    }
+  };
+
+  // Handle JSON Textarea Change
+  const handleJsonChange = (text: string) => {
+    setJsonText(text);
+    setParseError(null);
+    if (!text.trim()) {
+      setParsedQuestions([]);
+      return;
+    }
+    try {
+      const raw = JSON.parse(text);
+      const list = Array.isArray(raw) ? raw : [raw];
+      const questions: CreateQuestionRequest[] = list.map((item) => ({
+        ...item,
+        subject_id: item.subject_id || item.subjectId || defaultSubjectId,
+        visibility: "PUBLIC",
+        marks: item.marks ? Math.max(1, Number(item.marks)) : 1,
+        domain: item.domain || "ENGINEERING",
+        cognitiveLevel: item.cognitiveLevel || "APPLY",
+        status: item.status || "ACTIVE",
+      }));
+      setParsedQuestions(questions);
+    } catch {
+      setParseError("Invalid JSON syntax");
+    }
+  };
+
+  // Download DoSelect Sample Excel
+  const downloadDoSelectSampleExcel = () => {
+    const a = document.createElement("a");
+    a.href = "/doselect_sample_questions.xlsx";
+    a.download = "doselect_sample_questions.xlsx";
+    a.click();
+  };
+
+  // Download Standard Sample Excel
+  const downloadSampleExcel = () => {
+    const sampleRows = [
+      {
+        Title: "Thread Safety in Java HashMap",
+        Type: "MCQ",
+        Prompt: "Which data structure provides synchronized thread-safe access in Java collections?",
+        Difficulty: "Medium",
+        Marks: 3,
+        "Option 1": "ConcurrentHashMap",
+        "Option 2": "HashMap",
+        "Option 3": "TreeMap",
+        "Option 4": "WeakHashMap",
+        "Correct Option": "1",
+        Tags: "java, concurrency, collections",
+        "Avg Time (s)": 90,
+      },
+      {
+        Title: "Two Sum Problem",
+        Type: "Coding",
+        Prompt: "Given an array of integers nums and an integer target, return indices of the two numbers such that they add up to target.",
+        Difficulty: "Easy",
+        Marks: 5,
+        "Time Limit (s)": 2,
+        "Memory Limit (MB)": 256,
+        Tags: "arrays, hashmap, algorithms",
+        "Avg Time (s)": 300,
+      },
+      {
+        Title: "SQL Transaction Isolation",
+        Type: "MCQ",
+        Prompt: "Which SQL isolation level prevents Phantom Reads?",
+        Difficulty: "Hard",
+        Marks: 4,
+        "Option 1": "Serializable",
+        "Option 2": "Read Committed",
+        "Option 3": "Repeatable Read",
+        "Option 4": "Read Uncommitted",
+        "Correct Option": "1",
+        Tags: "sql, dbms, acid",
+        "Avg Time (s)": 120,
+      },
+    ];
+
+    const ws = XLSX.utils.json_to_sheet(sampleRows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Questions");
+    XLSX.writeFile(wb, "superadmin_question_template.xlsx");
+  };
+
+  // Download Sample JSON
+  const downloadSampleJson = () => {
+    const sampleJson = [
+      {
+        questionType: "MCQ",
+        title: "Thread Safety in Java HashMap",
+        prompt: "Which data structure provides synchronized thread-safe access in Java collections?",
+        difficulty: "MEDIUM",
+        marks: 3,
+        visibility: "PUBLIC",
+        mcqType: "SINGLE_CORRECT",
+        multipleCorrect: false,
+        shuffleOptions: true,
+        tags: ["java", "concurrency"],
+        avg_time_seconds: 90,
+        mcqOptions: [
+          { text: "ConcurrentHashMap", isCorrect: true },
+          { text: "HashMap", isCorrect: false },
+          { text: "TreeMap", isCorrect: false },
+          { text: "WeakHashMap", isCorrect: false },
+        ],
+      },
+      {
+        questionType: "CODING",
+        title: "LRU Cache Implementation",
+        prompt: "Design a data structure that follows the constraints of a Least Recently Used (LRU) Cache.\n\nImplement the LRUCache class with get and put methods in O(1) time complexity.",
+        difficulty: "HARD",
+        marks: 10,
+        visibility: "PUBLIC",
+        timeLimitSecs: 3,
+        memoryLimitMb: 512,
+        constraints: "1 <= capacity <= 3000\n0 <= key <= 10^4\n0 <= value <= 10^5",
+        sampleExplanation: "LRUCache cache = new LRUCache(2);\ncache.put(1, 1);\ncache.get(1); // returns 1",
+        tags: ["data-structures", "lru-cache", "design"],
+        avg_time_seconds: 1200,
+        languageTemplates: {
+          java: { code: "// Write your code here", lang: "java", langSlug: "java" },
+          python: { code: "# Write your code here", lang: "python", langSlug: "python" },
+        },
+        signatureMetadata: { functionName: "LRUCache" },
+      },
+    ];
+
+    const blob = new Blob([JSON.stringify(sampleJson, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "superadmin_questions_template.json";
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  // Submit bulk create
+  const handleBulkSubmit = async () => {
+    if (!parsedQuestions.length) {
+      toast({
+        title: "No questions to import",
+        description: "Please upload a valid file or JSON.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const fallbackSub = isUUID(defaultSubjectId) ? defaultSubjectId : subjects[0]?.id;
+
+    // Ensure subject is attached and visibility is explicitly PUBLIC
+    const payload = parsedQuestions.map((q) => {
+      const isMcq = (q.questionType ?? "MCQ").toUpperCase() === "MCQ";
+      const subject_id = isUUID(q.subject_id) ? q.subject_id : fallbackSub;
+      const topic_id = isUUID(q.topic_id) ? q.topic_id : undefined;
+      const subtopic_id = isUUID(q.subtopic_id) ? q.subtopic_id : undefined;
+
+      if (isMcq) {
+        const multipleCorrect = Boolean(q.multipleCorrect);
+        return {
+          ...q,
+          questionType: "MCQ" as const,
+          subject_id,
+          topic_id,
+          subtopic_id,
+          visibility: "PUBLIC" as const,
+          mcqType: multipleCorrect ? ("MULTIPLE_CORRECT" as const) : ("SINGLE_CORRECT" as const),
+          multipleCorrect,
+          shuffleOptions: q.shuffleOptions ?? true,
+          marks: Math.max(1, Number(q.marks) || 1),
+          avg_time_seconds: Math.max(0, Number(q.avg_time_seconds) || 90),
+          domain: (q.domain || "ENGINEERING") as any,
+          cognitiveLevel: (q.cognitiveLevel || "APPLY") as any,
+          p_value: q.p_value ?? 0.45,
+          discrimination_index: q.discrimination_index ?? 0.35,
+          status: "ACTIVE" as const,
+          mcqOptions: (q.mcqOptions || []).map((o) => ({
+            text: String(o.text || "").trim(),
+            isCorrect: Boolean(o.isCorrect),
+          })),
+        };
+      } else {
+        return {
+          ...q,
+          questionType: "CODING" as const,
+          title: q.title || "Coding Challenge",
+          prompt: q.prompt,
+          subject_id,
+          topic_id,
+          subtopic_id,
+          visibility: "PUBLIC" as const,
+          marks: Math.max(1, Number(q.marks) || 1),
+          avg_time_seconds: Math.max(0, Number(q.avg_time_seconds) || 300),
+          timeLimitSecs: Number(q.timeLimitSecs) || 2,
+          memoryLimitMb: Number(q.memoryLimitMb) || 256,
+          constraints: q.constraints || undefined,
+          sampleExplanation: q.sampleExplanation || undefined,
+          domain: (q.domain || "ENGINEERING") as any,
+          cognitiveLevel: (q.cognitiveLevel || "APPLY") as any,
+          p_value: q.p_value ?? 0.45,
+          discrimination_index: q.discrimination_index ?? 0.35,
+          status: "ACTIVE" as const,
+          languageTemplates: q.languageTemplates || {
+            java: { code: "// Write your code here", lang: "java", langSlug: "java" },
+            python: { code: "# Write your code here", lang: "python", langSlug: "python" },
+            javascript: { code: "// Write your code here", lang: "javascript", langSlug: "javascript" },
+          },
+          signatureMetadata: q.signatureMetadata || { functionName: "solve" },
+        };
+      }
+    });
+
+    try {
+      await bulkCreateMutation.mutateAsync(payload);
+      toast({
+        title: "Import Successful",
+        description: `Successfully imported ${payload.length} public questions.`,
+      });
+      onImportSuccess();
+      onClose();
+    } catch (err: any) {
+      console.error("[SuperAdminQuestionBank] Bulk import error:", err);
+      toast({
+        title: "Bulk import failed",
+        description: err.response?.data?.message || err.message || "Please check question parameters",
+        variant: "destructive",
+      });
+    }
+  };
+
+  return (
+    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="w-[94vw] max-w-3xl bg-background rounded-xl border border-border p-5 sm:p-6 space-y-4 max-h-[88vh] overflow-y-auto overflow-x-hidden box-border shadow-2xl">
+        <DialogHeader className="pr-8 pb-3 border-b border-border flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5">
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2">
+              <DialogTitle className="text-base font-bold text-foreground leading-tight">
+                Import Public Questions (SuperAdmin)
+              </DialogTitle>
+              <Badge className="bg-emerald-500/10 text-emerald-600 border-emerald-500/20 text-[10px]">
+                Visibility: PUBLIC
+              </Badge>
+            </div>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Upload an Excel (.xlsx, .xls, .csv) or JSON file to create global public questions accessible to all tenants.
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-1.5 shrink-0">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={downloadDoSelectSampleExcel}
+              className="flex items-center gap-1 h-7 px-2 text-[11px] font-medium border-indigo-200 text-indigo-700 bg-indigo-50/50 hover:bg-indigo-100/60 transition-colors"
+              title="Download DoSelect-style Professional 5-Question Excel Template"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
+              <span>DoSelect Sample (5 Qs)</span>
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={downloadSampleExcel}
+              className="flex items-center gap-1 h-7 px-2 text-[11px] font-medium border-border"
+              title="Download Standard Excel Template"
+            >
+              <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
+              <span>Excel Template</span>
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={downloadSampleJson}
+              className="flex items-center gap-1 h-7 px-2 text-[11px] font-medium border-border"
+              title="Download Sample JSON Template"
+            >
+              <FileCode className="w-3.5 h-3.5 text-amber-600" />
+              <span>JSON</span>
+            </Button>
+          </div>
+        </DialogHeader>
+
+        {/* Tab Selection */}
+        <div className="flex items-center gap-2 border-b border-border pb-2.5">
+          <button
+            type="button"
+            onClick={() => setActiveTab("FILE")}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all cursor-pointer ${
+              activeTab === "FILE"
+                ? "bg-primary/10 text-primary border border-primary/20"
+                : "text-muted-foreground hover:bg-muted"
+            }`}
+          >
+            <Upload className="w-3.5 h-3.5" />
+            <span>Upload File (.xlsx / .json)</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab("JSON")}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all cursor-pointer ${
+              activeTab === "JSON"
+                ? "bg-primary/10 text-primary border border-primary/20"
+                : "text-muted-foreground hover:bg-muted"
+            }`}
+          >
+            <FileCode className="w-3.5 h-3.5" />
+            <span>Direct JSON Editor</span>
+          </button>
+        </div>
+
+        {/* Default Subject Fallback */}
+        <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 p-3 bg-muted/40 rounded-lg border border-border">
+          <label className="text-xs font-semibold text-foreground shrink-0">
+            Default Subject:
+          </label>
+          <select
+            value={defaultSubjectId}
+            onChange={(e) => setDefaultSubjectId(e.target.value)}
+            className="flex-1 min-w-0 bg-background border border-input rounded-md px-2.5 py-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring cursor-pointer"
+          >
+            {subjects.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.name}
+              </option>
+            ))}
+          </select>
+          <span className="text-[11px] text-muted-foreground shrink-0">
+            Fallback for rows without a subject
+          </span>
+        </div>
+
+        {/* Tab Content */}
+        {activeTab === "FILE" ? (
+          <div className="w-full">
+            <label
+              htmlFor="superadmin-file-upload-input"
+              className="border-2 border-dashed border-border hover:border-primary/50 bg-muted/20 hover:bg-muted/40 transition-colors rounded-xl p-6 flex flex-col items-center justify-center gap-2 cursor-pointer w-full text-center group"
+            >
+              <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center group-hover:scale-110 transition-transform">
+                <Upload className="w-5 h-5 text-primary" />
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-foreground">
+                  Click to browse or drag and drop your file here
+                </p>
+                <p className="text-[11px] text-muted-foreground mt-0.5">
+                  Supports Excel (.xlsx, .xls, .csv) and JSON (.json)
+                </p>
+              </div>
+              {fileName && (
+                <div className="mt-2 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-primary/10 border border-primary/20 text-xs font-medium text-primary">
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  <span>Selected: {fileName}</span>
+                </div>
+              )}
+            </label>
+            <input
+              id="superadmin-file-upload-input"
+              type="file"
+              accept=".xlsx, .xls, .csv, .json"
+              onChange={handleFileUpload}
+              className="hidden"
+            />
+          </div>
+        ) : (
+          <div className="space-y-1.5">
+            <label className="text-xs font-semibold text-foreground">
+              Paste or Edit JSON Array:
+            </label>
+            <textarea
+              rows={8}
+              value={jsonText}
+              onChange={(e) => handleJsonChange(e.target.value)}
+              placeholder={`[\n  {\n    "questionType": "MCQ",\n    "title": "Sample Question",\n    "prompt": "What is the capital of France?",\n    "marks": 2,\n    "difficulty": "EASY",\n    "mcqOptions": [\n      { "text": "Paris", "isCorrect": true },\n      { "text": "London", "isCorrect": false }\n    ]\n  }\n]`}
+              className="w-full font-mono text-[11px] p-3 rounded-lg border border-input bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-ring resize-y leading-relaxed"
+            />
+          </div>
+        )}
+
+        {/* Error Alert */}
+        {parseError && (
+          <div className="flex items-start gap-2 p-2.5 bg-destructive/10 border border-destructive/20 rounded-lg text-destructive text-xs">
+            <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+            <span className="leading-snug">{parseError}</span>
+          </div>
+        )}
+
+        {/* Parsed Preview Table */}
+        {parsedQuestions.length > 0 && (
+          <div className="space-y-2 border-t border-border pt-3">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-foreground">
+                Parsed Questions Preview ({parsedQuestions.length})
+              </span>
+              <Badge variant="outline" className="text-[10px] text-primary border-primary/20 bg-primary/5">
+                Ready to Import as PUBLIC
+              </Badge>
+            </div>
+            <div className="max-h-44 overflow-y-auto border border-border rounded-lg">
+              <Table className="text-xs">
+                <TableHeader className="bg-muted/50 sticky top-0">
+                  <TableRow>
+                    <TableHead className="w-10 py-1.5 text-[11px]">#</TableHead>
+                    <TableHead className="py-1.5 text-[11px]">Type</TableHead>
+                    <TableHead className="py-1.5 text-[11px]">Title / Prompt</TableHead>
+                    <TableHead className="py-1.5 text-[11px]">Diff</TableHead>
+                    <TableHead className="py-1.5 text-[11px]">Marks</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {parsedQuestions.map((q, idx) => (
+                    <TableRow key={idx} className="hover:bg-muted/40">
+                      <TableCell className="py-1.5 text-muted-foreground font-mono text-[11px]">
+                        {idx + 1}
+                      </TableCell>
+                      <TableCell className="py-1.5">
+                        <Badge
+                          variant="secondary"
+                          className={`text-[9px] px-1 py-0 font-medium ${
+                            (q.questionType ?? "MCQ").toUpperCase() === "CODING"
+                              ? "bg-blue-500/10 text-blue-600 border-blue-500/20"
+                              : "bg-emerald-500/10 text-emerald-600 border-emerald-500/20"
+                          }`}
+                        >
+                          {(q.questionType ?? "MCQ").toUpperCase()}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="py-1.5 max-w-[320px] truncate text-foreground font-medium text-[11px]">
+                        {q.title || q.prompt}
+                      </TableCell>
+                      <TableCell className="py-1.5 text-muted-foreground text-[10px]">
+                        {q.difficulty || "MEDIUM"}
+                      </TableCell>
+                      <TableCell className="py-1.5 text-muted-foreground text-[10px]">
+                        {q.marks || 1}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </div>
+        )}
+
+        {/* Footer Actions */}
+        <div className="flex items-center justify-end gap-2 border-t border-border pt-3">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onClose}
+            disabled={bulkCreateMutation.isPending}
+            className="text-xs"
+          >
+            Cancel
+          </Button>
+          <Button
+            variant="hero"
+            size="sm"
+            onClick={handleBulkSubmit}
+            disabled={parsedQuestions.length === 0 || bulkCreateMutation.isPending}
+            className="text-xs gap-1.5"
+          >
+            {bulkCreateMutation.isPending ? (
+              <>
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                <span>Importing...</span>
+              </>
+            ) : (
+              <>
+                <Upload className="w-3.5 h-3.5" />
+                <span>Import {parsedQuestions.length} Questions</span>
+              </>
+            )}
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+

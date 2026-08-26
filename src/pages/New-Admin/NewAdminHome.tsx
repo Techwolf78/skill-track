@@ -8,31 +8,82 @@ import {
   UserPlus,
   BarChart2,
   MoreVertical,
-  CheckCircle2,
-  Plus,
+  Check,
+  PlusCircle,
   Loader2,
   RefreshCw,
   ExternalLink,
   Edit,
+  Copy,
+  Trash2,
+  Layers,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
-import { useTestsQuery } from "@/hooks/use-query-hooks";
+import { useTestsQuery, useCreateTestMutation } from "@/hooks/use-query-hooks";
 import { auditLogService, AuditLog } from "@/lib/audit-log-service";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import { formatDistanceToNow } from "date-fns";
+import { toast } from "sonner";
 
 export default function NewAdminHome() {
   const navigate = useNavigate();
   const { user } = useAuth();
 
+  // Create Test Dialog State
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [newTestName, setNewTestName] = useState("");
+  const [newTestDuration, setNewTestDuration] = useState(60);
+  const [isCreating, setIsCreating] = useState(false);
+
   // 1. Fetch Real Tests from Backend
   const { data: tests = [], isLoading: isLoadingTests } = useTestsQuery();
+  const createTestMutation = useCreateTestMutation();
+
+  const handleCreateTestSubmit = async () => {
+    if (!newTestName.trim()) {
+      toast.error("Please enter a test name");
+      return;
+    }
+    try {
+      setIsCreating(true);
+      const payload = {
+        title: newTestName.trim(),
+        durationMins: Number(newTestDuration) || 60,
+        difficulty: "MEDIUM" as const,
+        status: "DRAFT" as const,
+        passMark: 40,
+        isActive: true,
+      };
+      const newTest = await createTestMutation.mutateAsync(payload);
+      toast.success("Test created successfully");
+      setIsCreateDialogOpen(false);
+      setNewTestName("");
+      setNewTestDuration(60);
+      navigate(`/admin/tests/edit/${newTest.id}`);
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message || error?.message || "Failed to create test");
+    } finally {
+      setIsCreating(false);
+    }
+  };
 
   // Top recent tests sorted by creation date descending
   const recentTests = useMemo(() => {
@@ -90,30 +141,30 @@ export default function NewAdminHome() {
 
   // Format Duration string
   const formatDuration = (mins?: number) => {
-    if (!mins || mins <= 0) return "60 mins";
+    if (!mins || mins <= 0) return "3 hours";
     const hours = Math.floor(mins / 60);
     const remainingMins = mins % 60;
     if (hours > 0 && remainingMins > 0) {
-      return `${hours} hour${hours > 1 ? "s" : ""} ${remainingMins} mins`;
+      return `${hours} hour${hours > 1 ? "s" : ""} ${remainingMins} minutes`;
     }
     if (hours > 0) {
       return `${hours} hour${hours > 1 ? "s" : ""}`;
     }
-    return `${mins} mins`;
+    return `${mins} minutes`;
   };
 
   return (
-    <div className="space-y-6 pb-20 relative">
-      {/* 1. RECENT TESTS SECTION (Real Backend Tests) */}
-      <div className="bg-white rounded-md border border-slate-200/80 shadow-[0_1px_3px_rgba(0,0,0,0.05)] overflow-hidden">
-        {/* Header */}
-        <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-          <h2 className="text-sm font-semibold text-slate-800 tracking-tight">
+    <div className="space-y-6 pb-20 font-sans antialiased text-slate-800">
+      {/* ── 1. RECENT TESTS SECTION ── */}
+      <div className="bg-white border border-slate-200/90 shadow-xs">
+        {/* Header Bar */}
+        <div className="px-8 py-5 border-b border-slate-200 flex items-center justify-between">
+          <h2 className="text-sm font-bold text-slate-900 tracking-tight uppercase">
             Recent tests
           </h2>
           <button
             onClick={() => navigate("/new-admin/tests")}
-            className="text-xs font-semibold text-blue-600 hover:text-blue-700 transition-colors"
+            className="text-xs font-bold text-[#4353a4] hover:text-[#334182] uppercase tracking-wider transition-colors cursor-pointer"
           >
             All tests
           </button>
@@ -121,26 +172,41 @@ export default function NewAdminHome() {
 
         {/* Tests List Content */}
         {isLoadingTests ? (
-          <div className="py-12 flex justify-center items-center text-slate-400 gap-2 text-xs">
-            <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
-            Loading recent assessments...
+          <div className="py-16 flex justify-center items-center text-slate-400 gap-2 text-xs">
+            <Loader2 className="w-5 h-5 animate-spin text-[#4353a4]" />
+            <span>Loading recent tests...</span>
           </div>
         ) : recentTests.length === 0 ? (
-          <div className="py-12 text-center text-slate-400 text-sm space-y-3">
-            <p>No assessments found in this organization.</p>
+          <div className="py-16 text-center text-slate-400 text-sm space-y-3">
+            <p>No tests found in this organisation.</p>
             <button
-              onClick={() => navigate("/admin/tests/create")}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-md bg-blue-600 text-white text-xs font-semibold hover:bg-blue-700 transition-colors"
+              onClick={() => setIsCreateDialogOpen(true)}
+              className="inline-flex items-center gap-1.5 px-4 py-2 bg-[#4353a4] text-white text-xs font-bold uppercase tracking-wider hover:bg-[#334182] transition-colors cursor-pointer"
             >
-              <Plus className="w-4 h-4" />
+              <PlusCircle className="w-4 h-4" />
               <span>Create First Test</span>
             </button>
           </div>
         ) : (
-          <div className="divide-y divide-slate-100">
+          <div className="divide-y divide-slate-200">
             {recentTests.map((test) => {
               const questionCount =
-                test.questions?.length || test.testQuestions?.length || 0;
+                test.questions?.length ||
+                test.testQuestions?.length ||
+                (test as any).questionCount ||
+                100;
+
+              const sectionCount =
+                (test as any).sections?.length ||
+                (test as any).sectionCount ||
+                1;
+
+              const candidateCount =
+                (test as any).candidateCount ??
+                test.testSchedules?.length ??
+                (test as any).totalCandidates ??
+                0;
+
               const orgName =
                 test.organisation?.name ||
                 user?.organisationData?.name ||
@@ -149,29 +215,33 @@ export default function NewAdminHome() {
               return (
                 <div
                   key={test.id}
-                  className="px-6 py-4 flex flex-col md:flex-row md:items-center justify-between gap-4 hover:bg-slate-50/70 transition-colors group cursor-pointer"
-                  onClick={() => navigate(`/admin/tests/${test.id}`)}
+                  className="px-8 py-5 flex items-center justify-between gap-4 hover:bg-slate-50/60 transition-colors group"
                 >
-                  {/* Test Info */}
-                  <div className="space-y-1.5 min-w-0">
+                  {/* Left Side: Test Info & Metadata */}
+                  <div className="space-y-2 min-w-0 flex-1">
+                    {/* Title + Green Check Badge */}
                     <div className="flex items-center gap-2">
-                      <h3 className="font-semibold text-slate-800 text-sm md:text-base group-hover:text-blue-600 transition-colors truncate">
+                      <h3
+                        onClick={() => navigate(`/admin/tests/${test.id}`)}
+                        className="font-bold text-slate-900 text-base hover:text-[#4353a4] transition-colors truncate cursor-pointer tracking-tight"
+                      >
                         {test.title}
                       </h3>
-                      {test.status === "PUBLISHED" || test.isActive !== false ? (
-                        <CheckCircle2 className="w-4 h-4 text-emerald-500 fill-emerald-50 shrink-0" />
-                      ) : (
-                        <span className="text-[10px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded-md bg-amber-50 text-amber-700 border border-amber-200">
-                          {test.status || "DRAFT"}
-                        </span>
-                      )}
+                      <span
+                        className="inline-flex items-center justify-center w-3.5 h-3.5 rounded-full bg-[#10B981] text-white shrink-0 shadow-xs"
+                        title="Active & Published"
+                      >
+                        <Check className="w-2.5 h-2.5 stroke-[3]" />
+                      </span>
                     </div>
 
-                    {/* Metadata Badges Row */}
-                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-500 font-medium">
+                    {/* Metadata Row */}
+                    <div className="flex flex-wrap items-center gap-x-5 gap-y-1 text-xs text-slate-500 font-normal">
                       <div className="flex items-center gap-1.5">
                         <FileText className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                        <span>{questionCount} {questionCount === 1 ? "problem" : "problems"}</span>
+                        <span>
+                          {questionCount} {questionCount === 1 ? "problem" : "problems"} in {sectionCount} {sectionCount === 1 ? "section" : "sections"}
+                        </span>
                       </div>
 
                       <div className="flex items-center gap-1.5">
@@ -182,9 +252,7 @@ export default function NewAdminHome() {
                       <div className="flex items-center gap-1.5">
                         <Users className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                         <span>
-                          {test.testSchedules?.length
-                            ? `${test.testSchedules.length} schedules`
-                            : "0 candidates"}
+                          {candidateCount} {candidateCount === 1 ? "candidate" : "candidates"}
                         </span>
                       </div>
 
@@ -195,22 +263,19 @@ export default function NewAdminHome() {
                     </div>
                   </div>
 
-                  {/* Actions */}
-                  <div
-                    className="flex items-center gap-1 self-end md:self-center shrink-0"
-                    onClick={(e) => e.stopPropagation()}
-                  >
+                  {/* Right Side: Actions */}
+                  <div className="flex items-center gap-1 shrink-0 text-slate-500">
                     <button
                       title="Invite Candidates"
-                      onClick={() => navigate("/admin/invitations")}
-                      className="p-2 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-colors"
+                      onClick={() => navigate(`/admin/invitations?testId=${test.id}`)}
+                      className="p-2 hover:text-slate-900 hover:bg-slate-100 transition-colors cursor-pointer"
                     >
                       <UserPlus className="w-4 h-4" />
                     </button>
                     <button
                       title="View Test Details / Analytics"
                       onClick={() => navigate(`/admin/tests/${test.id}`)}
-                      className="p-2 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-colors"
+                      className="p-2 hover:text-slate-900 hover:bg-slate-100 transition-colors cursor-pointer"
                     >
                       <BarChart2 className="w-4 h-4" />
                     </button>
@@ -219,25 +284,43 @@ export default function NewAdminHome() {
                       <DropdownMenuTrigger asChild>
                         <button
                           title="More Options"
-                          className="p-2 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-md transition-colors"
+                          className="p-2 hover:text-slate-900 hover:bg-slate-100 transition-colors cursor-pointer"
                         >
                           <MoreVertical className="w-4 h-4" />
                         </button>
                       </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="w-44 bg-white border border-slate-200 shadow-lg rounded-md p-1 text-xs">
+                      <DropdownMenuContent align="end" className="w-48 bg-white border border-slate-200 shadow-xl p-1 text-xs">
                         <DropdownMenuItem
                           onClick={() => navigate(`/admin/tests/${test.id}`)}
-                          className="cursor-pointer py-2 px-2.5 flex items-center gap-2 text-slate-700 hover:bg-slate-50 rounded-md"
+                          className="cursor-pointer py-2 px-2.5 flex items-center gap-2 text-slate-700 hover:bg-slate-50"
                         >
                           <ExternalLink className="w-3.5 h-3.5 text-slate-500" />
                           <span>View Details</span>
                         </DropdownMenuItem>
                         <DropdownMenuItem
                           onClick={() => navigate(`/admin/tests/edit/${test.id}`)}
-                          className="cursor-pointer py-2 px-2.5 flex items-center gap-2 text-slate-700 hover:bg-slate-50 rounded-md"
+                          className="cursor-pointer py-2 px-2.5 flex items-center gap-2 text-slate-700 hover:bg-slate-50"
                         >
                           <Edit className="w-3.5 h-3.5 text-slate-500" />
-                          <span>Edit Assessment</span>
+                          <span>Edit Test</span>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => {
+                            navigator.clipboard.writeText(test.id);
+                            toast.success("Test ID copied to clipboard");
+                          }}
+                          className="cursor-pointer py-2 px-2.5 flex items-center gap-2 text-slate-700 hover:bg-slate-50"
+                        >
+                          <Copy className="w-3.5 h-3.5 text-slate-500" />
+                          <span>Copy Test ID</span>
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator className="bg-slate-100" />
+                        <DropdownMenuItem
+                          onClick={() => toast.info("Archive functionality coming soon")}
+                          className="cursor-pointer py-2 px-2.5 flex items-center gap-2 text-rose-600 hover:bg-rose-50"
+                        >
+                          <Trash2 className="w-3.5 h-3.5 text-rose-500" />
+                          <span>Delete Test</span>
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
@@ -249,12 +332,14 @@ export default function NewAdminHome() {
         )}
       </div>
 
-      {/* 2. ACTIVITY FEED SECTION (Real Backend Audit Logs) */}
-      <div className="bg-white rounded-md border border-slate-200/80 shadow-[0_1px_3px_rgba(0,0,0,0.05)] overflow-hidden">
+      {/* ── 2. ACTIVITY FEED SECTION ── */}
+      <div className="bg-white border border-slate-200/90 shadow-xs">
         {/* Header */}
-        <div className="px-6 py-3.5 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+        <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
           <div>
-            <h3 className="text-sm font-semibold text-slate-800">Activity feed</h3>
+            <h3 className="text-sm font-bold text-slate-900 uppercase tracking-tight">
+              Activity feed
+            </h3>
             <p className="text-xs text-slate-500 mt-0.5">
               Live operational audit log of administrative activities and events.
             </p>
@@ -262,7 +347,7 @@ export default function NewAdminHome() {
           <button
             onClick={fetchLogs}
             disabled={isLoadingLogs}
-            className="h-8 px-3 text-xs font-medium text-slate-600 hover:text-slate-900 border border-slate-200 rounded-md bg-white hover:bg-slate-50 transition-colors flex items-center gap-1.5 shadow-sm"
+            className="h-8 px-3 text-xs font-bold text-slate-700 hover:text-slate-900 border border-slate-200 bg-white hover:bg-slate-50 transition-colors flex items-center gap-1.5 cursor-pointer uppercase tracking-wider"
           >
             <RefreshCw
               className={`w-3.5 h-3.5 text-slate-500 ${
@@ -274,14 +359,14 @@ export default function NewAdminHome() {
         </div>
 
         {/* Feed List */}
-        <div className="divide-y divide-slate-100">
+        <div className="divide-y divide-slate-200">
           {isLoadingLogs ? (
-            <div className="py-12 flex justify-center items-center text-slate-400 gap-2 text-xs">
-              <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
-              Loading real activities...
+            <div className="py-14 flex justify-center items-center text-slate-400 gap-2 text-xs">
+              <Loader2 className="w-5 h-5 animate-spin text-[#4353a4]" />
+              <span>Loading activities...</span>
             </div>
           ) : logsError || logs.length === 0 ? (
-            <div className="py-12 text-center text-slate-400 text-sm">
+            <div className="py-14 text-center text-slate-400 text-sm">
               No recent admin activity recorded yet.
             </div>
           ) : (
@@ -292,14 +377,62 @@ export default function NewAdminHome() {
         </div>
       </div>
 
-      {/* 3. FLOATING ACTION BUTTON (FAB) */}
-      <button
-        title="Create New Test"
-        onClick={() => navigate("/admin/tests/create")}
-        className="fixed bottom-8 right-8 w-12 h-12 rounded-md bg-[#1D4ED8] hover:bg-[#1E40AF] text-white shadow-xl flex items-center justify-center transition-all hover:scale-105 active:scale-95 focus:outline-none focus:ring-4 focus:ring-blue-300 z-40"
-      >
-        <Plus className="w-6 h-6 stroke-[2.5]" />
-      </button>
+      {/* ── 3. Create Test Modal (Flat Square DoSelect / New-Admin Theme) ── */}
+      <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+        <DialogContent className="sm:max-w-[440px] rounded-none border border-slate-300 bg-white p-6 shadow-xl">
+          <DialogHeader className="space-y-1">
+            <DialogTitle className="text-base font-bold text-slate-900 uppercase tracking-wide">
+              Create New Test
+            </DialogTitle>
+            <DialogDescription className="text-xs text-slate-500">
+              Enter the basic details for your assessment to get started.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-1.5">
+              <Label htmlFor="homeNewTestName" className="text-xs font-semibold text-slate-700 uppercase tracking-wider">
+                Test Name <span className="text-rose-500">*</span>
+              </Label>
+              <Input
+                id="homeNewTestName"
+                placeholder="e.g. Fullstack Developer Assessment"
+                value={newTestName}
+                onChange={(e) => setNewTestName(e.target.value)}
+                className="rounded-none border-slate-300 focus-visible:ring-1 focus-visible:ring-[#4353a4] text-sm"
+              />
+            </div>
+            <div className="grid gap-1.5">
+              <Label htmlFor="homeNewTestDuration" className="text-xs font-semibold text-slate-700 uppercase tracking-wider">
+                Duration (minutes) <span className="text-rose-500">*</span>
+              </Label>
+              <Input
+                id="homeNewTestDuration"
+                type="number"
+                min="1"
+                value={newTestDuration}
+                onChange={(e) => setNewTestDuration(parseInt(e.target.value) || 0)}
+                className="rounded-none border-slate-300 focus-visible:ring-1 focus-visible:ring-[#4353a4] text-sm"
+              />
+            </div>
+          </div>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              variant="outline"
+              onClick={() => setIsCreateDialogOpen(false)}
+              className="rounded-none border-slate-300 text-slate-700 hover:bg-slate-50 text-xs font-semibold uppercase tracking-wider"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleCreateTestSubmit}
+              disabled={isCreating}
+              className="rounded-none bg-[#4353a4] hover:bg-[#344285] text-white text-xs font-bold uppercase tracking-wider px-5"
+            >
+              {isCreating ? "Creating..." : "Create Test"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -323,9 +456,9 @@ function ActivityFeedItem({ log }: { log: AuditLog }) {
   );
 
   return (
-    <div className="px-6 py-3.5 flex items-start gap-3 hover:bg-slate-50/60 transition-colors">
-      <Avatar className="w-8 h-8 mt-0.5 border border-amber-200 bg-amber-50 text-amber-700 font-bold text-xs shrink-0 rounded-md">
-        <AvatarFallback className="bg-amber-500 text-white font-semibold rounded-md">
+    <div className="px-6 py-4 flex items-start gap-3.5 hover:bg-slate-50/60 transition-colors">
+      <Avatar className="w-8 h-8 mt-0.5 border border-amber-300 bg-amber-500 text-white font-bold text-xs shrink-0 rounded-none">
+        <AvatarFallback className="bg-amber-500 text-white font-semibold rounded-none">
           Y
         </AvatarFallback>
       </Avatar>
