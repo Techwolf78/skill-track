@@ -15,7 +15,7 @@ import {
   CreateQuestionRequest,
   UpdateQuestionRequest,
 } from "@/lib/test-service";
-import { candidateService, Candidate, CreateCandidateRequest, SpringPage } from "@/lib/candidate-service";
+import { candidateService, Candidate, CandidateInvitation, CreateCandidateRequest, SpringPage } from "@/lib/candidate-service";
 import { organisationService, OrganisationResponse, CreateOrganisationRequest } from "@/lib/organisation-service";
 
 // ==================== Subjects Hooks ====================
@@ -150,12 +150,21 @@ export function useCandidatesQuery() {
  * Query key includes page + size so React Query refetches automatically on navigation.
  * keepPreviousData keeps the current page visible while the next page loads.
  */
-export function useCandidatesPageQuery(page: number, size: number) {
+export function useCandidatesPageQuery(page: number, size: number, search?: string) {
   return useQuery<SpringPage<Candidate>>({
-    queryKey: ["candidates-page", page, size],
-    queryFn: () => candidateService.getCandidatesPage(page, size),
+    queryKey: ["candidates-page", page, size, search ?? ""],
+    queryFn: () => candidateService.getCandidatesPage(page, size, search),
     placeholderData: keepPreviousData,
     staleTime: 60_000, // 60 seconds cache per page
+  });
+}
+
+export function useScheduleInvitationsQuery(scheduleId: string) {
+  return useQuery<CandidateInvitation[]>({
+    queryKey: ["schedule-invitations", scheduleId],
+    queryFn: () => candidateService.getInvitationsBySchedule(scheduleId),
+    enabled: Boolean(scheduleId),
+    staleTime: 10_000,
   });
 }
 
