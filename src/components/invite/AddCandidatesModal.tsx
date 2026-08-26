@@ -38,6 +38,8 @@ import {
   Trash2,
   KeyRound,
   CheckCircle2,
+  AlertTriangle,
+  RefreshCw,
 } from "lucide-react";
 
 interface AddCandidatesModalProps {
@@ -77,6 +79,15 @@ export function AddCandidatesModal({
   });
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [inviting, setInviting] = useState(false);
+  const [lastFailedCount, setLastFailedCount] = useState(0);
+
+  // Reset errors and selections when dialog opens/closes
+  useEffect(() => {
+    if (!open) {
+      setLastFailedCount(0);
+      setSelectedIds([]);
+    }
+  }, [open]);
 
   // Tab 2: Create Candidate Form state
   const [createForm, setCreateForm] = useState({
@@ -155,13 +166,13 @@ export function AddCandidatesModal({
     }
   };
 
-  // Bulk invite selected
+  // Bulk invite selected with partial-failure handling
   const handleInviteSelected = async () => {
     if (selectedIds.length === 0 || !scheduleId) return;
     try {
       setInviting(true);
       let successCount = 0;
-      let failCount = 0;
+      const failedIds: string[] = [];
 
       for (const candidateId of selectedIds) {
         try {
@@ -172,22 +183,45 @@ export function AddCandidatesModal({
           successCount++;
         } catch (err) {
           console.error(`Failed to invite candidate ${candidateId}:`, err);
-          failCount++;
+          failedIds.push(candidateId);
         }
       }
 
-      toast({
-        title: "Invitations Sent",
-        description: `Successfully invited ${successCount} candidates.${
-          failCount > 0 ? ` (${failCount} failed)` : ""
-        }`,
-      });
+      setLastFailedCount(failedIds.length);
 
-      setSelectedIds([]);
-      onSuccess();
-      onOpenChange(false);
+      if (failedIds.length === 0) {
+        // Complete success
+        toast({
+          title: "Invitations Sent",
+          description: `Successfully invited all ${successCount} candidate${successCount === 1 ? "" : "s"}.`,
+        });
+        setSelectedIds([]);
+        setLastFailedCount(0);
+        onSuccess();
+        onOpenChange(false);
+      } else {
+        // Partial or complete failure: Keep modal open and retain only failed IDs for retry
+        if (successCount > 0) {
+          onSuccess();
+          fetchPage();
+        }
+        setSelectedIds(failedIds);
+
+        toast({
+          title: successCount > 0 ? "Partial Invitations Sent" : "Invitations Failed",
+          description: successCount > 0
+            ? `${successCount} candidate${successCount === 1 ? "" : "s"} invited successfully, but ${failedIds.length} failed. The failed candidates remain selected below so you can retry.`
+            : `Failed to invite ${failedIds.length} candidate${failedIds.length === 1 ? "" : "s"}. The selections have been retained for you to retry.`,
+          variant: "destructive",
+        });
+      }
     } catch (error) {
       console.error("Bulk invite error:", error);
+      toast({
+        title: "Error",
+        description: "An unexpected error occurred while sending invitations.",
+        variant: "destructive",
+      });
     } finally {
       setInviting(false);
     }
@@ -323,6 +357,27 @@ export function AddCandidatesModal({
 
           {/* TAB 1: Pick Existing */}
           <TabsContent value="pick" className="flex-1 flex flex-col overflow-hidden p-6 pt-3 space-y-3">
+            {/* Failure Alert Banner */}
+            {lastFailedCount > 0 && (
+              <div className="flex items-center justify-between p-3 rounded-lg border border-destructive/30 bg-destructive/10 text-destructive text-xs">
+                <div className="flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4 shrink-0" />
+                  <span>
+                    <strong>{lastFailedCount} invitation{lastFailedCount === 1 ? "" : "s"} failed.</strong> The failed candidates remain selected below for you to retry.
+                  </span>
+                </div>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setLastFailedCount(0)}
+                  className="h-6 px-2 text-[11px] text-destructive hover:bg-destructive/20"
+                >
+                  Dismiss
+                </Button>
+              </div>
+            )}
+
             {/* Search */}
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -494,12 +549,18 @@ export function AddCandidatesModal({
               <Button
                 onClick={handleInviteSelected}
                 disabled={selectedIds.length === 0 || inviting}
+                variant={lastFailedCount > 0 ? "destructive" : "default"}
                 className="gap-1.5"
               >
                 {inviting ? (
                   <>
                     <Loader2 className="w-4 h-4 animate-spin" />
-                    Inviting...
+                    {lastFailedCount > 0 ? "Retrying..." : "Inviting..."}
+                  </>
+                ) : lastFailedCount > 0 ? (
+                  <>
+                    <RefreshCw className="w-4 h-4" />
+                    Retry Failed Invitations ({selectedIds.length})
                   </>
                 ) : (
                   <>
