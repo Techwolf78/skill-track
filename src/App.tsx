@@ -57,6 +57,7 @@ const NewAdminTests = React.lazy(() => import("./pages/New-Admin/NewAdminTests")
 const NewAdminHome = React.lazy(() => import("./pages/New-Admin/NewAdminHome"));
 const NewAdminLibrary = React.lazy(() => import("./pages/New-Admin/NewAdminLibrary"));
 const NewAdminQuestionCreate = React.lazy(() => import("./pages/New-Admin/NewAdminQuestionCreate"));
+const NewAdminQuestionPreview = React.lazy(() => import("./pages/New-Admin/NewAdminQuestionPreview"));
 
 // Test Taking
 const TestInterface = React.lazy(() => import("./pages/test/TestInterface"));
@@ -231,6 +232,12 @@ const App = () => (
               {/* Standalone Full-Screen Question Create / Edit for New-Admin (No 2nd Navbar) */}
               <Route path="/new-admin/questions/create" element={<NewAdminQuestionCreate />} />
               <Route path="/new-admin/library/create" element={<NewAdminQuestionCreate />} />
+
+              {/* Standalone Full-Screen Question Preview (DoSelect / Learn Style) */}
+              <Route path="/new-admin/questions/preview/:id" element={<NewAdminQuestionPreview />} />
+              <Route path="/new-admin/library/preview/:id" element={<NewAdminQuestionPreview />} />
+              <Route path="/superadmin/questions/preview/:id" element={<NewAdminQuestionPreview />} />
+              <Route path="/admin/questions/preview/:id" element={<NewAdminQuestionPreview />} />
 
               {/* Standalone Full-Screen Playground for New-Admin (No Sidebars) */}
               <Route path="/new-admin/playground/:id" element={<DSAPlayground />} />

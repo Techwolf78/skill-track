@@ -1181,79 +1181,7 @@ function ImportQuestionsDialog({
 
 // ─── Preview Dialog ───────────────────────────────────────────────────────────
 
-function PreviewDialog({
-  question,
-  onClose,
-}: {
-  question: Question | null;
-  onClose: () => void;
-}) {
-  const navigate = useNavigate();
-  if (!question) return null;
-  const isCoding = (question.questionType ?? "").toUpperCase() === "CODING";
 
-  return (
-    <Dialog open onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-xl bg-white border border-slate-200 p-5 space-y-4 max-h-[80vh] overflow-y-auto">
-        <DialogHeader className="flex flex-row items-center justify-between gap-3">
-          <DialogTitle className="text-sm font-bold text-slate-900">
-            {question.title || "Question Preview"}
-          </DialogTitle>
-          {isCoding && (
-            <button
-              onClick={() => {
-                onClose();
-                navigate(`/new-admin/playground/${question.id}`);
-              }}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#6366F1] hover:bg-[#4F46E5] text-white text-xs font-semibold shadow-sm transition-colors cursor-pointer shrink-0 mr-4"
-            >
-              <Terminal className="w-3.5 h-3.5" />
-              <span>Open Playground</span>
-            </button>
-          )}
-        </DialogHeader>
-        <div className="space-y-3 text-xs">
-          <div className="flex gap-2 flex-wrap">
-            <Badge variant="outline">{question.questionType}</Badge>
-            {question.difficulty && <Badge variant="secondary">{fmt(question.difficulty)}</Badge>}
-            {question.mcqType && <Badge variant="outline">{fmtMcqType(question.mcqType)}</Badge>}
-          </div>
-          <div className="p-3 bg-slate-50 border border-slate-200 text-slate-800">
-            <p className="font-semibold text-slate-600 mb-1.5">Problem Statement</p>
-            <p className="whitespace-pre-wrap leading-relaxed">{question.prompt || "—"}</p>
-          </div>
-          {question.questionType === "MCQ" && question.mcqOptions && (
-            <div>
-              <p className="font-semibold text-slate-600 mb-1.5">Options</p>
-              <div className="space-y-1.5">
-                {question.mcqOptions.map((opt, i) => (
-                  <div
-                    key={i}
-                    className={`px-3 py-2 border text-xs flex items-center justify-between ${
-                      opt.isCorrect
-                        ? "bg-emerald-50 border-emerald-300 text-emerald-900 font-medium"
-                        : "bg-white border-slate-200 text-slate-700"
-                    }`}
-                  >
-                    <span>{opt.text || `Option ${i + 1}`}</span>
-                    {opt.isCorrect && <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-          {question.tags && question.tags.length > 0 && (
-            <div className="flex flex-wrap gap-1.5">
-              {question.tags.map((t, i) => (
-                <span key={i} className="px-2 py-0.5 bg-slate-100 text-slate-600 border border-slate-200 text-[11px]">{t}</span>
-              ))}
-            </div>
-          )}
-        </div>
-      </DialogContent>
-    </Dialog>
-  );
-}
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
@@ -1268,7 +1196,6 @@ export default function NewAdminLibrary() {
   const [techSearch, setTechSearch] = useState("");
   const [tagSearch, setTagSearch] = useState("");
   const [selectedLevel, setSelectedLevel] = useState<"ALL" | "EASY" | "MEDIUM" | "HARD">("ALL");
-  const [previewQuestion, setPreviewQuestion] = useState<Question | null>(null);
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
@@ -1649,7 +1576,13 @@ export default function NewAdminLibrary() {
                           </button>
                         )}
                         <button
-                          onClick={() => setPreviewQuestion(q)}
+                          onClick={() => {
+                            if (isCoding) {
+                              navigate(`/new-admin/playground/${q.id}`);
+                            } else {
+                              navigate(`/new-admin/questions/preview/${q.id}`, { state: q });
+                            }
+                          }}
                           className="p-0.5 hover:text-slate-700 transition-colors cursor-pointer"
                           title="Preview Question"
                         >
@@ -1805,9 +1738,6 @@ export default function NewAdminLibrary() {
         }}
         onOpenBulkUploader={() => setImportOpen(true)}
       />
-
-      {/* Preview Dialog */}
-      <PreviewDialog question={previewQuestion} onClose={() => setPreviewQuestion(null)} />
 
       {/* Import Questions Dialog */}
       <ImportQuestionsDialog

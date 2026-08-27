@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
+  ChevronLeft,
   ChevronRight,
   ChevronDown,
   Search,
@@ -520,7 +521,16 @@ export default function NewAdminQuestionCreate() {
       <div className="bg-[#0B1028] absolute top-14 left-0 right-0 h-80 -z-0 pointer-events-none" />
 
       {/* ── 3. Main Workspace Area (Title tightly placed above cards) ── */}
-      <main className="max-w-7xl mx-auto px-4 md:px-8 pt-8 pb-20 w-full relative z-10">
+      <main className="max-w-7xl mx-auto px-4 md:px-8 pt-6 pb-20 w-full relative z-10">
+        {/* Back to Library Button above title */}
+        <button
+          onClick={() => navigate("/new-admin/library")}
+          className="inline-flex items-center gap-1.5 text-xs text-slate-400 hover:text-white transition-colors cursor-pointer mb-2.5"
+        >
+          <ChevronLeft className="w-4 h-4" />
+          <span>Back to Library</span>
+        </button>
+
         {/* Title & Type Metadata Row (Tightly above white card) */}
         <div className="space-y-1.5 mb-4 text-white">
           <div className="flex items-center gap-2.5">
