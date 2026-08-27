@@ -227,6 +227,15 @@ export default function NewAdminTests() {
 
                   {/* Right Side: Quick Action Icons */}
                   <div className="flex items-center gap-1 shrink-0 text-slate-500">
+                    {/* Edit Test (New UI) */}
+                    <button
+                      title="Edit Test Settings & Problems"
+                      onClick={() => navigate(`/new-admin/tests/edit/${test.id}`)}
+                      className="p-2 hover:text-[#4353a4] hover:bg-slate-100 transition-colors cursor-pointer"
+                    >
+                      <Edit className="w-4 h-4" />
+                    </button>
+
                     {/* Invite Candidates */}
                     <button
                       title="Invite Candidates"

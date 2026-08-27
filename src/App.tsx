@@ -58,6 +58,8 @@ const NewAdminHome = React.lazy(() => import("./pages/New-Admin/NewAdminHome"));
 const NewAdminLibrary = React.lazy(() => import("./pages/New-Admin/NewAdminLibrary"));
 const NewAdminQuestionCreate = React.lazy(() => import("./pages/New-Admin/NewAdminQuestionCreate"));
 const NewAdminQuestionPreview = React.lazy(() => import("./pages/New-Admin/NewAdminQuestionPreview"));
+const NewAdminTestEdit = React.lazy(() => import("./pages/New-Admin/NewAdminTestEdit"));
+const NewAdminTestAddProblems = React.lazy(() => import("./pages/New-Admin/NewAdminTestAddProblems"));
 
 // Test Taking
 const TestInterface = React.lazy(() => import("./pages/test/TestInterface"));
@@ -238,6 +240,12 @@ const App = () => (
               <Route path="/new-admin/library/preview/:id" element={<NewAdminQuestionPreview />} />
               <Route path="/superadmin/questions/preview/:id" element={<NewAdminQuestionPreview />} />
               <Route path="/admin/questions/preview/:id" element={<NewAdminQuestionPreview />} />
+
+              {/* Standalone Full-Screen Test Edit for New-Admin */}
+              <Route path="/new-admin/tests/edit/:id" element={<NewAdminTestEdit />} />
+              <Route path="/new-admin/tests/edit" element={<NewAdminTestEdit />} />
+              <Route path="/new-admin/tests/:id/add-problems" element={<NewAdminTestAddProblems />} />
+              <Route path="/new-admin/tests/edit/:id/library" element={<NewAdminTestAddProblems />} />
 
               {/* Standalone Full-Screen Playground for New-Admin (No Sidebars) */}
               <Route path="/new-admin/playground/:id" element={<DSAPlayground />} />
