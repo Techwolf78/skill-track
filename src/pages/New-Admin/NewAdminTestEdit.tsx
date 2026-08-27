@@ -737,8 +737,8 @@ export default function NewAdminTestEdit() {
   // ── Filtered Candidates for the CANDIDATES Tab ──
   const filteredCandidates = useMemo(() => {
     return invitations.filter((inv) => {
-      const name = (inv.candidateName || inv.candidate?.name || "").toLowerCase();
-      const email = (inv.candidateEmail || inv.candidate?.email || "").toLowerCase();
+      const name = (inv.candidateName || inv.candidate?.user?.name || "").toLowerCase();
+      const email = (inv.candidateEmail || inv.candidate?.user?.email || "").toLowerCase();
       const q = candidateSearchQuery.toLowerCase().trim();
 
       if (q && !name.includes(q) && !email.includes(q)) {
@@ -789,8 +789,11 @@ export default function NewAdminTestEdit() {
       return;
     }
     try {
+      const toResend = invitations.filter((i) => selectedCandidateIds.includes(i.id));
       await Promise.all(
-        selectedCandidateIds.map((invId) => candidateService.resendInvitation(invId))
+        toResend.map((inv) =>
+          candidateService.reissueInvitation(inv.scheduleId, inv.candidateId, inv.id)
+        )
       );
       toast.success(`Resent invitations to ${selectedCandidateIds.length} candidate(s).`);
     } catch {
@@ -806,7 +809,7 @@ export default function NewAdminTestEdit() {
     if (!confirm(`Revoke ${selectedCandidateIds.length} candidate invitations?`)) return;
     try {
       await Promise.all(
-        selectedCandidateIds.map((invId) => candidateService.revokeInvitation(invId))
+        selectedCandidateIds.map((invId) => candidateService.deleteInvitation(invId))
       );
       setInvitations((prev) => prev.filter((i) => !selectedCandidateIds.includes(i.id)));
       setSelectedCandidateIds([]);
@@ -820,8 +823,16 @@ export default function NewAdminTestEdit() {
     if (!candidateToResend) return;
     try {
       setResending(true);
-      await candidateService.resendInvitation(candidateToResend.id);
-      toast.success(`Invitation email resent to ${candidateToResend.candidateEmail || "candidate"}.`);
+      await candidateService.reissueInvitation(
+        candidateToResend.scheduleId,
+        candidateToResend.candidateId,
+        candidateToResend.id
+      );
+      toast.success(
+        `Invitation email resent to ${
+          candidateToResend.candidateEmail || candidateToResend.candidate?.user?.email || "candidate"
+        }.`
+      );
       setIsResendModalOpen(false);
       setCandidateToResend(null);
     } catch {
@@ -835,7 +846,7 @@ export default function NewAdminTestEdit() {
     if (!candidateToRevoke) return;
     try {
       setRevoking(true);
-      await candidateService.revokeInvitation(candidateToRevoke.id);
+      await candidateService.deleteInvitation(candidateToRevoke.id);
       setInvitations((prev) => prev.filter((i) => i.id !== candidateToRevoke.id));
       toast.success("Candidate invitation revoked successfully.");
       setIsRevokeModalOpen(false);
@@ -849,8 +860,8 @@ export default function NewAdminTestEdit() {
 
   const downloadAdvancedReport = async (inv: CandidateInvitation) => {
     try {
-      const name = inv.candidateName || inv.candidate?.name || "Candidate";
-      const email = inv.candidateEmail || inv.candidate?.email || "";
+      const name = inv.candidateName || inv.candidate?.user?.name || "Candidate";
+      const email = inv.candidateEmail || inv.candidate?.user?.email || "";
       const scoreData = candidateResults[inv.id];
 
       toast.info("Generating Candidate Audit PDF Report...");
@@ -948,8 +959,8 @@ export default function NewAdminTestEdit() {
     toast.info("Generating candidate assessment report download...");
     const headers = ["Candidate Name", "Email", "Status", "Time", "Total Score", "% Score"];
     const rows = filteredCandidates.map((inv) => {
-      const name = inv.candidateName || inv.candidate?.name || "Candidate";
-      const email = inv.candidateEmail || inv.candidate?.email || "";
+      const name = inv.candidateName || inv.candidate?.user?.name || "Candidate";
+      const email = inv.candidateEmail || inv.candidate?.user?.email || "";
       const scoreEntry = candidateResults[inv.id];
       const result = scoreEntry?.result;
       const status =
@@ -1116,7 +1127,7 @@ export default function NewAdminTestEdit() {
         </div>
 
         {/* ── 3. Tab Navigations (4 Standalone Tabs) ── */}
-        <div className="bg-white border border-slate-200/90 shadow-sm px-6 flex items-center overflow-x-auto">
+        <div className="bg-white border border-slate-200/90 shadow-sm px-6 flex items-center overflow-x-auto scrollbar-none">
           {/* PROBLEMS TAB */}
           <button
             onClick={() => setActiveTab("PROBLEMS")}
@@ -2366,8 +2377,8 @@ export default function NewAdminTestEdit() {
                         </tr>
                       ) : (
                         paginatedCandidates.map((inv) => {
-                          const name = inv.candidateName || inv.candidate?.name || inv.candidate?.user?.name || "Candidate";
-                          const email = inv.candidateEmail || inv.candidate?.email || inv.candidate?.user?.email || "—";
+                          const name = inv.candidateName || inv.candidate?.user?.name || "Candidate";
+                          const email = inv.candidateEmail || inv.candidate?.user?.email || "—";
                           const scoreEntry = candidateResults[inv.id];
                           const result = scoreEntry?.result;
                           const isPassed = result?.passed === true;
@@ -2384,9 +2395,8 @@ export default function NewAdminTestEdit() {
                               : result?.scorePercentage !== undefined
                               ? `${result.scorePercentage}%`
                               : "—";
-                          const dateStr = inv.createdAt || inv.sentAt
-                            ? new Date(inv.createdAt || inv.sentAt!).toLocaleDateString()
-                            : "—";
+                          const rawDate = (inv as Record<string, unknown>).createdAt as string | undefined || inv.sentAt;
+                          const dateStr = rawDate ? new Date(rawDate).toLocaleDateString() : "—";
 
                           let timeStr = "—";
                           if (result?.timeTakenSeconds) {
@@ -2621,7 +2631,6 @@ export default function NewAdminTestEdit() {
           open={isBulkInviteOpen}
           onOpenChange={setIsBulkInviteOpen}
           scheduleId={selectedScheduleId}
-          alreadyInvitedIds={alreadyInvitedCandidateIds}
           onSuccess={() => {
             loadCandidatesData();
             fetchTest();
@@ -2655,10 +2664,10 @@ export default function NewAdminTestEdit() {
               </p>
               <div className="p-3 bg-slate-50 border border-slate-100 rounded space-y-1">
                 <p className="font-bold text-slate-900">
-                  {candidateToResend.candidateName || candidateToResend.candidate?.name || "Candidate"}
+                  {candidateToResend.candidateName || candidateToResend.candidate?.user?.name || "Candidate"}
                 </p>
                 <p className="text-slate-500">
-                  {candidateToResend.candidateEmail || candidateToResend.candidate?.email}
+                  {candidateToResend.candidateEmail || candidateToResend.candidate?.user?.email}
                 </p>
               </div>
             </div>
@@ -2720,10 +2729,10 @@ export default function NewAdminTestEdit() {
               </p>
               <div className="p-3 bg-slate-50 border border-slate-100 rounded space-y-1">
                 <p className="font-bold text-slate-900">
-                  {candidateToRevoke.candidateName || candidateToRevoke.candidate?.name || "Candidate"}
+                  {candidateToRevoke.candidateName || candidateToRevoke.candidate?.user?.name || "Candidate"}
                 </p>
                 <p className="text-slate-500">
-                  {candidateToRevoke.candidateEmail || candidateToRevoke.candidate?.email}
+                  {candidateToRevoke.candidateEmail || candidateToRevoke.candidate?.user?.email}
                 </p>
               </div>
             </div>

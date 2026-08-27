@@ -172,7 +172,9 @@ export default function NewAdminTestAddProblems() {
     if (!id) return;
     try {
       setAddingId(q.id);
-      const nextOrderIndex = addedQuestionIds.size + 1;
+      const existing = await testService.getTestQuestions(id);
+      const maxOrder = (existing || []).reduce((max, tq) => Math.max(max, tq.orderIndex ?? 0), 0);
+      const nextOrderIndex = maxOrder + 1;
       const marks = q.marks ?? (q.questionType === "CODING" ? 100 : 10);
 
       await testService.addQuestionToTest(id, q.id, nextOrderIndex, marks);
