@@ -874,8 +874,15 @@ export default function NewAdminTestEdit() {
       const scoreText =
         scoreData?.result?.score !== undefined
           ? `${scoreData.result.score} pts`
-          : "50 pts";
-      const passText = scoreData?.result?.passed !== false ? "PASSED" : "FAILED";
+          : scoreData?.result?.totalScore !== undefined
+          ? `${scoreData.result.totalScore} pts`
+          : "—";
+      const passText =
+        scoreData?.result?.passed === true
+          ? "PASSED"
+          : scoreData?.result?.passed === false
+          ? "FAILED"
+          : inv.status || "PENDING";
 
       // Metadata Table
       autoTable(doc, {
@@ -945,10 +952,34 @@ export default function NewAdminTestEdit() {
       const email = inv.candidateEmail || inv.candidate?.email || "";
       const scoreEntry = candidateResults[inv.id];
       const result = scoreEntry?.result;
-      const status = result?.passed ? "Passed" : result ? "Failed" : inv.status;
-      const score = result?.score !== undefined ? result.score : 50;
-      const percent = result?.percentage !== undefined ? `${result.percentage}%` : "100%";
-      const time = "2h 0m";
+      const status =
+        result?.passed === true
+          ? "Passed"
+          : result?.passed === false
+          ? "Failed"
+          : inv.status || "Pending";
+      const score =
+        result?.score !== undefined
+          ? result.score
+          : result?.totalScore !== undefined
+          ? result.totalScore
+          : "—";
+      const percent =
+        result?.percentage !== undefined
+          ? `${result.percentage}%`
+          : result?.scorePercentage !== undefined
+          ? `${result.scorePercentage}%`
+          : "—";
+      let time = "—";
+      if (result?.timeTakenSeconds) {
+        const m = Math.floor(result.timeTakenSeconds / 60);
+        const s = result.timeTakenSeconds % 60;
+        time = m > 0 ? `${m}m ${s}s` : `${s}s`;
+      } else if (result?.timeTaken) {
+        time = String(result.timeTaken);
+      } else if (scoreEntry?.detail?.timeTaken) {
+        time = String(scoreEntry.detail.timeTaken);
+      }
       return [name, email, status, time, score, percent];
     });
 
@@ -2335,18 +2366,38 @@ export default function NewAdminTestEdit() {
                         </tr>
                       ) : (
                         paginatedCandidates.map((inv) => {
-                          const name = inv.candidateName || inv.candidate?.name || "Candidate";
-                          const email = inv.candidateEmail || inv.candidate?.email || "";
+                          const name = inv.candidateName || inv.candidate?.name || inv.candidate?.user?.name || "Candidate";
+                          const email = inv.candidateEmail || inv.candidate?.email || inv.candidate?.user?.email || "—";
                           const scoreEntry = candidateResults[inv.id];
                           const result = scoreEntry?.result;
                           const isPassed = result?.passed === true;
                           const isFailed = result && result.passed === false;
-                          const scoreVal = result?.score !== undefined ? result.score : 50;
-                          const percentVal = result?.percentage !== undefined ? `${result.percentage}%` : "100%";
-                          const dateStr = inv.createdAt
-                            ? new Date(inv.createdAt).toLocaleDateString()
-                            : "06/06/2026";
-                          const shortId = inv.candidateId?.slice(0, 8) || "ef5c5f9e";
+                          const scoreVal =
+                            result?.score !== undefined
+                              ? result.score
+                              : result?.totalScore !== undefined
+                              ? result.totalScore
+                              : "—";
+                          const percentVal =
+                            result?.percentage !== undefined
+                              ? `${result.percentage}%`
+                              : result?.scorePercentage !== undefined
+                              ? `${result.scorePercentage}%`
+                              : "—";
+                          const dateStr = inv.createdAt || inv.sentAt
+                            ? new Date(inv.createdAt || inv.sentAt!).toLocaleDateString()
+                            : "—";
+
+                          let timeStr = "—";
+                          if (result?.timeTakenSeconds) {
+                            const m = Math.floor(result.timeTakenSeconds / 60);
+                            const s = result.timeTakenSeconds % 60;
+                            timeStr = m > 0 ? `${m}m ${s}s` : `${s}s`;
+                          } else if (result?.timeTaken) {
+                            timeStr = String(result.timeTaken);
+                          } else if (scoreEntry?.detail?.timeTaken) {
+                            timeStr = String(scoreEntry.detail.timeTaken);
+                          }
 
                           let statusBadge = (
                             <span className="font-semibold text-slate-600">
@@ -2354,17 +2405,25 @@ export default function NewAdminTestEdit() {
                                 ? "Accepted"
                                 : inv.status === "PENDING"
                                 ? "Invited"
-                                : "Pending"}
+                                : inv.status || "Pending"}
                             </span>
                           );
 
-                          if (isPassed || inv.status === "SUBMITTED") {
+                          if (isPassed) {
                             statusBadge = (
-                              <span className="font-semibold text-emerald-700">Submitted</span>
+                              <span className="font-semibold text-emerald-700">Passed</span>
                             );
                           } else if (isFailed) {
                             statusBadge = (
                               <span className="font-semibold text-rose-600">Failed</span>
+                            );
+                          } else if (inv.status === "SUBMITTED" || inv.sessionStatus === "SUBMITTED" || inv.sessionStatus === "AUTO_SUBMITTED") {
+                            statusBadge = (
+                              <span className="font-semibold text-emerald-700">Submitted</span>
+                            );
+                          } else if (inv.status === "ACCEPTED" || inv.sessionStatus === "IN_PROGRESS") {
+                            statusBadge = (
+                              <span className="font-semibold text-amber-600">In Progress</span>
                             );
                           }
 
@@ -2396,9 +2455,6 @@ export default function NewAdminTestEdit() {
                                   <div className="space-y-0.5">
                                     <div className="flex items-center gap-2">
                                       <span className="font-bold text-slate-900">{name}</span>
-                                      <span className="text-[10px] text-slate-400 font-mono">
-                                        ID: {shortId}
-                                      </span>
                                     </div>
                                     <div className="flex items-center gap-3 text-[11px] text-slate-400 font-normal">
                                       <span className="flex items-center gap-1">
@@ -2418,7 +2474,7 @@ export default function NewAdminTestEdit() {
                               <td className="py-3.5 px-4">{statusBadge}</td>
 
                               {/* Time */}
-                              <td className="py-3.5 px-4 font-medium text-slate-700">2h 0m</td>
+                              <td className="py-3.5 px-4 font-medium text-slate-700">{timeStr}</td>
 
                               {/* Total Score */}
                               <td className="py-3.5 px-4 font-bold text-slate-900">{scoreVal}</td>
