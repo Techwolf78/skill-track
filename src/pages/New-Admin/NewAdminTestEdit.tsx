@@ -138,6 +138,20 @@ const formatDuration = (mins?: number) => {
   return `${mins} min${mins > 1 ? "s" : ""}`;
 };
 
+const formatTimeTaken = (totalSeconds: number) => {
+  if (totalSeconds <= 0) return "0m";
+  const h = Math.floor(totalSeconds / 3600);
+  const m = Math.floor((totalSeconds % 3600) / 60);
+
+  if (h > 0) {
+    return m > 0 ? `${h}h ${m}m` : `${h}h`;
+  }
+  if (m > 0) {
+    return `${m}m`;
+  }
+  return "< 1m";
+};
+
 const formatDateTime = (dateStr: string) => {
   if (!dateStr) return "";
   return new Date(dateStr).toLocaleString();
@@ -462,16 +476,23 @@ export default function NewAdminTestEdit() {
                 `/api/admin/proctoring/candidates/${inv.candidateId}/details?scheduleId=${inv.scheduleId}`
               );
               const detail = detailRes.data?.data || detailRes.data;
-              const sessionId = detail?.systemInfo?.sessionId;
+              const sessionId = detail?.systemInfo?.sessionId || detail?.sessionId || (inv as any).sessionId || (inv as any).testSessionId;
               if (sessionId) {
-                const res = await apiClient.get(`/test-results/session/${sessionId}`);
+                const [res, sessionRes] = await Promise.allSettled([
+                  apiClient.get(`/test-results/session/${sessionId}`),
+                  apiClient.get(`/test-sessions/${sessionId}`),
+                ]);
+                const resultData = res.status === "fulfilled" ? (res.value.data?.data || res.value.data) : null;
+                const sessionData = sessionRes.status === "fulfilled" ? (sessionRes.value.data?.data || sessionRes.value.data) : null;
+
                 resultsMap[inv.id] = {
                   sessionId,
                   detail,
-                  result: res.data?.data || res.data,
+                  session: sessionData,
+                  result: resultData,
                 };
               } else {
-                resultsMap[inv.id] = { detail, result: null };
+                resultsMap[inv.id] = { detail, session: null, result: null };
               }
             } catch {
               // fallback
@@ -864,36 +885,60 @@ export default function NewAdminTestEdit() {
       const email = inv.candidateEmail || inv.candidate?.user?.email || "";
       const scoreData = candidateResults[inv.id];
 
-      toast.info("Generating Candidate Audit PDF Report...");
+      if (!scoreData?.sessionId) {
+        toast.error("No active session found to build advanced report.");
+        return;
+      }
 
+      toast.info("Compiling telemetry into a premium PDF report...");
+
+      const detailRes = await apiClient.get(
+        `/api/admin/proctoring/candidates/${inv.candidateId}/details?scheduleId=${inv.scheduleId || selectedScheduleId || selectedScheduleData?.id}`,
+      ).catch(() => ({ data: null }));
+      const detailData = detailRes.data?.data ?? detailRes.data ?? scoreData?.detail;
+
+      const [paperRes, resumeRes, timingsRes] = await Promise.all([
+        apiClient.get(`/test-sessions/${scoreData.sessionId}/paper`).catch(() => ({ data: null })),
+        apiClient.get(`/test-sessions/${scoreData.sessionId}/resume`).catch(() => ({ data: null })),
+        apiClient.get(`/test-sessions/${scoreData.sessionId}/question-timings`).catch(() => ({ data: null })),
+      ]);
+
+      const paperData = paperRes.data?.data || paperRes.data;
+      const resumeData = resumeRes.data?.data || resumeRes.data;
+      const timingsList = timingsRes.data?.data || timingsRes.data || [];
+
+      const questionsList = paperData?.paper?.questions || [];
+      const submissionsList = resumeData?.submissions || [];
+
+      const scoreText =
+        scoreData?.result?.totalScore !== undefined
+          ? `${scoreData.result.totalScore} / ${scoreData.result.maxScore || (scoreData.result.percentage ? Math.round((scoreData.result.totalScore / (scoreData.result.percentage / 100))) : scoreData.result.totalScore)}`
+          : scoreData?.result?.score !== undefined
+          ? `${scoreData.result.score} pts`
+          : "N/A";
+      const passText =
+        scoreData?.result?.passed !== undefined
+          ? scoreData.result.passed
+            ? "PASSED"
+            : "FAILED"
+          : inv.status || "PENDING";
+
+      // Initialize jsPDF document
       const doc = new jsPDF();
 
-      // Header Banner
-      doc.setFillColor(8, 18, 37);
+      // Premium Header Banner
+      doc.setFillColor(15, 23, 42); // Obsidian background
       doc.rect(0, 0, 210, 32, "F");
 
       doc.setTextColor(255, 255, 255);
       doc.setFont("helvetica", "bold");
-      doc.setFontSize(16);
-      doc.text("CANDIDATE ASSESSMENT REPORT", 14, 18);
+      doc.setFontSize(18);
+      doc.text("CANDIDATE SESSION AUDIT", 14, 18);
 
-      doc.setTextColor(16, 185, 129);
+      doc.setTextColor(52, 211, 153); // Matrix Green
       doc.setFont("helvetica", "normal");
       doc.setFontSize(8.5);
-      doc.text(`TEST: ${testTitle.toUpperCase()}`, 14, 25);
-
-      const scoreText =
-        scoreData?.result?.score !== undefined
-          ? `${scoreData.result.score} pts`
-          : scoreData?.result?.totalScore !== undefined
-          ? `${scoreData.result.totalScore} pts`
-          : "—";
-      const passText =
-        scoreData?.result?.passed === true
-          ? "PASSED"
-          : scoreData?.result?.passed === false
-          ? "FAILED"
-          : inv.status || "PENDING";
+      doc.text(`SECURE ADVANCED PROCTORING TELEMETRY REPORT — TEST: ${testTitle.toUpperCase()}`, 14, 25);
 
       // Metadata Table
       autoTable(doc, {
@@ -902,7 +947,7 @@ export default function NewAdminTestEdit() {
         head: [
           [
             {
-              content: "CANDIDATE SESSION AUDIT",
+              content: "CANDIDATE METADATA & SESSION INFORMATION",
               colSpan: 4,
               styles: {
                 halign: "left",
@@ -914,28 +959,79 @@ export default function NewAdminTestEdit() {
         ],
         body: [
           [
-            { content: "Candidate Name:", styles: { fontStyle: "bold", textColor: [100, 116, 139] } },
+            {
+              content: "Candidate Name:",
+              styles: { fontStyle: "bold", textColor: [100, 116, 139] },
+            },
             name,
-            { content: "Result:", styles: { fontStyle: "bold", textColor: [100, 116, 139] } },
+            {
+              content: "Final Score:",
+              styles: { fontStyle: "bold", textColor: [100, 116, 139] },
+            },
             {
               content: `${scoreText} (${passText})`,
               styles: {
                 fontStyle: "bold",
-                textColor: passText === "PASSED" ? [16, 185, 129] : [239, 68, 68],
+                textColor: scoreData?.result?.passed
+                  ? [16, 185, 129]
+                  : [239, 68, 68],
               },
             },
           ],
           [
-            { content: "Email:", styles: { fontStyle: "bold", textColor: [100, 116, 139] } },
+            {
+              content: "Email Address:",
+              styles: { fontStyle: "bold", textColor: [100, 116, 139] },
+            },
             email,
-            { content: "Invitation Status:", styles: { fontStyle: "bold", textColor: [100, 116, 139] } },
-            inv.status || "ACCEPTED",
+            {
+              content: "Proctoring Risk:",
+              styles: { fontStyle: "bold", textColor: [100, 116, 139] },
+            },
+            {
+              content: detailData?.riskLevel || "NONE",
+              styles: {
+                fontStyle: "bold",
+                textColor:
+                  detailData?.riskLevel === "CRITICAL" ||
+                  detailData?.riskLevel === "HIGH"
+                    ? [239, 68, 68]
+                    : [16, 185, 129],
+              },
+            },
           ],
           [
-            { content: "Assessment Schedule:", styles: { fontStyle: "bold", textColor: [100, 116, 139] } },
-            `${formatDateTime(scheduleStartTime)} - ${formatDateTime(scheduleEndTime)}`,
-            { content: "Risk Level:", styles: { fontStyle: "bold", textColor: [100, 116, 139] } },
-            scoreData?.detail?.riskLevel || "NONE",
+            {
+              content: "Session Status:",
+              styles: { fontStyle: "bold", textColor: [100, 116, 139] },
+            },
+            (inv.sessionStatus || inv.status || "N/A").replace(/_/g, " "),
+            {
+              content: "Total Violations:",
+              styles: { fontStyle: "bold", textColor: [100, 116, 139] },
+            },
+            {
+              content: String(detailData?.violationCount || detailData?.violations?.length || 0),
+              styles: {
+                fontStyle: "bold",
+                textColor:
+                  (detailData?.violationCount || detailData?.violations?.length || 0) > 0
+                    ? [239, 68, 68]
+                    : [100, 116, 139],
+              },
+            },
+          ],
+          [
+            {
+              content: "IP Address:",
+              styles: { fontStyle: "bold", textColor: [100, 116, 139] },
+            },
+            detailData?.systemInfo?.ipAddress || "N/A",
+            {
+              content: "Browser / OS:",
+              styles: { fontStyle: "bold", textColor: [100, 116, 139] },
+            },
+            `${detailData?.systemInfo?.browser || "Chrome"} / ${detailData?.systemInfo?.os || "Windows"}`,
           ],
         ],
         theme: "grid",
@@ -947,11 +1043,351 @@ export default function NewAdminTestEdit() {
         },
       });
 
-      doc.save(`Assessment_Report_${name.replace(/\s+/g, "_")}.pdf`);
-      toast.success("Candidate PDF Report downloaded.");
+      // Warnings Timeline Table
+      const violations = detailData?.violations || [];
+      const violationsBody = violations.map(
+        (v: {
+          eventId?: string;
+          id?: string;
+          occurredAt?: string;
+          time?: string;
+          eventType?: string;
+          severity?: string;
+          metadata?: { description?: string };
+          description?: string;
+        }) => [
+          new Date(v.occurredAt || v.time || "").toLocaleTimeString(),
+          (v.eventType || "").replace(/_/g, " "),
+          v.severity || "INFO",
+          v.metadata?.description || v.description || "Violation logged",
+        ],
+      );
+
+      autoTable(doc, {
+        startY: (doc as JsPDFWithAutoTable).lastAutoTable.finalY + 8,
+        margin: { left: 14, right: 14 },
+        head: [
+          [
+            {
+              content: "PROCTORING WARNINGS TIMELINE",
+              colSpan: 4,
+              styles: {
+                halign: "left",
+                fillColor: [30, 41, 59],
+                fontStyle: "bold",
+              },
+            },
+          ],
+          ["Time", "Event Type", "Severity", "Description"],
+        ],
+        body:
+          violationsBody.length > 0
+            ? violationsBody
+            : [
+                [
+                  "-",
+                  "No proctoring violations recorded during this session.",
+                  "-",
+                  "-",
+                ],
+              ],
+        theme: "striped",
+        headStyles: {
+          fillColor: [71, 85, 105],
+          textColor: [255, 255, 255],
+          fontStyle: "bold",
+        },
+        styles: {
+          fontSize: 8,
+          cellPadding: 4,
+          lineColor: [100, 116, 139],
+          lineWidth: 0.5,
+        },
+      });
+
+      // Section Separator Label
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(11);
+      doc.setTextColor(30, 41, 59); // Slate header
+      doc.text(
+        "QUESTIONS & SUBMISSIONS DETAILS",
+        14,
+        (doc as JsPDFWithAutoTable).lastAutoTable.finalY + 10,
+      );
+
+      // Question Cards using autoTables
+      questionsList.forEach(
+        (
+          q: {
+            id: string;
+            sourceQuestionId?: string;
+            prompt?: string;
+            type?: string;
+            coding?: { title?: string };
+            options?: Array<{ id: string; text: string; isCorrect: boolean }>;
+            mcqOptions?: Array<{
+              id: string;
+              text: string;
+              isCorrect: boolean;
+            }>;
+          },
+          idx: number,
+        ) => {
+          const questionId = q.sourceQuestionId || q.id;
+          const sub = submissionsList.find(
+            (s: {
+              questionId: string;
+              answerText?: string;
+              selectedOptionIds?: string[];
+            }) => s.questionId === questionId,
+          );
+          const isCoding = q.type === "CODING";
+
+          // Build exact selected ID set & raw answers list
+          const selectedValues = new Set<string>();
+          if (sub?.selectedOptionIds && Array.isArray(sub.selectedOptionIds)) {
+            sub.selectedOptionIds.forEach((id: string) => selectedValues.add(String(id).trim().toLowerCase()));
+          }
+          if (sub?.answerText) {
+            const rawAns = String(sub.answerText).trim();
+            selectedValues.add(rawAns.toLowerCase());
+            try {
+              const parsed = JSON.parse(sub.answerText);
+              if (Array.isArray(parsed)) {
+                parsed.forEach((id: string) => selectedValues.add(String(id).trim().toLowerCase()));
+              } else if (typeof parsed === "string") {
+                selectedValues.add(parsed.trim().toLowerCase());
+              }
+            } catch {
+              /* raw text */
+            }
+          }
+
+          // Fetch true correct options list
+          const enrichedTQ = questions.find(
+            (tq) => tq.questionId === questionId || tq.id === questionId,
+          );
+          const enrichedQuestion = enrichedTQ?.question;
+          const correctOptions: Array<{ id?: string; text?: string; isCorrect?: boolean }> =
+            (enrichedQuestion?.options || enrichedQuestion?.mcqOptions || q.options || q.mcqOptions || []) as Array<{ id?: string; text?: string; isCorrect?: boolean }>;
+
+          // Calculate time spent telemetry
+          const timeItem = timingsList.find(
+            (t: { questionId: string }) => t.questionId === questionId,
+          );
+          const activeSeconds = timeItem?.activeSeconds || 0;
+          const minutes = Math.floor(activeSeconds / 60);
+          const seconds = activeSeconds % 60;
+          const timeSpentText =
+            minutes > 0 ? `${minutes}m ${seconds}s` : `${seconds}s`;
+
+          // Build structured body rows
+          const bodyRows: unknown[][] = [
+            [
+              {
+                content: `Question:\n${q.prompt || enrichedQuestion?.prompt || ""}`,
+                colSpan: 3,
+                styles: {
+                  textColor: [15, 23, 42],
+                  fontStyle: "bold",
+                  fillColor: [248, 250, 252],
+                  fontSize: 9,
+                },
+              },
+            ],
+          ];
+
+          if (isCoding) {
+            bodyRows.push([
+              {
+                content: `Submitted Code:\n${sub?.answerText || "No submission"}`,
+                colSpan: 3,
+                styles: {
+                  fontStyle: "normal",
+                  fillColor: [248, 250, 252],
+                  textColor: [15, 23, 42],
+                },
+              },
+            ]);
+          } else {
+            const optionsList = q.options || q.mcqOptions || enrichedQuestion?.options || enrichedQuestion?.mcqOptions || [];
+            optionsList.forEach(
+              (
+                opt: { id: string; text: string; isCorrect: boolean },
+                oIdx: number,
+              ) => {
+                const optionLetter = String.fromCharCode(65 + oIdx); // 'A', 'B', etc.
+                const correctOpt = correctOptions.find(
+                  (co) =>
+                    (co.id && opt.id && co.id === opt.id) ||
+                    (co.text && opt.text && co.text.trim().toLowerCase() === opt.text.trim().toLowerCase()),
+                );
+                const isOptionCorrect = correctOpt
+                  ? Boolean(correctOpt.isCorrect)
+                  : Boolean(opt.isCorrect);
+
+                // Robust check for selection matching ID, letter, index, or option text
+                const optIdStr = String(opt.id || "").trim().toLowerCase();
+                const optTextStr = String(opt.text || "").trim().toLowerCase();
+                const letterStr = optionLetter.toLowerCase();
+                const idxStr = String(oIdx);
+
+                const isSelected =
+                  (optIdStr !== "" && selectedValues.has(optIdStr)) ||
+                  selectedValues.has(letterStr) ||
+                  selectedValues.has(idxStr) ||
+                  (optTextStr !== "" && selectedValues.has(optTextStr)) ||
+                  Array.from(selectedValues).some(
+                    (val) =>
+                      val === optTextStr ||
+                      val.startsWith(`${letterStr}.`) ||
+                      val.startsWith(`${letterStr} `)
+                  );
+
+                const statusLabel =
+                  isSelected && isOptionCorrect
+                    ? "[SELECTED & CORRECT]"
+                    : isSelected
+                      ? "[SELECTED - INCORRECT]"
+                      : isOptionCorrect
+                        ? "[CORRECT ANSWER]"
+                        : "";
+
+                const rowText =
+                  `${optionLetter}. ${opt.text} ${statusLabel}`.trim();
+
+                let cellStyle = {
+                  textColor: [30, 41, 59],
+                  fontStyle: "normal",
+                  fillColor: [255, 255, 255],
+                };
+                if (isSelected && isOptionCorrect) {
+                  cellStyle = {
+                    textColor: [16, 185, 129],
+                    fontStyle: "bold",
+                    fillColor: [240, 253, 250],
+                  }; // matrix green bg/fg
+                } else if (isSelected) {
+                  cellStyle = {
+                    textColor: [239, 68, 68],
+                    fontStyle: "bold",
+                    fillColor: [254, 242, 242],
+                  }; // soft red bg/fg
+                } else if (isOptionCorrect) {
+                  cellStyle = {
+                    textColor: [16, 185, 129],
+                    fontStyle: "bold",
+                    fillColor: [255, 255, 255],
+                  }; // correct option marker
+                }
+
+                bodyRows.push([
+                  { content: rowText, colSpan: 3, styles: cellStyle },
+                ]);
+              },
+            );
+          }
+
+          autoTable(doc, {
+            pageBreak: "avoid",
+            startY:
+              idx === 0
+                ? (doc as JsPDFWithAutoTable).lastAutoTable.finalY + 16
+                : (doc as JsPDFWithAutoTable).lastAutoTable.finalY + 12,
+            margin: { left: 14, right: 14 },
+            head: [
+              [
+                {
+                  content: `Q${idx + 1}`,
+                  styles: {
+                    halign: "center",
+                    fillColor: [30, 41, 59],
+                    textColor: [255, 255, 255],
+                    fontStyle: "bold",
+                    lineColor: [100, 116, 139],
+                    lineWidth: 0.5,
+                  },
+                },
+                {
+                  content: "",
+                  styles: { fillColor: [255, 255, 255], lineWidth: 0 },
+                },
+                {
+                  content: "",
+                  styles: { fillColor: [255, 255, 255], lineWidth: 0 },
+                },
+              ],
+            ],
+            body: bodyRows,
+            theme: "grid",
+            styles: {
+              fontSize: 8,
+              cellPadding: 4.5,
+              lineColor: [100, 116, 139],
+              lineWidth: 0.5,
+            },
+            columnStyles: {
+              0: { cellWidth: 15 },
+              1: { cellWidth: 42 },
+              2: { cellWidth: 125 },
+            },
+            didDrawCell: (data) => {
+              if (data.row.section === "head" && data.column.index === 1) {
+                const cell = data.cell;
+                const h = cell.height;
+
+                doc.setFillColor(30, 41, 59);
+                doc.setDrawColor(30, 41, 59);
+                doc.triangle(
+                  cell.x,
+                  cell.y,
+                  cell.x + cell.width - h,
+                  cell.y,
+                  cell.x,
+                  cell.y + h,
+                  "FD",
+                );
+                doc.triangle(
+                  cell.x + cell.width - h,
+                  cell.y,
+                  cell.x + cell.width,
+                  cell.y + h,
+                  cell.x,
+                  cell.y + h,
+                  "FD",
+                );
+
+                doc.setDrawColor(100, 116, 139);
+                doc.setLineWidth(0.5);
+                doc.line(cell.x, cell.y, cell.x, cell.y + h);
+                doc.line(cell.x, cell.y + h, cell.x + cell.width, cell.y + h);
+                doc.line(cell.x, cell.y, cell.x + cell.width - h, cell.y);
+                doc.line(
+                  cell.x + cell.width - h,
+                  cell.y,
+                  cell.x + cell.width,
+                  cell.y + h,
+                );
+
+                doc.setTextColor(255, 255, 255);
+                doc.setFont("helvetica", "bold");
+                doc.setFontSize(7.5);
+                doc.text(
+                  `Time Spent: ${timeSpentText}`,
+                  cell.x + 2,
+                  cell.y + h / 2 + 1.5,
+                );
+              }
+            },
+          });
+        },
+      );
+
+      doc.save(`Advanced_Report_${name.replace(/\s+/g, "_")}.pdf`);
+      toast.success("Advanced PDF Report downloaded.");
     } catch (e) {
-      console.error("Failed to generate PDF report:", e);
-      toast.error("Failed to generate PDF report.");
+      console.error("Failed to generate advanced PDF report:", e);
+      toast.error("Failed to generate advanced PDF report.");
     }
   };
 
@@ -982,10 +1418,31 @@ export default function NewAdminTestEdit() {
           ? `${result.scorePercentage}%`
           : "—";
       let time = "—";
+      const startedAt =
+        scoreEntry?.session?.startedAt ||
+        scoreEntry?.session?.startTime ||
+        scoreEntry?.session?.createdAt ||
+        scoreEntry?.detail?.systemInfo?.startedAt ||
+        scoreEntry?.detail?.startedAt ||
+        scoreEntry?.detail?.createdAt;
+
+      const endedAt =
+        scoreEntry?.session?.submittedAt ||
+        scoreEntry?.session?.endedAt ||
+        scoreEntry?.session?.endTime ||
+        scoreEntry?.session?.updatedAt ||
+        scoreEntry?.detail?.systemInfo?.endedAt ||
+        scoreEntry?.detail?.systemInfo?.submittedAt ||
+        scoreEntry?.detail?.submittedAt ||
+        scoreEntry?.detail?.endedAt ||
+        result?.evaluatedAt ||
+        result?.createdAt;
+
       if (result?.timeTakenSeconds) {
-        const m = Math.floor(result.timeTakenSeconds / 60);
-        const s = result.timeTakenSeconds % 60;
-        time = m > 0 ? `${m}m ${s}s` : `${s}s`;
+        time = formatTimeTaken(result.timeTakenSeconds);
+      } else if (startedAt && endedAt) {
+        const diffSec = Math.max(0, Math.floor((new Date(endedAt).getTime() - new Date(startedAt).getTime()) / 1000));
+        time = formatTimeTaken(diffSec);
       } else if (result?.timeTaken) {
         time = String(result.timeTaken);
       } else if (scoreEntry?.detail?.timeTaken) {
@@ -2399,10 +2856,31 @@ export default function NewAdminTestEdit() {
                           const dateStr = rawDate ? new Date(rawDate).toLocaleDateString() : "—";
 
                           let timeStr = "—";
+                          const startedAt =
+                            scoreEntry?.session?.startedAt ||
+                            scoreEntry?.session?.startTime ||
+                            scoreEntry?.session?.createdAt ||
+                            scoreEntry?.detail?.systemInfo?.startedAt ||
+                            scoreEntry?.detail?.startedAt ||
+                            scoreEntry?.detail?.createdAt;
+
+                          const endedAt =
+                            scoreEntry?.session?.submittedAt ||
+                            scoreEntry?.session?.endedAt ||
+                            scoreEntry?.session?.endTime ||
+                            scoreEntry?.session?.updatedAt ||
+                            scoreEntry?.detail?.systemInfo?.endedAt ||
+                            scoreEntry?.detail?.systemInfo?.submittedAt ||
+                            scoreEntry?.detail?.submittedAt ||
+                            scoreEntry?.detail?.endedAt ||
+                            result?.evaluatedAt ||
+                            result?.createdAt;
+
                           if (result?.timeTakenSeconds) {
-                            const m = Math.floor(result.timeTakenSeconds / 60);
-                            const s = result.timeTakenSeconds % 60;
-                            timeStr = m > 0 ? `${m}m ${s}s` : `${s}s`;
+                            timeStr = formatTimeTaken(result.timeTakenSeconds);
+                          } else if (startedAt && endedAt) {
+                            const diffSec = Math.max(0, Math.floor((new Date(endedAt).getTime() - new Date(startedAt).getTime()) / 1000));
+                            timeStr = formatTimeTaken(diffSec);
                           } else if (result?.timeTaken) {
                             timeStr = String(result.timeTaken);
                           } else if (scoreEntry?.detail?.timeTaken) {
