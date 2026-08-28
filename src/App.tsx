@@ -60,6 +60,7 @@ const NewAdminQuestionCreate = React.lazy(() => import("./pages/New-Admin/NewAdm
 const NewAdminQuestionPreview = React.lazy(() => import("./pages/New-Admin/NewAdminQuestionPreview"));
 const NewAdminTestEdit = React.lazy(() => import("./pages/New-Admin/NewAdminTestEdit"));
 const NewAdminTestAddProblems = React.lazy(() => import("./pages/New-Admin/NewAdminTestAddProblems"));
+const NewAdminSettings = React.lazy(() => import("./pages/New-Admin/NewAdminSettings"));
 
 // Test Taking
 const TestInterface = React.lazy(() => import("./pages/test/TestInterface"));
@@ -160,46 +161,7 @@ const App = () => (
                 <Route path="settings" element={<Settings />} />
                 <Route path="subjects/manage" element={<ManageSubjects />} />
               </Route>
-              {/* Admin Routes (ADMIN role only) */}
-              <Route
-                path="/admin"
-                element={
-                  <ProtectedRoute requiredRoles={[ROLES.ADMIN]}>
-                    <AdminLayout />
-                  </ProtectedRoute>
-                }
-              >
-                <Route index element={<AdminDashboardAdmin />} />
-                <Route path="candidates" element={<AdminCandidates />} />
-                <Route path="questions" element={<AdminQuestionBank />} />
-                <Route
-                  path="questions/playground/:id"
-                  element={<DSAPlayground />}
-                />
-                <Route path="questions/add" element={<AddQuestion />} />
-                <Route path="questions/create" element={<AddQuestion />} />
-                <Route path="questions/edit/:id" element={<EditQuestion />} />
 
-                {/* Assessments Tab Group */}
-                <Route element={<AssessmentsLayout />}>
-                  <Route path="tests" element={<AdminTests />} />
-                  <Route path="schedules" element={<TestSchedules />} />
-                  <Route path="invitations" element={<InviteCandidates />} />
-                </Route>
-
-                <Route path="tests/create" element={<AdminTestCreate />} />
-                <Route path="tests/edit/:id" element={<AdminTestsEdit />} />
-                <Route path="tests/:id" element={<AdminTestDetails />} />
-                <Route path="tests/:id/questions" element={<TestQuestions />} />
-                <Route path="schedules/:id" element={<TestScheduleDetails />} />
-                <Route path="proctoring" element={<ProctoringDashboard />} />
-                <Route path="proctoring/:sessionId" element={<ProctoringDashboard />} />
-                <Route
-                  path="invitations-history"
-                  element={<InvitedCandidatesHistory />}
-                />
-                <Route path="profile" element={<AdminProfile />} />
-              </Route>
               {/* Student Test Taking */}
               <Route path="/test/:testId" element={<TestInterface />} />
               <Route
@@ -212,7 +174,6 @@ const App = () => (
               <Route path="/test/access/:id" element={<TestAccess />} />
               <Route path="/tests/access/:id" element={<TestAccess />} />
               <Route path="/test/access/:token" element={<TestAccess />} />
-              {/* ← Add this line */}
 
               {/* Candidate Dashboard Routes */}
               <Route path="/candidate" element={<CandidateLayout />}>
@@ -223,33 +184,44 @@ const App = () => (
                 <Route path="flow" element={<CandidateAssessmentFlow />} />
               </Route>
 
-              {/* New-Admin Routes */}
-              <Route path="/new-admin" element={<NewAdminLayout />}>
-                <Route index element={<Navigate to="/new-admin/home" replace />} />
+              {/* Admin Routes (ADMIN and SUPERADMIN access) */}
+              <Route
+                path="/admin"
+                element={
+                  <ProtectedRoute requiredRoles={[ROLES.ADMIN, ROLES.SUPERADMIN]}>
+                    <NewAdminLayout />
+                  </ProtectedRoute>
+                }
+              >
+                <Route index element={<Navigate to="/admin/home" replace />} />
                 <Route path="home" element={<NewAdminHome />} />
                 <Route path="tests" element={<NewAdminTests />} />
                 <Route path="library" element={<NewAdminLibrary />} />
+                <Route path="settings" element={<NewAdminSettings />} />
+                <Route path="profile" element={<NewAdminSettings />} />
               </Route>
 
-              {/* Standalone Full-Screen Question Create / Edit for New-Admin (No 2nd Navbar) */}
-              <Route path="/new-admin/questions/create" element={<NewAdminQuestionCreate />} />
-              <Route path="/new-admin/library/create" element={<NewAdminQuestionCreate />} />
+              {/* Standalone Full-Screen Question Create / Edit for Admin */}
+              <Route path="/admin/questions/create" element={<NewAdminQuestionCreate />} />
+              <Route path="/admin/library/create" element={<NewAdminQuestionCreate />} />
 
               {/* Standalone Full-Screen Question Preview (DoSelect / Learn Style) */}
-              <Route path="/new-admin/questions/preview/:id" element={<NewAdminQuestionPreview />} />
-              <Route path="/new-admin/library/preview/:id" element={<NewAdminQuestionPreview />} />
-              <Route path="/superadmin/questions/preview/:id" element={<NewAdminQuestionPreview />} />
               <Route path="/admin/questions/preview/:id" element={<NewAdminQuestionPreview />} />
+              <Route path="/admin/library/preview/:id" element={<NewAdminQuestionPreview />} />
+              <Route path="/superadmin/questions/preview/:id" element={<NewAdminQuestionPreview />} />
 
-              {/* Standalone Full-Screen Test Edit for New-Admin */}
-              <Route path="/new-admin/tests/edit/:id" element={<NewAdminTestEdit />} />
-              <Route path="/new-admin/tests/edit" element={<NewAdminTestEdit />} />
-              <Route path="/new-admin/tests/:id/add-problems" element={<NewAdminTestAddProblems />} />
-              <Route path="/new-admin/tests/edit/:id/library" element={<NewAdminTestAddProblems />} />
+              {/* Standalone Full-Screen Test Edit for Admin */}
+              <Route path="/admin/tests/edit/:id" element={<NewAdminTestEdit />} />
+              <Route path="/admin/tests/edit" element={<NewAdminTestEdit />} />
+              <Route path="/admin/tests/:id/add-problems" element={<NewAdminTestAddProblems />} />
+              <Route path="/admin/tests/edit/:id/library" element={<NewAdminTestAddProblems />} />
 
-              {/* Standalone Full-Screen Playground for New-Admin (No Sidebars) */}
-              <Route path="/new-admin/playground/:id" element={<DSAPlayground />} />
-              <Route path="/new-admin/questions/playground/:id" element={<DSAPlayground />} />
+              {/* Standalone Full-Screen Playground for Admin */}
+              <Route path="/admin/playground/:id" element={<DSAPlayground />} />
+              <Route path="/admin/questions/playground/:id" element={<DSAPlayground />} />
+
+              {/* Backwards compatibility for /new-admin routes */}
+              <Route path="/new-admin/*" element={<Navigate to="/admin" replace />} />
 
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />

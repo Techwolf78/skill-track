@@ -115,7 +115,7 @@ export default function NewAdminQuestionPreview() {
         <h2 className="text-lg font-bold text-slate-100 mb-1">Preview Unavailable</h2>
         <p className="text-xs text-slate-400 mb-6">{error || "Could not retrieve question."}</p>
         <button
-          onClick={() => navigate("/new-admin/library")}
+          onClick={() => navigate("/admin/library")}
           className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded shadow transition-colors"
         >
           Return to Library
@@ -164,26 +164,25 @@ export default function NewAdminQuestionPreview() {
   return (
     <div className="min-h-screen flex flex-col bg-[#F6F8FA] text-slate-800 font-sans antialiased relative">
       {/* ── 1. Top Navbar (Clean header matching Create Question) ── */}
-      <header className="h-14 bg-[#081225] border-b border-[#142340] px-4 md:px-8 flex items-center justify-between z-30 sticky top-0 shadow-md">
+      <header className="h-20 bg-[#081225] border-b border-[#142340] px-4 md:px-8 flex items-center justify-between z-30 sticky top-0 shadow-md">
         {/* Left Side: Logo + Divider + Breadcrumb (Library > Question Title) */}
         <div className="flex items-center space-x-3 md:space-x-4 min-w-0">
           <div
-            onClick={() => navigate("/new-admin/library")}
+            onClick={() => navigate("/admin/library")}
             className="flex items-center gap-2 cursor-pointer group shrink-0"
           >
-            <div className="w-8 h-8 bg-[#10B981] flex items-center justify-center shadow-sm">
-              <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-              </svg>
-            </div>
-            <span className="text-white font-bold text-lg md:text-xl tracking-tight">RxOne</span>
+            <img
+              src="/Gryphon360logo.png"
+              alt="Gryphon 360"
+              className="h-12 md:h-14 w-auto object-contain shrink-0 hover:opacity-95 transition-opacity"
+            />
           </div>
 
           <div className="h-5 w-[1px] bg-slate-700 mx-1 shrink-0" />
 
           <div className="flex items-center text-xs md:text-sm text-slate-400 font-medium space-x-1.5 truncate">
             <button
-              onClick={() => navigate("/new-admin/library")}
+              onClick={() => navigate("/admin/library")}
               className="hover:text-slate-200 cursor-pointer transition-colors shrink-0"
             >
               Library
@@ -220,12 +219,12 @@ export default function NewAdminQuestionPreview() {
               <DropdownMenuLabel className="font-normal px-3 py-2">
                 <div className="flex flex-col space-y-0.5">
                   <p className="text-sm font-bold text-slate-900 leading-none">{user?.name || "Admin User"}</p>
-                  <p className="text-xs text-slate-500 leading-none truncate mt-1">{user?.email || "admin@rxone.com"}</p>
+                  <p className="text-xs text-slate-500 leading-none truncate mt-1">{user?.email || "admin@gryphon360.com"}</p>
                 </div>
               </DropdownMenuLabel>
               <DropdownMenuSeparator className="bg-slate-100" />
               <DropdownMenuItem
-                onClick={() => navigate("/new-admin/library")}
+                onClick={() => navigate("/admin/library")}
                 className="cursor-pointer text-slate-700 hover:bg-slate-50 px-3 py-2 text-xs flex items-center gap-2"
               >
                 <ChevronLeft className="w-4 h-4 text-slate-500" />
@@ -251,7 +250,7 @@ export default function NewAdminQuestionPreview() {
       <main className="max-w-7xl mx-auto px-4 md:px-8 pt-6 pb-20 w-full relative z-10">
         {/* Back to Library Button above title */}
         <button
-          onClick={() => navigate("/new-admin/library")}
+          onClick={() => navigate("/admin/library")}
           className="inline-flex items-center gap-1.5 text-xs text-slate-400 hover:text-white transition-colors cursor-pointer mb-2.5"
         >
           <ChevronLeft className="w-4 h-4" />
@@ -587,9 +586,11 @@ export default function NewAdminQuestionPreview() {
               {/* Footer Banner */}
               <div className="mt-8 pt-4 border-t border-slate-100 flex items-center justify-end text-xs text-slate-500">
                 <button
-                  onClick={() => navigate("/new-admin/library")}
+                  onClick={() => navigate("/admin/library")}
                   className="px-3 py-1.5 border border-slate-200 text-slate-700 hover:bg-slate-50 font-medium rounded transition-colors cursor-pointer"
                 >
+                  Close Preview
+                </button>
                   Close Preview
                 </button>
               </div>

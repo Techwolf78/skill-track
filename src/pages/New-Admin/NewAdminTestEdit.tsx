@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import {
   ChevronLeft,
   ChevronRight,
@@ -239,8 +239,36 @@ export default function NewAdminTestEdit() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user, logout } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
 
-  const [activeTab, setActiveTab] = useState<TabType>("PROBLEMS");
+  const getInitialTab = (): TabType => {
+    const tabParam = searchParams.get("tab")?.toLowerCase();
+    if (tabParam === "candidates" || tabParam === "reports" || tabParam === "invite" || tabParam === "invitations") {
+      return "CANDIDATES";
+    }
+    if (tabParam === "general" || tabParam === "settings" || tabParam === "general_settings") {
+      return "GENERAL_SETTINGS";
+    }
+    if (tabParam === "advanced" || tabParam === "schedule" || tabParam === "proctoring" || tabParam === "advanced_settings") {
+      return "ADVANCED_SETTINGS";
+    }
+    return "PROBLEMS";
+  };
+
+  const [activeTab, setActiveTab] = useState<TabType>(getInitialTab);
+
+  useEffect(() => {
+    const tabParam = searchParams.get("tab")?.toLowerCase();
+    if (tabParam === "candidates" || tabParam === "reports" || tabParam === "invite" || tabParam === "invitations") {
+      setActiveTab("CANDIDATES");
+    } else if (tabParam === "general" || tabParam === "settings" || tabParam === "general_settings") {
+      setActiveTab("GENERAL_SETTINGS");
+    } else if (tabParam === "advanced" || tabParam === "schedule" || tabParam === "proctoring" || tabParam === "advanced_settings") {
+      setActiveTab("ADVANCED_SETTINGS");
+    } else if (tabParam === "problems" || tabParam === "questions") {
+      setActiveTab("PROBLEMS");
+    }
+  }, [searchParams]);
   const [loading, setLoading] = useState(Boolean(id));
   const [test, setTest] = useState<Test | null>(null);
   const [questions, setQuestions] = useState<Array<TestQuestion & { question?: Question }>>([]);
@@ -453,23 +481,27 @@ export default function NewAdminTestEdit() {
 
   // Load results and session details for candidates
   const loadCandidatesData = useCallback(async () => {
-    const schedId = selectedScheduleId || (test?.testSchedules?.[0]?.id as string);
-    if (!schedId && !id) return;
+    if (!id) return;
     try {
       setLoadingCandidatesData(true);
-      let targetSchedId = schedId;
-      if (!targetSchedId && id) {
-        const allScheds = await testService.getAllTestSchedules();
-        const matching = allScheds.filter((s) => s.testId === id);
-        if (matching.length > 0) {
-          targetSchedId = matching[0].id;
-          setSelectedScheduleId(matching[0].id);
-          setSelectedScheduleData(matching[0] as any);
-        }
-      }
+      const allScheds = await testService.getAllTestSchedules();
+      const testSchedules = allScheds.filter((s) => s.testId === id);
+      
+      const scheduleIds = testSchedules.length > 0 
+        ? Array.from(new Set(testSchedules.map((s) => s.id)))
+        : selectedScheduleId ? [selectedScheduleId] : [];
 
-      if (targetSchedId) {
-        const invs = await candidateService.getInvitationsBySchedule(targetSchedId);
+      if (scheduleIds.length > 0) {
+        const invsLists = await Promise.all(
+          scheduleIds.map(async (sId) => {
+            try {
+              return await candidateService.getInvitationsBySchedule(sId);
+            } catch {
+              return [];
+            }
+          })
+        );
+        const invs = invsLists.flat();
         setInvitations(invs || []);
 
         // Fetch score details for each invitation if available
@@ -511,7 +543,7 @@ export default function NewAdminTestEdit() {
     } finally {
       setLoadingCandidatesData(false);
     }
-  }, [selectedScheduleId, id, test?.testSchedules]);
+  }, [id, selectedScheduleId]);
 
   useEffect(() => {
     if (activeTab === "CANDIDATES") {
@@ -1519,27 +1551,26 @@ export default function NewAdminTestEdit() {
 
   return (
     <div className="min-h-screen bg-[#F6F8FA] flex flex-col font-sans text-slate-800 antialiased selection:bg-indigo-500 selection:text-white">
-      {/* ── 1. Top Navbar (Dark RxOne Navbar) ── */}
-      <header className="h-14 bg-[#081225] border-b border-[#142340] px-4 md:px-8 flex items-center justify-between z-30 sticky top-0 shadow-md">
+      {/* ── 1. Top Navbar (Dark Gryphon360 Navbar) ── */}
+      <header className="h-20 bg-[#081225] border-b border-[#142340] px-4 md:px-8 flex items-center justify-between z-30 sticky top-0 shadow-md">
         {/* Left Side: Logo + Divider + Breadcrumb */}
         <div className="flex items-center space-x-3 md:space-x-4 min-w-0">
           <div
-            onClick={() => navigate("/new-admin/tests")}
+            onClick={() => navigate("/admin/tests")}
             className="flex items-center gap-2 cursor-pointer group shrink-0"
           >
-            <div className="w-8 h-8 bg-[#10B981] flex items-center justify-center shadow-sm">
-              <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-              </svg>
-            </div>
-            <span className="text-white font-bold text-lg md:text-xl tracking-tight">RxOne</span>
+            <img
+              src="/Gryphon360logo.png"
+              alt="Gryphon 360"
+              className="h-12 md:h-14 w-auto object-contain shrink-0 hover:opacity-95 transition-opacity"
+            />
           </div>
 
           <div className="h-5 w-[1px] bg-slate-700 mx-1 shrink-0" />
 
           <div className="flex items-center text-xs md:text-sm text-slate-400 font-medium space-x-1.5 truncate">
             <button
-              onClick={() => navigate("/new-admin/tests")}
+              onClick={() => navigate("/admin/tests")}
               className="hover:text-slate-200 cursor-pointer transition-colors shrink-0"
             >
               Tests
@@ -1576,12 +1607,12 @@ export default function NewAdminTestEdit() {
               <DropdownMenuLabel className="font-normal px-3 py-2">
                 <div className="flex flex-col space-y-0.5">
                   <p className="text-sm font-bold text-slate-900 leading-none">{user?.name || "Admin User"}</p>
-                  <p className="text-xs text-slate-500 leading-none truncate mt-1">{user?.email || "admin@rxone.com"}</p>
+                  <p className="text-xs text-slate-500 leading-none truncate mt-1">{user?.email || "admin@gryphon360.com"}</p>
                 </div>
               </DropdownMenuLabel>
               <DropdownMenuSeparator className="bg-slate-100" />
               <DropdownMenuItem
-                onClick={() => navigate("/new-admin/tests")}
+                onClick={() => navigate("/admin/tests")}
                 className="cursor-pointer text-slate-700 hover:bg-slate-50 px-3 py-2 text-xs flex items-center gap-2"
               >
                 <ChevronLeft className="w-4 h-4 text-slate-500" />
@@ -1703,7 +1734,7 @@ export default function NewAdminTestEdit() {
                 <span className="text-xs font-semibold text-slate-700">Problems</span>
                 <div className="flex items-center gap-3 text-indigo-700">
                   <button
-                    onClick={() => navigate(id ? `/new-admin/tests/${id}/add-problems` : "/new-admin/library")}
+                    onClick={() => navigate(id ? `/admin/tests/${id}/add-problems` : "/admin/library")}
                     className="p-1 hover:text-indigo-900 transition-colors cursor-pointer"
                     title="Add problem from library"
                   >
@@ -1717,7 +1748,7 @@ export default function NewAdminTestEdit() {
                 <div className="py-12 px-4 text-center text-slate-400 text-xs space-y-2">
                   <p>No problems added to this test yet.</p>
                   <button
-                    onClick={() => navigate(id ? `/new-admin/tests/${id}/add-problems` : "/new-admin/library")}
+                    onClick={() => navigate(id ? `/admin/tests/${id}/add-problems` : "/admin/library")}
                     className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-none transition-colors cursor-pointer inline-flex items-center gap-1.5"
                   >
                     <Plus className="w-3.5 h-3.5" />
@@ -1759,9 +1790,9 @@ export default function NewAdminTestEdit() {
                                 onClick={() => {
                                   if (q) {
                                     if (isCoding) {
-                                      navigate(`/new-admin/playground/${q.id}`);
+                                      navigate(`/admin/playground/${q.id}`);
                                     } else {
-                                      navigate(`/new-admin/questions/preview/${q.id}`, { state: q });
+                                      navigate(`/admin/questions/preview/${q.id}`, { state: q });
                                     }
                                   }
                                 }}

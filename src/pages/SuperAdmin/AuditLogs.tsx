@@ -48,7 +48,7 @@ const MOCK_AUDIT_LOGS: AuditLog[] = [
   {
     id: "log-1",
     timestamp: "2026-06-13T12:45:00Z",
-    actor: "superadmin@rxone.com",
+    actor: "superadmin@gryphon360.com",
     action: "CREATE_ORGANISATION",
     details: "Created new organisation: 'Tata Consultancy Services' (TCS)",
     ipAddress: "192.168.1.10",
@@ -60,14 +60,14 @@ const MOCK_AUDIT_LOGS: AuditLog[] = [
   {
     id: "log-2",
     timestamp: "2026-06-13T12:40:12Z",
-    actor: "superadmin@rxone.com",
+    actor: "superadmin@gryphon360.com",
     action: "CREATE_USER",
-    details: "Created user: 'ajay.pawar@rxone.com' as ADMIN",
+    details: "Created user: 'ajay.pawar@gryphon360.com' as ADMIN",
     ipAddress: "192.168.1.10",
     status: "SUCCESS",
     beforeSnapshot: undefined,
     afterSnapshot:
-      '{"email":"ajay.pawar@rxone.com","role":"ADMIN","name":"Ajay Pawar","status":"ACTIVE"}',
+      '{"email":"ajay.pawar@gryphon360.com","role":"ADMIN","name":"Ajay Pawar","status":"ACTIVE"}',
   },
   {
     id: "log-3",
@@ -94,19 +94,19 @@ const MOCK_AUDIT_LOGS: AuditLog[] = [
   {
     id: "log-5",
     timestamp: "2026-06-13T09:22:10Z",
-    actor: "superadmin@rxone.com",
+    actor: "superadmin@gryphon360.com",
     action: "DELETE_USER",
-    details: "Deleted user 'testuser@rxone.com'",
+    details: "Deleted user 'testuser@gryphon360.com'",
     ipAddress: "192.168.1.10",
     status: "SUCCESS",
     beforeSnapshot:
-      '{"email":"testuser@rxone.com","role":"CANDIDATE","name":"Test User","status":"ACTIVE"}',
+      '{"email":"testuser@gryphon360.com","role":"CANDIDATE","name":"Test User","status":"ACTIVE"}',
     afterSnapshot: undefined,
   },
   {
     id: "log-6",
     timestamp: "2026-06-12T17:45:00Z",
-    actor: "superadmin@rxone.com",
+    actor: "superadmin@gryphon360.com",
     action: "UPDATE_ORGANISATION",
     details: "Updated organisation logo URL for 'Infosys Technologies'",
     ipAddress: "12.43.51.88",
@@ -144,7 +144,7 @@ const MOCK_AUDIT_LOGS: AuditLog[] = [
   {
     id: "log-9",
     timestamp: "2026-06-12T11:08:44Z",
-    actor: "superadmin@rxone.com",
+    actor: "superadmin@gryphon360.com",
     action: "MUTATE_PUBLIC_TAXONOMY",
     details: "Added new subtopic 'Microservices' to Topic 'Spring Boot'",
     ipAddress: "12.43.51.88",

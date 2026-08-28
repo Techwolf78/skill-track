@@ -4,7 +4,6 @@ import {
   Search,
   ShoppingBag,
   Building2,
-  BarChart2,
   Eye,
   Loader2,
   X,
@@ -1318,7 +1317,7 @@ export default function NewAdminLibrary() {
         <div className="bg-white border border-slate-200/80 shadow-[0_1px_3px_rgba(0,0,0,0.04)] py-4 overflow-hidden space-y-4">
           <p className="text-xs font-normal text-slate-500 px-4">Available libraries</p>
           <div className="space-y-3">
-            {/* RxOne Public Questions */}
+            {/* Public Questions */}
             <button
               onClick={() => setSelectedLibrary("PUBLIC")}
               className={`w-full flex items-center gap-3.5 px-4 py-1 text-left transition-colors relative ${
@@ -1335,7 +1334,7 @@ export default function NewAdminLibrary() {
                   selectedLibrary === "PUBLIC" ? "text-[#6366F1]" : "text-slate-500"
                 }`}
               />
-              <span className="text-[13px] leading-none">RxOne Public questions</span>
+              <span className="text-[13px] leading-none">Public questions</span>
             </button>
 
             {/* My company questions */}
@@ -1568,7 +1567,7 @@ export default function NewAdminLibrary() {
                       <div className="flex items-center gap-3 shrink-0 text-slate-400">
                         {isCoding && (
                           <button
-                            onClick={() => navigate(`/new-admin/playground/${q.id}`)}
+                            onClick={() => navigate(`/admin/playground/${q.id}`)}
                             className="p-0.5 hover:text-indigo-600 transition-colors cursor-pointer"
                             title="Open Playground"
                           >
@@ -1578,21 +1577,15 @@ export default function NewAdminLibrary() {
                         <button
                           onClick={() => {
                             if (isCoding) {
-                              navigate(`/new-admin/playground/${q.id}`);
+                              navigate(`/admin/playground/${q.id}`);
                             } else {
-                              navigate(`/new-admin/questions/preview/${q.id}`, { state: q });
+                              navigate(`/admin/questions/preview/${q.id}`, { state: q });
                             }
                           }}
                           className="p-0.5 hover:text-slate-700 transition-colors cursor-pointer"
                           title="Preview Question"
                         >
                           <Monitor className="w-4 h-4" />
-                        </button>
-                        <button
-                          className="p-0.5 hover:text-slate-700 transition-colors cursor-pointer"
-                          title="Question Statistics"
-                        >
-                          <BarChart2 className="w-4 h-4" />
                         </button>
                       </div>
                     </div>
@@ -1752,7 +1745,7 @@ export default function NewAdminLibrary() {
         onClose={() => setCreateModalOpen(false)}
         onCreate={(initialData) => {
           setCreateModalOpen(false);
-          navigate("/new-admin/questions/create", { state: initialData });
+          navigate("/admin/questions/create", { state: initialData });
         }}
         onOpenBulkUploader={() => setImportOpen(true)}
       />

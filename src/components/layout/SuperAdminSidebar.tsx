@@ -66,13 +66,17 @@ export function SuperAdminSidebar() {
         collapsed ? "flex-col items-center gap-4" : "items-center justify-between"
       )}>
         {collapsed ? (
-          <span className="font-heading font-extrabold text-2xl text-sidebar-foreground select-none">
-            Rx
-          </span>
+          <img
+            src="/Gryphon360logoFavicon1.png"
+            alt="Gryphon 360"
+            className="h-8 w-8 object-contain shrink-0"
+          />
         ) : (
-          <span className="font-heading font-extrabold text-2xl text-sidebar-foreground select-none">
-            RxOne
-          </span>
+          <img
+            src="/Gryphon360logo.png"
+            alt="Gryphon 360"
+            className="h-8 w-auto object-contain shrink-0"
+          />
         )}
         
         {/* Toggle Button */}

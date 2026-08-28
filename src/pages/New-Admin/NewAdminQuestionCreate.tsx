@@ -503,7 +503,7 @@ export default function NewAdminQuestionCreate() {
         setTitle(`${title.trim()} (Copy)`);
         toast.info("Cloned draft ready for editing");
       } else {
-        navigate("/new-admin/library");
+        navigate("/admin/library");
       }
     } catch (err: any) {
       console.error("[NewAdminQuestionCreate] Failed to save:", err);
@@ -514,26 +514,25 @@ export default function NewAdminQuestionCreate() {
   return (
     <div className="min-h-screen flex flex-col bg-[#F6F8FA] text-slate-800 font-sans antialiased">
       {/* ── 1. Top Navbar (Dark Navy Bar, NO Second Sub-navbar) ── */}
-      <header className="h-14 bg-[#081225] border-b border-[#142340] px-4 md:px-8 flex items-center justify-between z-30 sticky top-0 shadow-md">
+      <header className="h-20 bg-[#081225] border-b border-[#142340] px-4 md:px-8 flex items-center justify-between z-30 sticky top-0 shadow-md">
         {/* Left Side: Logo + Divider + Breadcrumb (Library > Problem Title) */}
         <div className="flex items-center space-x-3 md:space-x-4">
           <div
-            onClick={() => navigate("/new-admin/library")}
+            onClick={() => navigate("/admin/library")}
             className="flex items-center gap-2 cursor-pointer group"
           >
-            <div className="w-8 h-8 bg-[#10B981] flex items-center justify-center shadow-sm">
-              <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-              </svg>
-            </div>
-            <span className="text-white font-bold text-lg md:text-xl tracking-tight">RxOne</span>
+            <img
+              src="/Gryphon360logo.png"
+              alt="Gryphon 360"
+              className="h-12 md:h-14 w-auto object-contain shrink-0 hover:opacity-95 transition-opacity"
+            />
           </div>
 
           <div className="h-5 w-[1px] bg-slate-700 mx-1" />
 
           <div className="flex items-center text-xs md:text-sm text-slate-400 font-medium space-x-1.5">
             <button
-              onClick={() => navigate("/new-admin/library")}
+              onClick={() => navigate("/admin/library")}
               className="hover:text-slate-200 cursor-pointer transition-colors"
             >
               Library
@@ -568,12 +567,12 @@ export default function NewAdminQuestionCreate() {
               <DropdownMenuLabel className="font-normal px-3 py-2">
                 <div className="flex flex-col space-y-0.5">
                   <p className="text-sm font-bold text-slate-900 leading-none">{user?.name || "Admin User"}</p>
-                  <p className="text-xs text-slate-500 leading-none truncate mt-1">{user?.email || "admin@rxone.com"}</p>
+                  <p className="text-xs text-slate-500 leading-none truncate mt-1">{user?.email || "admin@gryphon360.com"}</p>
                 </div>
               </DropdownMenuLabel>
               <DropdownMenuSeparator className="bg-slate-100" />
               <DropdownMenuItem
-                onClick={() => navigate("/admin/profile")}
+                onClick={() => navigate("/admin/settings")}
                 className="cursor-pointer text-slate-700 hover:bg-slate-50 px-3 py-2 text-xs flex items-center gap-2"
               >
                 <UserIcon className="w-4 h-4 text-slate-500" />
@@ -599,7 +598,7 @@ export default function NewAdminQuestionCreate() {
       <main className="max-w-7xl mx-auto px-4 md:px-8 pt-6 pb-20 w-full relative z-10">
         {/* Back to Library Button above title */}
         <button
-          onClick={() => navigate("/new-admin/library")}
+          onClick={() => navigate("/admin/library")}
           className="inline-flex items-center gap-1.5 text-xs text-slate-400 hover:text-white transition-colors cursor-pointer mb-2.5"
         >
           <ChevronLeft className="w-4 h-4" />
@@ -1274,7 +1273,7 @@ export default function NewAdminQuestionCreate() {
 
               <button
                 type="button"
-                onClick={() => navigate("/new-admin/library")}
+                onClick={() => navigate("/admin/library")}
                 className="w-full py-2 text-xs font-semibold text-slate-500 hover:text-slate-700 transition-colors text-center cursor-pointer"
               >
                 Cancel

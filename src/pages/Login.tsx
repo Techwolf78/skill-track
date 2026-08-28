@@ -126,14 +126,11 @@ export default function Login() {
 
         <div className="relative z-10">
           <div className="flex items-center gap-3 mb-2">
-            <div className="w-12 h-12 rounded-xl bg-gradient-primary flex items-center justify-center shadow-primary">
-              <span className="text-2xl font-bold text-primary-foreground">
-                R
-              </span>
-            </div>
-            <span className="font-heading font-bold text-2xl text-white">
-              RxOne
-            </span>
+            <img
+              src="/Gryphon360logo.png"
+              alt="Gryphon 360"
+              className="h-12 w-auto object-contain shrink-0"
+            />
           </div>
           <p className="text-white/60 text-sm">Skill Assessment Platform</p>
         </div>

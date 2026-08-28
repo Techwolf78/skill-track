@@ -88,10 +88,11 @@ const NotFound = () => {
       <div className="relative z-10 flex min-h-screen flex-col items-center justify-center px-4 py-16">
         {/* Logo */}
         <div className="mb-8 flex items-center gap-3">
-          <div className="w-12 h-12 rounded-xl bg-gradient-primary flex items-center justify-center shadow-primary">
-            <span className="text-xl font-bold text-primary-foreground">R</span>
-          </div>
-          <span className="font-heading font-bold text-2xl">RxOne</span>
+          <img
+            src="/Gryphon360logo.png"
+            alt="Gryphon 360"
+            className="h-10 w-auto object-contain shrink-0"
+          />
         </div>
 
 {/* Animated 404 text with gradient */}
