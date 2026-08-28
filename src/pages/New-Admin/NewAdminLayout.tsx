@@ -28,27 +28,27 @@ export default function NewAdminLayout() {
 
   // Determine current section for breadcrumb
   const getCurrentBreadcrumb = () => {
-    if (location.pathname.includes("/new-admin/settings") || location.pathname.includes("/new-admin/profile")) return "Account Settings";
-    if (location.pathname.includes("/new-admin/tests")) return "Tests";
-    if (location.pathname.includes("/new-admin/library")) return "Library";
-    if (location.pathname.includes("/new-admin/home")) return "Home";
+    if (location.pathname.includes("/admin/settings") || location.pathname.includes("/admin/profile")) return "Account Settings";
+    if (location.pathname.includes("/admin/tests")) return "Tests";
+    if (location.pathname.includes("/admin/library")) return "Library";
+    if (location.pathname.includes("/admin/home")) return "Home";
     return "Tests";
   };
 
   const navItems = [
     {
       label: "Home",
-      path: "/new-admin/home",
+      path: "/admin/home",
       icon: GraduationCap,
     },
     {
       label: "Tests",
-      path: "/new-admin/tests",
+      path: "/admin/tests",
       icon: ClipboardList,
     },
     {
       label: "Library",
-      path: "/new-admin/library",
+      path: "/admin/library",
       icon: BookOpen,
     },
   ];
@@ -60,7 +60,7 @@ export default function NewAdminLayout() {
         {/* Left Side: Logo + Divider + Route Breadcrumb */}
         <div className="flex items-center space-x-3 md:space-x-4">
           <div 
-            onClick={() => navigate("/new-admin/home")}
+            onClick={() => navigate("/admin/home")}
             className="flex items-center gap-2 cursor-pointer group"
           >
             {/* Gryphon360 Brand Logo */}
@@ -112,7 +112,7 @@ export default function NewAdminLayout() {
               </DropdownMenuLabel>
               <DropdownMenuSeparator className="bg-slate-100" />
               <DropdownMenuItem
-                onClick={() => navigate("/new-admin/settings")}
+                onClick={() => navigate("/admin/settings")}
                 className="cursor-pointer text-slate-700 hover:bg-slate-50 px-3 py-2 text-xs flex items-center gap-2"
               >
                 <UserIcon className="w-4 h-4 text-slate-500" />
@@ -138,7 +138,7 @@ export default function NewAdminLayout() {
             const Icon = item.icon;
             const isActive =
               location.pathname === item.path ||
-              (item.path === "/new-admin/home" && (location.pathname === "/new-admin" || location.pathname === "/new-admin/"));
+              (item.path === "/admin/home" && (location.pathname === "/admin" || location.pathname === "/admin/"));
 
             return (
               <NavLink

@@ -1515,7 +1515,7 @@ export default function NewAdminTestEdit() {
         {/* Left Side: Logo + Divider + Breadcrumb */}
         <div className="flex items-center space-x-3 md:space-x-4 min-w-0">
           <div
-            onClick={() => navigate("/new-admin/tests")}
+            onClick={() => navigate("/admin/tests")}
             className="flex items-center gap-2 cursor-pointer group shrink-0"
           >
             <img
@@ -1529,7 +1529,7 @@ export default function NewAdminTestEdit() {
 
           <div className="flex items-center text-xs md:text-sm text-slate-400 font-medium space-x-1.5 truncate">
             <button
-              onClick={() => navigate("/new-admin/tests")}
+              onClick={() => navigate("/admin/tests")}
               className="hover:text-slate-200 cursor-pointer transition-colors shrink-0"
             >
               Tests
@@ -1571,7 +1571,7 @@ export default function NewAdminTestEdit() {
               </DropdownMenuLabel>
               <DropdownMenuSeparator className="bg-slate-100" />
               <DropdownMenuItem
-                onClick={() => navigate("/new-admin/tests")}
+                onClick={() => navigate("/admin/tests")}
                 className="cursor-pointer text-slate-700 hover:bg-slate-50 px-3 py-2 text-xs flex items-center gap-2"
               >
                 <ChevronLeft className="w-4 h-4 text-slate-500" />
@@ -1693,7 +1693,7 @@ export default function NewAdminTestEdit() {
                 <span className="text-xs font-semibold text-slate-700">Problems</span>
                 <div className="flex items-center gap-3 text-indigo-700">
                   <button
-                    onClick={() => navigate(id ? `/new-admin/tests/${id}/add-problems` : "/new-admin/library")}
+                    onClick={() => navigate(id ? `/admin/tests/${id}/add-problems` : "/admin/library")}
                     className="p-1 hover:text-indigo-900 transition-colors cursor-pointer"
                     title="Add problem from library"
                   >
@@ -1707,7 +1707,7 @@ export default function NewAdminTestEdit() {
                 <div className="py-12 px-4 text-center text-slate-400 text-xs space-y-2">
                   <p>No problems added to this test yet.</p>
                   <button
-                    onClick={() => navigate(id ? `/new-admin/tests/${id}/add-problems` : "/new-admin/library")}
+                    onClick={() => navigate(id ? `/admin/tests/${id}/add-problems` : "/admin/library")}
                     className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-none transition-colors cursor-pointer inline-flex items-center gap-1.5"
                   >
                     <Plus className="w-3.5 h-3.5" />
@@ -1749,9 +1749,9 @@ export default function NewAdminTestEdit() {
                                 onClick={() => {
                                   if (q) {
                                     if (isCoding) {
-                                      navigate(`/new-admin/playground/${q.id}`);
+                                      navigate(`/admin/playground/${q.id}`);
                                     } else {
-                                      navigate(`/new-admin/questions/preview/${q.id}`, { state: q });
+                                      navigate(`/admin/questions/preview/${q.id}`, { state: q });
                                     }
                                   }
                                 }}

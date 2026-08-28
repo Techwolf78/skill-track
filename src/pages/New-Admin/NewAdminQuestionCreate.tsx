@@ -428,7 +428,7 @@ export default function NewAdminQuestionCreate() {
         setTitle(`${title.trim()} (Copy)`);
         toast.info("Cloned draft ready for editing");
       } else {
-        navigate("/new-admin/library");
+        navigate("/admin/library");
       }
     } catch (err: any) {
       console.error("[NewAdminQuestionCreate] Failed to save:", err);
@@ -443,7 +443,7 @@ export default function NewAdminQuestionCreate() {
         {/* Left Side: Logo + Divider + Breadcrumb (Library > Problem Title) */}
         <div className="flex items-center space-x-3 md:space-x-4">
           <div
-            onClick={() => navigate("/new-admin/library")}
+            onClick={() => navigate("/admin/library")}
             className="flex items-center gap-2 cursor-pointer group"
           >
             <img
@@ -457,7 +457,7 @@ export default function NewAdminQuestionCreate() {
 
           <div className="flex items-center text-xs md:text-sm text-slate-400 font-medium space-x-1.5">
             <button
-              onClick={() => navigate("/new-admin/library")}
+              onClick={() => navigate("/admin/library")}
               className="hover:text-slate-200 cursor-pointer transition-colors"
             >
               Library
@@ -497,7 +497,7 @@ export default function NewAdminQuestionCreate() {
               </DropdownMenuLabel>
               <DropdownMenuSeparator className="bg-slate-100" />
               <DropdownMenuItem
-                onClick={() => navigate("/new-admin/settings")}
+                onClick={() => navigate("/admin/settings")}
                 className="cursor-pointer text-slate-700 hover:bg-slate-50 px-3 py-2 text-xs flex items-center gap-2"
               >
                 <UserIcon className="w-4 h-4 text-slate-500" />
@@ -523,7 +523,7 @@ export default function NewAdminQuestionCreate() {
       <main className="max-w-7xl mx-auto px-4 md:px-8 pt-6 pb-20 w-full relative z-10">
         {/* Back to Library Button above title */}
         <button
-          onClick={() => navigate("/new-admin/library")}
+          onClick={() => navigate("/admin/library")}
           className="inline-flex items-center gap-1.5 text-xs text-slate-400 hover:text-white transition-colors cursor-pointer mb-2.5"
         >
           <ChevronLeft className="w-4 h-4" />
@@ -1197,7 +1197,7 @@ export default function NewAdminQuestionCreate() {
 
               <button
                 type="button"
-                onClick={() => navigate("/new-admin/library")}
+                onClick={() => navigate("/admin/library")}
                 className="w-full py-2 text-xs font-semibold text-slate-500 hover:text-slate-700 transition-colors text-center cursor-pointer"
               >
                 Cancel

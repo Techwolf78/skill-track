@@ -115,7 +115,7 @@ export default function NewAdminQuestionPreview() {
         <h2 className="text-lg font-bold text-slate-100 mb-1">Preview Unavailable</h2>
         <p className="text-xs text-slate-400 mb-6">{error || "Could not retrieve question."}</p>
         <button
-          onClick={() => navigate("/new-admin/library")}
+          onClick={() => navigate("/admin/library")}
           className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded shadow transition-colors"
         >
           Return to Library
@@ -168,7 +168,7 @@ export default function NewAdminQuestionPreview() {
         {/* Left Side: Logo + Divider + Breadcrumb (Library > Question Title) */}
         <div className="flex items-center space-x-3 md:space-x-4 min-w-0">
           <div
-            onClick={() => navigate("/new-admin/library")}
+            onClick={() => navigate("/admin/library")}
             className="flex items-center gap-2 cursor-pointer group shrink-0"
           >
             <img
@@ -182,7 +182,7 @@ export default function NewAdminQuestionPreview() {
 
           <div className="flex items-center text-xs md:text-sm text-slate-400 font-medium space-x-1.5 truncate">
             <button
-              onClick={() => navigate("/new-admin/library")}
+              onClick={() => navigate("/admin/library")}
               className="hover:text-slate-200 cursor-pointer transition-colors shrink-0"
             >
               Library
@@ -224,7 +224,7 @@ export default function NewAdminQuestionPreview() {
               </DropdownMenuLabel>
               <DropdownMenuSeparator className="bg-slate-100" />
               <DropdownMenuItem
-                onClick={() => navigate("/new-admin/library")}
+                onClick={() => navigate("/admin/library")}
                 className="cursor-pointer text-slate-700 hover:bg-slate-50 px-3 py-2 text-xs flex items-center gap-2"
               >
                 <ChevronLeft className="w-4 h-4 text-slate-500" />
@@ -250,7 +250,7 @@ export default function NewAdminQuestionPreview() {
       <main className="max-w-7xl mx-auto px-4 md:px-8 pt-6 pb-20 w-full relative z-10">
         {/* Back to Library Button above title */}
         <button
-          onClick={() => navigate("/new-admin/library")}
+          onClick={() => navigate("/admin/library")}
           className="inline-flex items-center gap-1.5 text-xs text-slate-400 hover:text-white transition-colors cursor-pointer mb-2.5"
         >
           <ChevronLeft className="w-4 h-4" />
@@ -316,7 +316,7 @@ export default function NewAdminQuestionPreview() {
 
               {isCoding && (
                 <button
-                  onClick={() => navigate(`/new-admin/playground/${question.id}`)}
+                  onClick={() => navigate(`/admin/playground/${question.id}`)}
                   className="text-xs px-3 py-1 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded flex items-center gap-1.5 shadow-sm transition-colors cursor-pointer"
                 >
                   <Terminal className="w-3.5 h-3.5" />
@@ -448,7 +448,7 @@ export default function NewAdminQuestionPreview() {
                       </p>
                     </div>
                     <button
-                      onClick={() => navigate(`/new-admin/playground/${question.id}`)}
+                      onClick={() => navigate(`/admin/playground/${question.id}`)}
                       className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded shadow-md inline-flex items-center gap-2 transition-all cursor-pointer"
                     >
                       <Terminal className="w-4 h-4" />
@@ -536,9 +536,11 @@ export default function NewAdminQuestionPreview() {
               {/* Footer Banner */}
               <div className="mt-8 pt-4 border-t border-slate-100 flex items-center justify-end text-xs text-slate-500">
                 <button
-                  onClick={() => navigate("/new-admin/library")}
+                  onClick={() => navigate("/admin/library")}
                   className="px-3 py-1.5 border border-slate-200 text-slate-700 hover:bg-slate-50 font-medium rounded transition-colors cursor-pointer"
                 >
+                  Close Preview
+                </button>
                   Close Preview
                 </button>
               </div>

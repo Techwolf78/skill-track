@@ -102,7 +102,7 @@ export default function NewAdminTests() {
       const created = await createTestMutation.mutateAsync(duplicateTest);
       toast.success("Test duplicated successfully!");
       if (created?.id) {
-        navigate(`/new-admin/tests/edit/${created.id}`);
+        navigate(`/admin/tests/edit/${created.id}`);
       }
     } catch (error: any) {
       toast.error(error?.response?.data?.message || error?.message || "Failed to duplicate test");
@@ -140,7 +140,7 @@ export default function NewAdminTests() {
       setIsCreateDialogOpen(false);
       setNewTestName("");
       setNewTestDuration(60);
-      navigate(`/new-admin/tests/edit/${newTest.id}`);
+      navigate(`/admin/tests/edit/${newTest.id}`);
     } catch (error: any) {
       toast.error(error?.response?.data?.message || error?.message || "Failed to create test");
     } finally {
@@ -296,7 +296,7 @@ export default function NewAdminTests() {
                     {/* Invite Candidates */}
                     <button
                       title="Invite Candidates"
-                      onClick={() => navigate(`/new-admin/tests/edit/${test.id}?tab=candidates`)}
+                      onClick={() => navigate(`/admin/tests/edit/${test.id}?tab=candidates`)}
                       className="p-2 hover:text-slate-900 hover:bg-slate-100 transition-colors cursor-pointer"
                     >
                       <UserPlus className="w-4 h-4" />
@@ -305,7 +305,7 @@ export default function NewAdminTests() {
                     {/* Reports / Analytics */}
                     <button
                       title="View Reports / Analytics"
-                      onClick={() => navigate(`/new-admin/tests/edit/${test.id}?tab=candidates`)}
+                      onClick={() => navigate(`/admin/tests/edit/${test.id}?tab=candidates`)}
                       className="p-2 hover:text-slate-900 hover:bg-slate-100 transition-colors cursor-pointer"
                     >
                       <BarChart2 className="w-4 h-4" />
@@ -323,7 +323,7 @@ export default function NewAdminTests() {
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end" className="w-44 bg-white border border-slate-200 shadow-xl p-1 text-xs">
                         <DropdownMenuItem
-                          onClick={() => navigate(`/new-admin/tests/edit/${test.id}`)}
+                          onClick={() => navigate(`/admin/tests/edit/${test.id}`)}
                           className="cursor-pointer py-2 px-2.5 flex items-center gap-2 text-slate-700 hover:bg-slate-50"
                         >
                           <Edit className="w-3.5 h-3.5 text-slate-500" />

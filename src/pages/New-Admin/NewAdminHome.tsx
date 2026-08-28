@@ -105,7 +105,7 @@ export default function NewAdminHome() {
       const created = await createTestMutation.mutateAsync(duplicateTest);
       toast.success("Test duplicated successfully!");
       if (created?.id) {
-        navigate(`/new-admin/tests/edit/${created.id}`);
+        navigate(`/admin/tests/edit/${created.id}`);
       }
     } catch (error: any) {
       toast.error(error?.response?.data?.message || error?.message || "Failed to duplicate test");
@@ -143,7 +143,7 @@ export default function NewAdminHome() {
       setIsCreateDialogOpen(false);
       setNewTestName("");
       setNewTestDuration(60);
-      navigate(`/new-admin/tests/edit/${newTest.id}`);
+      navigate(`/admin/tests/edit/${newTest.id}`);
     } catch (error: any) {
       toast.error(error?.response?.data?.message || error?.message || "Failed to create test");
     } finally {
@@ -229,7 +229,7 @@ export default function NewAdminHome() {
             Recent tests
           </h2>
           <button
-            onClick={() => navigate("/new-admin/tests")}
+            onClick={() => navigate("/admin/tests")}
             className="text-xs font-bold text-[#4353a4] hover:text-[#334182] uppercase tracking-wider transition-colors cursor-pointer"
           >
             All tests
@@ -288,7 +288,7 @@ export default function NewAdminHome() {
                     {/* Title + Green Check Badge */}
                     <div className="flex items-center gap-2">
                       <h3
-                        onClick={() => navigate(`/admin/tests/${test.id}`)}
+                        onClick={() => navigate(`/admin/tests/edit/${test.id}`)}
                         className="font-bold text-slate-900 text-base hover:text-[#4353a4] transition-colors truncate cursor-pointer tracking-tight"
                       >
                         {test.title}
@@ -324,7 +324,9 @@ export default function NewAdminHome() {
 
                       <div className="flex items-center gap-1.5">
                         <User className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                        <span className="truncate">{orgName}</span>
+                        <span>
+                          <span className="truncate">{orgName}</span>
+                        </span>
                       </div>
                     </div>
                   </div>
@@ -333,14 +335,14 @@ export default function NewAdminHome() {
                   <div className="flex items-center gap-1 shrink-0 text-slate-500">
                     <button
                       title="Invite Candidates"
-                      onClick={() => navigate(`/new-admin/tests/edit/${test.id}?tab=candidates`)}
+                      onClick={() => navigate(`/admin/tests/edit/${test.id}?tab=candidates`)}
                       className="p-2 hover:text-slate-900 hover:bg-slate-100 transition-colors cursor-pointer"
                     >
                       <UserPlus className="w-4 h-4" />
                     </button>
                     <button
                       title="View Reports / Analytics"
-                      onClick={() => navigate(`/new-admin/tests/edit/${test.id}?tab=candidates`)}
+                      onClick={() => navigate(`/admin/tests/edit/${test.id}?tab=candidates`)}
                       className="p-2 hover:text-slate-900 hover:bg-slate-100 transition-colors cursor-pointer"
                     >
                       <BarChart2 className="w-4 h-4" />
@@ -357,7 +359,7 @@ export default function NewAdminHome() {
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end" className="w-44 bg-white border border-slate-200 shadow-xl p-1 text-xs">
                         <DropdownMenuItem
-                          onClick={() => navigate(`/new-admin/tests/edit/${test.id}`)}
+                          onClick={() => navigate(`/admin/tests/edit/${test.id}`)}
                           className="cursor-pointer py-2 px-2.5 flex items-center gap-2 text-slate-700 hover:bg-slate-50"
                         >
                           <Edit className="w-3.5 h-3.5 text-slate-500" />

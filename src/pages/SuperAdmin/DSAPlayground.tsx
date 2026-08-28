@@ -186,11 +186,9 @@ export default function DSAPlayground() {
   const { user } = useAuth();
 
   const backRoute =
-    location.pathname.includes("/new-admin")
-      ? "/new-admin/library"
-      : user?.role === ROLES.SUPERADMIN
+    user?.role === ROLES.SUPERADMIN && location.pathname.includes("/superadmin")
       ? "/superadmin/questions"
-      : "/admin/questions";
+      : "/admin/library";
 
   const [question, setQuestion] = useState<QuestionUI | null>(null);
   const [loading, setLoading] = useState(true);

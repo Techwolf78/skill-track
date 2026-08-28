@@ -178,7 +178,7 @@ export default function NewAdminSettings() {
         <Button
           type="button"
           variant="outline"
-          onClick={() => navigate("/new-admin/home")}
+          onClick={() => navigate("/admin/home")}
           className="border-slate-300 text-slate-700 hover:bg-slate-100 hover:text-slate-900 text-xs font-semibold px-3.5 py-2 h-auto rounded-sm gap-1.5 shrink-0 shadow-none"
         >
           <ChevronLeft className="w-4 h-4" />

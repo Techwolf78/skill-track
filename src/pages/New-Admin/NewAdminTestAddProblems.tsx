@@ -277,7 +277,7 @@ export default function NewAdminTestAddProblems() {
         {/* Left Side: Logo + Divider + Breadcrumbs */}
         <div className="flex items-center space-x-3 md:space-x-4 min-w-0">
           <div
-            onClick={() => navigate(`/new-admin/tests/edit/${id}`)}
+            onClick={() => navigate(`/admin/tests/edit/${id}`)}
             className="flex items-center gap-2 cursor-pointer group shrink-0"
           >
             <img
@@ -291,14 +291,14 @@ export default function NewAdminTestAddProblems() {
 
           <div className="flex items-center text-xs md:text-sm text-slate-400 font-medium space-x-1.5 truncate">
             <button
-              onClick={() => navigate("/new-admin/tests")}
+              onClick={() => navigate("/admin/tests")}
               className="hover:text-slate-200 cursor-pointer transition-colors shrink-0"
             >
               Tests
             </button>
             <ChevronRight className="w-3.5 h-3.5 text-slate-500 shrink-0" />
             <button
-              onClick={() => navigate(`/new-admin/tests/edit/${id}`)}
+              onClick={() => navigate(`/admin/tests/edit/${id}`)}
               className="hover:text-slate-200 cursor-pointer transition-colors truncate max-w-[150px]"
             >
               {testTitle}
@@ -340,7 +340,7 @@ export default function NewAdminTestAddProblems() {
               </DropdownMenuLabel>
               <DropdownMenuSeparator className="bg-slate-100" />
               <DropdownMenuItem
-                onClick={() => navigate(`/new-admin/tests/edit/${id}`)}
+                onClick={() => navigate(`/admin/tests/edit/${id}`)}
                 className="cursor-pointer text-slate-700 hover:bg-slate-50 px-3 py-2 text-xs flex items-center gap-2"
               >
                 <ArrowLeft className="w-4 h-4 text-slate-500" />
@@ -364,7 +364,7 @@ export default function NewAdminTestAddProblems() {
         <div className="max-w-7xl mx-auto px-4 md:px-8 py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <button
-              onClick={() => navigate(`/new-admin/tests/edit/${id}`)}
+              onClick={() => navigate(`/admin/tests/edit/${id}`)}
               className="p-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-none transition-colors cursor-pointer"
               title="Return to Test"
             >
@@ -381,7 +381,7 @@ export default function NewAdminTestAddProblems() {
           </div>
 
           <button
-            onClick={() => navigate(`/new-admin/tests/edit/${id}`)}
+            onClick={() => navigate(`/admin/tests/edit/${id}`)}
             className="px-5 py-2.5 bg-[#10B981] hover:bg-[#059669] text-white text-sm font-semibold rounded-none shadow-xs transition-colors inline-flex items-center gap-2 self-start sm:self-auto cursor-pointer"
           >
             <Check className="w-4 h-4 stroke-[3]" />
