@@ -50,6 +50,7 @@ export interface CandidateInvitation {
   status: "PENDING" | "ACCEPTED" | "EXPIRED" | string;
   sessionStatus?: "NOT_STARTED" | "IN_PROGRESS" | "SUBMITTED" | "AUTO_SUBMITTED" | "EVALUATED" | string;
   sentAt?: string;
+  createdAt?: string;
   token?: string;
   inviteLink?: string;
 }

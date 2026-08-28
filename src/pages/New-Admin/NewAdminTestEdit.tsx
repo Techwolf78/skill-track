@@ -94,6 +94,7 @@ import {
   TestScheduleExtended,
 } from "@/lib/test-service";
 import { candidateService, CandidateInvitation } from "@/lib/candidate-service";
+import { PublishTestConfirmationModal } from "@/components/admin/PublishTestConfirmationModal";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import { toast } from "sonner";
@@ -253,6 +254,10 @@ export default function NewAdminTestEdit() {
   const [description, setDescription] = useState("");
   const [instructions, setInstructions] = useState("");
   const [savingGeneralSettings, setSavingGeneralSettings] = useState(false);
+  const [publishModalOpen, setPublishModalOpen] = useState(false);
+  const [unverifiedQuestionsForPublish, setUnverifiedQuestionsForPublish] = useState<
+    Array<{ id: string; title: string; pendingLanguages?: string[] }>
+  >([]);
 
   // Advanced Settings: Schedule States
   const [selectedScheduleId, setSelectedScheduleId] = useState<string>("");
@@ -603,6 +608,32 @@ export default function NewAdminTestEdit() {
     }
   };
 
+  const executePublish = async () => {
+    if (!id) return;
+    const dur = Number(durationMins);
+    const pass = Number(passMark);
+    try {
+      setSavingGeneralSettings(true);
+      const updated = await testService.updateTest(id, {
+        title: title.trim(),
+        durationMins: dur,
+        passMark: pass,
+        difficulty,
+        status: "PUBLISHED",
+        description: description.trim(),
+        instructions: instructions ? { text: instructions.trim() } : {},
+      });
+      setTest(updated);
+      setPublishModalOpen(false);
+      toast.success("General settings saved and test published successfully!");
+    } catch (err: any) {
+      console.error("[NewAdminTestEdit] Failed to save general settings:", err);
+      toast.error("Failed to save settings: " + (err?.response?.data?.message || err.message || "Unknown error"));
+    } finally {
+      setSavingGeneralSettings(false);
+    }
+  };
+
   const handleSaveGeneralSettings = async () => {
     if (!id) return;
     if (!title.trim()) {
@@ -620,25 +651,36 @@ export default function NewAdminTestEdit() {
       return;
     }
 
-    try {
-      setSavingGeneralSettings(true);
-      const updated = await testService.updateTest(id, {
-        title: title.trim(),
-        durationMins: dur,
-        passMark: pass,
-        difficulty,
-        status: "PUBLISHED",
-        description: description.trim(),
-        instructions: instructions ? { text: instructions.trim() } : {},
+    // Checkpoint 2: Inspect all coding questions for pending driver verifications
+    const unverified = questions
+      .filter((tq) => {
+        const q = (tq as any).question || tq;
+        const isCoding = (q.questionType ?? "").toUpperCase() === "CODING";
+        if (!isCoding) return false;
+        const declaredLangs = Object.keys(q.languageTemplates || {});
+        const verifiedLangs = q.verifiedLanguages || [];
+        const hasUnverified = declaredLangs.length === 0 || declaredLangs.some((l: string) => !verifiedLangs.includes(l));
+        return q.status === "UNDER_REVIEW" || hasUnverified;
+      })
+      .map((tq) => {
+        const q = (tq as any).question || tq;
+        const declaredLangs = Object.keys(q.languageTemplates || { python: {}, javascript: {}, java: {}, cpp: {} });
+        const verifiedLangs = q.verifiedLanguages || [];
+        const pending = declaredLangs.filter((l: string) => !verifiedLangs.includes(l));
+        return {
+          id: q.id || tq.id,
+          title: q.title || "Untitled Coding Question",
+          pendingLanguages: pending.length > 0 ? pending : (q.pendingLanguages || ["python", "javascript", "java", "cpp"]),
+        };
       });
-      setTest(updated);
-      toast.success("General settings saved successfully!");
-    } catch (err: any) {
-      console.error("[NewAdminTestEdit] Failed to save general settings:", err);
-      toast.error("Failed to save settings: " + (err?.response?.data?.message || err.message || "Unknown error"));
-    } finally {
-      setSavingGeneralSettings(false);
+
+    if (unverified.length > 0) {
+      setUnverifiedQuestionsForPublish(unverified);
+      setPublishModalOpen(true);
+      return;
     }
+
+    await executePublish();
   };
 
   const handleSaveSchedule = async () => {
@@ -1168,8 +1210,7 @@ export default function NewAdminTestEdit() {
             (tq) => tq.questionId === questionId || tq.id === questionId,
           );
           const enrichedQuestion = enrichedTQ?.question;
-          const correctOptions: Array<{ id?: string; text?: string; isCorrect?: boolean }> =
-            (enrichedQuestion?.options || enrichedQuestion?.mcqOptions || q.options || q.mcqOptions || []) as Array<{ id?: string; text?: string; isCorrect?: boolean }>;
+          const correctOptions = enrichedQuestion?.mcqOptions || q.mcqOptions || [];
 
           // Calculate time spent telemetry
           const timeItem = timingsList.find(
@@ -1210,7 +1251,7 @@ export default function NewAdminTestEdit() {
               },
             ]);
           } else {
-            const optionsList = q.options || q.mcqOptions || enrichedQuestion?.options || enrichedQuestion?.mcqOptions || [];
+            const optionsList = q.mcqOptions || enrichedQuestion?.mcqOptions || [];
             optionsList.forEach(
               (
                 opt: { id: string; text: string; isCorrect: boolean },
@@ -2852,7 +2893,7 @@ export default function NewAdminTestEdit() {
                               : result?.scorePercentage !== undefined
                               ? `${result.scorePercentage}%`
                               : "—";
-                          const rawDate = (inv as Record<string, unknown>).createdAt as string | undefined || inv.sentAt;
+                          const rawDate = inv.createdAt || inv.sentAt;
                           const dateStr = rawDate ? new Date(rawDate).toLocaleDateString() : "—";
 
                           let timeStr = "—";
@@ -3245,6 +3286,20 @@ export default function NewAdminTestEdit() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Checkpoint 2 Publish Confirmation Modal */}
+      <PublishTestConfirmationModal
+        open={publishModalOpen}
+        onOpenChange={setPublishModalOpen}
+        testTitle={title || test?.title || "Assessment"}
+        unverifiedQuestions={unverifiedQuestionsForPublish}
+        onConfirmPublish={executePublish}
+        onReviewQuestions={() => {
+          setPublishModalOpen(false);
+          setActiveTab("PROBLEMS");
+        }}
+        isPublishing={savingGeneralSettings}
+      />
     </div>
   );
 }

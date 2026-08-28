@@ -599,13 +599,28 @@ export default function AdminQuestionBank() {
                       <TableRow key={question.id} className="hover:bg-muted/30 border-b transition-all">
                         <TableCell className="py-4">
                           <div className="space-y-1.5">
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-2 flex-wrap">
                               <p className="font-semibold tracking-tight leading-none text-sm text-foreground">
                                 {question.title || question.prompt?.substring(0, 60)}
                               </p>
                               <Badge variant="outline" className="text-[10px] uppercase">
                                 {question.format || "MCQ"}
                               </Badge>
+
+                              {/* Lifecycle Status and Verification Chips for Coding */}
+                              {((question.questionType ?? "").toUpperCase() === "CODING" || question.format === "CODING") && (
+                                <>
+                                  <Badge variant="outline" className="text-[10px] py-0 bg-muted/50 text-muted-foreground border-border font-medium">
+                                    {question.status === "UNDER_REVIEW" ? "Under Review" : "Active"}
+                                  </Badge>
+
+                                  {question.isLanguageSpecific && (
+                                    <Badge variant="outline" className="text-[9px] py-0 text-muted-foreground bg-muted/30">
+                                      Single-Lang
+                                    </Badge>
+                                  )}
+                                </>
+                              )}
                             </div>
                             <p className="text-xs text-muted-foreground line-clamp-2 font-normal">
                               {question.prompt}

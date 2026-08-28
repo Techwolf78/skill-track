@@ -669,11 +669,11 @@ function ImportQuestionsDialog({
         sampleExplanation: norm.sampleexplanation || norm.explanation || undefined,
         testCases: finalTestCases,
         languageTemplates: {
-          java: { code: "// Write your code here", lang: "java", langSlug: "java" },
-          python: { code: "# Write your code here", lang: "python", langSlug: "python" },
-          javascript: { code: "// Write your code here", lang: "javascript", langSlug: "javascript" },
+          java: { template: "// Write your code here", driver: "// Execution harness" },
+          python: { template: "# Write your code here", driver: "# Execution harness" },
+          javascript: { template: "// Write your code here", driver: "// Execution harness" },
         },
-        signatureMetadata: { functionName: "solve" },
+        signatureMetadata: { method_name: "solve", return_type: "void", params: [] },
       };
     }
   };
@@ -963,13 +963,13 @@ function ImportQuestionsDialog({
           cognitiveLevel: "APPLY" as const,
           p_value: 0.45,
           discrimination_index: 0.35,
-          status: "ACTIVE" as const,
+          status: "UNDER_REVIEW" as const,
           languageTemplates: q.languageTemplates || {
-            java: { code: "// Write your code here", lang: "java", langSlug: "java" },
-            python: { code: "# Write your code here", lang: "python", langSlug: "python" },
-            javascript: { code: "// Write your code here", lang: "javascript", langSlug: "javascript" },
+            java: { template: "// Write your code here", driver: "// Execution harness" },
+            python: { template: "# Write your code here", driver: "# Execution harness" },
+            javascript: { template: "// Write your code here", driver: "// Execution harness" },
           },
-          signatureMetadata: q.signatureMetadata || { functionName: "solve" },
+          signatureMetadata: q.signatureMetadata || { method_name: "solve", return_type: "void", params: [] },
           testCases: q.testCases || [],
         };
       }
@@ -1603,6 +1603,24 @@ export default function NewAdminLibrary() {
                         <span className="text-slate-400 font-mono text-[13px] leading-none">≡</span>
                         <span>{isCoding ? "Coding" : "MCQ"}</span>
                       </div>
+
+                      {/* Lifecycle and Language Verification Badges */}
+                      {isCoding && (
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span
+                            className="inline-flex items-center text-[11px] font-medium text-slate-600 bg-slate-100 px-2 py-0.5 rounded border border-slate-200"
+                            title={q.status === "UNDER_REVIEW" ? "Driver verification pending" : "All drivers verified"}
+                          >
+                            {q.status === "UNDER_REVIEW" ? "Under Review" : "Active"}
+                          </span>
+
+                          {q.isLanguageSpecific && (
+                            <span className="text-[10px] bg-slate-100 text-slate-600 font-medium px-1.5 py-0.5 rounded border border-slate-200">
+                              Single-Lang
+                            </span>
+                          )}
+                        </div>
+                      )}
 
                       {!isCoding && (
                         <div className="flex items-center gap-1">
