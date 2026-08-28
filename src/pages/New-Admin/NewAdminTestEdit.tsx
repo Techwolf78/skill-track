@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import {
   ChevronLeft,
   ChevronRight,
@@ -238,8 +238,36 @@ export default function NewAdminTestEdit() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user, logout } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
 
-  const [activeTab, setActiveTab] = useState<TabType>("PROBLEMS");
+  const getInitialTab = (): TabType => {
+    const tabParam = searchParams.get("tab")?.toLowerCase();
+    if (tabParam === "candidates" || tabParam === "reports" || tabParam === "invite" || tabParam === "invitations") {
+      return "CANDIDATES";
+    }
+    if (tabParam === "general" || tabParam === "settings" || tabParam === "general_settings") {
+      return "GENERAL_SETTINGS";
+    }
+    if (tabParam === "advanced" || tabParam === "schedule" || tabParam === "proctoring" || tabParam === "advanced_settings") {
+      return "ADVANCED_SETTINGS";
+    }
+    return "PROBLEMS";
+  };
+
+  const [activeTab, setActiveTab] = useState<TabType>(getInitialTab);
+
+  useEffect(() => {
+    const tabParam = searchParams.get("tab")?.toLowerCase();
+    if (tabParam === "candidates" || tabParam === "reports" || tabParam === "invite" || tabParam === "invitations") {
+      setActiveTab("CANDIDATES");
+    } else if (tabParam === "general" || tabParam === "settings" || tabParam === "general_settings") {
+      setActiveTab("GENERAL_SETTINGS");
+    } else if (tabParam === "advanced" || tabParam === "schedule" || tabParam === "proctoring" || tabParam === "advanced_settings") {
+      setActiveTab("ADVANCED_SETTINGS");
+    } else if (tabParam === "problems" || tabParam === "questions") {
+      setActiveTab("PROBLEMS");
+    }
+  }, [searchParams]);
   const [loading, setLoading] = useState(Boolean(id));
   const [test, setTest] = useState<Test | null>(null);
   const [questions, setQuestions] = useState<Array<TestQuestion & { question?: Question }>>([]);

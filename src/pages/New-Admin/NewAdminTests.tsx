@@ -17,9 +17,10 @@ import {
   Layers,
   Copy,
   Trash2,
+  Calendar,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
-import { useTestsQuery, useCreateTestMutation } from "@/hooks/use-query-hooks";
+import { useTestsQuery, useCreateTestMutation, useDeleteTestMutation } from "@/hooks/use-query-hooks";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -53,6 +54,71 @@ export default function NewAdminTests() {
 
   const { data: tests = [], isLoading } = useTestsQuery();
   const createTestMutation = useCreateTestMutation();
+  const deleteTestMutation = useDeleteTestMutation();
+
+  const handleDuplicate = async (test: any) => {
+    try {
+      const questionsPayload = (test.testQuestions || test.questions || []).map(
+        (q: any, index: number) => ({
+          questionId: q.questionId || q.question?.id || q.id,
+          sectionName: q.sectionName || "General",
+          orderIndex: q.orderIndex !== undefined ? q.orderIndex : index,
+          marks: q.marks || 0,
+          timeLimitSecs: q.timeLimitSecs || 120,
+        })
+      );
+
+      const duplicateTest = {
+        title: `${test.title} (Copy)`,
+        description: test.description || "",
+        durationMins: test.durationMins,
+        difficulty: test.difficulty || "MEDIUM",
+        status: "DRAFT" as const,
+        passMark: test.passMark || 40,
+        isActive: true,
+        questions: questionsPayload,
+        proctoringMode: test.proctoringMode,
+        enableTabSwitchTracking: test.enableTabSwitchTracking,
+        blockCopyPaste: test.blockCopyPaste,
+        blockRightClick: test.blockRightClick,
+        warnOnFullscreenExit: test.warnOnFullscreenExit,
+        maxWarnings: test.maxWarnings,
+        requireWebcam: test.requireWebcam,
+        detectFaceNotVisible: test.detectFaceNotVisible,
+        detectMultipleFaces: test.detectMultipleFaces,
+        detectSuspiciousAudio: test.detectSuspiciousAudio,
+        detectObjects: test.detectObjects,
+        periodicSnapshots: test.periodicSnapshots,
+        evidenceCapture: test.evidenceCapture,
+        requireMicrophone: test.requireMicrophone,
+        requireScreenShare: test.requireScreenShare,
+        detectDevTools: test.detectDevTools,
+        detectScreenShareStop: test.detectScreenShareStop,
+        enableLiveProctoring: test.enableLiveProctoring,
+        autoSubmitOnCriticalViolations: test.autoSubmitOnCriticalViolations,
+        maxCriticalViolations: test.maxCriticalViolations,
+      };
+
+      const created = await createTestMutation.mutateAsync(duplicateTest);
+      toast.success("Test duplicated successfully!");
+      if (created?.id) {
+        navigate(`/new-admin/tests/edit/${created.id}`);
+      }
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message || error?.message || "Failed to duplicate test");
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    if (window.confirm("Are you sure you want to delete this test?")) {
+      try {
+        await deleteTestMutation.mutateAsync(id);
+        toast.success("Test deleted successfully");
+      } catch (error: any) {
+        toast.error(error?.response?.data?.message || error?.message || "Failed to delete test");
+      }
+    }
+  };
 
   const handleCreateTestSubmit = async () => {
     if (!newTestName.trim()) {
@@ -74,7 +140,7 @@ export default function NewAdminTests() {
       setIsCreateDialogOpen(false);
       setNewTestName("");
       setNewTestDuration(60);
-      navigate(`/admin/tests/edit/${newTest.id}`);
+      navigate(`/new-admin/tests/edit/${newTest.id}`);
     } catch (error: any) {
       toast.error(error?.response?.data?.message || error?.message || "Failed to create test");
     } finally {
@@ -227,19 +293,10 @@ export default function NewAdminTests() {
 
                   {/* Right Side: Quick Action Icons */}
                   <div className="flex items-center gap-1 shrink-0 text-slate-500">
-                    {/* Edit Test (New UI) */}
-                    <button
-                      title="Edit Test Settings & Problems"
-                      onClick={() => navigate(`/new-admin/tests/edit/${test.id}`)}
-                      className="p-2 hover:text-[#4353a4] hover:bg-slate-100 transition-colors cursor-pointer"
-                    >
-                      <Edit className="w-4 h-4" />
-                    </button>
-
                     {/* Invite Candidates */}
                     <button
                       title="Invite Candidates"
-                      onClick={() => navigate(`/admin/invitations?testId=${test.id}`)}
+                      onClick={() => navigate(`/new-admin/tests/edit/${test.id}?tab=candidates`)}
                       className="p-2 hover:text-slate-900 hover:bg-slate-100 transition-colors cursor-pointer"
                     >
                       <UserPlus className="w-4 h-4" />
@@ -248,7 +305,7 @@ export default function NewAdminTests() {
                     {/* Reports / Analytics */}
                     <button
                       title="View Reports / Analytics"
-                      onClick={() => navigate(`/admin/tests/${test.id}`)}
+                      onClick={() => navigate(`/new-admin/tests/edit/${test.id}?tab=candidates`)}
                       className="p-2 hover:text-slate-900 hover:bg-slate-100 transition-colors cursor-pointer"
                     >
                       <BarChart2 className="w-4 h-4" />
@@ -264,34 +321,24 @@ export default function NewAdminTests() {
                           <MoreVertical className="w-4 h-4" />
                         </button>
                       </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="w-48 bg-white border border-slate-200 shadow-xl p-1 text-xs">
+                      <DropdownMenuContent align="end" className="w-44 bg-white border border-slate-200 shadow-xl p-1 text-xs">
                         <DropdownMenuItem
-                          onClick={() => navigate(`/admin/tests/${test.id}`)}
-                          className="cursor-pointer py-2 px-2.5 flex items-center gap-2 text-slate-700 hover:bg-slate-50"
-                        >
-                          <ExternalLink className="w-3.5 h-3.5 text-slate-500" />
-                          <span>View Details</span>
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={() => navigate(`/admin/tests/edit/${test.id}`)}
+                          onClick={() => navigate(`/new-admin/tests/edit/${test.id}`)}
                           className="cursor-pointer py-2 px-2.5 flex items-center gap-2 text-slate-700 hover:bg-slate-50"
                         >
                           <Edit className="w-3.5 h-3.5 text-slate-500" />
                           <span>Edit Test</span>
                         </DropdownMenuItem>
                         <DropdownMenuItem
-                          onClick={() => {
-                            navigator.clipboard.writeText(test.id);
-                            toast.success("Test ID copied to clipboard");
-                          }}
+                          onClick={() => handleDuplicate(test)}
                           className="cursor-pointer py-2 px-2.5 flex items-center gap-2 text-slate-700 hover:bg-slate-50"
                         >
                           <Copy className="w-3.5 h-3.5 text-slate-500" />
-                          <span>Copy Test ID</span>
+                          <span>Duplicate Test</span>
                         </DropdownMenuItem>
                         <DropdownMenuSeparator className="bg-slate-100" />
                         <DropdownMenuItem
-                          onClick={() => toast.info("Archive functionality coming soon")}
+                          onClick={() => handleDelete(test.id)}
                           className="cursor-pointer py-2 px-2.5 flex items-center gap-2 text-rose-600 hover:bg-rose-50"
                         >
                           <Trash2 className="w-3.5 h-3.5 text-rose-500" />

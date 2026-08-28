@@ -192,7 +192,7 @@ export default function AdminTests() {
       setNewTestDuration(60);
 
       // Route directly to edit page
-      navigate(`/admin/tests/edit/${newTest.id}`);
+      navigate(`/new-admin/tests/edit/${newTest.id}`);
     } catch (error) {
       const err = error as {
         response?: { data?: { message?: string } };
@@ -531,9 +531,7 @@ export default function AdminTests() {
                     variant="ghost"
                     size="icon"
                     onClick={() =>
-                      navigate(`/admin/tests/edit/${test.id}`, {
-                        state: { activeTab: "invite" },
-                      })
+                      navigate(`/new-admin/tests/edit/${test.id}?tab=candidates`)
                     }
                     title="Invite Candidates"
                     className="text-slate-500 hover:text-primary hover:bg-slate-50 rounded-md"
@@ -546,7 +544,7 @@ export default function AdminTests() {
                     variant="ghost"
                     size="icon"
                     onClick={() =>
-                      navigate(`/admin/tests/edit/${test.id}?tab=reports`)
+                      navigate(`/new-admin/tests/edit/${test.id}?tab=candidates`)
                     }
                     title="View Reports"
                     className="text-slate-500 hover:text-primary hover:bg-slate-50 rounded-md"
@@ -580,14 +578,14 @@ export default function AdminTests() {
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="w-48">
                       <DropdownMenuItem
-                        onClick={() => navigate(`/admin/tests/edit/${test.id}`)}
+                        onClick={() => navigate(`/new-admin/tests/edit/${test.id}`)}
                       >
                         <Edit className="w-4 h-4 mr-2" />
                         Edit Test
                       </DropdownMenuItem>
                       <DropdownMenuItem
                         onClick={() =>
-                          navigate(`/admin/tests/edit/${test.id}?tab=reports`)
+                          navigate(`/new-admin/tests/edit/${test.id}?tab=candidates`)
                         }
                       >
                         <BarChart3 className="w-4 h-4 mr-2 text-indigo-600" />
@@ -601,9 +599,7 @@ export default function AdminTests() {
                       <DropdownMenuItem
                         className="text-primary"
                         onClick={() =>
-                          navigate(`/admin/tests/edit/${test.id}`, {
-                            state: { activeTab: "settings" },
-                          })
+                          navigate(`/new-admin/tests/edit/${test.id}?tab=advanced`)
                         }
                       >
                         <Calendar className="w-4 h-4 mr-2" />
@@ -612,9 +608,7 @@ export default function AdminTests() {
                       <DropdownMenuItem
                         className="text-primary"
                         onClick={() =>
-                          navigate(`/admin/tests/edit/${test.id}`, {
-                            state: { activeTab: "invite" },
-                          })
+                          navigate(`/new-admin/tests/edit/${test.id}?tab=candidates`)
                         }
                       >
                         <Users className="w-4 h-4 mr-2" />

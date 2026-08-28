@@ -60,6 +60,7 @@ const NewAdminQuestionCreate = React.lazy(() => import("./pages/New-Admin/NewAdm
 const NewAdminQuestionPreview = React.lazy(() => import("./pages/New-Admin/NewAdminQuestionPreview"));
 const NewAdminTestEdit = React.lazy(() => import("./pages/New-Admin/NewAdminTestEdit"));
 const NewAdminTestAddProblems = React.lazy(() => import("./pages/New-Admin/NewAdminTestAddProblems"));
+const NewAdminSettings = React.lazy(() => import("./pages/New-Admin/NewAdminSettings"));
 
 // Test Taking
 const TestInterface = React.lazy(() => import("./pages/test/TestInterface"));
@@ -229,6 +230,8 @@ const App = () => (
                 <Route path="home" element={<NewAdminHome />} />
                 <Route path="tests" element={<NewAdminTests />} />
                 <Route path="library" element={<NewAdminLibrary />} />
+                <Route path="settings" element={<NewAdminSettings />} />
+                <Route path="profile" element={<NewAdminSettings />} />
               </Route>
 
               {/* Standalone Full-Screen Question Create / Edit for New-Admin (No 2nd Navbar) */}

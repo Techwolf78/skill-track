@@ -497,7 +497,7 @@ export default function NewAdminQuestionCreate() {
               </DropdownMenuLabel>
               <DropdownMenuSeparator className="bg-slate-100" />
               <DropdownMenuItem
-                onClick={() => navigate("/admin/profile")}
+                onClick={() => navigate("/new-admin/settings")}
                 className="cursor-pointer text-slate-700 hover:bg-slate-50 px-3 py-2 text-xs flex items-center gap-2"
               >
                 <UserIcon className="w-4 h-4 text-slate-500" />

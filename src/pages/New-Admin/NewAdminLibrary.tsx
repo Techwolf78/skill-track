@@ -4,7 +4,6 @@ import {
   Search,
   ShoppingBag,
   Building2,
-  BarChart2,
   Eye,
   Loader2,
   X,
@@ -1587,12 +1586,6 @@ export default function NewAdminLibrary() {
                           title="Preview Question"
                         >
                           <Monitor className="w-4 h-4" />
-                        </button>
-                        <button
-                          className="p-0.5 hover:text-slate-700 transition-colors cursor-pointer"
-                          title="Question Statistics"
-                        >
-                          <BarChart2 className="w-4 h-4" />
                         </button>
                       </div>
                     </div>
