@@ -143,16 +143,12 @@ export const candidateService = {
    */
   getCandidatesPage: async (
     page: number,
-    size: number,
-    search?: string
+    size: number
   ): Promise<SpringPage<Candidate>> => {
     const params = new URLSearchParams({
       page: String(page),
       size: String(size),
     });
-    if (search && search.trim()) {
-      params.set("search", search.trim());
-    }
     const response = await apiClient.get<unknown>(`/candidates?${params.toString()}`);
     const raw = response.data as Record<string, unknown>;
 

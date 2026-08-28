@@ -288,10 +288,12 @@ export default function Certificates() {
               <div className="border-2 border-double border-amber-800/25 p-8 w-full h-full flex flex-col items-center">
                 {/* Header */}
                 <div className="flex flex-col items-center gap-1 mb-6">
-                  <div className="w-14 h-14 rounded-full bg-gradient-primary flex items-center justify-center text-primary-foreground shadow-md mb-2">
-                    <span className="font-heading font-extrabold text-2xl">R</span>
-                  </div>
-                  <span className="text-xs uppercase tracking-widest font-heading font-semibold text-amber-800/80">RxOne Skill Track Assessment</span>
+                  <img
+                    src="/Gryphon360logoFavicon1.png"
+                    alt="Gryphon 360"
+                    className="w-14 h-14 object-contain shadow-md mb-2"
+                  />
+                  <span className="text-xs uppercase tracking-widest font-heading font-semibold text-amber-800/80">Gryphon 360 Skill Track Assessment</span>
                   <div className="w-24 h-0.5 bg-amber-600/30 my-1" />
                 </div>
 
@@ -314,7 +316,7 @@ export default function Certificates() {
 
                 <div className="grid grid-cols-2 w-full mt-10 border-t border-slate-100 pt-6">
                   <div className="flex flex-col items-center">
-                    <span className="text-lg text-slate-700 italic border-b border-slate-200 px-6 pb-1">RxOne Academy</span>
+                    <span className="text-lg text-slate-700 italic border-b border-slate-200 px-6 pb-1">Gryphon 360 Academy</span>
                     <span className="text-[10px] text-slate-400 uppercase tracking-wider mt-1.5 font-heading">Director of Evaluation</span>
                   </div>
                   <div className="flex flex-col items-center justify-end">

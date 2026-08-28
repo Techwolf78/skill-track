@@ -113,8 +113,30 @@ export function AddCandidatesModal({
     if (!open) return;
     try {
       setLoadingCandidates(true);
-      const res = await candidateService.getCandidatesPage(page, pageSize, debouncedSearch);
-      setPageData(res);
+      if (debouncedSearch && debouncedSearch.trim()) {
+        const query = debouncedSearch.trim().toLowerCase();
+        const all = await candidateService.getCandidates();
+        const filtered = all.filter((c) =>
+          c.user?.name?.toLowerCase().includes(query) ||
+          c.user?.email?.toLowerCase().includes(query) ||
+          c.user?.phoneNumber?.toLowerCase().includes(query)
+        );
+        const startIndex = page * pageSize;
+        const paged = filtered.slice(startIndex, startIndex + pageSize);
+        setPageData({
+          content: paged,
+          totalElements: filtered.length,
+          totalPages: Math.ceil(filtered.length / pageSize) || 1,
+          size: pageSize,
+          number: page,
+          first: page === 0,
+          last: startIndex + pageSize >= filtered.length,
+          empty: filtered.length === 0,
+        });
+      } else {
+        const res = await candidateService.getCandidatesPage(page, pageSize);
+        setPageData(res);
+      }
     } catch (error) {
       console.error("Failed to fetch candidates page:", error);
       toast({

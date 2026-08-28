@@ -45,7 +45,7 @@ export default function Support() {
   const faqs = [
     {
       q: "What happens if my internet disconnects during a test?",
-      a: "Do not panic. RxOne autosaves your answers locally in real-time. Once your network restores, your timer will resume from where you left off, and your progress is synced. If you experience extended drops, raise a ticket immediately with details of the outage."
+      a: "Do not panic. Gryphon 360 autosaves your answers locally in real-time. Once your network restores, your timer will resume from where you left off, and your progress is synced. If you experience extended drops, raise a ticket immediately with details of the outage."
     },
     {
       q: "Can I copy-paste code into the assessment compiler?",

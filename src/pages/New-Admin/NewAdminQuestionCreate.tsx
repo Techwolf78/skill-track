@@ -439,19 +439,18 @@ export default function NewAdminQuestionCreate() {
   return (
     <div className="min-h-screen flex flex-col bg-[#F6F8FA] text-slate-800 font-sans antialiased">
       {/* ── 1. Top Navbar (Dark Navy Bar, NO Second Sub-navbar) ── */}
-      <header className="h-14 bg-[#081225] border-b border-[#142340] px-4 md:px-8 flex items-center justify-between z-30 sticky top-0 shadow-md">
+      <header className="h-20 bg-[#081225] border-b border-[#142340] px-4 md:px-8 flex items-center justify-between z-30 sticky top-0 shadow-md">
         {/* Left Side: Logo + Divider + Breadcrumb (Library > Problem Title) */}
         <div className="flex items-center space-x-3 md:space-x-4">
           <div
             onClick={() => navigate("/new-admin/library")}
             className="flex items-center gap-2 cursor-pointer group"
           >
-            <div className="w-8 h-8 bg-[#10B981] flex items-center justify-center shadow-sm">
-              <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-              </svg>
-            </div>
-            <span className="text-white font-bold text-lg md:text-xl tracking-tight">RxOne</span>
+            <img
+              src="/Gryphon360logo.png"
+              alt="Gryphon 360"
+              className="h-12 md:h-14 w-auto object-contain shrink-0 hover:opacity-95 transition-opacity"
+            />
           </div>
 
           <div className="h-5 w-[1px] bg-slate-700 mx-1" />
@@ -493,7 +492,7 @@ export default function NewAdminQuestionCreate() {
               <DropdownMenuLabel className="font-normal px-3 py-2">
                 <div className="flex flex-col space-y-0.5">
                   <p className="text-sm font-bold text-slate-900 leading-none">{user?.name || "Admin User"}</p>
-                  <p className="text-xs text-slate-500 leading-none truncate mt-1">{user?.email || "admin@rxone.com"}</p>
+                  <p className="text-xs text-slate-500 leading-none truncate mt-1">{user?.email || "admin@gryphon360.com"}</p>
                 </div>
               </DropdownMenuLabel>
               <DropdownMenuSeparator className="bg-slate-100" />

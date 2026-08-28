@@ -1318,7 +1318,7 @@ export default function NewAdminLibrary() {
         <div className="bg-white border border-slate-200/80 shadow-[0_1px_3px_rgba(0,0,0,0.04)] py-4 overflow-hidden space-y-4">
           <p className="text-xs font-normal text-slate-500 px-4">Available libraries</p>
           <div className="space-y-3">
-            {/* RxOne Public Questions */}
+            {/* Public Questions */}
             <button
               onClick={() => setSelectedLibrary("PUBLIC")}
               className={`w-full flex items-center gap-3.5 px-4 py-1 text-left transition-colors relative ${
@@ -1335,7 +1335,7 @@ export default function NewAdminLibrary() {
                   selectedLibrary === "PUBLIC" ? "text-[#6366F1]" : "text-slate-500"
                 }`}
               />
-              <span className="text-[13px] leading-none">RxOne Public questions</span>
+              <span className="text-[13px] leading-none">Public questions</span>
             </button>
 
             {/* My company questions */}

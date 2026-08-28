@@ -251,7 +251,7 @@ export default function CandidateAssessmentFlow() {
                   <span>Proctoring Rules Active</span>
                 </div>
                 <p className="text-xs text-amber-800/80 leading-relaxed">
-                  RxOne proctors tab navigation logs, copy-paste block registers, and fullscreen logs. Navigating away from this window more than <strong>3 times</strong> will auto-submit the exam.
+                  Gryphon 360 proctors tab navigation logs, copy-paste block registers, and fullscreen logs. Navigating away from this window more than <strong>3 times</strong> will auto-submit the exam.
                 </p>
               </div>
 

@@ -877,7 +877,7 @@ export default function SeedData() {
               </div>
               <div>
                 <h1 className="text-4xl font-extrabold tracking-tight bg-gradient-to-r from-white via-slate-200 to-slate-400 bg-clip-text text-transparent">
-                  RxOne Database Seeder
+                  Gryphon 360 Database Seeder
                 </h1>
                 <p className="text-slate-400 text-sm md:text-base">
                   Instant premium test environment population for hassle-free developer testing.

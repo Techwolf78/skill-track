@@ -91,7 +91,7 @@ const testimonials = [
     name: "Dr. Rajesh Kumar",
     role: "Director, IIT Delhi",
     content:
-      "RxOne has revolutionized our assessment process. The anti-cheating features and detailed analytics have helped us maintain academic integrity while providing valuable insights.",
+      "Gryphon 360 has revolutionized our assessment process. The anti-cheating features and detailed analytics have helped us maintain academic integrity while providing valuable insights.",
     rating: 5,
   },
   {
@@ -256,7 +256,7 @@ function assessCandidate(skills) {
             <span className="w-2.5 h-2.5 rounded-full bg-amber-500/80" />
             <span className="w-2.5 h-2.5 rounded-full bg-emerald-500/80" />
             <span className="text-[9px] text-slate-500 font-sans ml-2">
-              RxOne Candidate Hub v2.1
+              Gryphon 360 Candidate Hub v2.1
             </span>
           </div>
           <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-slate-800 text-[9px] text-slate-400 font-sans">
@@ -577,16 +577,11 @@ export default function NationalLandingPage() {
               }`}
               onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
             >
-              <div className="w-8 h-8 rounded-lg bg-gradient-primary flex items-center justify-center shadow-lg shadow-primary flex-shrink-0">
-                <span className="text-sm font-black text-white font-sans">
-                  R
-                </span>
-              </div>
-              {activeLayout !== "vertical" && (
-                <span className="font-heading font-extrabold text-lg tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-white to-slate-300">
-                  RxOne
-                </span>
-              )}
+              <img
+                src="/Gryphon360logo.png"
+                alt="Gryphon 360"
+                className="h-8 w-auto object-contain shrink-0"
+              />
             </div>
 
             {/* Center Navigation Links (Horizontal vs Vertical Icons) */}
@@ -1096,7 +1091,7 @@ export default function NationalLandingPage() {
                   <div className="flex justify-between items-start">
                     <div>
                       <h4 className="text-[10px] text-accent tracking-wider uppercase font-semibold">
-                        RxOne Certification
+                        Gryphon 360 Certification
                       </h4>
                       <p className="text-[8px] text-slate-400 font-mono mt-0.5">
                         Verified Credential
@@ -1565,7 +1560,7 @@ export default function NationalLandingPage() {
               </h2>
               <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed">
                 Join hundreds of institutions already driving academic and
-                hiring excellence with RxOne.
+                hiring excellence with Gryphon 360.
               </p>
             </motion.div>
           </div>
@@ -1724,7 +1719,7 @@ export default function NationalLandingPage() {
                   </h3>
                   <div className="space-y-4">
                     <a
-                      href="mailto:sales@rxone.com"
+                      href="mailto:sales@gryphon360.com"
                       className="flex items-center gap-3.5 p-4 rounded-xl border border-slate-105 bg-white hover:border-primary/30 hover:shadow-sm transition-all duration-300 group"
                     >
                       <div className="w-10 h-10 rounded-lg bg-primary/10 text-primary flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
@@ -1735,7 +1730,7 @@ export default function NationalLandingPage() {
                           Email Us
                         </span>
                         <span className="text-sm font-semibold text-slate-800">
-                          sales@rxone.com
+                          sales@gryphon360.com
                         </span>
                       </div>
                     </a>
@@ -1775,7 +1770,7 @@ export default function NationalLandingPage() {
 
                 <div className="border-t border-slate-200/60 pt-6">
                   <h3 className="font-heading font-bold text-xl text-slate-900 mb-4 tracking-tight">
-                    Why Choose RxOne?
+                    Why Choose Gryphon 360?
                   </h3>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     {[
@@ -1943,14 +1938,11 @@ export default function NationalLandingPage() {
             {/* Brand column */}
             <div className="lg:col-span-2 space-y-5">
               <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-xl bg-gradient-primary flex items-center justify-center shadow-md shadow-primary/20">
-                  <span className="text-sm font-extrabold text-white font-sans">
-                    R
-                  </span>
-                </div>
-                <span className="font-heading font-extrabold text-xl text-white tracking-tight">
-                  RxOne
-                </span>
+                <img
+                  src="/Gryphon360logo.png"
+                  alt="Gryphon 360"
+                  className="h-9 w-auto object-contain shrink-0"
+                />
               </div>
               <p className="text-sm text-slate-400 leading-relaxed max-w-sm">
                 India's premier skill assessment platform, trusted by colleges,
@@ -2095,7 +2087,7 @@ export default function NationalLandingPage() {
           {/* Bottom Copyright Bar */}
           <div className="border-t border-slate-900 mt-12 pt-8 flex flex-col md:flex-row items-center justify-between gap-4 text-xs text-slate-500">
             <p className="order-2 md:order-1">
-              &copy; 2024 RxOne. All rights reserved. Made with ❤️ for India's
+              &copy; 2026 Gryphon 360. All rights reserved. Made with ❤️ for India's
               education sector.
             </p>
             <div className="flex gap-6 order-1 md:order-2">
@@ -2135,7 +2127,7 @@ export default function NationalLandingPage() {
             {isVideoModalOpen && (
               <iframe
                 src="https://www.youtube.com/embed/8mAITCNt70k?autoplay=1&rel=0"
-                title="RxOne Platform Video"
+                title="Gryphon 360 Platform Video"
                 className="w-full h-full border-0"
                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
                 allowFullScreen
