@@ -586,11 +586,9 @@ export default function NewAdminQuestionPreview() {
               {/* Footer Banner */}
               <div className="mt-8 pt-4 border-t border-slate-100 flex items-center justify-end text-xs text-slate-500">
                 <button
-                  onClick={() => navigate("/admin/library")}
+                  onClick={() => navigate("/new-admin/library")}
                   className="px-3 py-1.5 border border-slate-200 text-slate-700 hover:bg-slate-50 font-medium rounded transition-colors cursor-pointer"
                 >
-                  Close Preview
-                </button>
                   Close Preview
                 </button>
               </div>
