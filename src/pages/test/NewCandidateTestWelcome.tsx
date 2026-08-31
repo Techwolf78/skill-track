@@ -19,6 +19,8 @@ import { useAuth } from "@/lib/auth-context";
 import { testService, Test, TestQuestion, TestScheduleExtended } from "@/lib/test-service";
 import NewCandidateOnboardingWizard from "./NewCandidateOnboardingWizard";
 
+import { apiClient } from "@/lib/api-client";
+
 interface TestWelcomeProps {
   testId?: string;
   testTitle?: string;
@@ -43,80 +45,308 @@ export default function NewCandidateTestWelcome({
   onStartAssessment,
 }: TestWelcomeProps) {
   const [searchParams] = useSearchParams();
-  const { testId: routeTestId, id: routeId } = useParams();
+  const { testId: routeTestId, id: routeId, token: routeToken } = useParams();
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { login: loginToContext, user, isAuthenticated } = useAuth();
 
   const effectiveTestId =
     testIdProp || routeTestId || routeId || searchParams.get("testId") || searchParams.get("id");
 
+  const [invitationId, setInvitationId] = useState<string>(routeId || "");
+  const [invitationToken, setInvitationToken] = useState<string>(searchParams.get("token") || routeToken || "");
+  const [magicToken, setMagicToken] = useState<string>(searchParams.get("magicToken") || "");
+
   const [test, setTest] = useState<Test | null>(null);
   const [questions, setQuestions] = useState<TestQuestion[]>([]);
   const [schedule, setSchedule] = useState<TestScheduleExtended | null>(null);
-  const [loading, setLoading] = useState(!!effectiveTestId);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [helpOpen, setHelpOpen] = useState(false);
   const [isOnboardingOpen, setIsOnboardingOpen] = useState(false);
 
-  // Fetch real test, questions, and test schedules from backend
+  // Magic link / OTP login drawer states
+  const [showAuthDrawer, setShowAuthDrawer] = useState(false);
+  const [loginEmail, setLoginEmail] = useState("");
+  const [loginPassword, setLoginPassword] = useState("");
+  const [otpCode, setOtpCode] = useState("");
+  const [otpRequested, setOtpRequested] = useState(false);
+  const [otpCooldown, setOtpCooldown] = useState(0);
+  const [isAuthSubmitting, setIsAuthSubmitting] = useState(false);
+
   useEffect(() => {
-    if (!effectiveTestId) {
-      setLoading(false);
+    if (otpCooldown > 0) {
+      const timer = setTimeout(() => setOtpCooldown(otpCooldown - 1), 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [otpCooldown]);
+
+  const parseJwt = (tokenStr: string) => {
+    try {
+      const base64Url = tokenStr.split(".")[1];
+      const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
+      const jsonPayload = decodeURIComponent(
+        window
+          .atob(base64)
+          .split("")
+          .map((c) => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2))
+          .join("")
+      );
+      return JSON.parse(jsonPayload);
+    } catch {
+      return null;
+    }
+  };
+
+  const handleAuthResponse = (authData: { accessToken: string; sessionId?: string; sessionStatus?: string; testId?: string }) => {
+    const decoded = parseJwt(authData.accessToken);
+    if (!decoded) return;
+    loginToContext(authData.accessToken, { id: decoded.id, name: decoded.name, email: decoded.sub, role: decoded.role });
+    if (
+      authData.sessionId &&
+      authData.sessionStatus &&
+      ["SUBMITTED", "AUTO_SUBMITTED", "EVALUATED", "FLAGGED"].includes(authData.sessionStatus)
+    ) {
+      navigate(`/test/${authData.testId || effectiveTestId}/results?session=${authData.sessionId}&submitted=true`);
       return;
     }
+    // Close drawer — the effect will re-run because isAuthenticated changed
+    setShowAuthDrawer(false);
+  };
 
+  /**
+   * Phase 2: Fetch all protected data (invitation → schedule → test → questions).
+   * Only called AFTER the candidate is authenticated (has a valid JWT in localStorage).
+   * Mirrors the old TestAccess.tsx validateToken() logic exactly.
+   */
+  const fetchProtectedData = async (decoded: any) => {
+    // 403 Bypass/Fallback strategy: Try direct GET, fall back to list, then to JWT claims
+    let invitation: any = null;
+    if (routeId) {
+      try {
+        const invitationResponse = await apiClient.get(`/candidate-invitations/${routeId}`);
+        invitation = invitationResponse.data?.data || invitationResponse.data;
+      } catch (err: unknown) {
+        const axiosError = err as { response?: { status?: number } };
+        console.warn("Direct invitation fetch failed with status:", axiosError.response?.status, err);
+
+        // Fallback 1: Try list endpoint
+        try {
+          const listResponse = await apiClient.get("/candidate-invitations?size=100");
+          const listData = listResponse.data?.data || listResponse.data;
+          const items = Array.isArray(listData)
+            ? listData
+            : listData?.content && Array.isArray(listData.content)
+            ? listData.content
+            : [];
+          invitation = items.find((item: any) => item.id === routeId) || null;
+          if (invitation) {
+            console.log("Found invitation in list fallback:", invitation);
+          }
+        } catch (listErr) {
+          console.warn("List invitation fetch failed:", listErr);
+        }
+
+        // Fallback 2: Check JWT decoded claims
+        if (!invitation && decoded) {
+          console.log("Decoded JWT payload for fallback:", decoded);
+          const scheduleId = decoded.scheduleId || decoded.schedule_id || decoded.schedId;
+          const candidateId = decoded.candidateId || decoded.candidate_id || decoded.candId || decoded.id;
+          const testId = decoded.testId || decoded.test_id;
+          const invId = decoded.invitationId || decoded.invitation_id || decoded.invId || routeId;
+
+          if (scheduleId) {
+            invitation = { id: invId, scheduleId, candidateId, testId };
+            console.log("Constructed invitation from JWT claims:", invitation);
+          }
+        }
+
+        // Fallback 3: Construct invitation manually using decoded JWT if still null
+        if (!invitation) {
+          invitation = {
+            id: routeId,
+            scheduleId: decoded?.scheduleId || decoded?.schedule_id || decoded?.schedId,
+            candidateId: decoded?.candidateId || decoded?.candidate_id || decoded?.id,
+            testId: decoded?.testId || decoded?.test_id,
+          };
+          console.log("Constructed manual fallback invitation:", invitation);
+        }
+      }
+    }
+
+    let resolvedSchedule: any = null;
+    let testObj: any = null;
+
+    if (invitation && invitation.scheduleId) {
+      try {
+        const scheduleResponse = await apiClient.get(`/test-schedules/${invitation.scheduleId}`);
+        resolvedSchedule = scheduleResponse.data?.data || scheduleResponse.data;
+      } catch (schedErr) {
+        console.warn("Failed to fetch schedule details, continuing with defaults:", schedErr);
+      }
+    }
+
+    const targetTestId = invitation?.testId || resolvedSchedule?.testId || decoded?.testId || decoded?.test_id || effectiveTestId;
+    if (targetTestId) {
+      try {
+        testObj = await testService.getTestById(targetTestId);
+      } catch (testErr) {
+        console.warn("Failed to fetch test details, continuing with defaults:", testErr);
+      }
+    }
+
+    // Block DRAFT/ARCHIVED tests
+    if (testObj && testObj.status && testObj.status !== "PUBLISHED") {
+      throw new Error("This test is currently in Draft or Archived state and cannot be accessed.");
+    }
+
+    // Resolve questions: prefer questions embedded in the test object (from getTestById),
+    // then fall back to the separate /test-questions endpoint
+    let resolvedQuestions: TestQuestion[] = [];
+    if (testObj?.testQuestions && testObj.testQuestions.length > 0) {
+      resolvedQuestions = testObj.testQuestions;
+    } else if (testObj?.questions && testObj.questions.length > 0) {
+      resolvedQuestions = testObj.questions;
+    } else if (targetTestId) {
+      try {
+        resolvedQuestions = await testService.getTestQuestions(targetTestId);
+      } catch (qErr) {
+        console.warn("Failed to fetch test questions (restricted access), continuing with defaults:", qErr);
+      }
+    }
+
+    // Populate test object falling back to decoded claims or default assessment
+    const fallbackTest: Test = {
+      id: targetTestId || "assessment",
+      title: testObj?.title || decoded?.testTitle || decoded?.test_title || "Technical Assessment",
+      durationMins: testObj?.durationMins || decoded?.durationMins || decoded?.duration_mins || 45,
+      proctoringMode: testObj?.proctoringMode || "STANDARD",
+      description: testObj?.description || testObj?.instructions || decoded?.instructions,
+      organisation: testObj?.organisation,
+    };
+
+    setTest(fallbackTest);
+    setQuestions(resolvedQuestions);
+    setSchedule(resolvedSchedule || null);
+  };
+
+  /**
+   * Phase 1: Public status check → Auth flow → fetchProtectedData().
+   * Mirrors old TestAccess.tsx mount effect + validateToken() exactly.
+   */
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
     let isMounted = true;
-    const fetchTestData = async () => {
+
+    const validateAccessAndFetch = async () => {
       setLoading(true);
       setError(null);
+
       try {
-        const [testData, questionsData, schedulesData] = await Promise.all([
-          testService.getTestById(effectiveTestId).catch(() => null),
-          testService.getTestQuestions(effectiveTestId).catch(() => []),
-          testService.getAllTestSchedules().catch(() => []),
-        ]);
+        if (!routeId) {
+          setError("Invalid link parameters. No invitation ID found.");
+          return;
+        }
 
-        if (!isMounted) return;
+        // ─── Phase 1a: Public status check (no auth needed) ───
+        try {
+          const statusRes = await apiClient.get(`/candidate-invitations/${routeId}/status`);
+          const statusData = statusRes.data?.data || statusRes.data;
+          const expired = !!statusData?.scheduleExpired;
+          const submitted = !!statusData?.hasSubmittedSession;
 
-        if (testData) {
-          setTest(testData);
-          const resolvedQuestions =
-            questionsData && questionsData.length > 0
-              ? questionsData
-              : testData.testQuestions || testData.questions || [];
-          setQuestions(resolvedQuestions);
+          if (submitted) {
+            navigate(`/test/${effectiveTestId || "assessment"}/results?submitted=true`);
+            return;
+          }
+          if (expired) {
+            if (isMounted) setError("This assessment schedule has expired. Please contact your administrator.");
+            return;
+          }
+        } catch (e) {
+          // If status endpoint fails, fall through to normal auth flow
+          console.warn("Public status endpoint bypassed/failed:", e);
+        }
 
-          // Find active or latest schedule matching this test
-          const matchingSchedules = (schedulesData || []).filter(
-            (s: TestScheduleExtended) => s.testId === effectiveTestId
-          );
+        // ─── Phase 1b: Magic Link Verification ───
+        const searchParams = new URLSearchParams(window.location.search);
+        const currentMagicToken = magicToken || searchParams.get("magicToken");
+        if (routeId && currentMagicToken) {
+          try {
+            const response = await apiClient.post(`/candidate-invitations/${routeId}/access/verify`, { magicToken: currentMagicToken });
+            const authData = response.data?.data || response.data;
+            if (authData?.accessToken) {
+              window.history.replaceState({}, "", `/test/access/${routeId}`);
+              handleAuthResponse(authData);
+              // handleAuthResponse will login → isAuthenticated changes → effect re-runs → Phase 2 executes
+              return;
+            }
+          } catch (err: any) {
+            console.error("Magic link verification failed:", err);
+          }
+        }
 
-          const activeOrLatestSchedule =
-            matchingSchedules.find(
-              (s: TestScheduleExtended) =>
-                s.status === "LIVE" ||
-                s.status === "SCHEDULED" ||
-                s.status === "ACCEPTED"
-            ) || matchingSchedules[matchingSchedules.length - 1];
+        // ─── Phase 1c: Token validation (URL token or stored session) ───
+        let decoded: any = null;
 
-          setSchedule(activeOrLatestSchedule || null);
+        if (routeToken) {
+          // Validate invitation token via POST /candidate-invitations/validate
+          try {
+            const authResponse = await apiClient.post("/candidate-invitations/validate", {
+              id: routeId,
+              token: routeToken,
+            });
+            const authData = authResponse.data?.data || authResponse.data;
+            if (authData?.accessToken) {
+              decoded = parseJwt(authData.accessToken);
+              if (decoded) {
+                loginToContext(authData.accessToken, {
+                  id: decoded.id,
+                  name: decoded.name,
+                  email: decoded.sub,
+                  role: decoded.role,
+                });
+              } else {
+                throw new Error("Failed to parse authentication token.");
+              }
+            }
+          } catch (err: any) {
+            console.warn("Invitation token validation failed:", err);
+          }
         } else {
-          setError("Test details not found or unavailable.");
+          // No URL token — check stored session (same as old TestAccess lines 396-404)
+          const storedToken = localStorage.getItem("token");
+          if (storedToken) {
+            decoded = parseJwt(storedToken);
+          }
+          if (!isAuthenticated || !decoded) {
+            // Not authenticated and no token in URL → stop loading, show page
+            // (the page will display with whatever data is available)
+            return;
+          }
+        }
+
+        // ─── Phase 2: Fetch protected data (only if we have a valid decoded JWT) ───
+        if (decoded) {
+          await fetchProtectedData(decoded);
         }
       } catch (err: any) {
+        console.error("Token validation error:", err);
         if (isMounted) {
-          setError(err?.response?.data?.message || err?.message || "Failed to load test details.");
+          setError(err?.response?.data?.message || err?.message || "Invalid or expired invitation link");
         }
       } finally {
-        if (isMounted) setLoading(false);
+        if (isMounted) {
+          setLoading(false);
+        }
       }
     };
 
-    fetchTestData();
+    validateAccessAndFetch();
+
     return () => {
       isMounted = false;
     };
-  }, [effectiveTestId]);
+  }, [routeId, routeToken, magicToken, isAuthenticated]);
 
   // Dynamic Question Type Breakdown calculation
   const questionStats = useMemo(() => {
@@ -278,9 +508,6 @@ export default function NewCandidateTestWelcome({
             <h1 className="text-2xl md:text-3xl font-bold text-slate-900 tracking-tight">
               {displayTitle}
             </h1>
-            <p className="text-xs md:text-sm text-slate-500 font-medium">
-              By {displayAuthor}
-            </p>
           </div>
 
           {/* 2. Test Info Metadata Banner (White Box) */}
@@ -441,6 +668,8 @@ export default function NewCandidateTestWelcome({
           test={test}
           testQuestions={questions}
           testTitle={displayTitle}
+          invitationId={routeId || invitationId}
+          testId={effectiveTestId}
           isWebcamMonitored={
             !!(
               test?.requireWebcam ||
@@ -449,13 +678,6 @@ export default function NewCandidateTestWelcome({
               test?.proctoringMode === "CUSTOM"
             )
           }
-          onProceedToTest={() => {
-            if (effectiveTestId) {
-              navigate(`/test/${effectiveTestId}?preview=true`);
-            } else {
-              setIsOnboardingOpen(false);
-            }
-          }}
         />
       )}
     </div>

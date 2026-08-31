@@ -82,7 +82,7 @@ const App = () => (
         <TooltipProvider>
           <Toaster />
           <Sonner />
-          <BrowserRouter>
+          <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
             <Suspense
               fallback={
                 <div className="flex h-screen w-full items-center justify-center bg-background">
@@ -160,13 +160,11 @@ const App = () => (
                 element={<TestInterface />}
               />
               <Route path="/test/:testId/results" element={<TestResults />} />
-              <Route path="/test/access/:id/:token" element={<TestAccess />} />
-              <Route path="/tests/access/:id/:token" element={<TestAccess />} />
-              <Route path="/test/access/:id" element={<TestAccess />} />
-              <Route path="/tests/access/:id" element={<TestAccess />} />
-              <Route path="/test/access/:token" element={<TestAccess />} />
-              <Route path="/test/welcome-preview" element={<NewCandidateTestWelcome />} />
-              <Route path="/tests/welcome-preview" element={<NewCandidateTestWelcome />} />
+              <Route path="/test/access/:id/:token" element={<NewCandidateTestWelcome />} />
+              <Route path="/tests/access/:id/:token" element={<NewCandidateTestWelcome />} />
+              <Route path="/test/access/:id" element={<NewCandidateTestWelcome />} />
+              <Route path="/tests/access/:id" element={<NewCandidateTestWelcome />} />
+              <Route path="/test/access/:token" element={<NewCandidateTestWelcome />} />
 
               {/* Candidate Dashboard Routes */}
               <Route path="/candidate" element={<CandidateLayout />}>

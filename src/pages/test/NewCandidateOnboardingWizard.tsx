@@ -29,8 +29,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/lib/auth-context";
-import { Test, TestQuestion } from "@/lib/test-service";
+import { testService, Test, TestQuestion } from "@/lib/test-service";
 import { proctoringService } from "@/lib/proctoring-service";
+import { useNavigate } from "react-router-dom";
+import { useToast } from "@/hooks/use-toast";
 
 type OnboardingStep = "proctoring" | "system_checks" | "candidate_details" | "declaration";
 
@@ -41,6 +43,8 @@ interface CandidateOnboardingModalProps {
   testQuestions?: TestQuestion[];
   testTitle?: string;
   isWebcamMonitored?: boolean;
+  invitationId?: string;
+  testId?: string;
   sessionId?: string;
   onProceedToTest?: () => void;
 }
@@ -52,9 +56,13 @@ export default function NewCandidateOnboardingWizard({
   testQuestions = [],
   testTitle = "Assessment",
   isWebcamMonitored,
-  sessionId,
+  invitationId,
+  testId,
+  sessionId: propSessionId,
   onProceedToTest,
 }: CandidateOnboardingModalProps) {
+  const navigate = useNavigate();
+  const { toast } = useToast();
   const { user } = useAuth();
   const [activeStep, setActiveStep] = useState<OnboardingStep>("proctoring");
   const [isDeclarationAgreed, setIsDeclarationAgreed] = useState(false);
@@ -442,13 +450,100 @@ export default function NewCandidateOnboardingWizard({
     }
   };
 
-  const handleNext = () => {
+  const [isLaunching, setIsLaunching] = useState(false);
+
+  const handleNext = async () => {
     if (activeStep === "proctoring") setActiveStep("system_checks");
     else if (activeStep === "system_checks") setActiveStep("candidate_details");
     else if (activeStep === "candidate_details") setActiveStep("declaration");
     else if (activeStep === "declaration") {
+      if (isLaunching) return;
+      setIsLaunching(true);
+
+      // Stop onboarding media streams
       stopAllMedia();
-      if (onProceedToTest) onProceedToTest();
+
+      if (onProceedToTest) {
+        onProceedToTest();
+        setIsLaunching(false);
+        return;
+      }
+
+      // Launch secure assessment
+      try {
+        // 1. Enter Fullscreen Mode
+        if (!document.fullscreenElement) {
+          await document.documentElement.requestFullscreen().catch(() => {});
+        }
+
+        // 2. Start Backend Test Session
+        const targetInvitationId = invitationId || "";
+        const session = await testService.startTestSession(targetInvitationId, "0.0.0.0");
+        const sessStatus = String(session.status);
+
+        // If session was already completed/submitted, navigate to results
+        if (
+          sessStatus === "SUBMITTED" ||
+          sessStatus === "AUTO_SUBMITTED" ||
+          sessStatus === "EVALUATED" ||
+          sessStatus === "FLAGGED"
+        ) {
+          if (document.fullscreenElement) {
+            await document.exitFullscreen().catch(() => {});
+          }
+          navigate(`/test/${session.testId || testId}/results?session=${session.id}&submitted=true`);
+          return;
+        }
+
+        // 3. Save verified state to sessionStorage for TestInterface
+        sessionStorage.setItem(`env_checked_${session.id}`, "true");
+        sessionStorage.setItem(`identity_verified_${session.id}`, "true");
+
+        // 4. Upload photo snapshot if captured
+        if (snapshotImage) {
+          try {
+            const fetchRes = await fetch(snapshotImage);
+            const blob = await fetchRes.blob();
+            const capturedAt = Date.now();
+            const { url: signedUploadUrl, storagePath } = await proctoringService.presignEvidence(
+              session.id,
+              "IDENTITY_PHOTO"
+            );
+
+            if (signedUploadUrl && signedUploadUrl.startsWith("http")) {
+              await fetch(signedUploadUrl, {
+                method: "PUT",
+                headers: { "Content-Type": "image/jpeg", "x-upsert": "true" },
+                body: blob,
+              });
+
+              await proctoringService.confirmEvidence(
+                session.id,
+                storagePath,
+                "IDENTITY_PHOTO",
+                capturedAt,
+                blob.size
+              );
+            }
+          } catch (uploadErr) {
+            console.warn("Failed to upload identity snapshot:", uploadErr);
+          }
+        }
+
+        // 5. Navigate to core assessment interface
+        navigate(`/test/${session.testId || testId || "assessment"}/session/${session.id}`);
+      } catch (err: any) {
+        if (document.fullscreenElement) {
+          await document.exitFullscreen().catch(() => {});
+        }
+        console.error("Failed to launch test session:", err);
+        toast({
+          title: "Error Launching Assessment",
+          description: err?.response?.data?.message || err?.message || "Failed to start test session",
+          variant: "destructive",
+        });
+        setIsLaunching(false);
+      }
     }
   };
 

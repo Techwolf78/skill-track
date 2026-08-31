@@ -853,6 +853,8 @@ export default function NewAdminTestEdit() {
 
       return true;
     });
+
+
   }, [invitations, candidateSearchQuery, candidateStatusFilter, candidateResults]);
 
   const totalCandidatePages = Math.max(
@@ -2732,7 +2734,6 @@ export default function NewAdminTestEdit() {
                         { key: "PASSED", label: "Passed" },
                         { key: "FAILED", label: "Failed" },
                         { key: "INVITED", label: "Invited (Pending)" },
-                        { key: "SUBMITTED", label: "Submitted" },
                       ].map((st) => (
                         <label
                           key={st.key}
