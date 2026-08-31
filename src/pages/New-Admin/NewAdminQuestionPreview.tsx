@@ -541,8 +541,6 @@ export default function NewAdminQuestionPreview() {
                 >
                   Close Preview
                 </button>
-                  Close Preview
-                </button>
               </div>
             </div>
           </div>

@@ -418,9 +418,16 @@ export default function Tests() {
                         <MoreVertical className="w-4 h-4" />
                       </Button>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={() => handleViewDetails(test)}>
+                      <DropdownMenuItem
+                        onClick={() =>
+                          window.open(`/test/welcome-preview?testId=${test.id}`, "_blank")
+                        }
+                      >
                         <Eye className="w-4 h-4 mr-2" />
+                        Preview Test
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => handleViewDetails(test)}>
+                        <FileText className="w-4 h-4 mr-2" />
                         View Details
                       </DropdownMenuItem>
                       <DropdownMenuItem onClick={() => handleEdit(test)}>
