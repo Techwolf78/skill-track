@@ -1,6 +1,14 @@
 import { apiClient } from "./api-client";
-import { BaseResponse } from "./auth-service";
-import { SignatureMetadata, LanguageTemplates, mapFrontendToBackendLang } from "../types/question";
+import { BaseResponse, unwrapResponse, unwrapArrayResponse, extractWarnings } from "./api/baseResponseUtils";
+import {
+  SignatureMetadata,
+  LanguageTemplates,
+  mapFrontendToBackendLang,
+  mapBackendToFrontendLang,
+  ValidateDriverRequest,
+  ValidateDriverResponse,
+  QuestionBankStatus,
+} from "../types/question";
 
 export type ProctoringMode = "NONE" | "LOW" | "MEDIUM" | "HIGH" | "CUSTOM";
 
@@ -151,6 +159,8 @@ export interface CreateQuestionRequest {
   codeTemplate?: Record<string, CodeTemplateEntry>;
   signatureMetadata?: SignatureMetadata;
   languageTemplates?: LanguageTemplates;
+  isLanguageSpecific?: boolean | null;
+  comparisonMode?: "exact" | "unordered_array" | "float_tolerance";
   examples?: Array<{ input: string; output: string; explanation?: string }>;
   testCases?: Array<{
     input: string;
@@ -166,7 +176,7 @@ export interface CreateQuestionRequest {
   p_value?: number;
   discrimination_index?: number;
   avg_time_seconds?: number;
-  status?: "ACTIVE" | "UNDER_REVIEW" | "QUARANTINED";
+  status?: QuestionBankStatus;
 }
 
 // Updated UpdateQuestionRequest to match backend API
@@ -197,6 +207,10 @@ export interface UpdateQuestionRequest {
   correctAnswer?: string;
   // Coding specific
   codeTemplate?: Record<string, CodeTemplateEntry>;
+  signatureMetadata?: SignatureMetadata;
+  languageTemplates?: LanguageTemplates;
+  isLanguageSpecific?: boolean | null;
+  comparisonMode?: "exact" | "unordered_array" | "float_tolerance";
   examples?: Array<{ input: string; output: string; explanation?: string }>;
   visibility?: "PUBLIC" | "ORG_OWNED";
   // Extended Enterprise Metadata
@@ -205,7 +219,7 @@ export interface UpdateQuestionRequest {
   p_value?: number;
   discrimination_index?: number;
   avg_time_seconds?: number;
-  status?: "ACTIVE" | "UNDER_REVIEW" | "QUARANTINED";
+  status?: QuestionBankStatus;
 }
 
 // Updated TestCase DTOs to match backend
@@ -347,6 +361,10 @@ export interface Question {
   codeTemplate?: Record<string, CodeTemplateEntry>;
   signatureMetadata?: SignatureMetadata;
   languageTemplates?: LanguageTemplates;
+  isLanguageSpecific?: boolean | null;
+  comparisonMode?: "exact" | "unordered_array" | "float_tolerance";
+  verifiedLanguages?: string[];
+  pendingLanguages?: string[];
   starterCode?: Record<string, string>;
   coding?: {
     starterCode?: Record<string, string>;
@@ -360,7 +378,7 @@ export interface Question {
   p_value?: number;
   discrimination_index?: number;
   avg_time_seconds?: number;
-  status?: "ACTIVE" | "UNDER_REVIEW" | "QUARANTINED";
+  status?: QuestionBankStatus;
 }
 
 export interface TestQuestion {
@@ -403,6 +421,7 @@ export interface Test {
   questions?: TestQuestion[];
   testQuestions?: TestQuestion[];
   testSchedules?: TestScheduleExtended[];
+  warnings?: string[];
   isActive?: boolean;
   organisationId?: string;
   organisation?: Organisation;
@@ -513,36 +532,6 @@ export interface GroupedTestQuestions {
   [sectionName: string]: TestQuestion[];
 }
 
-// ==================== Helper to unwrap BaseResponse ====================
-const unwrapResponse = <T>(response: { data: BaseResponse<T> | T }): T => {
-  const data = response.data;
-  if (data && typeof data === "object" && "data" in data && "success" in data) {
-    return (data as BaseResponse<T>).data;
-  }
-  return data as T;
-};
-
-const unwrapArrayResponse = <T>(response: {
-  data: BaseResponse<T[]> | T[];
-}): T[] => {
-  const data = response.data;
-  if (Array.isArray(data)) {
-    return data;
-  }
-  if (data && typeof data === "object" && "data" in data) {
-    const nestedData = (data as unknown as Record<string, unknown>).data;
-    if (Array.isArray(nestedData)) {
-      return nestedData;
-    }
-    if (nestedData && typeof nestedData === "object" && "content" in nestedData && Array.isArray((nestedData as Record<string, unknown>).content)) {
-      return (nestedData as Record<string, unknown>).content as T[];
-    }
-  }
-  if (data && typeof data === "object" && "content" in data && Array.isArray((data as unknown as Record<string, unknown>).content)) {
-    return (data as unknown as Record<string, unknown>).content as T[];
-  }
-  return [];
-};
 
 
 // ==================== Error Types ====================
@@ -559,9 +548,9 @@ export const testService = {
   // ==================== Subject APIs ====================
   getAllSubjects: async (): Promise<Subject[]> => {
     const response = await apiClient.get<Subject[]>("/subjects");
-    const subjects = unwrapArrayResponse(response);
-    console.log("[testService] Fetched Subjects (UUIDs):", subjects.map((s) => ({ id: s.id, name: s.name })));
-    return subjects;
+    const subjects = unwrapArrayResponse<Subject>(response);
+    console.log("[testService] Fetched Subjects (UUIDs):", Array.isArray(subjects) ? subjects.map((s) => ({ id: s.id, name: s.name })) : subjects);
+    return Array.isArray(subjects) ? subjects : [];
   },
 
   getSubjectById: async (id: string): Promise<Subject> => {
@@ -588,9 +577,9 @@ export const testService = {
   // ==================== Topic APIs ====================
   getAllTopics: async (): Promise<Topic[]> => {
     const response = await apiClient.get<Topic[]>("/topics");
-    const topics = unwrapArrayResponse(response);
-    console.log("[testService] Fetched Topics (UUIDs):", topics.map((t) => ({ id: t.id, name: t.name, subjectId: t.subjectId })));
-    return topics;
+    const topics = unwrapArrayResponse<Topic>(response);
+    console.log("[testService] Fetched Topics (UUIDs):", Array.isArray(topics) ? topics.map((t) => ({ id: t.id, name: t.name, subjectId: t.subjectId })) : topics);
+    return Array.isArray(topics) ? topics : [];
   },
 
   getTopicById: async (id: string): Promise<Topic> => {
@@ -602,9 +591,9 @@ export const testService = {
 
   getTopicsBySubject: async (subjectId: string): Promise<Topic[]> => {
     const response = await apiClient.get<Topic[]>(`/topics/subject/${subjectId}`);
-    const topics = unwrapArrayResponse(response);
-    console.log(`[testService] Fetched Topics for Subject ${subjectId} (UUIDs):`, topics.map((t) => ({ id: t.id, name: t.name })));
-    return topics;
+    const topics = unwrapArrayResponse<Topic>(response);
+    console.log(`[testService] Fetched Topics for Subject ${subjectId} (UUIDs):`, Array.isArray(topics) ? topics.map((t) => ({ id: t.id, name: t.name })) : topics);
+    return Array.isArray(topics) ? topics : [];
   },
 
   createTopic: async (name: string, subjectId: string): Promise<Topic> => {
@@ -727,6 +716,21 @@ export const testService = {
   ): Promise<Question> => {
     // Use PATCH for partial updates as per backend
     const response = await apiClient.patch<Question>(`/questions/${id}`, dto);
+    return unwrapResponse(response);
+  },
+
+  validateDriver: async (
+    questionId: string,
+    request: ValidateDriverRequest,
+  ): Promise<ValidateDriverResponse> => {
+    const payload = {
+      ...request,
+      language: mapFrontendToBackendLang(request.language),
+    };
+    const response = await apiClient.post<ValidateDriverResponse>(
+      `/questions/${questionId}/validate-driver`,
+      payload
+    );
     return unwrapResponse(response);
   },
 
@@ -930,6 +934,7 @@ export const testService = {
       detectDevTools: (d.detectDevTools ?? false) as boolean,
       detectScreenShareStop: (d.detectScreenShareStop ?? false) as boolean,
       enableLiveProctoring: (d.enableLiveProctoring ?? false) as boolean,
+      warnings: (d.warnings || []) as string[],
     };
   },
 
@@ -970,6 +975,16 @@ export const testService = {
   ): Promise<TestQuestion> => {
     const response = await apiClient.post<TestQuestion>("/test-questions", dto);
     return unwrapResponse(response);
+  },
+
+  createTestQuestionWithWarnings: async (
+    dto: CreateTestQuestionRequest,
+  ): Promise<{ testQuestion: TestQuestion; warnings: string[] }> => {
+    const response = await apiClient.post<TestQuestion>("/test-questions", dto);
+    return {
+      testQuestion: unwrapResponse(response),
+      warnings: extractWarnings(response),
+    };
   },
 
   getTestQuestions: async (
@@ -1018,6 +1033,22 @@ export const testService = {
     });
   },
 
+  addQuestionToTestWithWarnings: async (
+    testId: string,
+    questionId: string,
+    orderIndex: number,
+    marks: number,
+    timeLimitSecs?: number,
+  ): Promise<{ testQuestion: TestQuestion; warnings: string[] }> => {
+    return testService.createTestQuestionWithWarnings({
+      testId,
+      questionId,
+      orderIndex,
+      marks,
+      timeLimitSecs,
+    });
+  },
+
   // Helper: Remove question from test
   removeQuestionFromTest: async (testQuestionId: string): Promise<void> => {
     await testService.deleteTestQuestion(testQuestionId);
@@ -1029,6 +1060,16 @@ export const testService = {
   ): Promise<TestQuestion[]> => {
     const response = await apiClient.post<TestQuestion[]>(`/test-questions/bulk`, dto);
     return unwrapArrayResponse(response);
+  },
+
+  bulkAddQuestionsToTestWithWarnings: async (
+    dto: BulkAddQuestionsRequest,
+  ): Promise<{ testQuestions: TestQuestion[]; warnings: string[] }> => {
+    const response = await apiClient.post<TestQuestion[]>(`/test-questions/bulk`, dto);
+    return {
+      testQuestions: unwrapArrayResponse(response),
+      warnings: extractWarnings(response),
+    };
   },
 
   // Helper: Get questions for a test

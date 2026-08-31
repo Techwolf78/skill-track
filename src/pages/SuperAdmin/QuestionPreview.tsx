@@ -482,31 +482,85 @@ export function QuestionPreview({ question, open, onOpenChange }: QuestionPrevie
               </Card>
             )}
 
-            {/* Coding Question Metadata */}
+            {/* Coding Question Metadata & Verification Status */}
             {!isMcq && (
-              <div className="grid grid-cols-2 gap-4">
-                {question.timeLimitSecs !== undefined && question.timeLimitSecs !== null && (
-                  <Card className="bg-muted/30">
-                    <CardContent className="pt-4">
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
-                        <Clock className="w-4 h-4" />
-                        Time Limit
-                      </div>
-                      <p className="font-medium">{question.timeLimitSecs} seconds</p>
-                    </CardContent>
-                  </Card>
+              <div className="space-y-4">
+                {question.status === "UNDER_REVIEW" && (
+                  <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg flex items-center gap-3 text-amber-700 text-xs">
+                    <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+                    <div>
+                      <span className="font-bold">Driver Verification Pending:</span> One or more language execution drivers have not passed pre-flight execution. Question remains in UNDER_REVIEW status.
+                    </div>
+                  </div>
                 )}
-                {question.memoryLimitMb !== undefined && question.memoryLimitMb !== null && (
-                  <Card className="bg-muted/30">
-                    <CardContent className="pt-4">
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
-                        <HardDrive className="w-4 h-4" />
-                        Memory Limit
-                      </div>
-                      <p className="font-medium">{question.memoryLimitMb} MB</p>
-                    </CardContent>
-                  </Card>
-                )}
+
+                <div className="grid grid-cols-2 gap-4">
+                  {question.timeLimitSecs !== undefined && question.timeLimitSecs !== null && (
+                    <Card className="bg-muted/30">
+                      <CardContent className="pt-4">
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
+                          <Clock className="w-4 h-4" />
+                          Time Limit
+                        </div>
+                        <p className="font-medium">{question.timeLimitSecs} seconds</p>
+                      </CardContent>
+                    </Card>
+                  )}
+                  {question.memoryLimitMb !== undefined && question.memoryLimitMb !== null && (
+                    <Card className="bg-muted/30">
+                      <CardContent className="pt-4">
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
+                          <HardDrive className="w-4 h-4" />
+                          Memory Limit
+                        </div>
+                        <p className="font-medium">{question.memoryLimitMb} MB</p>
+                      </CardContent>
+                    </Card>
+                  )}
+                </div>
+
+                {/* Driver Verification Breakdown Card */}
+                <Card className="bg-muted/20 border">
+                  <CardContent className="pt-4 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-foreground uppercase tracking-wider">
+                        Language Driver Verification Status
+                      </span>
+                      <Badge variant="outline" className="text-xs font-semibold py-0.5 bg-muted/50 text-muted-foreground border-border">
+                        {question.status === "ACTIVE" ? "Active" : "Under Review"}
+                      </Badge>
+                    </div>
+
+                    {question.isLanguageSpecific && (
+                      <p className="text-xs text-muted-foreground bg-muted/40 p-2 rounded">
+                        Single-Language Restriction: Submissions only accepted for configured language.
+                      </p>
+                    )}
+
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                      {["python", "javascript", "java", "cpp"].map((lang) => {
+                        const hasTemplate = question.languageTemplates && lang in question.languageTemplates;
+                        const isVerified = (question.verifiedLanguages || []).includes(lang);
+                        if (!hasTemplate && question.isLanguageSpecific) return null;
+
+                        return (
+                          <div key={lang} className="p-2 bg-card border rounded text-center space-y-1">
+                            <span className="text-[11px] font-semibold text-foreground uppercase block font-mono">
+                              {lang}
+                            </span>
+                            <span className={`text-[10px] py-0.5 px-1.5 rounded font-medium border block w-full text-center ${
+                              isVerified
+                                ? "bg-muted/50 text-foreground border-border"
+                                : "bg-muted/20 text-muted-foreground border-border/60"
+                            }`}>
+                              {isVerified ? "Verified" : "Pending"}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </CardContent>
+                </Card>
               </div>
             )}
 

@@ -292,6 +292,16 @@ export default function NewAdminQuestionPreview() {
 
         {/* ── 4. White Workspace Card ── */}
         <div className="bg-white rounded-sm border border-slate-200/90 shadow-xl overflow-hidden min-h-[560px] flex flex-col">
+          {/* UNDER_REVIEW Warning Banner */}
+          {isCoding && question.status === "UNDER_REVIEW" && (
+            <div className="bg-amber-50 border-b border-amber-200 px-6 py-3 flex items-center gap-3 text-amber-800 text-xs font-medium">
+              <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+              <div>
+                <span className="font-bold">Driver Verification Pending (UNDER_REVIEW):</span> One or more language execution drivers have not passed pre-flight verification against a reference solution.
+              </div>
+            </div>
+          )}
+
           {/* Top Tab Bar: SOLVE */}
           <div className="border-b border-slate-200 flex items-center justify-between px-6 bg-white">
             <div className="flex items-center space-x-8">
@@ -316,8 +326,8 @@ export default function NewAdminQuestionPreview() {
 
               {isCoding && (
                 <button
-                  onClick={() => navigate(`/admin/playground/${question.id}`)}
-                  className="text-xs px-3 py-1 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded flex items-center gap-1.5 shadow-sm transition-colors cursor-pointer"
+                  onClick={() => navigate(`/new-admin/playground/${question.id}`)}
+                  className="text-xs px-2.5 py-1 rounded bg-[#4353a4] hover:bg-[#354388] text-white font-medium flex items-center gap-1.5 shadow-sm transition-colors cursor-pointer"
                 >
                   <Terminal className="w-3.5 h-3.5" />
                   <span>Open Playground</span>
@@ -326,25 +336,25 @@ export default function NewAdminQuestionPreview() {
             </div>
           </div>
 
-          {/* ── 2-Column Split Content ── */}
+          {/* Content Area */}
           <div className="grid grid-cols-1 lg:grid-cols-12 flex-1 divide-y lg:divide-y-0 lg:divide-x divide-slate-200">
-            {/* Left Column: DESCRIPTION */}
-            <div className="lg:col-span-5 p-6 md:p-8 flex flex-col justify-between space-y-6">
+            {/* Left Column: Problem Prompt & Metadata */}
+            <div className="lg:col-span-5 p-6 md:p-8 flex flex-col justify-between border-b lg:border-b-0 border-slate-200 bg-white">
               <div className="space-y-4">
-                <h2 className="text-xs font-bold tracking-wider text-slate-600 uppercase">
-                  DESCRIPTION
-                </h2>
+                <div className="flex items-center justify-between">
+                  <h2 className="text-sm font-semibold text-slate-900">Problem Statement</h2>
+                </div>
 
                 {/* Assertion Reason layout if applicable */}
                 {isAssertionReason ? (
-                  <div className="space-y-4 text-xs text-slate-800 leading-relaxed">
-                    <div className="p-3.5 bg-slate-50 border-l-4 border-indigo-500 rounded-r">
-                      <p className="font-semibold text-slate-700 mb-1">Assertion (A)</p>
-                      <p className="text-slate-800">{assertion || question.prompt || "No assertion provided"}</p>
+                  <div className="space-y-3 pt-1">
+                    <div className="p-3 bg-slate-50 border border-slate-200 rounded">
+                      <span className="font-bold text-slate-800 text-xs block mb-1">Assertion (A):</span>
+                      <p className="text-slate-700 text-xs">{assertion || "No assertion text provided."}</p>
                     </div>
-                    <div className="p-3.5 bg-slate-50 border-l-4 border-indigo-500 rounded-r">
-                      <p className="font-semibold text-slate-700 mb-1">Reason (R)</p>
-                      <p className="text-slate-800">{reason || "No reason provided"}</p>
+                    <div className="p-3 bg-slate-50 border border-slate-200 rounded">
+                      <span className="font-bold text-slate-800 text-xs block mb-1">Reason (R):</span>
+                      <p className="text-slate-700 text-xs">{reason || "No reason text provided."}</p>
                     </div>
                   </div>
                 ) : (
@@ -402,58 +412,98 @@ export default function NewAdminQuestionPreview() {
               </div>
             </div>
 
-            {/* Right Column: Answer Choices */}
+            {/* Right Column: Answer Choices / Coding Driver Status */}
             <div className="lg:col-span-7 p-6 md:p-8 flex flex-col justify-between bg-white">
               <div className="space-y-5">
                 {/* Header Row: Answer Choices + CLEAR button */}
                 <div className="flex items-start justify-between gap-4">
                   <div>
-                    <h2 className="text-sm font-semibold text-slate-900">Answer choices</h2>
+                    <h2 className="text-sm font-semibold text-slate-900">
+                      {isCoding ? "Language Drivers & Playground" : "Answer choices"}
+                    </h2>
                     <p className="text-xs text-slate-500 mt-0.5">
-                      {isMultipleCorrect
+                      {isCoding
+                        ? "Verify driver execution status and run candidates code."
+                        : isMultipleCorrect
                         ? "Please choose all correct answers."
                         : "Please choose a correct answer."}
                     </p>
                   </div>
 
-                  <button
-                    onClick={handleClear}
-                    disabled={!isAttempted}
-                    className="text-xs font-semibold text-slate-700 hover:text-slate-900 disabled:opacity-40 disabled:hover:text-slate-700 flex items-center gap-1 cursor-pointer transition-colors"
-                  >
-                    <span className="font-mono text-slate-400">=</span>
-                    <span>CLEAR</span>
-                  </button>
+                  {!isCoding && (
+                    <button
+                      onClick={handleClear}
+                      disabled={!isAttempted}
+                      className="text-xs font-semibold text-slate-700 hover:text-slate-900 disabled:opacity-40 disabled:hover:text-slate-700 flex items-center gap-1 cursor-pointer transition-colors"
+                    >
+                      <span className="font-mono text-slate-400">=</span>
+                      <span>CLEAR</span>
+                    </button>
+                  )}
                 </div>
-
-                {/* Attempted Status Badge */}
-                {isAttempted && (
-                  <div>
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 border border-purple-300 bg-purple-50 text-purple-700 text-[11px] font-semibold tracking-wider rounded uppercase">
-                      <span>🖊</span> ATTEMPTED
-                    </span>
-                  </div>
-                )}
 
                 {/* Coding Question Alternative Right Panel */}
                 {isCoding ? (
-                  <div className="p-6 bg-slate-50 border border-slate-200 rounded-lg text-center space-y-4 my-4">
-                    <div className="w-12 h-12 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center mx-auto">
-                      <Code2 className="w-6 h-6" />
+                  <div className="space-y-4 my-2">
+                    {/* Driver Verification Status Card */}
+                    <div className="p-4 bg-slate-50 border border-slate-200 rounded-lg space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-slate-800 uppercase tracking-wider">
+                          Driver Verification Status
+                        </span>
+                        <span className="text-[11px] font-semibold px-2 py-0.5 rounded border border-slate-200 bg-slate-100 text-slate-700">
+                          {question.status === "ACTIVE" ? "Active" : "Under Review"}
+                        </span>
+                      </div>
+
+                      {question.isLanguageSpecific && (
+                        <p className="text-[11px] text-slate-600 bg-slate-100 p-2 rounded">
+                          Single-Language Restriction Enabled: submissions only permitted in target configured language.
+                        </p>
+                      )}
+
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1">
+                        {["python", "javascript", "java", "cpp"].map((lang) => {
+                          const hasTemplate = question.languageTemplates && lang in question.languageTemplates;
+                          const isVerified = (question.verifiedLanguages || []).includes(lang);
+                          if (!hasTemplate && question.isLanguageSpecific) return null;
+
+                          return (
+                            <div key={lang} className="p-2 bg-white border border-slate-200 rounded text-center space-y-1">
+                              <span className="text-[11px] font-semibold text-slate-700 uppercase block font-mono">
+                                {lang}
+                              </span>
+                              <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium border block ${
+                                isVerified
+                                  ? "text-slate-700 bg-slate-100 border-slate-200"
+                                  : "text-slate-500 bg-slate-50 border-slate-200"
+                              }`}>
+                                {isVerified ? "Verified" : "Pending"}
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
                     </div>
-                    <div className="space-y-1">
-                      <h3 className="text-sm font-bold text-slate-800">Interactive Coding Question</h3>
-                      <p className="text-xs text-slate-500 max-w-sm mx-auto">
-                        This is a coding problem with test cases and runtime evaluation. Launch the full-screen IDE playground to write code and test solutions.
-                      </p>
+
+                    <div className="p-6 bg-slate-50 border border-slate-200 rounded-lg text-center space-y-4">
+                      <div className="w-12 h-12 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center mx-auto">
+                        <Code2 className="w-6 h-6" />
+                      </div>
+                      <div className="space-y-1">
+                        <h3 className="text-sm font-bold text-slate-800">Interactive Coding Question</h3>
+                        <p className="text-xs text-slate-500 max-w-sm mx-auto">
+                          Launch the IDE playground to write code, test solutions, and verify drivers live.
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => navigate(`/new-admin/playground/${question.id}`)}
+                        className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded shadow-md inline-flex items-center gap-2 transition-all cursor-pointer"
+                      >
+                        <Terminal className="w-4 h-4" />
+                        <span>Launch Coding Playground</span>
+                      </button>
                     </div>
-                    <button
-                      onClick={() => navigate(`/admin/playground/${question.id}`)}
-                      className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded shadow-md inline-flex items-center gap-2 transition-all cursor-pointer"
-                    >
-                      <Terminal className="w-4 h-4" />
-                      <span>Launch Coding Playground</span>
-                    </button>
                   </div>
                 ) : (
                   /* MCQ Options List (Dark Box Code / Text Style) */

@@ -38,13 +38,22 @@ import {
   Loader2,
   Trash2,
   Plus,
-  FileQuestion,
   Clock,
   Target,
+  FileQuestion,
+  HelpCircle,
+  Eye,
+  AlertTriangle,
+  MoveUp,
+  MoveDown,
+  Calendar,
+  Layers,
+  ChevronDown,
   AlertCircle,
   X,
 } from "lucide-react";
 import { testService, Test, CreateTestRequest, TestQuestion, Question, ProctoringMode } from "@/lib/test-service";
+import { PublishTestConfirmationModal } from "@/components/admin/PublishTestConfirmationModal";
 import { useToast } from "@/hooks/use-toast";
 
 const getProctoringPreset = (mode: ProctoringMode) => {
@@ -147,6 +156,10 @@ export default function TestsEdit() {
   const [deleting, setDeleting] = useState(false);
   const [test, setTest] = useState<Test | null>(null);
   const [questionsData, setQuestionsData] = useState<(TestQuestion & { question?: Question })[]>([]);
+  const [publishModalOpen, setPublishModalOpen] = useState(false);
+  const [unverifiedQuestionsForPublish, setUnverifiedQuestionsForPublish] = useState<
+    Array<{ id: string; title: string; pendingLanguages?: string[] }>
+  >([]);
 
   // Form state
   const [formData, setFormData] = useState<Partial<CreateTestRequest>>({
@@ -330,6 +343,41 @@ export default function TestsEdit() {
       return;
     }
 
+    // Checkpoint 2: If publishing, check for unverified coding questions
+    if (formData.status === "PUBLISHED") {
+      const unverified = questionsData
+        .filter((tq) => {
+          const q = tq.question || (tq as any);
+          const isCoding = (q.questionType ?? "").toUpperCase() === "CODING";
+          if (!isCoding) return false;
+          const declaredLangs = Object.keys(q.languageTemplates || {});
+          const verifiedLangs = q.verifiedLanguages || [];
+          const hasUnverified = declaredLangs.length === 0 || declaredLangs.some((l: string) => !verifiedLangs.includes(l));
+          return q.status === "UNDER_REVIEW" || hasUnverified;
+        })
+        .map((tq) => {
+          const q = tq.question || (tq as any);
+          const declaredLangs = Object.keys(q.languageTemplates || { python: {}, javascript: {}, java: {}, cpp: {} });
+          const verifiedLangs = q.verifiedLanguages || [];
+          const pending = declaredLangs.filter((l: string) => !verifiedLangs.includes(l));
+          return {
+            id: q.id || tq.id,
+            title: q.title || "Untitled Coding Question",
+            pendingLanguages: pending.length > 0 ? pending : (q.pendingLanguages || ["python", "javascript", "java", "cpp"]),
+          };
+        });
+
+      if (unverified.length > 0) {
+        setUnverifiedQuestionsForPublish(unverified);
+        setPublishModalOpen(true);
+        return;
+      }
+    }
+
+    await executeUpdate();
+  };
+
+  const executeUpdate = async () => {
     try {
       setSaving(true);
       await testService.updateTest(id!, {
@@ -361,6 +409,7 @@ export default function TestsEdit() {
         autoSubmitOnCriticalViolations: formData.autoSubmitOnCriticalViolations || false,
         maxCriticalViolations: formData.maxCriticalViolations || 0,
       });
+      setPublishModalOpen(false);
       toast({
         title: "Success",
         description: "Test has been updated successfully.",
@@ -659,7 +708,7 @@ export default function TestsEdit() {
                             )}
                             <Badge variant="outline">
                               {tq.question?.questionType ||
-                                (tq.question as Record<string, unknown>)?.type as string ||
+                                (tq.question as any)?.type ||
                                 "MCQ"}
                             </Badge>
                           </div>
@@ -1252,6 +1301,20 @@ export default function TestsEdit() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Checkpoint 2 Publish Confirmation Modal */}
+      <PublishTestConfirmationModal
+        open={publishModalOpen}
+        onOpenChange={setPublishModalOpen}
+        testTitle={formData.title || test?.title || "Assessment"}
+        unverifiedQuestions={unverifiedQuestionsForPublish}
+        onConfirmPublish={executeUpdate}
+        onReviewQuestions={() => {
+          setPublishModalOpen(false);
+          // Navigate / switch to questions tab if needed
+        }}
+        isPublishing={saving}
+      />
     </div>
   );
 }

@@ -167,7 +167,7 @@ export default function NewAdminTestAddProblems() {
       });
   }, [id]);
 
-  // Handle Adding a Question to Test
+  // Handle Adding a Question to Test (Checkpoint 1: Surface warning if UNDER_REVIEW)
   const handleAddQuestion = async (q: Question) => {
     if (!id) return;
     try {
@@ -177,9 +177,19 @@ export default function NewAdminTestAddProblems() {
       const nextOrderIndex = maxOrder + 1;
       const marks = q.marks ?? (q.questionType === "CODING" ? 100 : 10);
 
-      await testService.addQuestionToTest(id, q.id, nextOrderIndex, marks);
+      const res = await testService.addQuestionToTestWithWarnings(id, q.id, nextOrderIndex, marks);
       setAddedQuestionIds((prev) => new Set([...prev, q.id]));
       toast.success(`"${q.title || 'Problem'}" added to test!`);
+
+      // Checkpoint 1 Non-blocking Warning Toast
+      if (res.warnings && res.warnings.length > 0) {
+        res.warnings.forEach((warn) => toast.warning(warn, { duration: 7000 }));
+      } else if (q.status === "UNDER_REVIEW" || (q.questionType === "CODING" && (!q.verifiedLanguages || q.verifiedLanguages.length === 0))) {
+        toast.warning(
+          `Notice: Question "${q.title || 'Problem'}" is currently UNDER_REVIEW. Execution drivers have not been verified against reference solutions.`,
+          { duration: 7000 }
+        );
+      }
     } catch (err: any) {
       console.error("[NewAdminTestAddProblems] Failed to add question:", err);
       toast.error("Failed to add question to test: " + (err?.response?.data?.message || err.message || "Unknown error"));
@@ -637,12 +647,30 @@ export default function NewAdminTestAddProblems() {
                           </div>
                         </div>
 
-                        {/* Metadata Row: ≡ MCQ, ⊙ Single, Difficulty, Time */}
+                        {/* Metadata Row: ≡ MCQ, ⊙ Single, Difficulty, Time, Lifecycle Status */}
                         <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-slate-500 font-medium">
                           <div className="flex items-center gap-1">
                             <span className="text-slate-400 font-mono text-[13px] leading-none">≡</span>
                             <span>{isCoding ? "Coding" : "MCQ"}</span>
                           </div>
+
+                          {/* Lifecycle and Language Verification Badges */}
+                          {isCoding && (
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span
+                                className="inline-flex items-center text-[11px] font-medium text-slate-600 bg-slate-100 px-2 py-0.5 rounded border border-slate-200"
+                                title={q.status === "UNDER_REVIEW" ? "Driver verification pending" : "All drivers verified"}
+                              >
+                                {q.status === "UNDER_REVIEW" ? "Under Review" : "Active"}
+                              </span>
+
+                              {q.isLanguageSpecific && (
+                                <span className="text-[10px] bg-slate-100 text-slate-600 font-medium px-1.5 py-0.5 rounded border border-slate-200">
+                                  Single-Lang
+                                </span>
+                              )}
+                            </div>
+                          )}
 
                           {!isCoding && (
                             <div className="flex items-center gap-1">

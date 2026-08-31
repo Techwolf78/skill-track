@@ -189,12 +189,28 @@ const handleAddQuestions = async () => {
         const targetQ = questions.find((q) => q.id === questionId);
         const questionMarks = targetQ?.marks ?? 1;
 
-        const response = await testService.addQuestionToTest(
+        const response = await testService.addQuestionToTestWithWarnings(
           id!,
           questionId,
           currentOrderIndex,
           questionMarks
         );
+
+        if (response.warnings && response.warnings.length > 0) {
+          response.warnings.forEach((w) => {
+            toast({
+              title: "Question Verification Notice",
+              description: w,
+              variant: "default",
+            });
+          });
+        } else if (targetQ?.status === "UNDER_REVIEW") {
+          toast({
+            title: "Question Notice",
+            description: `"${targetQ.title || 'Problem'}" is UNDER_REVIEW. Drivers are not yet verified.`,
+            variant: "default",
+          });
+        }
         
         console.log("Question added successfully:", response);
         successCount++;

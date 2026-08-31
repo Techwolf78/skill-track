@@ -523,13 +523,28 @@ export default function SuperAdminQuestionBank() {
                       <TableRow key={question.id} className="hover:bg-muted/30 border-b transition-all">
                         <TableCell className="py-4">
                           <div className="space-y-1.5">
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-2 flex-wrap">
                               <p className="font-semibold tracking-tight leading-none text-sm text-foreground">
                                 {question.title || question.prompt?.substring(0, 60)}
                               </p>
                               <Badge variant="outline" className="text-[10px] uppercase">
                                 {question.format || "MCQ"}
                               </Badge>
+
+                              {/* Lifecycle Status and Verification Chips for Coding */}
+                              {((question.questionType ?? "").toUpperCase() === "CODING" || question.format === "CODING") && (
+                                <>
+                                  <Badge variant="outline" className="text-[10px] py-0 bg-muted/50 text-muted-foreground border-border font-medium">
+                                    {question.status === "UNDER_REVIEW" ? "Under Review" : "Active"}
+                                  </Badge>
+
+                                  {question.isLanguageSpecific && (
+                                    <Badge variant="outline" className="text-[9px] py-0 text-muted-foreground bg-muted/30">
+                                      Single-Lang
+                                    </Badge>
+                                  )}
+                                </>
+                              )}
                             </div>
                             <p className="text-xs text-muted-foreground line-clamp-2 font-normal">
                               {question.prompt}
@@ -930,7 +945,8 @@ function SuperAdminImportQuestionsDialog({
     const title = norm.title || (String(prompt).length > 50 ? String(prompt).slice(0, 50) + "..." : String(prompt));
     const marks = Math.max(1, Number(norm.marks || norm.points || norm.score) || 1);
     const rawDiff = (norm.difficulty || "MEDIUM").toString().toUpperCase();
-    const difficulty = rawDiff === "EASY" ? "EASY" : rawDiff === "HARD" ? "HARD" : rawDiff === "EXPERT" ? "EXPERT" : "MEDIUM";
+    const difficulty: "EASY" | "MEDIUM" | "HARD" =
+      rawDiff === "EASY" ? "EASY" : rawDiff === "HARD" || rawDiff === "EXPERT" ? "HARD" : "MEDIUM";
     const avg_time_seconds = Math.max(0, Number(norm.avgtimeseconds || norm.time || norm.avgtime) || 90);
 
     let tags: string[] = [];
@@ -952,11 +968,11 @@ function SuperAdminImportQuestionsDialog({
       difficulty,
       visibility: "PUBLIC", // SuperAdmin imported questions are always PUBLIC
       avg_time_seconds,
-      domain: (norm.domain || "ENGINEERING").toUpperCase(),
-      cognitiveLevel: (norm.cognitivelevel || norm.cognitive || "APPLY").toUpperCase(),
+      domain: (norm.domain || "ENGINEERING").toUpperCase() as "ENGINEERING" | "BUSINESS" | "APTITUDE" | "CORPORATE" | "VERBAL_ABILITY",
+      cognitiveLevel: (norm.cognitivelevel || norm.cognitive || "APPLY").toUpperCase() as "REMEMBER" | "UNDERSTAND" | "APPLY" | "ANALYZE" | "EVALUATE" | "CREATE",
       p_value: Number(norm.pvalue) || 0.45,
       discrimination_index: Number(norm.discriminationindex) || 0.35,
-      status: "ACTIVE",
+      status: "UNDER_REVIEW",
       tags: tags.length ? tags : undefined,
     };
 
@@ -1001,11 +1017,11 @@ function SuperAdminImportQuestionsDialog({
         memoryLimitMb: Number(norm.memorylimit || norm.memorylimitmb) || 256,
         sampleExplanation: norm.sampleexplanation || norm.explanation || undefined,
         languageTemplates: {
-          java: { code: "// Write your code here", lang: "java", langSlug: "java" },
-          python: { code: "# Write your code here", lang: "python", langSlug: "python" },
-          javascript: { code: "// Write your code here", lang: "javascript", langSlug: "javascript" },
+          java: { template: "// Write your code here", driver: "// Execution harness" },
+          python: { template: "# Write your code here", driver: "# Execution harness" },
+          javascript: { template: "// Write your code here", driver: "// Execution harness" },
         },
-        signatureMetadata: { functionName: "solve" },
+        signatureMetadata: { method_name: "solve", return_type: "void", params: [] },
       };
     }
   };
@@ -1271,17 +1287,17 @@ function SuperAdminImportQuestionsDialog({
           memoryLimitMb: Number(q.memoryLimitMb) || 256,
           constraints: q.constraints || undefined,
           sampleExplanation: q.sampleExplanation || undefined,
-          domain: (q.domain || "ENGINEERING") as any,
-          cognitiveLevel: (q.cognitiveLevel || "APPLY") as any,
+          domain: (q.domain || "ENGINEERING").toUpperCase() as "ENGINEERING" | "BUSINESS" | "APTITUDE" | "CORPORATE" | "VERBAL_ABILITY",
+          cognitiveLevel: (q.cognitiveLevel || "APPLY").toUpperCase() as "REMEMBER" | "UNDERSTAND" | "APPLY" | "ANALYZE" | "EVALUATE" | "CREATE",
           p_value: q.p_value ?? 0.45,
           discrimination_index: q.discrimination_index ?? 0.35,
-          status: "ACTIVE" as const,
+          status: "UNDER_REVIEW" as const,
           languageTemplates: q.languageTemplates || {
-            java: { code: "// Write your code here", lang: "java", langSlug: "java" },
-            python: { code: "# Write your code here", lang: "python", langSlug: "python" },
-            javascript: { code: "// Write your code here", lang: "javascript", langSlug: "javascript" },
+            java: { template: "// Write your code here", driver: "// Execution harness" },
+            python: { template: "# Write your code here", driver: "# Execution harness" },
+            javascript: { template: "// Write your code here", driver: "// Execution harness" },
           },
-          signatureMetadata: q.signatureMetadata || { functionName: "solve" },
+          signatureMetadata: q.signatureMetadata || { method_name: "solve", return_type: "void", params: [] },
         };
       }
     });
