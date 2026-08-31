@@ -418,6 +418,7 @@ export default function Tests() {
                         <MoreVertical className="w-4 h-4" />
                       </Button>
                     </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
                       <DropdownMenuItem
                         onClick={() =>
                           window.open(`/test/welcome-preview?testId=${test.id}`, "_blank")
