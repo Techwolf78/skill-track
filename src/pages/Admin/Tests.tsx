@@ -85,7 +85,7 @@ export default function AdminTests() {
   } = useQuery<any[]>({
     queryKey: ["all-candidate-invitations"],
     queryFn: async () => {
-      const res = await apiClient.get("/candidate-invitations?size=1000");
+      const res = await apiClient.get("/candidate-invitations");
       const data = res.data?.data ?? res.data;
       if (Array.isArray(data)) return data;
       if (data && typeof data === "object" && Array.isArray(data.content))

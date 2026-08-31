@@ -131,7 +131,7 @@ export default function NewCandidateTestWelcome({
 
         // Fallback 1: Try list endpoint
         try {
-          const listResponse = await apiClient.get("/candidate-invitations?size=100");
+          const listResponse = await apiClient.get("/candidate-invitations");
           const listData = listResponse.data?.data || listResponse.data;
           const items = Array.isArray(listData)
             ? listData

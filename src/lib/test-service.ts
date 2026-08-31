@@ -665,6 +665,7 @@ export const testService = {
     subjectId?: string,
     topicId?: string,
     subtopicId?: string,
+    tag?: string,
   ): Promise<Question[]> => {
     let allQuestions: Question[] = [];
     let page = 0;
@@ -677,6 +678,7 @@ export const testService = {
       if (subjectId) params.append("subjectId", subjectId);
       if (topicId) params.append("topicId", topicId);
       if (subtopicId) params.append("subtopicId", subtopicId);
+      if (tag) params.append("tag", tag);
       params.append("page", page.toString());
       params.append("size", size.toString());
 
@@ -881,7 +883,7 @@ export const testService = {
   // ==================== Test APIs ====================
   // ==================== Test APIs ====================
   getAllTests: async (): Promise<Test[]> => {
-    const response = await apiClient.get<Test[]>("/tests?size=1000");
+    const response = await apiClient.get<Test[]>("/tests");
     const list = unwrapArrayResponse(response);
     return list.map((t) => testService.mapTestFromBackend(t));
   },
@@ -1182,7 +1184,7 @@ export const testService = {
   },
 
   getAllTestSchedules: async (): Promise<TestScheduleExtended[]> => {
-    const response = await apiClient.get<TestScheduleExtended[]>("/test-schedules?size=1000");
+    const response = await apiClient.get<TestScheduleExtended[]>("/test-schedules");
     return unwrapArrayResponse(response);
   },
 
@@ -1234,7 +1236,7 @@ export const testService = {
   },
 
   getAllSessions: async (): Promise<TestSession[]> => {
-    const response = await apiClient.get<TestSession[]>("/test-sessions?size=1000");
+    const response = await apiClient.get<TestSession[]>("/test-sessions");
     return unwrapArrayResponse(response);
   },
 

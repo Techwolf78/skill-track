@@ -131,7 +131,7 @@ export const candidateService = {
    * Continues to use size=5000 to load all records in one shot.
    */
   getCandidates: async (): Promise<Candidate[]> => {
-    const response = await apiClient.get<Candidate[]>("/candidates?size=5000");
+    const response = await apiClient.get<Candidate[]>("/candidates");
     const rawList = unwrapArrayResponse(response);
     return rawList.map((c) => mapCandidate(c as Candidate & Record<string, unknown>));
   },
