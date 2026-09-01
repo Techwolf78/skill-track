@@ -212,6 +212,14 @@ export interface UpdateQuestionRequest {
   isLanguageSpecific?: boolean | null;
   comparisonMode?: "exact" | "unordered_array" | "float_tolerance";
   examples?: Array<{ input: string; output: string; explanation?: string }>;
+  testCases?: Array<{
+    id?: string;
+    input: string;
+    expectedOutput: string;
+    sample?: boolean;
+    weight?: number;
+    explanation?: string;
+  }>;
   visibility?: "PUBLIC" | "ORG_OWNED";
   // Extended Enterprise Metadata
   domain?: "ENGINEERING" | "BUSINESS" | "APTITUDE" | "CORPORATE" | "VERBAL_ABILITY";
@@ -623,7 +631,7 @@ export const testService = {
   // ==================== Subtopic APIs ====================
   getAllSubtopics: async (): Promise<Subtopic[]> => {
     const response = await apiClient.get<Subtopic[]>("/subtopics");
-    return unwrapArrayResponse(response);
+    return unwrapArrayResponse<Subtopic>(response);
   },
 
   getSubtopicById: async (id: string): Promise<Subtopic> => {
@@ -633,7 +641,7 @@ export const testService = {
 
   getSubtopicsByTopic: async (topicId: string): Promise<Subtopic[]> => {
     const response = await apiClient.get<Subtopic[]>(`/subtopics/topic/${topicId}`);
-    return unwrapArrayResponse(response);
+    return unwrapArrayResponse<Subtopic>(response);
   },
 
   createSubtopic: async (name: string, topicId: string): Promise<Subtopic> => {
@@ -682,7 +690,7 @@ export const testService = {
 
       const url = `/questions?${params.toString()}`;
       const response = await apiClient.get<Question[]>(url);
-      const content = unwrapArrayResponse(response);
+      const content = unwrapArrayResponse<Question>(response);
       allQuestions = [...allQuestions, ...content];
 
       if (content.length < size) {
@@ -707,7 +715,7 @@ export const testService = {
 
   bulkCreateQuestions: async (dtos: CreateQuestionRequest[]): Promise<Question[]> => {
     const response = await apiClient.post<Question[]>("/questions/bulk", dtos);
-    return unwrapArrayResponse(response);
+    return unwrapArrayResponse<Question>(response);
   },
 
   updateQuestion: async (
@@ -765,7 +773,7 @@ export const testService = {
         ? `/test-cases?codingQuestionId=${codingQuestionId}&page=${page}&size=${size}`
         : `/test-cases?page=${page}&size=${size}`;
       const response = await apiClient.get<TestCase[]>(url);
-      const content = unwrapArrayResponse(response);
+      const content = unwrapArrayResponse<TestCase>(response);
       allTestCases = [...allTestCases, ...content];
 
       if (content.length < size) {
@@ -997,7 +1005,7 @@ export const testService = {
 
     const url = `/test-questions${params.toString() ? `?${params.toString()}` : ""}`;
     const response = await apiClient.get<TestQuestion[]>(url);
-    return unwrapArrayResponse(response);
+    return unwrapArrayResponse<TestQuestion>(response);
   },
 
   getTestQuestionById: async (id: string): Promise<TestQuestion> => {
@@ -1059,7 +1067,7 @@ export const testService = {
     dto: BulkAddQuestionsRequest,
   ): Promise<TestQuestion[]> => {
     const response = await apiClient.post<TestQuestion[]>(`/test-questions/bulk`, dto);
-    return unwrapArrayResponse(response);
+    return unwrapArrayResponse<TestQuestion>(response);
   },
 
   bulkAddQuestionsToTestWithWarnings: async (
@@ -1067,7 +1075,7 @@ export const testService = {
   ): Promise<{ testQuestions: TestQuestion[]; warnings: string[] }> => {
     const response = await apiClient.post<TestQuestion[]>(`/test-questions/bulk`, dto);
     return {
-      testQuestions: unwrapArrayResponse(response),
+      testQuestions: unwrapArrayResponse<TestQuestion>(response),
       warnings: extractWarnings(response),
     };
   },
@@ -1183,7 +1191,7 @@ export const testService = {
 
   getAllTestSchedules: async (): Promise<TestScheduleExtended[]> => {
     const response = await apiClient.get<TestScheduleExtended[]>("/test-schedules?size=1000");
-    return unwrapArrayResponse(response);
+    return unwrapArrayResponse<TestScheduleExtended>(response);
   },
 
   getTestScheduleById: async (id: string): Promise<TestScheduleExtended> => {
@@ -1235,7 +1243,7 @@ export const testService = {
 
   getAllSessions: async (): Promise<TestSession[]> => {
     const response = await apiClient.get<TestSession[]>("/test-sessions?size=1000");
-    return unwrapArrayResponse(response);
+    return unwrapArrayResponse<TestSession>(response);
   },
 
   getSessionsByTestId: async (testId: string): Promise<TestSession[]> => {

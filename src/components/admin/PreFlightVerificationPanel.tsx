@@ -36,11 +36,38 @@ interface PreFlightVerificationPanelProps {
 }
 
 const DEFAULT_REFERENCE_SOLUTIONS: Record<string, string> = {
-  python3: `# Paste reference solution in Python 3\nclass Solution:\n    def solve(self, *args):\n        # Return verified solution\n        pass\n`,
-  python: `# Paste reference solution in Python 3\nclass Solution:\n    def solve(self, *args):\n        # Return verified solution\n        pass\n`,
-  javascript: `// Paste reference solution in JavaScript\nfunction solve(...args) {\n    // Return verified solution\n}\n`,
-  java: `// Paste reference solution in Java\nclass Solution {\n    public Object solve() {\n        // Return verified solution\n        return null;\n    }\n}\n`,
-  cpp: `// Paste reference solution in C++\nclass Solution {\npublic:\n    // Return verified solution\n};\n`,
+  python3: `class Solution:
+    def solve(self, n: int) -> int:
+        # Write your logic here
+        return n + 9
+`,
+  python: `class Solution:
+    def solve(self, n: int) -> int:
+        # Write your logic here
+        return n + 9
+`,
+  javascript: `class Solution {
+    solve(n) {
+        // Write your logic here
+        return n + 9;
+    }
+}
+`,
+  java: `class Solution {
+    public int solve(int n) {
+        // Write your logic here
+        return n + 9;
+    }
+}
+`,
+  cpp: `class Solution {
+public:
+    int solve(int n) {
+        // Write your logic here
+        return n + 9;
+    }
+};
+`,
 };
 
 export const PreFlightVerificationPanel: React.FC<PreFlightVerificationPanelProps> = ({
@@ -55,7 +82,7 @@ export const PreFlightVerificationPanel: React.FC<PreFlightVerificationPanelProp
   const [referenceSolution, setReferenceSolution] = useState<string>(
     DEFAULT_REFERENCE_SOLUTIONS[language] || ""
   );
-  const [runScope, setRunScope] = useState<"SAMPLE" | "ALL">("SAMPLE");
+  const [runScope, setRunScope] = useState<"SAMPLE" | "ALL">("ALL");
   const [isValidating, setIsValidating] = useState(false);
   const [lastResponse, setLastResponse] = useState<ValidateDriverResponse | null>(null);
   const [expandedTestCases, setExpandedTestCases] = useState<Record<string, boolean>>({});

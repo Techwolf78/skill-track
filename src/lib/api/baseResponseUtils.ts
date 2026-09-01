@@ -59,8 +59,8 @@ export const extractWarnings = (response: { data: unknown }): string[] => {
 };
 
 /** Unwraps an array BaseResponse, Spring Page, or raw array, always returning a valid array. */
-export const unwrapArrayResponse = <T>(
-  response: { data: BaseResponse<T[] | { content?: T[] }> | T[] | { content?: T[] } | unknown }
+export const unwrapArrayResponse = <T = any>(
+  response: { data: BaseResponse<T[] | { content?: T[] }> | T[] | { content?: T[] } | unknown } | any
 ): T[] => {
   const payload = response.data;
   if (Array.isArray(payload)) {

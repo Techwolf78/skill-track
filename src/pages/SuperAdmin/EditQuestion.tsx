@@ -98,78 +98,43 @@ interface CodeTemplate {
 
 const defaultCodeTemplate: CodeTemplate = {
   python3: {
-    code: `# Write your solution here
-
-def solve():
-    import sys
-    data = sys.stdin.read()
-    # Your code here
-    print(data)
-
-if __name__ == "__main__":
-    solve()`,
+    code: `class Solution:
+    def solve(self, n: int) -> int:
+        # Write your logic here
+        return n + 9`,
     lang: "Python 3",
     langSlug: "python3",
   },
   javascript: {
-    code: `// Write your solution here
-
-function solve() {
-    const readline = require('readline');
-    const rl = readline.createInterface({
-        input: process.stdin,
-        output: process.stdout
-    });
-    
-    let input = '';
-    rl.on('line', (line) => {
-        input += line + '\\n';
-    });
-    rl.on('close', () => {
-        // Your code here
-        console.log(input.trim());
-    });
-}
-
-solve();`,
+    code: `class Solution {
+    solve(n) {
+        // Write your logic here
+        return n + 9;
+    }
+}`,
     lang: "JavaScript",
     langSlug: "javascript",
   },
   java: {
-    code: `// Write your solution here
-
-import java.util.*;
-
-public class Main {
-    public static void main(String[] args) {
-        Scanner sc = new Scanner(System.in);
-        StringBuilder input = new StringBuilder();
-        while (sc.hasNextLine()) {
-            input.append(sc.nextLine()).append("\\n");
-        }
-        // Your code here
-        System.out.print(input.toString());
+    code: `class Solution {
+    public int solve(int n) {
+        // Write your logic here
+        return n + 9;
     }
 }`,
     lang: "Java",
     langSlug: "java",
   },
   cpp: {
-    code: `// Write your solution here
-
-#include <iostream>
-#include <string>
+    code: `#include <iostream>
 using namespace std;
-
-int main() {
-    string input, line;
-    while (getline(cin, line)) {
-        input += line + "\\n";
+class Solution {
+public:
+    int solve(int n) {
+        // Write your logic here
+        return n + 9;
     }
-    // Your code here
-    cout << input;
-    return 0;
-}`,
+};`,
     lang: "C++",
     langSlug: "cpp",
   },
@@ -2261,6 +2226,36 @@ export default function EditQuestion() {
                           language={langKey}
                           driverCode={languageTemplates[langKey]?.driver || ""}
                           testCases={testCases.map((tc, idx) => ({ ...tc, id: tc.id || `tc-${idx}`, codingQuestionId: id || "" }))}
+                          onSaveFirstRequired={async () => {
+                            if (!id) return undefined;
+                            const backendTemplates = isLanguageSpecific
+                              ? { [mapFrontendToBackendLang(activeLanguageTab)]: { template: languageTemplates[activeLanguageTab]?.template || "", driver: languageTemplates[activeLanguageTab]?.driver || "" } }
+                              : {
+                                  python: { template: languageTemplates.python3?.template || "", driver: languageTemplates.python3?.driver || "" },
+                                  javascript: { template: languageTemplates.javascript?.template || "", driver: languageTemplates.javascript?.driver || "" },
+                                  java: { template: languageTemplates.java?.template || "", driver: languageTemplates.java?.driver || "" },
+                                  cpp: { template: languageTemplates.cpp?.template || "", driver: languageTemplates.cpp?.driver || "" },
+                                };
+                            const validTestCases = testCases.filter((tc) => tc.input.trim() || tc.expectedOutput.trim());
+                            await testService.updateQuestion(id, {
+                              title: title.trim(),
+                              prompt: prompt.trim(),
+                              subject_id: selectedSubject,
+                              topic_id: selectedTopic || undefined,
+                              subtopic_id: selectedSubtopic || undefined,
+                              difficulty,
+                              marks,
+                              timeLimitSecs: Number(timeLimitSecs) || 2,
+                              memoryLimitMb: Number(memoryLimitMb) || 256,
+                              constraints: constraints.trim() || undefined,
+                              sampleExplanation: sampleExplanation.trim() || undefined,
+                              isLanguageSpecific,
+                              testCases: validTestCases,
+                              languageTemplates: backendTemplates,
+                              signatureMetadata: signature,
+                            });
+                            return id;
+                          }}
                           onVerificationSuccess={(res) => {
                             setVerifiedLanguages((prev) => Array.from(new Set([...prev, bLang])));
                             setPendingLanguages((prev) => prev.filter((l) => l !== bLang));
@@ -2533,7 +2528,7 @@ export default function EditQuestion() {
                                   onChange={(e) =>
                                     updateTestCase(idx, "input", e.target.value)
                                   }
-                                  placeholder="Enter input (e.g. 5\n1 2 3 4 5)"
+                                  placeholder="Enter input (e.g. 10)"
                                   rows={4}
                                   className="font-mono text-sm bg-white text-slate-900 border-slate-300 focus:border-orange-500"
                                 />
@@ -2552,7 +2547,7 @@ export default function EditQuestion() {
                                       e.target.value,
                                     )
                                   }
-                                  placeholder="Enter expected output"
+                                  placeholder="Enter expected output (e.g. 19)"
                                   rows={4}
                                   className="font-mono text-sm bg-white text-slate-900 border-slate-300 focus:border-orange-500"
                                 />

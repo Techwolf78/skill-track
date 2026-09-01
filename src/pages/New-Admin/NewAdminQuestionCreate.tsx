@@ -100,20 +100,73 @@ const LineSelect = ({
 
 const DEFAULT_CODE_TEMPLATES = {
   python3: {
-    template: `# Candidate Starter Code\n\ndef solve():\n    import sys\n    data = sys.stdin.read()\n    # Write your logic here\n    print(data)\n\nif __name__ == "__main__":\n    solve()`,
-    driver: `# Hidden Execution Driver (Appended during evaluation)\nimport sys\n# Runner setup\n`,
+    template: `class Solution:
+    def solve(self, n: int) -> int:
+        # Write your logic here
+        return n + 9`,
+    driver: `import sys
+if __name__ == "__main__":
+    data = sys.stdin.read().strip()
+    if data:
+        n = int(data)
+        sol = Solution()
+        print(sol.solve(n))`,
   },
   javascript: {
-    template: `// Candidate Starter Code\n\nfunction solve() {\n    const fs = require('fs');\n    const input = fs.readFileSync('/dev/stdin', 'utf-8');\n    // Write your logic here\n    console.log(input.trim());\n}\n\nsolve();`,
-    driver: `// Hidden Execution Driver\n`,
+    template: `class Solution {
+    solve(n) {
+        // Write your logic here
+        return n + 9;
+    }
+}`,
+    driver: `const fs = require('fs');
+function main() {
+    const input = fs.readFileSync('/dev/stdin', 'utf-8').trim();
+    if (input) {
+        const n = parseInt(input, 10);
+        const sol = new Solution();
+        console.log(sol.solve(n));
+    }
+}
+main();`,
   },
   java: {
-    template: `// Candidate Starter Code\n\nimport java.util.*;\n\npublic class Solution {\n    public static void main(String[] args) {\n        Scanner sc = new Scanner(System.in);\n        // Write your logic here\n    }\n}`,
-    driver: `// Hidden Execution Driver\n`,
+    template: `class Solution {
+    public int solve(int n) {
+        // Write your logic here
+        return n + 9;
+    }
+}`,
+    driver: `import java.util.Scanner;
+public class Main {
+    public static void main(String[] args) {
+        Scanner sc = new Scanner(System.in);
+        if (sc.hasNextInt()) {
+            int n = sc.nextInt();
+            Solution sol = new Solution();
+            System.out.println(sol.solve(n));
+        }
+    }
+}`,
   },
   cpp: {
-    template: `// Candidate Starter Code\n\n#include <iostream>\n#include <vector>\nusing namespace std;\n\nint main() {\n    // Write your logic here\n    return 0;\n}`,
-    driver: `// Hidden Execution Driver\n`,
+    template: `#include <iostream>
+using namespace std;
+class Solution {
+public:
+    int solve(int n) {
+        // Write your logic here
+        return n + 9;
+    }
+};`,
+    driver: `int main() {
+    int n;
+    if (cin >> n) {
+        Solution sol;
+        cout << sol.solve(n) << endl;
+    }
+    return 0;
+}`,
   },
 };
 
@@ -160,16 +213,16 @@ export default function NewAdminQuestionCreate() {
   const [testCases, setTestCases] = useState<
     Array<{ input: string; expectedOutput: string; sample: boolean; weight: number; explanation?: string }>
   >([
-    { input: "", expectedOutput: "", sample: true, weight: 20, explanation: "" },
-    { input: "", expectedOutput: "", sample: false, weight: 40 },
-    { input: "", expectedOutput: "", sample: false, weight: 40 },
+    { input: "10", expectedOutput: "19", sample: true, weight: 20, explanation: "n = 10 -> 10 + 9 = 19" },
+    { input: "5", expectedOutput: "14", sample: false, weight: 40 },
+    { input: "0", expectedOutput: "9", sample: false, weight: 40 },
   ]);
 
   // Method Signature Configuration
   const [signature, setSignature] = useState({
     method_name: "solve",
     return_type: "int",
-    params: [{ name: "nums", type: "list[int]" }],
+    params: [{ name: "n", type: "int" }],
   });
 
   // Code Templates & Drivers
@@ -312,8 +365,6 @@ export default function NewAdminQuestionCreate() {
 
   // Minimal draft save for pre-flight verification execution
   const handleSaveDraftForVerification = async (): Promise<string | undefined> => {
-    if (createdQuestionId) return createdQuestionId;
-
     if (!title.trim() || !prompt.trim() || !subjectId) {
       toast.error("Please fill in Problem Name, Description, and Subject before running pre-flight check.");
       return undefined;
@@ -322,6 +373,34 @@ export default function NewAdminQuestionCreate() {
     const avgTimeSecs = Math.max(30, Number(solvingTimeMins || 2) * 60);
     const validTestCases = testCases.filter((tc) => tc.input.trim() || tc.expectedOutput.trim());
     const cleanHints = hints.filter((h) => h.trim());
+
+    if (createdQuestionId) {
+      // Sync latest test cases and templates before running pre-flight verification
+      await testService.updateQuestion(createdQuestionId, {
+        title: title.trim(),
+        prompt: prompt.trim(),
+        subject_id: subjectId,
+        topic_id: topicId || undefined,
+        subtopic_id: subtopicId || undefined,
+        difficulty,
+        marks,
+        avg_time_seconds: avgTimeSecs,
+        timeLimitSecs: Number(timeLimitSecs) || 2,
+        memoryLimitMb: Number(memoryLimitMb) || 256,
+        constraints: constraints.trim() || undefined,
+        sampleExplanation: sampleExplanation.trim() || undefined,
+        hints: cleanHints.length ? cleanHints : undefined,
+        testCases: validTestCases,
+        tags: tags.length ? tags : undefined,
+        languageTemplates: buildLanguageTemplatesPayload(),
+        signatureMetadata: {
+          method_name: signature.method_name || "solve",
+          return_type: signature.return_type,
+          params: signature.params,
+        },
+      });
+      return createdQuestionId;
+    }
 
     const dto: CreateQuestionRequest = {
       questionType: "CODING",
@@ -1108,7 +1187,7 @@ export default function NewAdminQuestionCreate() {
                               rows={2}
                               value={tc.input}
                               onChange={(e) => updateTestCase(idx, "input", e.target.value)}
-                              placeholder="e.g. [2, 7, 11, 15]\n9"
+                              placeholder="e.g. 10"
                               className="w-full border border-slate-200 p-2 text-xs font-mono bg-slate-50/40 focus:bg-white focus:outline-none"
                             />
                           </div>
@@ -1118,7 +1197,7 @@ export default function NewAdminQuestionCreate() {
                               rows={2}
                               value={tc.expectedOutput}
                               onChange={(e) => updateTestCase(idx, "expectedOutput", e.target.value)}
-                              placeholder="e.g. [0, 1]"
+                              placeholder="e.g. 19"
                               className="w-full border border-slate-200 p-2 text-xs font-mono bg-slate-50/40 focus:bg-white focus:outline-none"
                             />
                           </div>
@@ -1131,7 +1210,7 @@ export default function NewAdminQuestionCreate() {
                               type="text"
                               value={tc.explanation || ""}
                               onChange={(e) => updateTestCase(idx, "explanation", e.target.value)}
-                              placeholder="e.g. nums[0] + nums[1] == 9, so we return indices 0 and 1."
+                              placeholder="e.g. n = 10 -> 10 + 9 = 19"
                               className="w-full border-b border-slate-200 py-1 text-xs text-slate-800 bg-transparent focus:outline-none focus:border-[#4353a4]"
                             />
                           </div>

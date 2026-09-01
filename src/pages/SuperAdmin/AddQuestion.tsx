@@ -107,78 +107,43 @@ interface CodeTemplate {
 
 const defaultCodeTemplate: CodeTemplate = {
   python3: {
-    code: `# Write your solution here
-
-def solve():
-    import sys
-    data = sys.stdin.read()
-    # Your code here
-    print(data)
-
-if __name__ == "__main__":
-    solve()`,
+    code: `class Solution:
+    def solve(self, n: int) -> int:
+        # Write your logic here
+        return n + 9`,
     lang: "Python 3",
     langSlug: "python3",
   },
   javascript: {
-    code: `// Write your solution here
-
-function solve() {
-    const readline = require('readline');
-    const rl = readline.createInterface({
-        input: process.stdin,
-        output: process.stdout
-    });
-    
-    let input = '';
-    rl.on('line', (line) => {
-        input += line + '\\n';
-    });
-    rl.on('close', () => {
-        // Your code here
-        console.log(input.trim());
-    });
-}
-
-solve();`,
+    code: `class Solution {
+    solve(n) {
+        // Write your logic here
+        return n + 9;
+    }
+}`,
     lang: "JavaScript",
     langSlug: "javascript",
   },
   java: {
-    code: `// Write your solution here
-
-import java.util.*;
-
-public class Main {
-    public static void main(String[] args) {
-        Scanner sc = new Scanner(System.in);
-        StringBuilder input = new StringBuilder();
-        while (sc.hasNextLine()) {
-            input.append(sc.nextLine()).append("\\n");
-        }
-        // Your code here
-        System.out.print(input.toString());
+    code: `class Solution {
+    public int solve(int n) {
+        // Write your logic here
+        return n + 9;
     }
 }`,
     lang: "Java",
     langSlug: "java",
   },
   cpp: {
-    code: `// Write your solution here
-
-#include <iostream>
-#include <string>
+    code: `#include <iostream>
 using namespace std;
-
-int main() {
-    string input, line;
-    while (getline(cin, line)) {
-        input += line + "\\n";
+class Solution {
+public:
+    int solve(int n) {
+        // Write your logic here
+        return n + 9;
     }
-    // Your code here
-    cout << input;
-    return 0;
-}`,
+};`,
     lang: "C++",
     langSlug: "cpp",
   },
@@ -290,16 +255,81 @@ export default function AddQuestion() {
   const [activeLanguageTab, setActiveLanguageTab] = useState<string>("python3");
 
   const [signature, setSignature] = useState<SignatureMetadata>({
-    method_name: "twoSum",
-    params: [{ name: "nums", type: "list[int]" }, { name: "target", type: "int" }],
-    return_type: "list[int]"
+    method_name: "solve",
+    params: [{ name: "n", type: "int" }],
+    return_type: "int"
   });
 
   const [languageTemplates, setLanguageTemplates] = useState<LanguageTemplates>({
-    python3: { template: "", driver: "" },
-    javascript: { template: "", driver: "" },
-    java: { template: "", driver: "" },
-    cpp: { template: "", driver: "" }
+    python3: {
+      template: `class Solution:
+    def solve(self, n: int) -> int:
+        # Write your logic here
+        return n + 9`,
+      driver: `import sys
+if __name__ == "__main__":
+    data = sys.stdin.read().strip()
+    if data:
+        n = int(data)
+        sol = Solution()
+        print(sol.solve(n))`,
+    },
+    javascript: {
+      template: `class Solution {
+    solve(n) {
+        // Write your logic here
+        return n + 9;
+    }
+}`,
+      driver: `const fs = require('fs');
+function main() {
+    const input = fs.readFileSync('/dev/stdin', 'utf-8').trim();
+    if (input) {
+        const n = parseInt(input, 10);
+        const sol = new Solution();
+        console.log(sol.solve(n));
+    }
+}
+main();`,
+    },
+    java: {
+      template: `class Solution {
+    public int solve(int n) {
+        // Write your logic here
+        return n + 9;
+    }
+}`,
+      driver: `import java.util.Scanner;
+public class Main {
+    public static void main(String[] args) {
+        Scanner sc = new Scanner(System.in);
+        if (sc.hasNextInt()) {
+            int n = sc.nextInt();
+            Solution sol = new Solution();
+            System.out.println(sol.solve(n));
+        }
+    }
+}`,
+    },
+    cpp: {
+      template: `#include <iostream>
+using namespace std;
+class Solution {
+public:
+    int solve(int n) {
+        // Write your logic here
+        return n + 9;
+    }
+};`,
+      driver: `int main() {
+    int n;
+    if (cin >> n) {
+        Solution sol;
+        cout << sol.solve(n) << endl;
+    }
+    return 0;
+}`,
+    },
   });
 
   const [isLanguageSpecific, setIsLanguageSpecific] = useState<boolean>(false);
@@ -343,8 +373,77 @@ export default function AddQuestion() {
 
   // Test cases state for coding questions
   const [testCases, setTestCases] = useState<TestCase[]>([
-    { input: "", expectedOutput: "", sample: true, weight: 100 },
+    { input: "10", expectedOutput: "19", sample: true, weight: 20, explanation: "n = 10 -> 10 + 9 = 19" },
+    { input: "5", expectedOutput: "14", sample: false, weight: 40 },
+    { input: "0", expectedOutput: "9", sample: false, weight: 40 },
   ]);
+
+  const handleSaveDraftForVerification = async (): Promise<string | undefined> => {
+    if (!title.trim() || !prompt.trim() || !selectedSubject) {
+      toast({
+        title: "Validation Error",
+        description: "Please fill in Title, Description, and Subject before running pre-flight check.",
+        variant: "destructive",
+      });
+      return undefined;
+    }
+
+    const validTestCases = testCases.filter((tc) => tc.input.trim() || tc.expectedOutput.trim());
+    const langPayload = isLanguageSpecific
+      ? { [mapFrontendToBackendLang(activeLanguageTab)]: { template: languageTemplates[activeLanguageTab].template, driver: languageTemplates[activeLanguageTab].driver } }
+      : {
+          python: { template: languageTemplates.python3.template, driver: languageTemplates.python3.driver },
+          javascript: { template: languageTemplates.javascript.template, driver: languageTemplates.javascript.driver },
+          java: { template: languageTemplates.java.template, driver: languageTemplates.java.driver },
+          cpp: { template: languageTemplates.cpp.template, driver: languageTemplates.cpp.driver },
+        };
+
+    if (createdQuestionId) {
+      await testService.updateQuestion(createdQuestionId, {
+        title: title.trim(),
+        prompt: prompt.trim(),
+        subject_id: selectedSubject,
+        topic_id: selectedTopic || undefined,
+        subtopic_id: selectedSubtopic || undefined,
+        difficulty,
+        marks,
+        constraints: constraints.trim() || undefined,
+        sampleExplanation: sampleExplanation.trim() || undefined,
+        testCases: validTestCases,
+        languageTemplates: langPayload,
+        signatureMetadata: signature,
+      });
+      return createdQuestionId;
+    }
+
+    const dto: CreateQuestionRequest = {
+      questionType: "CODING",
+      title: title.trim(),
+      prompt: prompt.trim(),
+      subject_id: selectedSubject,
+      topic_id: selectedTopic || undefined,
+      subtopic_id: selectedSubtopic || undefined,
+      difficulty,
+      marks,
+      visibility,
+      timeLimitSecs: Number(timeLimitSecs) || 2,
+      memoryLimitMb: Number(memoryLimitMb) || 256,
+      constraints: constraints.trim() || undefined,
+      sampleExplanation: sampleExplanation.trim() || undefined,
+      status: "UNDER_REVIEW",
+      isLanguageSpecific,
+      testCases: validTestCases,
+      languageTemplates: langPayload,
+      signatureMetadata: signature,
+    };
+
+    const saved = await testService.createQuestion(dto);
+    if (saved?.id) {
+      setCreatedQuestionId(saved.id);
+      return saved.id;
+    }
+    return undefined;
+  };
 
   // Extended Enterprise Metadata States
   const [domain, setDomain] = useState<"ENGINEERING" | "BUSINESS" | "APTITUDE" | "CORPORATE" | "VERBAL_ABILITY" | "">("");
@@ -1868,6 +1967,7 @@ export default function AddQuestion() {
                           language={langKey}
                           driverCode={languageTemplates[langKey]?.driver || ""}
                           testCases={testCases.map((tc, idx) => ({ ...tc, id: tc.id || `tc-${idx}`, codingQuestionId: createdQuestionId || "" }))}
+                          onSaveFirstRequired={handleSaveDraftForVerification}
                           onVerificationSuccess={(res) => {
                             setVerifiedLanguages((prev) => Array.from(new Set([...prev, bLang])));
                             setPendingLanguages((prev) => prev.filter((l) => l !== bLang));
@@ -1965,7 +2065,7 @@ export default function AddQuestion() {
                           onChange={(e) =>
                             updateTestCase(index, "input", e.target.value)
                           }
-                          placeholder="Enter test input (e.g., 2 3)"
+                          placeholder="Enter test input (e.g., 10)"
                           rows={2}
                           className="font-mono text-sm"
                         />
@@ -1982,7 +2082,7 @@ export default function AddQuestion() {
                               e.target.value,
                             )
                           }
-                          placeholder="Enter expected output (e.g., 5)"
+                          placeholder="Enter expected output (e.g., 19)"
                           rows={2}
                           className="font-mono text-sm"
                         />

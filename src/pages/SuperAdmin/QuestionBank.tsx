@@ -68,9 +68,18 @@ import { authService } from "@/lib/auth-service";
 import {
   useQuestionsQuery,
   useSubjectsQuery,
+  useTopicsQuery,
+  useSubtopicsQuery,
   useDeleteQuestionMutation,
   useBulkCreateQuestionsMutation,
 } from "@/hooks/use-query-hooks";
+import {
+  ParsedQuestionRow,
+  TaxonomyContext,
+  parseImportRow,
+  generateDynamicExcelTemplate,
+  resolveTaxonomyForRow,
+} from "@/lib/admin/questionImport";
 import { QuestionPreview } from "./QuestionPreview";
 
 const difficultyColors: Record<string, string> = {
@@ -890,13 +899,19 @@ function SuperAdminImportQuestionsDialog({
   onImportSuccess: () => void;
 }) {
   const { data: subjects = [] } = useSubjectsQuery();
+  const { data: allTopics = [] } = useTopicsQuery();
+  const { data: allSubtopics = [] } = useSubtopicsQuery();
   const bulkCreateMutation = useBulkCreateQuestionsMutation();
   const { toast } = useToast();
 
   const [activeTab, setActiveTab] = useState<"FILE" | "JSON">("FILE");
   const [defaultSubjectId, setDefaultSubjectId] = useState<string>("");
+  const [defaultTopicId, setDefaultTopicId] = useState<string>("");
+  const [defaultSubtopicId, setDefaultSubtopicId] = useState<string>("");
+
   const [jsonText, setJsonText] = useState("");
-  const [parsedQuestions, setParsedQuestions] = useState<CreateQuestionRequest[]>([]);
+  const [parsedRows, setParsedRows] = useState<ParsedQuestionRow[]>([]);
+  const [rawFileRows, setRawFileRows] = useState<any[] | null>(null);
   const [parseError, setParseError] = useState<string | null>(null);
   const [fileName, setFileName] = useState<string | null>(null);
 
@@ -907,122 +922,62 @@ function SuperAdminImportQuestionsDialog({
     }
   }, [subjects, defaultSubjectId]);
 
-  // UUID validation helper
-  const isUUID = (val?: any): boolean =>
-    typeof val === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val.trim());
+  // Cascading topics filtered by selected default subject
+  const availableDefaultTopics = subjects.length > 0 && defaultSubjectId
+    ? allTopics.filter((t) => t.subjectId === defaultSubjectId || (t.subject && t.subject.id === defaultSubjectId))
+    : [];
 
-  // Helper to parse Excel row with PUBLIC visibility
-  const parseExcelRow = (row: any, fallbackSubId: string): CreateQuestionRequest | null => {
-    const norm: Record<string, any> = {};
-    for (const [k, v] of Object.entries(row)) {
-      norm[k.toLowerCase().replace(/[^a-z0-9]/g, "")] = v;
-    }
+  // Cascading subtopics filtered by selected default topic
+  const availableDefaultSubtopics = defaultTopicId
+    ? allSubtopics.filter((st) => st.topicId === defaultTopicId || (st.topic && st.topic.id === defaultTopicId))
+    : [];
 
-    const prompt = norm.prompt || norm.description || norm.question || norm.problem || norm.questiontext;
-    if (!prompt) return null;
-
-    const rawType = (norm.type || norm.questiontype || "MCQ").toString().toUpperCase();
-    const isCoding = rawType.includes("COD");
-    const questionType = isCoding ? "CODING" : "MCQ";
-
-    // Match subject by name or id
-    let subId = fallbackSubId;
-    const rawSub = (norm.subject || norm.subjectid || norm.subjectname || "").toString().trim();
-    if (rawSub) {
-      if (isUUID(rawSub)) {
-        subId = rawSub;
-      } else {
-        const match = subjects.find(
-          (s) => s.id.toLowerCase() === rawSub.toLowerCase() || s.name.toLowerCase() === rawSub.toLowerCase()
-        );
-        if (match) subId = match.id;
-      }
-    }
-
-    const rawTopic = (norm.topic || norm.topicid || norm.topicname || "").toString().trim();
-    const rawSubtopic = (norm.subtopic || norm.subtopicid || norm.subtopicname || "").toString().trim();
-
-    const title = norm.title || (String(prompt).length > 50 ? String(prompt).slice(0, 50) + "..." : String(prompt));
-    const marks = Math.max(1, Number(norm.marks || norm.points || norm.score) || 1);
-    const rawDiff = (norm.difficulty || "MEDIUM").toString().toUpperCase();
-    const difficulty: "EASY" | "MEDIUM" | "HARD" =
-      rawDiff === "EASY" ? "EASY" : rawDiff === "HARD" || rawDiff === "EXPERT" ? "HARD" : "MEDIUM";
-    const avg_time_seconds = Math.max(0, Number(norm.avgtimeseconds || norm.time || norm.avgtime) || 90);
-
-    let tags: string[] = [];
-    const rawTags = norm.tags || norm.tag || norm.categories;
-    if (Array.isArray(rawTags)) {
-      tags = rawTags.map((t) => String(t).trim()).filter(Boolean);
-    } else if (typeof rawTags === "string") {
-      tags = rawTags.split(",").map((t) => t.trim()).filter(Boolean);
-    }
-
-    const base: Partial<CreateQuestionRequest> = {
-      questionType,
-      prompt: String(prompt).trim(),
-      title: String(title).trim(),
-      subject_id: isUUID(subId) ? subId : fallbackSubId,
-      topic_id: isUUID(rawTopic) ? rawTopic : undefined,
-      subtopic_id: isUUID(rawSubtopic) ? rawSubtopic : undefined,
-      marks,
-      difficulty,
-      visibility: "PUBLIC", // SuperAdmin imported questions are always PUBLIC
-      avg_time_seconds,
-      domain: (norm.domain || "ENGINEERING").toUpperCase() as "ENGINEERING" | "BUSINESS" | "APTITUDE" | "CORPORATE" | "VERBAL_ABILITY",
-      cognitiveLevel: (norm.cognitivelevel || norm.cognitive || "APPLY").toUpperCase() as "REMEMBER" | "UNDERSTAND" | "APPLY" | "ANALYZE" | "EVALUATE" | "CREATE",
-      p_value: Number(norm.pvalue) || 0.45,
-      discrimination_index: Number(norm.discriminationindex) || 0.35,
-      status: "UNDER_REVIEW",
-      tags: tags.length ? tags : undefined,
+  // Helper to re-parse rows when default taxonomy fallbacks change
+  const reparseRowsWithContext = (
+    subId: string,
+    topId: string,
+    subtopId: string,
+    sourceRows: any[]
+  ) => {
+    const context: TaxonomyContext = {
+      subjects,
+      topics: allTopics,
+      subtopics: allSubtopics,
+      fallbackSubjectId: subId,
+      fallbackTopicId: topId || undefined,
+      fallbackSubtopicId: subtopId || undefined,
     };
 
-    if (questionType === "MCQ") {
-      const options: McqOption[] = [];
-      const correctRaw = String(norm.correctoption || norm.correctanswer || norm.answer || norm.correct || "1").toLowerCase();
+    const nextRows: ParsedQuestionRow[] = [];
+    for (let i = 0; i < sourceRows.length; i++) {
+      const parsed = parseImportRow(sourceRows[i], i + 1, context, "PUBLIC");
+      if (parsed) nextRows.push(parsed);
+    }
+    setParsedRows(nextRows);
+    setJsonText(JSON.stringify(nextRows.map((r) => r.question), null, 2));
+  };
 
-      for (let i = 1; i <= 10; i++) {
-        const optVal = norm[`option${i}`] || norm[`opt${i}`] || norm[`choice${i}`];
-        if (optVal != null && String(optVal).trim()) {
-          const optText = String(optVal).trim();
-          const isNumMatch = correctRaw.includes(String(i));
-          const isLetterMatch = correctRaw.includes(String.fromCharCode(96 + i));
-          const isTextMatch = correctRaw === optText.toLowerCase();
-          options.push({
-            text: optText,
-            isCorrect: isNumMatch || isLetterMatch || isTextMatch,
-          });
-        }
-      }
+  const handleDefaultSubjectChange = (newSubId: string) => {
+    setDefaultSubjectId(newSubId);
+    setDefaultTopicId("");
+    setDefaultSubtopicId("");
+    if (rawFileRows && rawFileRows.length > 0) {
+      reparseRowsWithContext(newSubId, "", "", rawFileRows);
+    }
+  };
 
-      if (options.length < 2) {
-        options.push({ text: "Option A", isCorrect: true }, { text: "Option B", isCorrect: false });
-      } else if (!options.some((o) => o.isCorrect)) {
-        options[0].isCorrect = true;
-      }
+  const handleDefaultTopicChange = (newTopId: string) => {
+    setDefaultTopicId(newTopId);
+    setDefaultSubtopicId("");
+    if (rawFileRows && rawFileRows.length > 0) {
+      reparseRowsWithContext(defaultSubjectId, newTopId, "", rawFileRows);
+    }
+  };
 
-      const multipleCorrect = options.filter((o) => o.isCorrect).length > 1;
-
-      return {
-        ...(base as CreateQuestionRequest),
-        mcqType: multipleCorrect ? "MULTIPLE_CORRECT" : "SINGLE_CORRECT",
-        multipleCorrect,
-        shuffleOptions: true,
-        mcqOptions: options,
-      };
-    } else {
-      return {
-        ...(base as CreateQuestionRequest),
-        constraints: norm.constraints || undefined,
-        timeLimitSecs: Number(norm.timelimit || norm.timelimitsecs) || 2,
-        memoryLimitMb: Number(norm.memorylimit || norm.memorylimitmb) || 256,
-        sampleExplanation: norm.sampleexplanation || norm.explanation || undefined,
-        languageTemplates: {
-          java: { template: "// Write your code here", driver: "// Execution harness" },
-          python: { template: "# Write your code here", driver: "# Execution harness" },
-          javascript: { template: "// Write your code here", driver: "// Execution harness" },
-        },
-        signatureMetadata: { method_name: "solve", return_type: "void", params: [] },
-      };
+  const handleDefaultSubtopicChange = (newSubtopId: string) => {
+    setDefaultSubtopicId(newSubtopId);
+    if (rawFileRows && rawFileRows.length > 0) {
+      reparseRowsWithContext(defaultSubjectId, defaultTopicId, newSubtopId, rawFileRows);
     }
   };
 
@@ -1041,17 +996,8 @@ function SuperAdminImportQuestionsDialog({
         try {
           const raw = JSON.parse(evt.target?.result as string);
           const list = Array.isArray(raw) ? raw : [raw];
-          const questions: CreateQuestionRequest[] = list.map((item) => ({
-            ...item,
-            subject_id: item.subject_id || item.subjectId || defaultSubjectId,
-            visibility: "PUBLIC",
-            marks: item.marks ? Math.max(1, Number(item.marks)) : 1,
-            domain: item.domain || "ENGINEERING",
-            cognitiveLevel: item.cognitiveLevel || "APPLY",
-            status: item.status || "ACTIVE",
-          }));
-          setParsedQuestions(questions);
-          setJsonText(JSON.stringify(questions, null, 2));
+          setRawFileRows(list);
+          reparseRowsWithContext(defaultSubjectId, defaultTopicId, defaultSubtopicId, list);
         } catch (err: any) {
           setParseError("Invalid JSON file: " + err.message);
         }
@@ -1070,19 +1016,8 @@ function SuperAdminImportQuestionsDialog({
             return;
           }
 
-          const questions: CreateQuestionRequest[] = [];
-          for (const row of rows) {
-            const parsed = parseExcelRow(row, defaultSubjectId);
-            if (parsed) questions.push(parsed);
-          }
-
-          if (questions.length === 0) {
-            setParseError("Could not extract any valid questions from the Excel file. Please check column headers.");
-            return;
-          }
-
-          setParsedQuestions(questions);
-          setJsonText(JSON.stringify(questions, null, 2));
+          setRawFileRows(rows);
+          reparseRowsWithContext(defaultSubjectId, defaultTopicId, defaultSubtopicId, rows);
         } catch (err: any) {
           setParseError("Failed to parse Excel file: " + err.message);
         }
@@ -1096,25 +1031,71 @@ function SuperAdminImportQuestionsDialog({
     setJsonText(text);
     setParseError(null);
     if (!text.trim()) {
-      setParsedQuestions([]);
+      setParsedRows([]);
+      setRawFileRows(null);
       return;
     }
     try {
       const raw = JSON.parse(text);
       const list = Array.isArray(raw) ? raw : [raw];
-      const questions: CreateQuestionRequest[] = list.map((item) => ({
-        ...item,
-        subject_id: item.subject_id || item.subjectId || defaultSubjectId,
-        visibility: "PUBLIC",
-        marks: item.marks ? Math.max(1, Number(item.marks)) : 1,
-        domain: item.domain || "ENGINEERING",
-        cognitiveLevel: item.cognitiveLevel || "APPLY",
-        status: item.status || "ACTIVE",
-      }));
-      setParsedQuestions(questions);
+      setRawFileRows(list);
+      reparseRowsWithContext(defaultSubjectId, defaultTopicId, defaultSubtopicId, list);
     } catch {
       setParseError("Invalid JSON syntax");
     }
+  };
+
+  // Inline row topic mapping
+  const handleRowTopicChange = (rowIndex: number, newTopicId: string) => {
+    setParsedRows((prev) => {
+      const copy = [...prev];
+      const target = { ...copy[rowIndex] };
+      const matchedTopic = allTopics.find((t) => t.id === newTopicId);
+
+      target.taxonomy = {
+        ...target.taxonomy,
+        topicId: newTopicId || undefined,
+        topicName: matchedTopic?.name,
+        topicStatus: newTopicId ? "MATCHED" : "NONE",
+        // Reset subtopic if topic changed
+        subtopicId: undefined,
+        subtopicName: undefined,
+        subtopicStatus: "NONE",
+      };
+
+      target.question = {
+        ...target.question,
+        topic_id: newTopicId || undefined,
+        subtopic_id: undefined,
+      };
+
+      copy[rowIndex] = target;
+      return copy;
+    });
+  };
+
+  // Inline row subtopic mapping
+  const handleRowSubtopicChange = (rowIndex: number, newSubtopicId: string) => {
+    setParsedRows((prev) => {
+      const copy = [...prev];
+      const target = { ...copy[rowIndex] };
+      const matchedSubtopic = allSubtopics.find((st) => st.id === newSubtopicId);
+
+      target.taxonomy = {
+        ...target.taxonomy,
+        subtopicId: newSubtopicId || undefined,
+        subtopicName: matchedSubtopic?.name,
+        subtopicStatus: newSubtopicId ? "MATCHED" : "NONE",
+      };
+
+      target.question = {
+        ...target.question,
+        subtopic_id: newSubtopicId || undefined,
+      };
+
+      copy[rowIndex] = target;
+      return copy;
+    });
   };
 
   // Download DoSelect Sample Excel
@@ -1125,62 +1106,27 @@ function SuperAdminImportQuestionsDialog({
     a.click();
   };
 
-  // Download Standard Sample Excel
-  const downloadSampleExcel = () => {
-    const sampleRows = [
-      {
-        Title: "Thread Safety in Java HashMap",
-        Type: "MCQ",
-        Prompt: "Which data structure provides synchronized thread-safe access in Java collections?",
-        Difficulty: "Medium",
-        Marks: 3,
-        "Option 1": "ConcurrentHashMap",
-        "Option 2": "HashMap",
-        "Option 3": "TreeMap",
-        "Option 4": "WeakHashMap",
-        "Correct Option": "1",
-        Tags: "java, concurrency, collections",
-        "Avg Time (s)": 90,
-      },
-      {
-        Title: "Two Sum Problem",
-        Type: "Coding",
-        Prompt: "Given an array of integers nums and an integer target, return indices of the two numbers such that they add up to target.",
-        Difficulty: "Easy",
-        Marks: 5,
-        "Time Limit (s)": 2,
-        "Memory Limit (MB)": 256,
-        Tags: "arrays, hashmap, algorithms",
-        "Avg Time (s)": 300,
-      },
-      {
-        Title: "SQL Transaction Isolation",
-        Type: "MCQ",
-        Prompt: "Which SQL isolation level prevents Phantom Reads?",
-        Difficulty: "Hard",
-        Marks: 4,
-        "Option 1": "Serializable",
-        "Option 2": "Read Committed",
-        "Option 3": "Repeatable Read",
-        "Option 4": "Read Uncommitted",
-        "Correct Option": "1",
-        Tags: "sql, dbms, acid",
-        "Avg Time (s)": 120,
-      },
-    ];
-
-    const ws = XLSX.utils.json_to_sheet(sampleRows);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Questions");
+  // Download Dynamic Standard Sample Excel
+  const downloadDynamicExcel = () => {
+    const wb = generateDynamicExcelTemplate({
+      subjects,
+      topics: allTopics,
+      subtopics: allSubtopics,
+    });
     XLSX.writeFile(wb, "superadmin_question_template.xlsx");
   };
 
   // Download Sample JSON
   const downloadSampleJson = () => {
+    const sampleSub = subjects[0]?.name || "Computer Science";
+    const sampleTop = allTopics.find((t) => subjects[0] && (t.subjectId === subjects[0].id || t.subject?.id === subjects[0].id))?.name || "Data Structures";
+
     const sampleJson = [
       {
         questionType: "MCQ",
         title: "Thread Safety in Java HashMap",
+        subject: sampleSub,
+        topic: sampleTop,
         prompt: "Which data structure provides synchronized thread-safe access in Java collections?",
         difficulty: "MEDIUM",
         marks: 3,
@@ -1200,6 +1146,8 @@ function SuperAdminImportQuestionsDialog({
       {
         questionType: "CODING",
         title: "LRU Cache Implementation",
+        subject: sampleSub,
+        topic: sampleTop,
         prompt: "Design a data structure that follows the constraints of a Least Recently Used (LRU) Cache.\n\nImplement the LRUCache class with get and put methods in O(1) time complexity.",
         difficulty: "HARD",
         marks: 10,
@@ -1227,9 +1175,17 @@ function SuperAdminImportQuestionsDialog({
     URL.revokeObjectURL(url);
   };
 
+  // Check metrics for preview table
+  const totalRows = parsedRows.length;
+  const unmatchedRows = parsedRows.filter(
+    (r) => r.taxonomy.topicStatus === "UNMATCHED" || r.taxonomy.subtopicStatus === "UNMATCHED" || r.taxonomy.subjectStatus === "UNMATCHED"
+  );
+  const unmatchedCount = unmatchedRows.length;
+  const matchedCount = totalRows - unmatchedCount;
+
   // Submit bulk create
   const handleBulkSubmit = async () => {
-    if (!parsedQuestions.length) {
+    if (!parsedRows.length) {
       toast({
         title: "No questions to import",
         description: "Please upload a valid file or JSON.",
@@ -1238,69 +1194,7 @@ function SuperAdminImportQuestionsDialog({
       return;
     }
 
-    const fallbackSub = isUUID(defaultSubjectId) ? defaultSubjectId : subjects[0]?.id;
-
-    // Ensure subject is attached and visibility is explicitly PUBLIC
-    const payload = parsedQuestions.map((q) => {
-      const isMcq = (q.questionType ?? "MCQ").toUpperCase() === "MCQ";
-      const subject_id = isUUID(q.subject_id) ? q.subject_id : fallbackSub;
-      const topic_id = isUUID(q.topic_id) ? q.topic_id : undefined;
-      const subtopic_id = isUUID(q.subtopic_id) ? q.subtopic_id : undefined;
-
-      if (isMcq) {
-        const multipleCorrect = Boolean(q.multipleCorrect);
-        return {
-          ...q,
-          questionType: "MCQ" as const,
-          subject_id,
-          topic_id,
-          subtopic_id,
-          visibility: "PUBLIC" as const,
-          mcqType: multipleCorrect ? ("MULTIPLE_CORRECT" as const) : ("SINGLE_CORRECT" as const),
-          multipleCorrect,
-          shuffleOptions: q.shuffleOptions ?? true,
-          marks: Math.max(1, Number(q.marks) || 1),
-          avg_time_seconds: Math.max(0, Number(q.avg_time_seconds) || 90),
-          domain: (q.domain || "ENGINEERING") as any,
-          cognitiveLevel: (q.cognitiveLevel || "APPLY") as any,
-          p_value: q.p_value ?? 0.45,
-          discrimination_index: q.discrimination_index ?? 0.35,
-          status: "ACTIVE" as const,
-          mcqOptions: (q.mcqOptions || []).map((o) => ({
-            text: String(o.text || "").trim(),
-            isCorrect: Boolean(o.isCorrect),
-          })),
-        };
-      } else {
-        return {
-          ...q,
-          questionType: "CODING" as const,
-          title: q.title || "Coding Challenge",
-          prompt: q.prompt,
-          subject_id,
-          topic_id,
-          subtopic_id,
-          visibility: "PUBLIC" as const,
-          marks: Math.max(1, Number(q.marks) || 1),
-          avg_time_seconds: Math.max(0, Number(q.avg_time_seconds) || 300),
-          timeLimitSecs: Number(q.timeLimitSecs) || 2,
-          memoryLimitMb: Number(q.memoryLimitMb) || 256,
-          constraints: q.constraints || undefined,
-          sampleExplanation: q.sampleExplanation || undefined,
-          domain: (q.domain || "ENGINEERING").toUpperCase() as "ENGINEERING" | "BUSINESS" | "APTITUDE" | "CORPORATE" | "VERBAL_ABILITY",
-          cognitiveLevel: (q.cognitiveLevel || "APPLY").toUpperCase() as "REMEMBER" | "UNDERSTAND" | "APPLY" | "ANALYZE" | "EVALUATE" | "CREATE",
-          p_value: q.p_value ?? 0.45,
-          discrimination_index: q.discrimination_index ?? 0.35,
-          status: "UNDER_REVIEW" as const,
-          languageTemplates: q.languageTemplates || {
-            java: { template: "// Write your code here", driver: "// Execution harness" },
-            python: { template: "# Write your code here", driver: "# Execution harness" },
-            javascript: { template: "// Write your code here", driver: "// Execution harness" },
-          },
-          signatureMetadata: q.signatureMetadata || { method_name: "solve", return_type: "void", params: [] },
-        };
-      }
-    });
+    const payload = parsedRows.map((r) => r.question);
 
     try {
       await bulkCreateMutation.mutateAsync(payload);
@@ -1322,7 +1216,7 @@ function SuperAdminImportQuestionsDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="w-[94vw] max-w-3xl bg-background rounded-xl border border-border p-5 sm:p-6 space-y-4 max-h-[88vh] overflow-y-auto overflow-x-hidden box-border shadow-2xl">
+      <DialogContent className="w-[96vw] max-w-4xl bg-background rounded-xl border border-border p-5 sm:p-6 space-y-4 max-h-[90vh] overflow-y-auto overflow-x-hidden box-border shadow-2xl">
         <DialogHeader className="pr-8 pb-3 border-b border-border flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5">
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
@@ -1334,7 +1228,7 @@ function SuperAdminImportQuestionsDialog({
               </Badge>
             </div>
             <p className="text-xs text-muted-foreground mt-0.5">
-              Upload an Excel (.xlsx, .xls, .csv) or JSON file to create global public questions accessible to all tenants.
+              Upload an Excel (.xlsx, .csv) or JSON file with intelligent taxonomy matching & pre-flight verification.
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-1.5 shrink-0">
@@ -1346,14 +1240,14 @@ function SuperAdminImportQuestionsDialog({
               title="Download DoSelect-style Professional 5-Question Excel Template"
             >
               <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
-              <span>DoSelect Sample (5 Qs)</span>
+              <span>DoSelect Sample</span>
             </Button>
             <Button
               variant="outline"
               size="sm"
-              onClick={downloadSampleExcel}
+              onClick={downloadDynamicExcel}
               className="flex items-center gap-1 h-7 px-2 text-[11px] font-medium border-border"
-              title="Download Standard Excel Template"
+              title="Download Dynamic Excel Template with System Taxonomy Reference"
             >
               <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
               <span>Excel Template</span>
@@ -1371,6 +1265,79 @@ function SuperAdminImportQuestionsDialog({
           </div>
         </DialogHeader>
 
+        {/* 1. Cascading Batch Hierarchy Selector */}
+        <div className="p-3.5 bg-muted/40 rounded-xl border border-border space-y-2.5">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold text-foreground flex items-center gap-1.5">
+              <FolderTree className="w-3.5 h-3.5 text-primary" />
+              Batch Hierarchy Defaults (Fallback Selector)
+            </span>
+            <span className="text-[11px] text-muted-foreground hidden sm:inline">
+              Auto-inherited by rows without specific taxonomy
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+            {/* Target Subject (Required) */}
+            <div className="space-y-1">
+              <label className="text-[11px] font-semibold text-foreground flex items-center gap-1">
+                <span>Target Subject</span>
+                <span className="text-destructive">*</span>
+              </label>
+              <select
+                value={defaultSubjectId}
+                onChange={(e) => handleDefaultSubjectChange(e.target.value)}
+                className="w-full bg-background border border-input rounded-md px-2.5 py-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring cursor-pointer"
+              >
+                {subjects.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Target Topic (Optional) */}
+            <div className="space-y-1">
+              <label className="text-[11px] font-semibold text-foreground">
+                Target Topic <span className="text-[10px] text-muted-foreground font-normal">(Optional)</span>
+              </label>
+              <select
+                value={defaultTopicId}
+                onChange={(e) => handleDefaultTopicChange(e.target.value)}
+                className="w-full bg-background border border-input rounded-md px-2.5 py-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring cursor-pointer"
+              >
+                <option value="">-- All Topics / Unassigned --</option>
+                {availableDefaultTopics.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Target Subtopic (Optional) */}
+            <div className="space-y-1">
+              <label className="text-[11px] font-semibold text-foreground">
+                Target Subtopic <span className="text-[10px] text-muted-foreground font-normal">(Optional)</span>
+              </label>
+              <select
+                value={defaultSubtopicId}
+                disabled={!defaultTopicId || availableDefaultSubtopics.length === 0}
+                onChange={(e) => handleDefaultSubtopicChange(e.target.value)}
+                className="w-full bg-background border border-input rounded-md px-2.5 py-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <option value="">-- All Subtopics / Unassigned --</option>
+                {availableDefaultSubtopics.map((st) => (
+                  <option key={st.id} value={st.id}>
+                    {st.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+        </div>
+
         {/* Tab Selection */}
         <div className="flex items-center gap-2 border-b border-border pb-2.5">
           <button
@@ -1383,7 +1350,7 @@ function SuperAdminImportQuestionsDialog({
             }`}
           >
             <Upload className="w-3.5 h-3.5" />
-            <span>Upload File (.xlsx / .json)</span>
+            <span>Upload File (.xlsx / .csv / .json)</span>
           </button>
           <button
             type="button"
@@ -1399,47 +1366,26 @@ function SuperAdminImportQuestionsDialog({
           </button>
         </div>
 
-        {/* Default Subject Fallback */}
-        <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 p-3 bg-muted/40 rounded-lg border border-border">
-          <label className="text-xs font-semibold text-foreground shrink-0">
-            Default Subject:
-          </label>
-          <select
-            value={defaultSubjectId}
-            onChange={(e) => setDefaultSubjectId(e.target.value)}
-            className="flex-1 min-w-0 bg-background border border-input rounded-md px-2.5 py-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring cursor-pointer"
-          >
-            {subjects.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name}
-              </option>
-            ))}
-          </select>
-          <span className="text-[11px] text-muted-foreground shrink-0">
-            Fallback for rows without a subject
-          </span>
-        </div>
-
         {/* Tab Content */}
         {activeTab === "FILE" ? (
           <div className="w-full">
             <label
               htmlFor="superadmin-file-upload-input"
-              className="border-2 border-dashed border-border hover:border-primary/50 bg-muted/20 hover:bg-muted/40 transition-colors rounded-xl p-6 flex flex-col items-center justify-center gap-2 cursor-pointer w-full text-center group"
+              className="border-2 border-dashed border-border hover:border-primary/50 bg-muted/20 hover:bg-muted/40 transition-colors rounded-xl p-5 flex flex-col items-center justify-center gap-2 cursor-pointer w-full text-center group"
             >
-              <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center group-hover:scale-110 transition-transform">
-                <Upload className="w-5 h-5 text-primary" />
+              <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center group-hover:scale-110 transition-transform">
+                <Upload className="w-4 h-4 text-primary" />
               </div>
               <div>
                 <p className="text-xs font-semibold text-foreground">
-                  Click to browse or drag and drop your file here
+                  Click to browse or drag and drop your question spreadsheet
                 </p>
                 <p className="text-[11px] text-muted-foreground mt-0.5">
-                  Supports Excel (.xlsx, .xls, .csv) and JSON (.json)
+                  Supports Excel (.xlsx, .xls, .csv) and JSON (.json) with case-insensitive taxonomy matching
                 </p>
               </div>
               {fileName && (
-                <div className="mt-2 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-primary/10 border border-primary/20 text-xs font-medium text-primary">
+                <div className="mt-1.5 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-primary/10 border border-primary/20 text-xs font-medium text-primary">
                   <CheckCircle2 className="w-3.5 h-3.5" />
                   <span>Selected: {fileName}</span>
                 </div>
@@ -1459,10 +1405,10 @@ function SuperAdminImportQuestionsDialog({
               Paste or Edit JSON Array:
             </label>
             <textarea
-              rows={8}
+              rows={7}
               value={jsonText}
               onChange={(e) => handleJsonChange(e.target.value)}
-              placeholder={`[\n  {\n    "questionType": "MCQ",\n    "title": "Sample Question",\n    "prompt": "What is the capital of France?",\n    "marks": 2,\n    "difficulty": "EASY",\n    "mcqOptions": [\n      { "text": "Paris", "isCorrect": true },\n      { "text": "London", "isCorrect": false }\n    ]\n  }\n]`}
+              placeholder={`[\n  {\n    "questionType": "MCQ",\n    "title": "Sample Question",\n    "subject": "Computer Science",\n    "topic": "Data Structures",\n    "prompt": "What is the time complexity of binary search?",\n    "marks": 2,\n    "difficulty": "EASY",\n    "mcqOptions": [\n      { "text": "O(log n)", "isCorrect": true },\n      { "text": "O(n)", "isCorrect": false }\n    ]\n  }\n]`}
               className="w-full font-mono text-[11px] p-3 rounded-lg border border-input bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-ring resize-y leading-relaxed"
             />
           </div>
@@ -1476,57 +1422,209 @@ function SuperAdminImportQuestionsDialog({
           </div>
         )}
 
-        {/* Parsed Preview Table */}
-        {parsedQuestions.length > 0 && (
-          <div className="space-y-2 border-t border-border pt-3">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-foreground">
-                Parsed Questions Preview ({parsedQuestions.length})
+        {/* 2. Interactive Pre-Flight Mapping & Preview Table */}
+        {totalRows > 0 && (
+          <div className="space-y-2.5 border-t border-border pt-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-foreground">
+                  Pre-Flight Mapping & Preview ({totalRows} Questions)
+                </span>
+                <Badge variant="outline" className="text-[10px] text-emerald-600 border-emerald-500/20 bg-emerald-500/5">
+                  ✅ {matchedCount} Ready
+                </Badge>
+                {unmatchedCount > 0 && (
+                  <Badge variant="outline" className="text-[10px] text-amber-600 border-amber-500/20 bg-amber-500/10 animate-pulse">
+                    ⚠️ {unmatchedCount} Require Mapping
+                  </Badge>
+                )}
+              </div>
+              <span className="text-[11px] text-muted-foreground">
+                Verify taxonomy mapping before confirming
               </span>
-              <Badge variant="outline" className="text-[10px] text-primary border-primary/20 bg-primary/5">
-                Ready to Import as PUBLIC
-              </Badge>
             </div>
-            <div className="max-h-44 overflow-y-auto border border-border rounded-lg">
+
+            {unmatchedCount > 0 && (
+              <div className="flex items-center gap-2 p-2.5 bg-amber-500/10 border border-amber-500/20 rounded-lg text-amber-700 dark:text-amber-400 text-xs">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                <span>
+                  {unmatchedCount} question(s) contain topic/subject names not found in the database. Use the inline dropdowns below to map them.
+                </span>
+              </div>
+            )}
+
+            <div className="max-h-56 overflow-y-auto border border-border rounded-lg">
               <Table className="text-xs">
-                <TableHeader className="bg-muted/50 sticky top-0">
+                <TableHeader className="bg-muted/60 sticky top-0 z-10 backdrop-blur-sm">
                   <TableRow>
-                    <TableHead className="w-10 py-1.5 text-[11px]">#</TableHead>
-                    <TableHead className="py-1.5 text-[11px]">Type</TableHead>
-                    <TableHead className="py-1.5 text-[11px]">Title / Prompt</TableHead>
-                    <TableHead className="py-1.5 text-[11px]">Diff</TableHead>
-                    <TableHead className="py-1.5 text-[11px]">Marks</TableHead>
+                    <TableHead className="w-8 py-2 text-[11px]">#</TableHead>
+                    <TableHead className="w-16 py-2 text-[11px]">Type</TableHead>
+                    <TableHead className="py-2 text-[11px] min-w-[160px]">Title / Prompt</TableHead>
+                    <TableHead className="py-2 text-[11px] min-w-[120px]">Detected Subject</TableHead>
+                    <TableHead className="py-2 text-[11px] min-w-[180px]">Detected Topic</TableHead>
+                    <TableHead className="py-2 text-[11px] min-w-[150px]">Subtopic</TableHead>
+                    <TableHead className="w-20 py-2 text-[11px] text-right">Status</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {parsedQuestions.map((q, idx) => (
-                    <TableRow key={idx} className="hover:bg-muted/40">
-                      <TableCell className="py-1.5 text-muted-foreground font-mono text-[11px]">
-                        {idx + 1}
-                      </TableCell>
-                      <TableCell className="py-1.5">
-                        <Badge
-                          variant="secondary"
-                          className={`text-[9px] px-1 py-0 font-medium ${
-                            (q.questionType ?? "MCQ").toUpperCase() === "CODING"
-                              ? "bg-blue-500/10 text-blue-600 border-blue-500/20"
-                              : "bg-emerald-500/10 text-emerald-600 border-emerald-500/20"
-                          }`}
-                        >
-                          {(q.questionType ?? "MCQ").toUpperCase()}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="py-1.5 max-w-[320px] truncate text-foreground font-medium text-[11px]">
-                        {q.title || q.prompt}
-                      </TableCell>
-                      <TableCell className="py-1.5 text-muted-foreground text-[10px]">
-                        {q.difficulty || "MEDIUM"}
-                      </TableCell>
-                      <TableCell className="py-1.5 text-muted-foreground text-[10px]">
-                        {q.marks || 1}
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                  {parsedRows.map((row, idx) => {
+                    const rowSubjectTopics = allTopics.filter(
+                      (t) => t.subjectId === row.taxonomy.subjectId || (t.subject && t.subject.id === row.taxonomy.subjectId)
+                    );
+                    const rowTopicSubtopics = row.taxonomy.topicId
+                      ? allSubtopics.filter(
+                          (st) => st.topicId === row.taxonomy.topicId || (st.topic && st.topic.id === row.taxonomy.topicId)
+                        )
+                      : [];
+
+                    const hasIssue =
+                      row.taxonomy.topicStatus === "UNMATCHED" ||
+                      row.taxonomy.subtopicStatus === "UNMATCHED" ||
+                      row.taxonomy.subjectStatus === "UNMATCHED";
+
+                    return (
+                      <TableRow key={row.id} className={hasIssue ? "bg-amber-500/5 hover:bg-amber-500/10" : "hover:bg-muted/40"}>
+                        <TableCell className="py-2 text-muted-foreground font-mono text-[11px]">
+                          {idx + 1}
+                        </TableCell>
+                        <TableCell className="py-2">
+                          <Badge
+                            variant="secondary"
+                            className={`text-[9px] px-1 py-0 font-medium ${
+                              row.question.questionType === "CODING"
+                                ? "bg-blue-500/10 text-blue-600 border-blue-500/20"
+                                : "bg-emerald-500/10 text-emerald-600 border-emerald-500/20"
+                            }`}
+                          >
+                            {row.question.questionType}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="py-2 max-w-[200px] truncate text-foreground font-medium text-[11px]">
+                          <span title={row.question.prompt}>
+                            {row.question.title || row.question.prompt}
+                          </span>
+                        </TableCell>
+                        <TableCell className="py-2">
+                          <div className="flex flex-col">
+                            <span className="text-xs text-foreground font-medium truncate max-w-[120px]">
+                              {row.taxonomy.subjectName || "Default Subject"}
+                            </span>
+                            {row.taxonomy.subjectStatus === "FALLBACK" && (
+                              <span className="text-[10px] text-muted-foreground">(Inherited)</span>
+                            )}
+                            {row.taxonomy.subjectStatus === "UNMATCHED" && (
+                              <span className="text-[10px] text-amber-600">
+                                Unmatched ("{row.taxonomy.rawSubject}")
+                              </span>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell className="py-2">
+                          {row.taxonomy.topicStatus === "MATCHED" ? (
+                            <div className="flex items-center gap-1.5">
+                              <Badge variant="outline" className="bg-emerald-500/10 text-emerald-600 border-emerald-500/20 text-[10px] py-0 font-normal">
+                                {row.taxonomy.topicName} (Matched)
+                              </Badge>
+                            </div>
+                          ) : row.taxonomy.topicStatus === "UNMATCHED" ? (
+                            <div className="space-y-1">
+                              <div className="text-[10px] text-amber-600 font-semibold flex items-center gap-1">
+                                <AlertCircle className="w-3 h-3 shrink-0" />
+                                <span>Unmatched ("{row.taxonomy.rawTopic}")</span>
+                              </div>
+                              <select
+                                value={row.taxonomy.topicId || ""}
+                                onChange={(e) => handleRowTopicChange(idx, e.target.value)}
+                                className="w-full bg-background border border-amber-300 dark:border-amber-700/60 rounded px-2 py-0.5 text-xs text-foreground focus:ring-1 focus:ring-amber-500 cursor-pointer"
+                              >
+                                <option value="">-- Map to Topic --</option>
+                                {rowSubjectTopics.map((t) => (
+                                  <option key={t.id} value={t.id}>
+                                    {t.name}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                          ) : row.taxonomy.topicStatus === "FALLBACK" ? (
+                            <div className="flex items-center gap-1">
+                              <span className="text-xs text-muted-foreground">
+                                {row.taxonomy.topicName}
+                              </span>
+                              <span className="text-[10px] text-muted-foreground/70">(Default)</span>
+                            </div>
+                          ) : (
+                            <select
+                              value={row.taxonomy.topicId || ""}
+                              onChange={(e) => handleRowTopicChange(idx, e.target.value)}
+                              className="w-full bg-background/50 border border-input rounded px-1.5 py-0.5 text-[11px] text-muted-foreground cursor-pointer"
+                            >
+                              <option value="">-- Assign Topic --</option>
+                              {rowSubjectTopics.map((t) => (
+                                <option key={t.id} value={t.id}>
+                                  {t.name}
+                                </option>
+                              ))}
+                            </select>
+                          )}
+                        </TableCell>
+                        <TableCell className="py-2">
+                          {row.taxonomy.subtopicStatus === "MATCHED" ? (
+                            <Badge variant="outline" className="bg-emerald-500/10 text-emerald-600 border-emerald-500/20 text-[10px] py-0 font-normal">
+                              {row.taxonomy.subtopicName}
+                            </Badge>
+                          ) : row.taxonomy.subtopicStatus === "UNMATCHED" ? (
+                            <div className="space-y-1">
+                              <div className="text-[10px] text-amber-600 font-semibold">
+                                Unmatched ("{row.taxonomy.rawSubtopic}")
+                              </div>
+                              <select
+                                value={row.taxonomy.subtopicId || ""}
+                                onChange={(e) => handleRowSubtopicChange(idx, e.target.value)}
+                                className="w-full bg-background border border-amber-300 dark:border-amber-700/60 rounded px-2 py-0.5 text-xs text-foreground focus:ring-1 focus:ring-amber-500 cursor-pointer"
+                              >
+                                <option value="">-- Map Subtopic --</option>
+                                {rowTopicSubtopics.map((st) => (
+                                  <option key={st.id} value={st.id}>
+                                    {st.name}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                          ) : row.taxonomy.subtopicStatus === "FALLBACK" ? (
+                            <span className="text-xs text-muted-foreground">
+                              {row.taxonomy.subtopicName} <span className="text-[10px] text-muted-foreground/70">(Default)</span>
+                            </span>
+                          ) : rowTopicSubtopics.length > 0 ? (
+                            <select
+                              value={row.taxonomy.subtopicId || ""}
+                              onChange={(e) => handleRowSubtopicChange(idx, e.target.value)}
+                              className="w-full bg-background/50 border border-input rounded px-1.5 py-0.5 text-[11px] text-muted-foreground cursor-pointer"
+                            >
+                              <option value="">-- Subtopic --</option>
+                              {rowTopicSubtopics.map((st) => (
+                                <option key={st.id} value={st.id}>
+                                  {st.name}
+                                </option>
+                              ))}
+                            </select>
+                          ) : (
+                            <span className="text-[11px] text-muted-foreground/60">--</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="py-2 text-right">
+                          {hasIssue ? (
+                            <Badge variant="outline" className="bg-amber-500/10 text-amber-600 border-amber-500/20 text-[10px] font-semibold whitespace-nowrap">
+                              ⚠️ Action
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline" className="bg-emerald-500/10 text-emerald-600 border-emerald-500/20 text-[10px] font-semibold whitespace-nowrap">
+                              ✅ Ready
+                            </Badge>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
                 </TableBody>
               </Table>
             </div>
@@ -1548,7 +1646,7 @@ function SuperAdminImportQuestionsDialog({
             variant="hero"
             size="sm"
             onClick={handleBulkSubmit}
-            disabled={parsedQuestions.length === 0 || bulkCreateMutation.isPending}
+            disabled={parsedRows.length === 0 || bulkCreateMutation.isPending}
             className="text-xs gap-1.5"
           >
             {bulkCreateMutation.isPending ? (
@@ -1559,7 +1657,7 @@ function SuperAdminImportQuestionsDialog({
             ) : (
               <>
                 <Upload className="w-3.5 h-3.5" />
-                <span>Import {parsedQuestions.length} Questions</span>
+                <span>Import {parsedRows.length} Questions</span>
               </>
             )}
           </Button>
@@ -1568,4 +1666,5 @@ function SuperAdminImportQuestionsDialog({
     </Dialog>
   );
 }
+
 
