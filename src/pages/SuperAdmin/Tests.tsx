@@ -419,14 +419,6 @@ export default function Tests() {
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                      <DropdownMenuItem
-                        onClick={() =>
-                          window.open(`/test/welcome-preview?testId=${test.id}`, "_blank")
-                        }
-                      >
-                        <Eye className="w-4 h-4 mr-2" />
-                        Preview Test
-                      </DropdownMenuItem>
                       <DropdownMenuItem onClick={() => handleViewDetails(test)}>
                         <FileText className="w-4 h-4 mr-2" />
                         View Details

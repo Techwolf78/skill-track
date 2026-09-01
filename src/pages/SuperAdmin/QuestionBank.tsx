@@ -534,7 +534,7 @@ export default function SuperAdminQuestionBank() {
                           <div className="space-y-1.5">
                             <div className="flex items-center gap-2 flex-wrap">
                               <p className="font-semibold tracking-tight leading-none text-sm text-foreground">
-                                {question.title || question.prompt?.substring(0, 60)}
+                                {question.title || (question.prompt ? question.prompt.replace(/<[^>]*>/g, " ").replace(/&nbsp;/g, " ").replace(/\s+/g, " ").trim().substring(0, 60) : "")}
                               </p>
                               <Badge variant="outline" className="text-[10px] uppercase">
                                 {question.format || "MCQ"}
@@ -556,7 +556,7 @@ export default function SuperAdminQuestionBank() {
                               )}
                             </div>
                             <p className="text-xs text-muted-foreground line-clamp-2 font-normal">
-                              {question.prompt}
+                              {question.prompt ? question.prompt.replace(/<[^>]*>/g, " ").replace(/&nbsp;/g, " ").replace(/\s+/g, " ").trim() : ""}
                             </p>
                             {question.tags && question.tags.length > 0 && (
                               <div className="flex gap-1.5 flex-wrap pt-1">

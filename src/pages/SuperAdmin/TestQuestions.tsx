@@ -513,7 +513,14 @@ const handleAddQuestions = async () => {
                           {question.marks || 0} marks
                         </Badge>
                       </div>
-                      <p className="text-sm font-medium">{question.prompt}</p>
+                      {/<[a-z][\s\S]*>/i.test(question.prompt || "") ? (
+                        <div
+                          className="text-sm font-medium prose prose-sm max-w-none"
+                          dangerouslySetInnerHTML={{ __html: question.prompt || "" }}
+                        />
+                      ) : (
+                        <p className="text-sm font-medium">{question.prompt}</p>
+                      )}
                       {question.mcqOptions &&
                         question.mcqOptions.length > 0 && (
                           <div className="mt-2 text-xs text-muted-foreground">

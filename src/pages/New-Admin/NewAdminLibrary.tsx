@@ -29,6 +29,7 @@ import {
   Save,
   Copy,
   FolderTree,
+  Edit,
 } from "lucide-react";
 import * as XLSX from "xlsx";
 import {
@@ -58,7 +59,9 @@ type LibraryType = "PUBLIC" | "ORG_OWNED";
 type ProblemType =
   | "ALL"
   | "CODING"
-  | "MCQ"
+  | "LANGUAGE_SPECIFIC_CODING"
+  | "SINGLE_CORRECT"
+  | "MULTIPLE_CORRECT"
   | "TRUE_FALSE"
   | "ASSERTION_REASON"
   | "FILL_IN_THE_BLANK";
@@ -149,11 +152,11 @@ const fmtMcqType = (t?: string) => {
   if (!t) return null;
   switch (t.toUpperCase()) {
     case "SINGLE_CORRECT":
-      return "Single";
+      return "Single Choice";
     case "MULTIPLE_CORRECT":
-      return "Multiple";
+      return "Multiple Choice";
     case "TRUE_FALSE":
-      return "True/False";
+      return "True / False";
     case "ASSERTION_REASON":
       return "Assertion Reason";
     case "FILL_IN_THE_BLANK":
@@ -242,7 +245,7 @@ function CreateProblemModal({
   onOpenBulkUploader: () => void;
 }) {
   const [name, setName] = useState("");
-  const [problemCategory, setProblemCategory] = useState<string>("MCQ");
+  const [problemCategory, setProblemCategory] = useState<string>("SINGLE_CORRECT");
   const [level, setLevel] = useState<"EASY" | "MEDIUM" | "HARD">("MEDIUM");
 
   if (!isOpen) return null;
@@ -256,10 +259,10 @@ function CreateProblemModal({
     const isCoding = problemCategory === "CODING" || problemCategory === "LANGUAGE_SPECIFIC_CODING";
     const isLanguageSpecific = problemCategory === "LANGUAGE_SPECIFIC_CODING";
     let mcqType: McqType = "SINGLE_CORRECT";
-    if (problemCategory === "TRUE_FALSE") mcqType = "TRUE_FALSE";
+    if (problemCategory === "MULTIPLE_CORRECT") mcqType = "MULTIPLE_CORRECT";
+    else if (problemCategory === "TRUE_FALSE") mcqType = "TRUE_FALSE";
     else if (problemCategory === "ASSERTION_REASON") mcqType = "ASSERTION_REASON";
     else if (problemCategory === "FILL_IN_THE_BLANK") mcqType = "FILL_IN_THE_BLANK";
-    else if (problemCategory === "MULTIPLE_CORRECT") mcqType = "MULTIPLE_CORRECT";
 
     onCreate({
       title: name.trim(),
@@ -316,9 +319,10 @@ function CreateProblemModal({
                   onChange={(e) => setProblemCategory(e.target.value)}
                   className="w-full appearance-none bg-transparent py-2 pr-8 text-sm text-slate-800 font-medium focus:outline-none cursor-pointer"
                 >
-                  <option value="CODING">Coding (Multi-Language)</option>
-                  <option value="LANGUAGE_SPECIFIC_CODING">Language-Specific Coding</option>
-                  <option value="MCQ">Multiple-choice</option>
+                  <option value="CODING">Coding</option>
+                  <option value="LANGUAGE_SPECIFIC_CODING">Language Specific</option>
+                  <option value="SINGLE_CORRECT">Single Choice</option>
+                  <option value="MULTIPLE_CORRECT">Multiple Choice</option>
                   <option value="TRUE_FALSE">True / False</option>
                   <option value="ASSERTION_REASON">Assertion Reason</option>
                   <option value="FILL_IN_THE_BLANK">Fill in the blanks</option>
@@ -1167,11 +1171,11 @@ export default function NewAdminLibrary() {
       if (problemType !== "ALL") {
         const qt = (q.questionType ?? "").toUpperCase();
         if (problemType === "CODING") {
-          if (qt !== "CODING") return false;
-        } else if (problemType === "MCQ") {
-          if (qt !== "MCQ") return false;
+          if (qt !== "CODING" || q.isLanguageSpecific) return false;
+        } else if (problemType === "LANGUAGE_SPECIFIC_CODING") {
+          if (qt !== "CODING" || !q.isLanguageSpecific) return false;
         } else {
-          // Specific MCQ Subtype filter (TRUE_FALSE, ASSERTION_REASON, FILL_IN_THE_BLANK)
+          // Specific MCQ Subtype filter (SINGLE_CORRECT, MULTIPLE_CORRECT, TRUE_FALSE, ASSERTION_REASON, FILL_IN_THE_BLANK)
           if (qt !== "MCQ") return false;
           const mt = getQuestionMcqType(q);
           if (mt !== problemType) return false;
@@ -1314,7 +1318,9 @@ export default function NewAdminLibrary() {
               {[
                 { key: "ALL", label: "All" },
                 { key: "CODING", label: "Coding" },
-                { key: "MCQ", label: "Multiple-choice" },
+                { key: "LANGUAGE_SPECIFIC_CODING", label: "Language Specific" },
+                { key: "SINGLE_CORRECT", label: "Single Choice" },
+                { key: "MULTIPLE_CORRECT", label: "Multiple Choice" },
                 { key: "TRUE_FALSE", label: "True / False" },
                 { key: "ASSERTION_REASON", label: "Assertion Reason" },
                 { key: "FILL_IN_THE_BLANK", label: "Fill in the blanks" },
@@ -1497,6 +1503,16 @@ export default function NewAdminLibrary() {
                         {q.title || "Not available"}
                       </h3>
                       <div className="flex items-center gap-3 shrink-0 text-slate-400">
+                        {/* Edit Button for ORG_OWNED / Company Questions */}
+                        {(q.visibility === "ORG_OWNED" || selectedLibrary === "ORG_OWNED") && (
+                          <button
+                            onClick={() => navigate(`/admin/questions/edit/${q.id}`, { state: q })}
+                            className="p-0.5 hover:text-indigo-600 transition-colors cursor-pointer"
+                            title="Edit Question"
+                          >
+                            <Edit className="w-4 h-4" />
+                          </button>
+                        )}
                         {isCoding && (
                           <button
                             onClick={() => navigate(`/admin/playground/${q.id}`)}
@@ -1526,10 +1542,10 @@ export default function NewAdminLibrary() {
                     <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-slate-500 font-medium">
                       <div className="flex items-center gap-1">
                         <span className="text-slate-400 font-mono text-[13px] leading-none">≡</span>
-                        <span>{isCoding ? "Coding" : "MCQ"}</span>
+                        <span>{isCoding ? (q.isLanguageSpecific ? "Language Specific" : "Coding") : "MCQ"}</span>
                       </div>
 
-                      {/* Lifecycle and Language Verification Badges */}
+                      {/* Lifecycle Status Badge */}
                       {isCoding && (
                         <div className="flex items-center gap-1.5 flex-wrap">
                           <span
@@ -1538,12 +1554,6 @@ export default function NewAdminLibrary() {
                           >
                             {q.status === "UNDER_REVIEW" ? "Under Review" : "Active"}
                           </span>
-
-                          {q.isLanguageSpecific && (
-                            <span className="text-[10px] bg-slate-100 text-slate-600 font-medium px-1.5 py-0.5 rounded border border-slate-200">
-                              Single-Lang
-                            </span>
-                          )}
                         </div>
                       )}
 
@@ -1587,7 +1597,13 @@ export default function NewAdminLibrary() {
 
                     {/* Problem Statement / Description */}
                     <p className="pt-0.5 text-xs text-slate-600 leading-relaxed font-normal line-clamp-3">
-                      {q.prompt || "Not available"}
+                      {q.prompt
+                        ? q.prompt
+                            .replace(/<[^>]*>/g, " ")
+                            .replace(/&nbsp;/g, " ")
+                            .replace(/\s+/g, " ")
+                            .trim()
+                        : "Not available"}
                     </p>
                   </div>
                 );

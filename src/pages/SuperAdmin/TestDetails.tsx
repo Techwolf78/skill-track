@@ -521,7 +521,14 @@ export default function TestDetails() {
                           </TableCell>
                           <TableCell>
                             <div>
-                              <p>{question.prompt}</p>
+                              {/<[a-z][\s\S]*>/i.test(question.prompt || "") ? (
+                                <div
+                                  className="text-sm prose prose-sm max-w-none"
+                                  dangerouslySetInnerHTML={{ __html: question.prompt || "" }}
+                                />
+                              ) : (
+                                <p>{question.prompt}</p>
+                              )}
                               {question.mcqOptions &&
                                 question.mcqOptions.length > 0 && (
                                   <div className="text-xs text-muted-foreground mt-1">

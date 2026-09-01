@@ -12,6 +12,7 @@ import {
   CheckCircle2,
   Info,
   Loader2,
+  Edit,
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
@@ -32,10 +33,10 @@ const fmt = (s?: string) =>
   s ? s.charAt(0).toUpperCase() + s.slice(1).toLowerCase() : "—";
 
 const fmtMcqType = (t?: string) => {
-  if (!t) return "MCQ";
+  if (!t) return "Single Choice";
   switch (t.toUpperCase()) {
     case "SINGLE_CORRECT":
-      return "MCQ";
+      return "Single Choice";
     case "MULTIPLE_CORRECT":
       return "Multiple Choice";
     case "TRUE_FALSE":
@@ -259,14 +260,23 @@ export default function NewAdminQuestionPreview() {
 
         {/* Title & Type Metadata Row (Tightly above white card matching Create Question) */}
         <div className="space-y-1.5 mb-4 text-white">
-          <div className="flex items-center gap-2.5">
+          <div className="flex items-center justify-between gap-4">
             <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-white">
               {question.title || "Untitled Problem"}
             </h1>
+            {question.visibility === "ORG_OWNED" && (
+              <button
+                onClick={() => navigate(`/admin/questions/edit/${question.id}`, { state: question })}
+                className="px-3 py-1.5 bg-[#4353a4] hover:bg-[#38468d] text-white text-xs font-semibold rounded shadow-xs inline-flex items-center gap-1.5 transition-colors cursor-pointer"
+              >
+                <Edit className="w-3.5 h-3.5" />
+                <span>Edit Problem</span>
+              </button>
+            )}
           </div>
           <div className="flex flex-wrap items-center gap-4 text-xs text-slate-300 font-medium">
             <span className="flex items-center gap-1.5 font-mono text-slate-300">
-              <span className="text-slate-400">=</span> {isCoding ? "Coding" : fmtMcqType(question.mcqType) || "MCQ"}
+              <span className="text-slate-400">=</span> {isCoding ? (question.isLanguageSpecific ? "Language Specific" : "Coding") : fmtMcqType(question.mcqType) || "MCQ"}
             </span>
             <span className="flex items-center gap-1.5 text-slate-300">
               <DifficultyIcon level={question.difficulty} />

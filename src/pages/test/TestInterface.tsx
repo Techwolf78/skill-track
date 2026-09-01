@@ -1582,15 +1582,24 @@ useEffect(() => {
                           </Badge>
                         )}
                       </div>
-                      {currentQuestion.prompt && /<[a-z][\s\S]*>/i.test(currentQuestion.prompt) ? (
+                      {currentQuestion.title &&
+                        !/<[a-z][\s\S]*>/i.test(currentQuestion.title) &&
+                        currentQuestion.title !== currentQuestion.prompt && (
+                          <h2 className="text-lg font-bold text-slate-900 mt-2 mb-1">
+                            {currentQuestion.title}
+                          </h2>
+                        )}
+                      {/<[a-z][\s\S]*>/i.test(currentQuestion.prompt || currentQuestion.title || "") ? (
                         <div
                           className="text-base font-normal mt-3 prose prose-slate max-w-none [&_ol]:list-decimal [&_ol]:pl-5 [&_ul]:list-disc [&_ul]:pl-5 [&_pre]:bg-slate-900 [&_pre]:text-slate-100 [&_pre]:p-3 [&_pre]:rounded-sm [&_code]:bg-slate-100 [&_code]:text-pink-600 [&_code]:px-1 [&_code]:py-0.5"
-                          dangerouslySetInnerHTML={{ __html: currentQuestion.prompt }}
+                          dangerouslySetInnerHTML={{
+                            __html: currentQuestion.prompt || currentQuestion.title || "",
+                          }}
                         />
                       ) : (
-                        <h2 className="text-lg font-medium mt-3 whitespace-pre-wrap">
-                          {currentQuestion.title || currentQuestion.prompt}
-                        </h2>
+                        <div className="text-base font-medium mt-3 whitespace-pre-wrap">
+                          {currentQuestion.prompt || currentQuestion.title}
+                        </div>
                       )}
                       {currentQuestion.tags && currentQuestion.tags.length > 0 && (
                         <div className="flex flex-wrap gap-1 mt-2">

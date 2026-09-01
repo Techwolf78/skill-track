@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import {
   ChevronLeft,
   ChevronRight,
@@ -35,6 +35,7 @@ import {
   useCreateQuestionMutation,
 } from "@/hooks/use-query-hooks";
 import { testService, McqOption, McqType, CreateQuestionRequest } from "@/lib/test-service";
+import { apiClient } from "@/lib/api-client";
 import { PreFlightVerificationPanel } from "@/components/admin/PreFlightVerificationPanel";
 import { ValidateDriverResponse, QuestionBankStatus, mapFrontendToBackendLang } from "@/types/question";
 import { toast } from "sonner";
@@ -55,11 +56,11 @@ const fmtMcqType = (t?: string) => {
   if (!t) return null;
   switch (t.toUpperCase()) {
     case "SINGLE_CORRECT":
-      return "Single";
+      return "Single Choice";
     case "MULTIPLE_CORRECT":
-      return "Multiple";
+      return "Multiple Choice";
     case "TRUE_FALSE":
-      return "True/False";
+      return "True / False";
     case "ASSERTION_REASON":
       return "Assertion Reason";
     case "FILL_IN_THE_BLANK":
@@ -182,9 +183,11 @@ public:
 export default function NewAdminQuestionCreate() {
   const location = useLocation();
   const navigate = useNavigate();
+  const { id: editQuestionId } = useParams<{ id?: string }>();
+  const isEditMode = Boolean(editQuestionId);
   const { user, logout } = useAuth();
 
-  // Navigation state passed from modal
+  // Navigation state passed from modal or edit navigation
   const initialData = location.state || {
     title: "New Problem",
     questionType: "MCQ",
@@ -192,16 +195,19 @@ export default function NewAdminQuestionCreate() {
     difficulty: "MEDIUM" as const,
   };
 
-  const isCoding = initialData.questionType === "CODING";
+  const [isCoding, setIsCoding] = useState(initialData.questionType === "CODING");
+  const [isLoadingQuestion, setIsLoadingQuestion] = useState(Boolean(editQuestionId));
+  const [isSaving, setIsSaving] = useState(false);
+
   const { data: subjects = [] } = useSubjectsQuery();
   const { data: allTopics = [] } = useTopicsQuery();
   const createMutation = useCreateQuestionMutation();
 
-  const [title, setTitle] = useState(initialData.title || "Untitled Problem");
+  const [title, setTitle] = useState(initialData.title || (isEditMode ? "Loading Problem..." : "Untitled Problem"));
   const [difficulty, setDifficulty] = useState<"EASY" | "MEDIUM" | "HARD">(initialData.difficulty || "MEDIUM");
   const [prompt, setPrompt] = useState("");
-  const [solvingTimeMins, setSolvingTimeMins] = useState(isCoding ? "15" : "2");
-  const [marks, setMarks] = useState(isCoding ? 100 : 10);
+  const [solvingTimeMins, setSolvingTimeMins] = useState(initialData.questionType === "CODING" ? "15" : "2");
+  const [marks, setMarks] = useState(initialData.questionType === "CODING" ? 100 : 10);
   const [subjectId, setSubjectId] = useState("");
   const [topicId, setTopicId] = useState("");
   const [subtopicId, setSubtopicId] = useState("");
@@ -270,12 +276,100 @@ export default function NewAdminQuestionCreate() {
     }
   }, [title, prompt, solvingTimeMins, isCoding, testCases, mcqOptions]);
 
-  // Default subject initialization
+  // Fetch question details if in Edit Mode
   useEffect(() => {
-    if (subjects.length > 0 && !subjectId) {
+    if (!editQuestionId) return;
+    setIsLoadingQuestion(true);
+
+    testService
+      .getQuestionById(editQuestionId)
+      .then((q) => {
+        if (!q) return;
+        setTitle(q.title || "");
+        setPrompt(q.prompt || "");
+        if (q.difficulty) setDifficulty(q.difficulty);
+        if (q.marks !== undefined) setMarks(q.marks);
+        if (q.avg_time_seconds) setSolvingTimeMins(String(Math.round(q.avg_time_seconds / 60)));
+        if (q.subject_id || q.subjectId || q.subject?.id) {
+          setSubjectId(q.subject_id || q.subjectId || q.subject?.id || "");
+        }
+        if (q.topic_id || q.topicId || q.topic?.id) {
+          setTopicId(q.topic_id || q.topicId || q.topic?.id || "");
+        }
+        if (q.subtopic_id || q.subtopicId || q.subtopic?.id) {
+          setSubtopicId(q.subtopic_id || q.subtopicId || q.subtopic?.id || "");
+        }
+        if (q.tags && Array.isArray(q.tags)) setTags(q.tags);
+
+        const isC = (q.questionType ?? "").toUpperCase() === "CODING";
+        setIsCoding(isC);
+
+        if (isC) {
+          if (q.timeLimitSecs !== undefined) setTimeLimitSecs(q.timeLimitSecs);
+          if (q.memoryLimitMb !== undefined) setMemoryLimitMb(q.memoryLimitMb);
+          if (q.constraints) setConstraints(q.constraints);
+          if (q.sampleExplanation) setSampleExplanation(q.sampleExplanation);
+          if (q.hints && q.hints.length) setHints(q.hints);
+          if (q.testCases && Array.isArray(q.testCases)) {
+            setTestCases(
+              q.testCases.map((tc: any) => ({
+                input: tc.input || "",
+                expectedOutput: tc.expectedOutput || "",
+                sample: Boolean(tc.sample),
+                weight: tc.weight || 20,
+                explanation: tc.explanation || "",
+              }))
+            );
+          }
+          if (q.signatureMetadata) {
+            setSignature({
+              method_name: q.signatureMetadata.method_name || "solve",
+              return_type: q.signatureMetadata.return_type || "int",
+              params: q.signatureMetadata.params || [{ name: "n", type: "int" }],
+            });
+          }
+          if (q.languageTemplates) {
+            setCodeTemplates((prev) => {
+              const updated = { ...prev };
+              Object.entries(q.languageTemplates!).forEach(([lang, tpl]: [string, any]) => {
+                const feLang = (lang === "python" ? "python3" : lang) as "python3" | "javascript" | "java" | "cpp";
+                if (updated[feLang]) {
+                  updated[feLang] = {
+                    template: tpl.template || tpl.starterCode || updated[feLang].template,
+                    driver: tpl.driver || updated[feLang].driver,
+                  };
+                }
+              });
+              return updated;
+            });
+          }
+          if (q.verifiedLanguages) setVerifiedLanguages(q.verifiedLanguages);
+          if (q.status) setQuestionStatus(q.status);
+          setCreatedQuestionId(q.id);
+        } else {
+          // MCQ
+          if (q.mcqType) setMcqType(q.mcqType);
+          if (q.shuffleOptions !== undefined) setShuffleOptions(q.shuffleOptions);
+          if (q.mcqOptions && Array.isArray(q.mcqOptions) && q.mcqOptions.length > 0) {
+            setMcqOptions(q.mcqOptions);
+          }
+        }
+      })
+      .catch((err) => {
+        console.error("Failed to load question for editing:", err);
+        toast.error("Failed to load question details: " + (err.message || "Unknown error"));
+      })
+      .finally(() => {
+        setIsLoadingQuestion(false);
+      });
+  }, [editQuestionId]);
+
+  // Default subject initialization for new questions
+  useEffect(() => {
+    if (!isEditMode && subjects.length > 0 && !subjectId) {
       setSubjectId(subjects[0].id);
     }
-  }, [subjects, subjectId]);
+  }, [isEditMode, subjects, subjectId]);
 
   // Cascade: subject → topics
   useEffect(() => {
@@ -285,9 +379,6 @@ export default function NewAdminQuestionCreate() {
     }
     const filtered = allTopics.filter((t) => t.subjectId === subjectId);
     setTopicsForSubject(filtered);
-    setTopicId("");
-    setSubtopicId("");
-    setSubtopics([]);
   }, [subjectId, allTopics]);
 
   // Cascade: topic → subtopics
@@ -297,7 +388,6 @@ export default function NewAdminQuestionCreate() {
       return;
     }
     testService.getSubtopicsByTopic(topicId).then(setSubtopics).catch(() => setSubtopics([]));
-    setSubtopicId("");
   }, [topicId]);
 
   // Option actions
@@ -581,9 +671,15 @@ export default function NewAdminQuestionCreate() {
       };
     }
 
+    setIsSaving(true);
     try {
-      await createMutation.mutateAsync(dto);
-      toast.success("Problem saved successfully!");
+      if (editQuestionId) {
+        await apiClient.put(`/questions/${editQuestionId}`, dto);
+        toast.success("Problem updated successfully!");
+      } else {
+        await createMutation.mutateAsync(dto);
+        toast.success("Problem saved successfully!");
+      }
 
       if (cloneAfter) {
         setTitle(`${title.trim()} (Copy)`);
@@ -594,8 +690,19 @@ export default function NewAdminQuestionCreate() {
     } catch (err: any) {
       console.error("[NewAdminQuestionCreate] Failed to save:", err);
       toast.error("Failed to save problem: " + (err.message || "Unknown error"));
+    } finally {
+      setIsSaving(false);
     }
   };
+
+  if (isLoadingQuestion) {
+    return (
+      <div className="min-h-screen bg-[#081225] flex flex-col items-center justify-center text-white">
+        <Loader2 className="w-8 h-8 animate-spin text-[#4353a4] mb-3" />
+        <p className="text-sm font-medium text-slate-300">Loading problem details...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex flex-col bg-[#F6F8FA] text-slate-800 font-sans antialiased">
@@ -624,7 +731,7 @@ export default function NewAdminQuestionCreate() {
               Library
             </button>
             <ChevronRight className="w-3.5 h-3.5 text-slate-500" />
-            <span className="text-slate-200 font-semibold max-w-[200px] truncate">{title || "New Problem"}</span>
+            <span className="text-slate-200 font-semibold max-w-[200px] truncate">{title || (isEditMode ? "Edit Problem" : "New Problem")}</span>
           </div>
         </div>
 
@@ -694,7 +801,7 @@ export default function NewAdminQuestionCreate() {
         {/* Title & Type Metadata Row (Tightly above white card) */}
         <div className="space-y-1.5 mb-4 text-white">
           <div className="flex items-center gap-2.5">
-            <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-white">{title || "Untitled Problem"}</h1>
+            <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-white">{title || (isEditMode ? "Edit Problem" : "Untitled Problem")}</h1>
             <span
               className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-rose-500 text-[10px] text-white font-bold shrink-0 cursor-default"
               title="Unsaved changes"
@@ -704,7 +811,7 @@ export default function NewAdminQuestionCreate() {
           </div>
           <div className="flex items-center gap-4 text-xs text-slate-300 font-medium">
             <span className="flex items-center gap-1.5 font-mono text-slate-300">
-              <span className="text-slate-400">=</span> {isCoding ? (isLanguageSpecific ? "Language-Specific Coding" : "Coding") : fmtMcqType(mcqType) || "MCQ"}
+              <span className="text-slate-400">=</span> {isCoding ? (isLanguageSpecific ? "Language Specific" : "Coding") : fmtMcqType(mcqType) || "MCQ"}
             </span>
             <span className="flex items-center gap-1.5 text-slate-300">
               <DifficultyIcon level={difficulty} />
@@ -719,64 +826,51 @@ export default function NewAdminQuestionCreate() {
           <div className="lg:col-span-3 bg-white border border-slate-200/90 shadow-sm p-6 md:p-8 space-y-6">
             {/* Section Header */}
             <div className="border-b border-slate-100 pb-3">
-              <span className="text-sm font-bold text-slate-800">Problem details</span>
+              <h2 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Problem Details</h2>
+              <p className="text-[11px] text-slate-400">Configure core metadata, taxonomy, and description for this question.</p>
             </div>
 
-            {/* Info Banner - Only shown when required items are missing */}
-            {!isProblemReady && (
-              <div className="flex items-start gap-3 p-4 bg-slate-50 border border-slate-200 text-xs text-slate-700 leading-relaxed animate-in fade-in duration-150">
-                <Info className="w-4 h-4 text-slate-500 shrink-0 mt-0.5" />
-                <span>
-                  This problem is not ready to use yet. It must have a description and expected solving time.{" "}
-                  {isCoding
-                    ? "Testcases should be added for automatic evaluation."
-                    : "Options should be added for evaluation."}
-                </span>
-              </div>
-            )}
-
-            {/* Problem Name (Underline style) */}
+            {/* Title (Underline input style) */}
             <div className="space-y-1">
               <label className="block text-xs font-semibold text-slate-700">
-                Problem name <span className="text-rose-500">*</span>
+                Title <span className="text-rose-500">*</span>
               </label>
               <input
                 type="text"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                placeholder="Test 1"
-                className="w-full border-b border-slate-200 focus:border-[#4353a4] py-1.5 text-sm text-slate-800 focus:outline-none bg-transparent"
+                placeholder="e.g. Invert a Binary Tree"
+                className="w-full border-b border-slate-200 focus:border-[#4353a4] py-1.5 text-sm text-slate-900 font-semibold focus:outline-none transition-colors bg-transparent"
               />
-              <p className="text-[11px] text-slate-400">A descriptive name helps.</p>
             </div>
 
-            {/* Expected solving time & Scoring side by side on same baseline */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-2">
-              {/* Expected solving time */}
+            {/* ── Problem Attributes Grid (Marks & Solving Time side-by-side) ── */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-1">
+              {/* Estimated Solving Time */}
               <div className="space-y-1">
                 <label className="block text-xs font-semibold text-slate-700">
-                  Expected solving time (in minutes) <span className="text-rose-500">*</span>
+                  Estimated Solving Time (Minutes) <span className="text-rose-500">*</span>
                 </label>
-                <p className="text-[11px] text-slate-400">How much time should normally be required to solve this problem?</p>
                 <input
                   type="number"
                   min={1}
+                  max={180}
                   value={solvingTimeMins}
                   onChange={(e) => setSolvingTimeMins(e.target.value)}
-                  placeholder="15"
+                  placeholder={isCoding ? "15" : "2"}
                   className="w-full border-b border-slate-200 focus:border-[#4353a4] py-1.5 text-sm text-slate-800 focus:outline-none bg-transparent"
                 />
               </div>
 
-              {/* Scoring */}
+              {/* Total Marks */}
               <div className="space-y-1">
                 <label className="block text-xs font-semibold text-slate-700">
-                  Scoring <span className="text-rose-500">*</span>
+                  Total Marks <span className="text-rose-500">*</span>
                 </label>
-                <p className="text-[11px] text-slate-400">Customize scoring and penalty for this problem.</p>
                 <input
                   type="number"
                   min={1}
+                  max={500}
                   value={marks}
                   onChange={(e) => setMarks(Number(e.target.value))}
                   placeholder="100"
@@ -790,7 +884,7 @@ export default function NewAdminQuestionCreate() {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div className="space-y-1">
                   <label className="block text-xs font-semibold text-slate-700">Subject *</label>
-                  <LineSelect value={subjectId} onChange={(v) => setSubjectId(v)}>
+                  <LineSelect value={subjectId} onChange={(v) => { setSubjectId(v); setTopicId(""); setSubtopicId(""); setSubtopics([]); }}>
                     <option value="">Select subject</option>
                     {subjects.map((s) => (
                       <option key={s.id} value={s.id}>
@@ -802,7 +896,7 @@ export default function NewAdminQuestionCreate() {
 
                 <div className="space-y-1">
                   <label className="block text-xs font-semibold text-slate-700">Topic</label>
-                  <LineSelect value={topicId} onChange={(v) => setTopicId(v)}>
+                  <LineSelect value={topicId} onChange={(v) => { setTopicId(v); setSubtopicId(""); }}>
                     <option value="">None</option>
                     {topicsForSubject.map((t) => (
                       <option key={t.id} value={t.id}>
@@ -999,7 +1093,7 @@ export default function NewAdminQuestionCreate() {
                 <div className="space-y-4 pt-4 border-t border-slate-100">
                   <div>
                     <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
-                      {isLanguageSpecific ? "Language & Code Setup" : "Multi-Language Code Setup"}
+                      {isLanguageSpecific ? "Language & Code Setup" : "Code Setup"}
                     </h4>
                     <p className="text-[11px] text-slate-400">
                       {isLanguageSpecific
@@ -1348,21 +1442,21 @@ export default function NewAdminQuestionCreate() {
               <button
                 type="button"
                 onClick={() => handleSave(false)}
-                disabled={createMutation.isPending}
+                disabled={isSaving || createMutation.isPending}
                 className="w-full py-3 bg-[#4353a4] hover:bg-[#38468d] disabled:opacity-50 text-white text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 shadow-xs transition-all cursor-pointer"
               >
-                {createMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                <span>SAVE PROBLEM</span>
+                {isSaving || createMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                <span>{isEditMode ? "UPDATE PROBLEM" : "SAVE PROBLEM"}</span>
               </button>
 
               <button
                 type="button"
                 onClick={() => handleSave(true)}
-                disabled={createMutation.isPending}
+                disabled={isSaving || createMutation.isPending}
                 className="w-full py-2.5 border border-slate-200 hover:bg-slate-50 disabled:opacity-50 text-slate-700 text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 transition-all cursor-pointer"
               >
                 <Copy className="w-3.5 h-3.5 text-slate-500" />
-                <span>SAVE AND CLONE</span>
+                <span>{isEditMode ? "UPDATE AND CLONE" : "SAVE AND CLONE"}</span>
               </button>
 
               <button

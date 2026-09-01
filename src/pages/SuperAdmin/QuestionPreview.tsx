@@ -570,7 +570,14 @@ export function QuestionPreview({ question, open, onOpenChange }: QuestionPrevie
             <div>
               <h3 className="text-sm font-medium text-muted-foreground mb-2">Question Prompt</h3>
               <div className="rounded-lg bg-muted/30 p-4">
-                <p className="text-base whitespace-pre-wrap">{question.prompt}</p>
+                {/<[a-z][\s\S]*>/i.test(question.prompt || "") ? (
+                  <div
+                    className="text-base prose prose-slate max-w-none [&_ol]:list-decimal [&_ol]:pl-5 [&_ul]:list-disc [&_ul]:pl-5"
+                    dangerouslySetInnerHTML={{ __html: question.prompt || "" }}
+                  />
+                ) : (
+                  <p className="text-base whitespace-pre-wrap">{question.prompt}</p>
+                )}
               </div>
             </div>
 

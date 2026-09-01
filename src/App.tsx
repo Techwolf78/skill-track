@@ -195,6 +195,8 @@ const App = () => (
               {/* Standalone Full-Screen Question Create / Edit for Admin */}
               <Route path="/admin/questions/create" element={<NewAdminQuestionCreate />} />
               <Route path="/admin/library/create" element={<NewAdminQuestionCreate />} />
+              <Route path="/admin/questions/edit/:id" element={<NewAdminQuestionCreate />} />
+              <Route path="/admin/library/edit/:id" element={<NewAdminQuestionCreate />} />
 
               {/* Standalone Full-Screen Question Preview (DoSelect / Learn Style) */}
               <Route path="/admin/questions/preview/:id" element={<NewAdminQuestionPreview />} />
