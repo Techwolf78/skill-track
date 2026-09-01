@@ -18,6 +18,7 @@ import {
   Copy,
   Trash2,
   Calendar,
+  Eye,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { useTestsQuery, useCreateTestMutation, useDeleteTestMutation } from "@/hooks/use-query-hooks";
@@ -246,7 +247,7 @@ export default function NewAdminTests() {
                     {/* Title + Green Check Badge */}
                     <div className="flex items-center gap-2">
                       <h3
-                        onClick={() => navigate(`/admin/tests/${test.id}`)}
+                        onClick={() => navigate(`/admin/tests/edit/${test.id}`)}
                         className="font-bold text-slate-900 text-base hover:text-[#4353a4] transition-colors truncate cursor-pointer tracking-tight"
                       >
                         {test.title}
@@ -293,6 +294,15 @@ export default function NewAdminTests() {
 
                   {/* Right Side: Quick Action Icons */}
                   <div className="flex items-center gap-1 shrink-0 text-slate-500">
+                    {/* Preview Test */}
+                    <button
+                      title="Preview Test"
+                      onClick={() => window.open(`/test/welcome-preview?testId=${test.id}`, "_blank")}
+                      className="p-2 hover:text-[#4353a4] hover:bg-slate-100 transition-colors cursor-pointer"
+                    >
+                      <Eye className="w-4 h-4" />
+                    </button>
+
                     {/* Invite Candidates */}
                     <button
                       title="Invite Candidates"
@@ -322,6 +332,13 @@ export default function NewAdminTests() {
                         </button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end" className="w-44 bg-white border border-slate-200 shadow-xl p-1 text-xs">
+                        <DropdownMenuItem
+                          onClick={() => window.open(`/test/welcome-preview?testId=${test.id}`, "_blank")}
+                          className="cursor-pointer py-2 px-2.5 flex items-center gap-2 text-slate-700 hover:bg-slate-50"
+                        >
+                          <Eye className="w-3.5 h-3.5 text-slate-500" />
+                          <span>Preview Test</span>
+                        </DropdownMenuItem>
                         <DropdownMenuItem
                           onClick={() => navigate(`/admin/tests/edit/${test.id}`)}
                           className="cursor-pointer py-2 px-2.5 flex items-center gap-2 text-slate-700 hover:bg-slate-50"

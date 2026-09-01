@@ -85,7 +85,7 @@ export default function AdminTests() {
   } = useQuery<any[]>({
     queryKey: ["all-candidate-invitations"],
     queryFn: async () => {
-      const res = await apiClient.get("/candidate-invitations?size=1000");
+      const res = await apiClient.get("/candidate-invitations");
       const data = res.data?.data ?? res.data;
       if (Array.isArray(data)) return data;
       if (data && typeof data === "object" && Array.isArray(data.content))
@@ -526,6 +526,19 @@ export default function AdminTests() {
 
                 {/* Right side actions */}
                 <div className="flex items-center gap-2 shrink-0 md:self-center self-end">
+                  {/* Preview Button */}
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() =>
+                      window.open(`/test/welcome-preview?testId=${test.id}`, "_blank")
+                    }
+                    title="Preview Test"
+                    className="text-slate-500 hover:text-primary hover:bg-slate-50 rounded-md"
+                  >
+                    <Eye className="w-5 h-5" />
+                  </Button>
+
                   {/* Invite Button (User with Plus icon) */}
                   <Button
                     variant="ghost"
@@ -577,6 +590,14 @@ export default function AdminTests() {
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="w-48">
+                      <DropdownMenuItem
+                        onClick={() =>
+                          window.open(`/test/welcome-preview?testId=${test.id}`, "_blank")
+                        }
+                      >
+                        <Eye className="w-4 h-4 mr-2" />
+                        Preview Test
+                      </DropdownMenuItem>
                       <DropdownMenuItem
                         onClick={() => navigate(`/new-admin/tests/edit/${test.id}`)}
                       >

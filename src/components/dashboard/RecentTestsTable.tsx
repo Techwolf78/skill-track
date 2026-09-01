@@ -53,7 +53,7 @@ export function RecentTestsTable({ timeframe = "7D" }: RecentTestsTableProps) {
         // Fetch candidate invitations safely
         let invitations: Array<{ testScheduleId?: string; scheduleId?: string; status?: string }> = [];
         try {
-          const res = await apiClient.get("/candidate-invitations?size=1000");
+          const res = await apiClient.get("/candidate-invitations");
           const data = res.data?.data || res.data;
           if (Array.isArray(data)) {
             invitations = data;

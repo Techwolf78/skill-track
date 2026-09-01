@@ -56,7 +56,7 @@ export default function TestScheduleDetails() {
       setInvitationsLoading(true);
       // Fetch all invitations and candidates for map resolution
       const [invRes, candData] = await Promise.all([
-        apiClient.get("/candidate-invitations?size=1000").catch(() => null),
+        apiClient.get("/candidate-invitations").catch(() => null),
         candidateService.getCandidates().catch(() => []),
       ]);
 

@@ -41,16 +41,6 @@ const AuditLogs = React.lazy(() => import("./pages/SuperAdmin/AuditLogs"));
 const SeedData = React.lazy(() => import("./pages/SeedData"));
 const ProctoringDashboard = React.lazy(() => import("@/pages/Admin/ProctoringDashboard"));
 
-// Admin pages
-const AdminDashboardAdmin = React.lazy(() => import("./pages/Admin/Dashboard"));
-const AdminCandidates = React.lazy(() => import("./pages/Admin/AdminCandidates"));
-const AdminQuestionBank = React.lazy(() => import("./pages/Admin/QuestionBank"));
-const AdminTests = React.lazy(() => import("./pages/Admin/Tests"));
-const AdminTestCreate = React.lazy(() => import("./pages/Admin/TestCreate"));
-const AdminTestsEdit = React.lazy(() => import("./pages/Admin/TestsEdit"));
-const AdminTestDetails = React.lazy(() => import("./pages/Admin/TestDetails"));
-const AdminProfile = React.lazy(() => import("./pages/Admin/Profile"));
-
 // New-Admin pages
 const NewAdminLayout = React.lazy(() => import("./pages/New-Admin/NewAdminLayout"));
 const NewAdminTests = React.lazy(() => import("./pages/New-Admin/NewAdminTests"));
@@ -65,6 +55,7 @@ const NewAdminSettings = React.lazy(() => import("./pages/New-Admin/NewAdminSett
 // Test Taking
 const TestInterface = React.lazy(() => import("./pages/test/TestInterface"));
 const TestResults = React.lazy(() => import("./pages/test/TestResults"));
+const NewCandidateTestWelcome = React.lazy(() => import("./pages/test/NewCandidateTestWelcome"));
 
 // Candidate Dashboard pages
 const CandidateDashboard = React.lazy(() => import("./pages/Candidate/Dashboard"));
@@ -91,7 +82,7 @@ const App = () => (
         <TooltipProvider>
           <Toaster />
           <Sonner />
-          <BrowserRouter>
+          <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
             <Suspense
               fallback={
                 <div className="flex h-screen w-full items-center justify-center bg-background">
@@ -169,11 +160,11 @@ const App = () => (
                 element={<TestInterface />}
               />
               <Route path="/test/:testId/results" element={<TestResults />} />
-              <Route path="/test/access/:id/:token" element={<TestAccess />} />
-              <Route path="/tests/access/:id/:token" element={<TestAccess />} />
-              <Route path="/test/access/:id" element={<TestAccess />} />
-              <Route path="/tests/access/:id" element={<TestAccess />} />
-              <Route path="/test/access/:token" element={<TestAccess />} />
+              <Route path="/test/access/:id/:token" element={<NewCandidateTestWelcome />} />
+              <Route path="/tests/access/:id/:token" element={<NewCandidateTestWelcome />} />
+              <Route path="/test/access/:id" element={<NewCandidateTestWelcome />} />
+              <Route path="/tests/access/:id" element={<NewCandidateTestWelcome />} />
+              <Route path="/test/access/:token" element={<NewCandidateTestWelcome />} />
 
               {/* Candidate Dashboard Routes */}
               <Route path="/candidate" element={<CandidateLayout />}>
@@ -211,6 +202,7 @@ const App = () => (
               <Route path="/superadmin/questions/preview/:id" element={<NewAdminQuestionPreview />} />
 
               {/* Standalone Full-Screen Test Edit for Admin */}
+              <Route path="/admin/tests/:id" element={<NewAdminTestEdit />} />
               <Route path="/admin/tests/edit/:id" element={<NewAdminTestEdit />} />
               <Route path="/admin/tests/edit" element={<NewAdminTestEdit />} />
               <Route path="/admin/tests/:id/add-problems" element={<NewAdminTestAddProblems />} />
