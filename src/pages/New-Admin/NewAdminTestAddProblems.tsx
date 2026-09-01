@@ -712,7 +712,7 @@ export default function NewAdminTestAddProblems() {
 
                         {/* Problem Statement / Prompt */}
                         <p className="pt-0.5 text-xs text-slate-600 leading-relaxed font-normal line-clamp-3">
-                          {q.prompt || "Not available"}
+                          {q.prompt ? q.prompt.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim() : "Not available"}
                         </p>
                       </div>
                     );

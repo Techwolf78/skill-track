@@ -357,6 +357,11 @@ export default function NewAdminQuestionPreview() {
                       <p className="text-slate-700 text-xs">{reason || "No reason text provided."}</p>
                     </div>
                   </div>
+                ) : /<[a-z][\s\S]*>/i.test(question.prompt || "") ? (
+                  <div
+                    className="text-[13px] md:text-sm text-slate-800 leading-relaxed font-sans prose prose-slate max-w-none [&_ol]:list-decimal [&_ol]:pl-5 [&_ul]:list-disc [&_ul]:pl-5 [&_li]:my-1 [&_p]:my-1 [&_pre]:bg-slate-900 [&_pre]:text-slate-100 [&_pre]:p-3 [&_pre]:rounded-xs [&_pre]:font-mono [&_pre]:text-xs [&_pre]:overflow-x-auto [&_code]:font-mono [&_code]:text-xs [&_code]:bg-slate-100 [&_code]:text-pink-600 [&_code]:px-1 [&_code]:py-0.5 [&_code]:rounded-xs [&_pre_code]:bg-transparent [&_pre_code]:text-inherit [&_pre_code]:p-0 [&_a]:text-[#4353a4] [&_a]:underline [&_a]:font-medium hover:[&_a]:text-[#344287] [&_blockquote]:border-none [&_blockquote]:italic [&_blockquote]:text-slate-700 [&_blockquote]:my-1.5 [&_blockquote]:px-1 [&_blockquote]:before:content-['“'] [&_blockquote]:after:content-['”'] [&_blockquote]:before:font-serif [&_blockquote]:after:font-serif [&_blockquote]:before:text-[#4353a4] [&_blockquote]:after:text-[#4353a4] [&_blockquote]:before:font-bold [&_blockquote]:after:font-bold"
+                    dangerouslySetInnerHTML={{ __html: question.prompt || "" }}
+                  />
                 ) : (
                   <div className="text-[13px] md:text-sm text-slate-800 leading-relaxed whitespace-pre-wrap font-normal">
                     {question.prompt || "No description provided for this question."}
@@ -564,9 +569,16 @@ export default function NewAdminQuestionPreview() {
                                   : "border-[#232936]"
                               }`}
                             >
-                              <span className="leading-relaxed select-none">
-                                {opt.text || `Option ${String.fromCharCode(65 + idx)}`}
-                              </span>
+                              {/<[a-z][\s\S]*>/i.test(opt.text || "") ? (
+                                <div
+                                  className="leading-relaxed select-none prose prose-invert prose-xs max-w-none text-xs font-mono [&_p]:my-0.5 [&_ol]:list-decimal [&_ol]:pl-4 [&_ul]:list-disc [&_ul]:pl-4 [&_code]:bg-slate-800 [&_code]:text-pink-400 [&_code]:px-1 [&_code]:py-0.5 [&_code]:rounded-xs"
+                                  dangerouslySetInnerHTML={{ __html: opt.text || "" }}
+                                />
+                              ) : (
+                                <span className="leading-relaxed select-none">
+                                  {opt.text || `Option ${String.fromCharCode(65 + idx)}`}
+                                </span>
+                              )}
 
                               {/* Admin Answer Key Tag */}
                               {showAnswerKey && isCorrectOption && (

@@ -38,6 +38,13 @@ import { testService, McqOption, McqType, CreateQuestionRequest } from "@/lib/te
 import { PreFlightVerificationPanel } from "@/components/admin/PreFlightVerificationPanel";
 import { ValidateDriverResponse, QuestionBankStatus, mapFrontendToBackendLang } from "@/types/question";
 import { toast } from "sonner";
+import { RichTextEditor } from "@/components/ui/RichTextEditor";
+
+const isRichTextEmpty = (html: string) => {
+  if (!html) return true;
+  const stripped = html.replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim();
+  return stripped.length === 0;
+};
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -254,11 +261,11 @@ export default function NewAdminQuestionCreate() {
 
   // Dynamic problem readiness check
   const isProblemReady = useMemo(() => {
-    if (!title.trim() || !prompt.trim() || !solvingTimeMins) return false;
+    if (!title.trim() || isRichTextEmpty(prompt) || !solvingTimeMins) return false;
     if (isCoding) {
       return testCases.some((tc) => tc.input.trim() || tc.expectedOutput.trim());
     } else {
-      const filled = mcqOptions.filter((o) => o.text.trim());
+      const filled = mcqOptions.filter((o) => !isRichTextEmpty(o.text));
       return filled.length >= 2 && filled.some((o) => o.isCorrect);
     }
   }, [title, prompt, solvingTimeMins, isCoding, testCases, mcqOptions]);
@@ -540,7 +547,7 @@ export default function NewAdminQuestionCreate() {
         },
       };
     } else {
-      const filledOptions = mcqOptions.filter((o) => o.text.trim());
+      const filledOptions = mcqOptions.filter((o) => !isRichTextEmpty(o.text));
       if (filledOptions.length < 2) {
         toast.error("Please provide at least 2 non-empty options");
         return;
@@ -847,12 +854,11 @@ export default function NewAdminQuestionCreate() {
               <label className="block text-xs font-semibold text-slate-700">
                 Description <span className="text-rose-500">*</span>
               </label>
-              <textarea
-                rows={6}
-                value={prompt}
-                onChange={(e) => setPrompt(e.target.value)}
+              <RichTextEditor
+                content={prompt}
+                onChange={(html) => setPrompt(html)}
                 placeholder="Insert text here..."
-                className="w-full border border-slate-200 p-3.5 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#4353a4] leading-relaxed"
+                minHeight="160px"
               />
               <p className="text-[11px] text-slate-400">Be as descriptive as possible, but no more.</p>
             </div>
@@ -1246,32 +1252,35 @@ export default function NewAdminQuestionCreate() {
                   <label className="block text-xs font-semibold text-slate-700">
                     Options — {mcqType === "MULTIPLE_CORRECT" ? "Check all correct options" : "Click radio button for correct option"}
                   </label>
-                  <div className="space-y-2.5">
+                  <div className="space-y-3">
                     {mcqOptions.map((opt, i) => (
-                      <div key={i} className="flex items-center gap-3">
+                      <div key={i} className="flex items-start gap-3 p-2 bg-slate-50/40 border border-slate-200/80 rounded-sm">
                         <button
                           type="button"
                           onClick={() => toggleCorrect(i)}
-                          className={`shrink-0 w-5 h-5 ${mcqType === "MULTIPLE_CORRECT" ? "" : "rounded-full"} border-2 flex items-center justify-center transition-colors cursor-pointer ${
+                          className={`shrink-0 w-5 h-5 mt-2.5 ${mcqType === "MULTIPLE_CORRECT" ? "" : "rounded-full"} border-2 flex items-center justify-center transition-colors cursor-pointer ${
                             opt.isCorrect
                               ? "border-slate-800 bg-slate-800 text-white"
                               : "border-slate-300 hover:border-slate-400 bg-white"
                           }`}
+                          title={opt.isCorrect ? "Correct Option" : "Mark as Correct"}
                         >
                           {opt.isCorrect && <Check className="w-3 h-3" />}
                         </button>
-                        <input
-                          type="text"
-                          value={opt.text}
-                          onChange={(e) => setOptionText(i, e.target.value)}
-                          placeholder={`Option ${i + 1}`}
-                          className="flex-1 border border-slate-200 px-3 py-2 text-xs focus:outline-none focus:border-[#4353a4]"
-                        />
+                        <div className="flex-1 min-w-0">
+                          <RichTextEditor
+                            content={opt.text}
+                            onChange={(html) => setOptionText(i, html)}
+                            placeholder={`Option ${i + 1}`}
+                            minHeight="70px"
+                          />
+                        </div>
                         {mcqOptions.length > 2 && (
                           <button
                             type="button"
                             onClick={() => removeOption(i)}
-                            className="text-slate-300 hover:text-slate-600 transition-colors p-1 cursor-pointer"
+                            className="text-slate-300 hover:text-slate-600 transition-colors p-1 mt-2 cursor-pointer shrink-0"
+                            title="Remove Option"
                           >
                             <X className="w-4 h-4" />
                           </button>

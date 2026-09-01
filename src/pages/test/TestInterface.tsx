@@ -1582,9 +1582,16 @@ useEffect(() => {
                           </Badge>
                         )}
                       </div>
-                      <h2 className="text-lg font-medium mt-3 whitespace-pre-wrap">
-                        {currentQuestion.title || currentQuestion.prompt}
-                      </h2>
+                      {currentQuestion.prompt && /<[a-z][\s\S]*>/i.test(currentQuestion.prompt) ? (
+                        <div
+                          className="text-base font-normal mt-3 prose prose-slate max-w-none [&_ol]:list-decimal [&_ol]:pl-5 [&_ul]:list-disc [&_ul]:pl-5 [&_pre]:bg-slate-900 [&_pre]:text-slate-100 [&_pre]:p-3 [&_pre]:rounded-sm [&_code]:bg-slate-100 [&_code]:text-pink-600 [&_code]:px-1 [&_code]:py-0.5"
+                          dangerouslySetInnerHTML={{ __html: currentQuestion.prompt }}
+                        />
+                      ) : (
+                        <h2 className="text-lg font-medium mt-3 whitespace-pre-wrap">
+                          {currentQuestion.title || currentQuestion.prompt}
+                        </h2>
+                      )}
                       {currentQuestion.tags && currentQuestion.tags.length > 0 && (
                         <div className="flex flex-wrap gap-1 mt-2">
                           {currentQuestion.tags.map((tag, idx) => (
@@ -1630,12 +1637,19 @@ useEffect(() => {
                               className={cn(
                                 "flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-all",
                                 answers[currentQuestion.id] === optionId 
-                                  ? "border-primary bg-primary/5 ring-1 ring-primary" 
-                                  : "border-border hover:bg-muted/50 hover:border-primary/30"
+                                   ? "border-primary bg-primary/5 ring-1 ring-primary" 
+                                   : "border-border hover:bg-muted/50 hover:border-primary/30"
                               )}
                             >
                               <RadioGroupItem value={optionId} id={`option-${idx}`} />
-                              <span className="text-sm">{optionText}</span>
+                              {/<[a-z][\s\S]*>/i.test(optionText) ? (
+                                <span
+                                  className="text-sm prose prose-sm max-w-none [&_p]:inline [&_p]:my-0"
+                                  dangerouslySetInnerHTML={{ __html: optionText }}
+                                />
+                              ) : (
+                                <span className="text-sm">{optionText}</span>
+                              )}
                             </Label>
                           );
                         })}
@@ -1653,9 +1667,16 @@ useEffect(() => {
                     <div className="space-y-4">
                       <div className="rounded-lg bg-muted/30 p-4 space-y-4">
                         <div className="prose prose-sm dark:prose-invert max-w-none">
-                          <p className="whitespace-pre-wrap leading-relaxed">
-                            {currentQuestion.problemStatement || currentQuestion.prompt}
-                          </p>
+                          {/<[a-z][\s\S]*>/i.test(currentQuestion.problemStatement || currentQuestion.prompt || "") ? (
+                            <div
+                              className="leading-relaxed [&_ol]:list-decimal [&_ol]:pl-5 [&_ul]:list-disc [&_ul]:pl-5 [&_pre]:bg-slate-900 [&_pre]:text-slate-100 [&_pre]:p-3 [&_pre]:rounded-sm [&_code]:bg-slate-100 dark:[&_code]:bg-slate-800 [&_code]:text-pink-600 [&_code]:px-1 [&_code]:py-0.5"
+                              dangerouslySetInnerHTML={{ __html: currentQuestion.problemStatement || currentQuestion.prompt || "" }}
+                            />
+                          ) : (
+                            <p className="whitespace-pre-wrap leading-relaxed">
+                              {currentQuestion.problemStatement || currentQuestion.prompt}
+                            </p>
+                          )}
                         </div>
 
                         {(currentQuestion.timeLimitSecs || currentQuestion.memoryLimitMb) && (
