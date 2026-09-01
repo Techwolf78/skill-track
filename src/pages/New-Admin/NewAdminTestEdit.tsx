@@ -98,6 +98,7 @@ import { candidateService, CandidateInvitation } from "@/lib/candidate-service";
 import { PublishTestConfirmationModal } from "@/components/admin/PublishTestConfirmationModal";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
+import * as XLSX from "xlsx";
 import { toast } from "sonner";
 
 type JsPDFWithAutoTable = jsPDF & { lastAutoTable: { finalY: number } };
@@ -1468,76 +1469,287 @@ export default function NewAdminTestEdit() {
   };
 
   const handleDownloadReport = () => {
-    toast.info("Generating candidate assessment report download...");
-    const headers = ["Candidate Name", "Email", "Status", "Time", "Total Score", "% Score"];
-    const rows = filteredCandidates.map((inv) => {
-      const name = inv.candidateName || inv.candidate?.user?.name || "Candidate";
-      const email = inv.candidateEmail || inv.candidate?.user?.email || "";
-      const scoreEntry = candidateResults[inv.id];
-      const result = scoreEntry?.result;
-      const status =
-        result?.passed === true
-          ? "Passed"
-          : result?.passed === false
-          ? "Failed"
-          : inv.status || "Pending";
-      const score =
-        result?.score !== undefined
-          ? result.score
-          : result?.totalScore !== undefined
-          ? result.totalScore
-          : "—";
-      const percent =
-        result?.percentage !== undefined
-          ? `${result.percentage}%`
-          : result?.scorePercentage !== undefined
-          ? `${result.scorePercentage}%`
-          : "—";
-      let time = "—";
-      const startedAt =
-        scoreEntry?.session?.startedAt ||
-        scoreEntry?.session?.startTime ||
-        scoreEntry?.session?.createdAt ||
-        scoreEntry?.detail?.systemInfo?.startedAt ||
-        scoreEntry?.detail?.startedAt ||
-        scoreEntry?.detail?.createdAt;
+    const candidatesToExport = invitations.length > 0 ? invitations : filteredCandidates;
+    if (candidatesToExport.length === 0) {
+      toast.error("No candidate data available to export.");
+      return;
+    }
 
-      const endedAt =
-        scoreEntry?.session?.submittedAt ||
-        scoreEntry?.session?.endedAt ||
-        scoreEntry?.session?.endTime ||
-        scoreEntry?.session?.updatedAt ||
-        scoreEntry?.detail?.systemInfo?.endedAt ||
-        scoreEntry?.detail?.systemInfo?.submittedAt ||
-        scoreEntry?.detail?.submittedAt ||
-        scoreEntry?.detail?.endedAt ||
-        result?.evaluatedAt ||
-        result?.createdAt;
+    toast.info("Generating comprehensive Excel test report...");
 
-      if (result?.timeTakenSeconds) {
-        time = formatTimeTaken(result.timeTakenSeconds);
-      } else if (startedAt && endedAt) {
-        const diffSec = Math.max(0, Math.floor((new Date(endedAt).getTime() - new Date(startedAt).getTime()) / 1000));
-        time = formatTimeTaken(diffSec);
-      } else if (result?.timeTaken) {
-        time = String(result.timeTaken);
-      } else if (scoreEntry?.detail?.timeTaken) {
-        time = String(scoreEntry.detail.timeTaken);
-      }
-      return [name, email, status, time, score, percent];
-    });
+    try {
+      // Find distinct subjects for dynamic section scoring
+      const distinctSubjects = Array.from(
+        new Set(
+          questions
+            .map((q) => q.question?.subject?.name || (q as any).subject?.name || (q as any).subjectName)
+            .filter(Boolean)
+        )
+      );
 
-    const csvContent =
-      "data:text/csv;charset=utf-8," +
-      [headers.join(","), ...rows.map((e) => e.join(","))].join("\n");
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `${testTitle.replace(/\s+/g, "_")}_Candidates_Report.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    toast.success("Report downloaded successfully.");
+      // 1. Sheet: Candidate Performance Summary
+      const summaryRows = candidatesToExport.map((inv) => {
+        const name = inv.candidateName || inv.candidate?.user?.name || "Candidate";
+        const email = inv.candidateEmail || inv.candidate?.user?.email || "—";
+        const phone = inv.candidatePhone || inv.candidate?.user?.phoneNumber || "—";
+        const college =
+          inv.candidate?.organisation?.name ||
+          (inv.candidate?.extraFields?.collegeName as string) ||
+          (inv.candidate?.extraFields?.college as string) ||
+          "—";
+        const domain =
+          (inv.candidate?.extraFields?.domain as string) ||
+          (inv.candidate?.extraFields?.department as string) ||
+          (inv.candidate?.extraFields?.branch as string) ||
+          "—";
+
+        const scoreEntry = candidateResults[inv.id];
+        const result = scoreEntry?.result;
+        const detail = scoreEntry?.detail;
+        const session = scoreEntry?.session;
+
+        const status =
+          result?.passed === true
+            ? "Passed"
+            : result?.passed === false
+            ? "Failed"
+            : inv.sessionStatus || inv.status || "Pending";
+
+        const totalMarks =
+          result?.maxScore ??
+          test?.totalMarks ??
+          (questions.reduce((sum, q) => sum + (q.marks || 0), 0) || 100);
+
+        const candidateScore =
+          result?.totalScore !== undefined
+            ? result.totalScore
+            : result?.score !== undefined
+            ? result.score
+            : 0;
+
+        const percentage =
+          result?.percentage !== undefined
+            ? `${result.percentage}%`
+            : result?.scorePercentage !== undefined
+            ? `${result.scorePercentage}%`
+            : "0%";
+
+        const startedAt =
+          session?.startedAt ||
+          session?.startTime ||
+          detail?.systemInfo?.startedAt ||
+          detail?.startedAt;
+
+        const endedAt =
+          session?.submittedAt ||
+          session?.endedAt ||
+          session?.endTime ||
+          detail?.systemInfo?.endedAt ||
+          detail?.submittedAt ||
+          result?.evaluatedAt;
+
+        let timeTaken = "—";
+        if (result?.timeTakenSeconds) {
+          timeTaken = formatTimeTaken(result.timeTakenSeconds);
+        } else if (startedAt && endedAt) {
+          const diffSec = Math.max(0, Math.floor((new Date(endedAt).getTime() - new Date(startedAt).getTime()) / 1000));
+          timeTaken = formatTimeTaken(diffSec);
+        } else if (result?.timeTaken) {
+          timeTaken = String(result.timeTaken);
+        } else if (detail?.timeTaken) {
+          timeTaken = String(detail.timeTaken);
+        }
+
+        // Proctoring metrics
+        const violations: any[] = detail?.violations || [];
+        const violationsCount = detail?.violationsCount ?? detail?.violationCount ?? violations.length;
+        const criticalViolations =
+          detail?.criticalViolationsCount ??
+          detail?.criticalViolationCount ??
+          violations.filter((v: any) => v.severity === "HIGH" || v.severity === "CRITICAL").length;
+
+        const tabSwitchCount = violations.filter((v: any) => v.eventType === "TAB_SWITCH").length;
+        const fullscreenExitCount = violations.filter((v: any) => v.eventType === "FULLSCREEN_EXIT").length;
+        const devtoolsCount = violations.filter((v: any) => v.eventType === "DEVTOOLS_OPEN" || v.eventType === "DEVTOOLS").length;
+        const copyPasteCount = violations.filter((v: any) => v.eventType === "COPY_PASTE").length;
+        const faceNotVisibleCount = violations.filter((v: any) => v.eventType === "FACE_NOT_VISIBLE" || v.eventType === "NO_FACE").length;
+        const multipleFacesCount = violations.filter((v: any) => v.eventType === "MULTIPLE_FACES").length;
+        const suspiciousAudioCount = violations.filter((v: any) => v.eventType === "SUSPICIOUS_AUDIO" || v.eventType === "AUDIO_VIOLATION").length;
+        const objectDetectedCount = violations.filter((v: any) => v.eventType === "OBJECT_DETECTED" || v.eventType === "CELL_PHONE").length;
+        const framesCaptured = (detail?.snapshots?.length || 0) + (detail?.evidence?.length || 0);
+
+        const riskLevel =
+          detail?.riskLevel ||
+          (detail?.riskScore !== undefined
+            ? detail.riskScore > 60
+              ? "Severe"
+              : detail.riskScore > 30
+              ? "Minor"
+              : "Negligible"
+            : "Negligible");
+
+        const trustScore =
+          detail?.trustScore ??
+          (detail?.riskScore !== undefined ? Math.max(0, 100 - Math.round(detail.riskScore)) : 100);
+
+        // Problem breakdown
+        const submissions: any[] = detail?.submissions || [];
+        const totalProblems = questions.length || 0;
+        const solvedProblems =
+          submissions.filter((s: any) => s.isPassed || s.score > 0).length ||
+          (status === "Passed" ? totalProblems : 0);
+
+        const technologiesUsed =
+          Array.from(new Set(submissions.map((s: any) => s.language || s.type || "Coding"))).join(", ") ||
+          (questions.some((q) => q.question?.questionType === "CODING") ? "Coding" : "MCQ");
+
+        const rowObj: Record<string, any> = {
+          "Full Name": name,
+          "Email": email,
+          "Phone Number": phone,
+          "College / Organisation": college,
+          "Domain / Branch": domain,
+          "Status": status,
+          "Verdict": result?.passed === true ? "Passed" : result?.passed === false ? "Failed" : "Pending",
+          "Invited On": inv.createdAt || inv.sentAt ? new Date(inv.createdAt || inv.sentAt || "").toLocaleString() : "—",
+          "Started At": startedAt ? new Date(startedAt).toLocaleString() : "—",
+          "Submitted At": endedAt ? new Date(endedAt).toLocaleString() : "—",
+          "Time Taken": timeTaken,
+          "Test Max Score": totalMarks,
+          "Candidate Score": candidateScore,
+          "% Score": percentage,
+          "Total no. of Problems": totalProblems,
+          "No. of Problems Solved": solvedProblems,
+          "Technologies Used": technologiesUsed,
+          "Proctoring Verdict": riskLevel,
+          "Trust Score": trustScore,
+          "Total Number of Violations": violationsCount,
+          "Critical Violations": criticalViolations,
+          "Navigation / Tab Switch Violations": tabSwitchCount,
+          "Fullscreen Exit Violations": fullscreenExitCount,
+          "DevTools Violations": devtoolsCount,
+          "Copy Paste Violations": copyPasteCount,
+          "Frames without a Face": faceNotVisibleCount,
+          "Frames with Multiple Faces": multipleFacesCount,
+          "Suspicious Audio Violations": suspiciousAudioCount,
+          "Prohibited Object Detected": objectDetectedCount,
+          "Frames Captured": framesCaptured,
+          "Report Url": `${window.location.origin}/admin/tests/${id}?tab=candidates&candidateId=${inv.candidateId}`,
+        };
+
+        // Dynamic Section/Subject Breakdown
+        distinctSubjects.forEach((subj) => {
+          const subjQuestions = questions.filter(
+            (q) => (q.question?.subject?.name || (q as any).subject?.name || (q as any).subjectName) === subj
+          );
+          const subjMax = subjQuestions.reduce((sum, q) => sum + (q.marks || 0), 0);
+          let subjScore = 0;
+          subjQuestions.forEach((sq) => {
+            const sub = submissions.find((s: any) => s.questionId === sq.questionId);
+            if (sub) subjScore += sub.score || 0;
+          });
+          rowObj[`${subj} - Max Score`] = subjMax;
+          rowObj[`${subj} - Candidate Score`] = subjScore;
+        });
+
+        return rowObj;
+      });
+
+      // 2. Sheet: Question-by-Question Submissions
+      const submissionRows: Array<Record<string, any>> = [];
+      candidatesToExport.forEach((inv) => {
+        const name = inv.candidateName || inv.candidate?.user?.name || "Candidate";
+        const email = inv.candidateEmail || inv.candidate?.user?.email || "—";
+        const scoreEntry = candidateResults[inv.id];
+        const submissions: any[] = scoreEntry?.detail?.submissions || [];
+
+        questions.forEach((tq, idx) => {
+          const q = tq.question || (tq as any);
+          const sub = submissions.find((s: any) => s.questionId === tq.questionId || s.questionId === q?.id);
+          submissionRows.push({
+            "Candidate Name": name,
+            "Email Address": email,
+            "Question #": idx + 1,
+            "Question Title": q?.title || `Question ${idx + 1}`,
+            "Question Type": q?.questionType || "MCQ",
+            "Subject": q?.subject?.name || "General",
+            "Max Marks": tq.marks || 0,
+            "Score Obtained": sub?.score ?? 0,
+            "Passed / Solved": sub?.isPassed ? "YES" : "NO",
+            "Language Used": sub?.language || "N/A",
+            "Submitted At": sub?.submittedAt ? new Date(sub.submittedAt).toLocaleString() : "—",
+          });
+        });
+      });
+
+      // 3. Sheet: Proctoring Violations Log
+      const violationRows: Array<Record<string, any>> = [];
+      candidatesToExport.forEach((inv) => {
+        const name = inv.candidateName || inv.candidate?.user?.name || "Candidate";
+        const email = inv.candidateEmail || inv.candidate?.user?.email || "—";
+        const scoreEntry = candidateResults[inv.id];
+        const violations: any[] = scoreEntry?.detail?.violations || [];
+
+        if (violations.length === 0) {
+          violationRows.push({
+            "Candidate Name": name,
+            "Email Address": email,
+            "Timestamp": "—",
+            "Violation Type": "None",
+            "Severity": "INFO",
+            "Description": "Clean session — no violations recorded",
+          });
+        } else {
+          violations.forEach((v: any) => {
+            violationRows.push({
+              "Candidate Name": name,
+              "Email Address": email,
+              "Timestamp": v.occurredAt || v.time ? new Date(v.occurredAt || v.time || "").toLocaleString() : "—",
+              "Violation Type": (v.eventType || "VIOLATION").replace(/_/g, " "),
+              "Severity": v.severity || "MEDIUM",
+              "Description": v.metadata?.description || v.description || `Triggered ${v.eventType || "violation"}`,
+            });
+          });
+        }
+      });
+
+      // Create Workbook & Sheets
+      const wb = XLSX.utils.book_new();
+
+      const wsSummary = XLSX.utils.json_to_sheet(summaryRows);
+      const wsSubmissions = XLSX.utils.json_to_sheet(submissionRows.length > 0 ? submissionRows : [{ "Status": "No submissions recorded" }]);
+      const wsViolations = XLSX.utils.json_to_sheet(violationRows);
+
+      // Auto-fit Column Widths
+      const autoFitCols = (rows: Array<Record<string, unknown>>) => {
+        if (!rows || rows.length === 0) return [];
+        const keys = Object.keys(rows[0]);
+        return keys.map((key) => {
+          const maxLen = rows.reduce((max, row) => {
+            const cellVal = String(row[key] ?? "");
+            return Math.max(max, cellVal.length);
+          }, key.length);
+          return { wch: Math.min(Math.max(maxLen + 3, 12), 50) };
+        });
+      };
+
+      wsSummary["!cols"] = autoFitCols(summaryRows);
+      if (submissionRows.length > 0) wsSubmissions["!cols"] = autoFitCols(submissionRows);
+      wsViolations["!cols"] = autoFitCols(violationRows);
+
+      XLSX.utils.book_append_sheet(wb, wsSummary, "Assessment Summary");
+      XLSX.utils.book_append_sheet(wb, wsSubmissions, "Question Submissions");
+      XLSX.utils.book_append_sheet(wb, wsViolations, "Proctoring Violations");
+
+      const testTitleSafe = (title || test?.title || "Assessment").replace(/[^a-zA-Z0-9_-]/g, "_");
+      const dateStr = new Date().toISOString().slice(0, 10);
+      XLSX.writeFile(wb, `${testTitleSafe}_Complete_Report_${dateStr}.xlsx`);
+
+      toast.success(`Complete assessment report exported for ${candidatesToExport.length} candidate(s).`);
+    } catch (err) {
+      console.error("[NewAdminTestEdit] Failed to export Excel report:", err);
+      toast.error("Failed to generate complete Excel report.");
+    }
   };
 
   if (loading) {
