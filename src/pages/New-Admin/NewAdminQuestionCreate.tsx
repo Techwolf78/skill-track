@@ -40,6 +40,16 @@ import { PreFlightVerificationPanel } from "@/components/admin/PreFlightVerifica
 import { ValidateDriverResponse, QuestionBankStatus, mapFrontendToBackendLang } from "@/types/question";
 import { toast } from "sonner";
 import { RichTextEditor } from "@/components/ui/RichTextEditor";
+import Editor from "@monaco-editor/react";
+
+const mapLanguageToMonaco = (lang: string): string => {
+  const l = (lang || "").toLowerCase();
+  if (l.includes("python") || l.includes("py")) return "python";
+  if (l.includes("javascript") || l.includes("js") || l.includes("node")) return "javascript";
+  if (l.includes("java")) return "java";
+  if (l.includes("cpp") || l.includes("c++") || l.includes("c")) return "cpp";
+  return "plaintext";
+};
 
 const isRichTextEmpty = (html: string) => {
   if (!html) return true;
@@ -222,7 +232,8 @@ export default function NewAdminQuestionCreate() {
   const [memoryLimitMb, setMemoryLimitMb] = useState(256);
   const [constraints, setConstraints] = useState("");
   const [sampleExplanation, setSampleExplanation] = useState("");
-  const [hints, setHints] = useState<string[]>([""]);
+  const [hints, setHints] = useState<string[]>([]);
+  const [hintInput, setHintInput] = useState("");
   const [testCases, setTestCases] = useState<
     Array<{ input: string; expectedOutput: string; sample: boolean; weight: number; explanation?: string }>
   >([
@@ -407,9 +418,11 @@ export default function NewAdminQuestionCreate() {
   const removeOption = (idx: number) => setMcqOptions((opts) => opts.filter((_, i) => i !== idx));
 
   // Hint actions
-  const addHint = () => setHints((prev) => [...prev, ""]);
-  const updateHint = (idx: number, val: string) =>
-    setHints((prev) => prev.map((h, i) => (i === idx ? val : h)));
+  const addHint = () => {
+    const h = hintInput.trim();
+    if (h && !hints.includes(h)) setHints((prev) => [...prev, h]);
+    setHintInput("");
+  };
   const removeHint = (idx: number) => setHints((prev) => prev.filter((_, i) => i !== idx));
 
   // Signature actions
@@ -822,13 +835,15 @@ export default function NewAdminQuestionCreate() {
 
         {/* 2-Column Cards Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 items-start">
-          {/* Left / Center: Problem Details Form (3 cols) */}
-          <div className="lg:col-span-3 bg-white border border-slate-200/90 shadow-sm p-6 md:p-8 space-y-6">
-            {/* Section Header */}
-            <div className="border-b border-slate-100 pb-3">
-              <h2 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Problem Details</h2>
-              <p className="text-[11px] text-slate-400">Configure core metadata, taxonomy, and description for this question.</p>
-            </div>
+          {/* Left / Center: Form Cards Column (3 cols) */}
+          <div className="lg:col-span-3 space-y-6">
+            {/* Box 1: Problem Details */}
+            <div className="bg-white border border-slate-200/90 shadow-sm p-6 md:p-8 space-y-6">
+              {/* Section Header */}
+              <div className="border-b border-slate-100 pb-3">
+                <h2 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Problem Details</h2>
+                <p className="text-[11px] text-slate-400">Configure core metadata, taxonomy, and description for this question.</p>
+              </div>
 
             {/* Title (Underline input style) */}
             <div className="space-y-1">
@@ -844,43 +859,8 @@ export default function NewAdminQuestionCreate() {
               />
             </div>
 
-            {/* ── Problem Attributes Grid (Marks & Solving Time side-by-side) ── */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-1">
-              {/* Estimated Solving Time */}
-              <div className="space-y-1">
-                <label className="block text-xs font-semibold text-slate-700">
-                  Estimated Solving Time (Minutes) <span className="text-rose-500">*</span>
-                </label>
-                <input
-                  type="number"
-                  min={1}
-                  max={180}
-                  value={solvingTimeMins}
-                  onChange={(e) => setSolvingTimeMins(e.target.value)}
-                  placeholder={isCoding ? "15" : "2"}
-                  className="w-full border-b border-slate-200 focus:border-[#4353a4] py-1.5 text-sm text-slate-800 focus:outline-none bg-transparent"
-                />
-              </div>
-
-              {/* Total Marks */}
-              <div className="space-y-1">
-                <label className="block text-xs font-semibold text-slate-700">
-                  Total Marks <span className="text-rose-500">*</span>
-                </label>
-                <input
-                  type="number"
-                  min={1}
-                  max={500}
-                  value={marks}
-                  onChange={(e) => setMarks(Number(e.target.value))}
-                  placeholder="100"
-                  className="w-full border-b border-slate-200 focus:border-[#4353a4] py-1.5 text-sm text-slate-800 focus:outline-none bg-transparent"
-                />
-              </div>
-            </div>
-
-            {/* ── Subject / Topic / Subtopic (Shifted Upwards) ── */}
-            <div className="space-y-3 pt-2">
+            {/* ── Subject / Topic / Subtopic (Directly Below Title) ── */}
+            <div className="space-y-3 pt-1">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div className="space-y-1">
                   <label className="block text-xs font-semibold text-slate-700">Subject *</label>
@@ -920,13 +900,48 @@ export default function NewAdminQuestionCreate() {
               </div>
             </div>
 
-            {/* ── Difficulty Level (Full Width Radio Group with Larger Size) ── */}
+            {/* ── Problem Attributes Grid (Marks & Solving Time side-by-side) ── */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-1">
+              {/* Estimated Solving Time */}
+              <div className="space-y-1">
+                <label className="block text-xs font-semibold text-slate-700">
+                  Estimated Solving Time (Minutes) <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="number"
+                  min={1}
+                  max={180}
+                  value={solvingTimeMins}
+                  onChange={(e) => setSolvingTimeMins(e.target.value)}
+                  placeholder={isCoding ? "15" : "2"}
+                  className="w-full border-b border-slate-200 focus:border-[#4353a4] py-1.5 text-sm text-slate-800 focus:outline-none bg-transparent"
+                />
+              </div>
+
+              {/* Total Marks */}
+              <div className="space-y-1">
+                <label className="block text-xs font-semibold text-slate-700">
+                  Total Marks <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="number"
+                  min={1}
+                  max={500}
+                  value={marks}
+                  onChange={(e) => setMarks(Number(e.target.value))}
+                  placeholder="100"
+                  className="w-full border-b border-slate-200 focus:border-[#4353a4] py-1.5 text-sm text-slate-800 focus:outline-none bg-transparent"
+                />
+              </div>
+            </div>
+
+            {/* ── Difficulty Level (Full Width Radio Group with Equally Divided Space) ── */}
             <div className="space-y-2 pt-2 w-full">
               <label className="block text-xs font-semibold text-slate-700">
                 Difficulty level
               </label>
               <p className="text-[11px] text-slate-400">Proper difficulty level helps in better user recommendations.</p>
-              <div className="grid grid-cols-3 w-full pt-1.5">
+              <div className="grid grid-cols-3 w-full pt-1.5 gap-4">
                 {(["EASY", "MEDIUM", "HARD"] as const).map((lvl) => (
                   <label key={lvl} className="flex items-center gap-3 cursor-pointer text-sm font-medium text-slate-700">
                     <input
@@ -935,7 +950,7 @@ export default function NewAdminQuestionCreate() {
                       value={lvl}
                       checked={difficulty === lvl}
                       onChange={() => setDifficulty(lvl)}
-                      className="w-5 h-5 text-[#4353a4] focus:ring-[#4353a4] border-slate-300 cursor-pointer"
+                      className="w-4 h-4 text-[#4353a4] focus:ring-[#4353a4] border-slate-300 cursor-pointer"
                     />
                     <span>{fmt(lvl)}</span>
                   </label>
@@ -957,10 +972,9 @@ export default function NewAdminQuestionCreate() {
               <p className="text-[11px] text-slate-400">Be as descriptive as possible, but no more.</p>
             </div>
 
-            {/* ── Type Specific Sections ── */}
-            {isCoding ? (
-              /* Coding Complete Details */
-              <div className="space-y-8 pt-4 border-t border-slate-100">
+            {/* ── Coding Limits, Constraints & Explanation inside Problem Details ── */}
+            {isCoding && (
+              <div className="space-y-6 pt-2 border-t border-slate-100">
                 {/* Time & Memory Limits (Side-by-side underline inputs) */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                   <div className="space-y-1">
@@ -992,409 +1006,35 @@ export default function NewAdminQuestionCreate() {
                   </div>
                 </div>
 
-                {/* Constraints */}
-                <div className="space-y-1">
-                  <label className="block text-xs font-semibold text-slate-700">Constraints</label>
-                  <textarea
-                    rows={3}
-                    value={constraints}
-                    onChange={(e) => setConstraints(e.target.value)}
-                    placeholder="e.g. 1 <= nums.length <= 10^5&#10;-10^9 <= nums[i] <= 10^9"
-                    className="w-full border border-slate-200 p-3 text-xs text-slate-800 focus:outline-none focus:border-[#4353a4]"
-                  />
-                </div>
-
-                {/* Sample Explanation */}
-                <div className="space-y-1">
-                  <label className="block text-xs font-semibold text-slate-700">Sample Explanation</label>
-                  <textarea
-                    rows={3}
-                    value={sampleExplanation}
-                    onChange={(e) => setSampleExplanation(e.target.value)}
-                    placeholder="Input: nums = [2,7,11,15], target = 9&#10;Output: [0,1]&#10;Explanation: nums[0] + nums[1] == 9, we return [0, 1]."
-                    className="w-full border border-slate-200 p-3 text-xs text-slate-800 focus:outline-none focus:border-[#4353a4]"
-                  />
-                </div>
-
-                {/* Hints Section */}
-                <div className="space-y-3 pt-2">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-700">Hints</label>
-                      <p className="text-[11px] text-slate-400">Optional tips to guide candidates if requested.</p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={addHint}
-                      className="px-3 py-1 bg-slate-100 text-slate-700 border border-slate-200 text-xs font-medium hover:bg-slate-200 transition-colors cursor-pointer"
-                    >
-                      + Add Hint
-                    </button>
-                  </div>
-                  <div className="space-y-2">
-                    {hints.map((hint, idx) => (
-                      <div key={idx} className="flex items-center gap-2">
-                        <input
-                          type="text"
-                          value={hint}
-                          onChange={(e) => updateHint(idx, e.target.value)}
-                          placeholder={`Hint #${idx + 1}`}
-                          className="flex-1 border-b border-slate-200 focus:border-[#4353a4] py-1 text-xs text-slate-800 focus:outline-none bg-transparent"
-                        />
-                        {hints.length > 1 && (
-                          <button
-                            type="button"
-                            onClick={() => removeHint(idx)}
-                            className="text-slate-400 hover:text-slate-600 p-1 cursor-pointer"
-                          >
-                            <X className="w-3.5 h-3.5" />
-                          </button>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Optional Function Definition */}
-                <div className="space-y-4 pt-4 border-t border-slate-100">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Function Definition (Optional)</h4>
-                      <p className="text-[11px] text-slate-400">Define the expected function name and return type for candidates.</p>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="space-y-1">
-                      <label className="block text-xs font-semibold text-slate-700">Function Name</label>
-                      <input
-                        type="text"
-                        value={signature.method_name}
-                        onChange={(e) => setSignature({ ...signature, method_name: e.target.value })}
-                        placeholder="solve"
-                        className="w-full border-b border-slate-200 focus:border-[#4353a4] py-1 text-xs text-slate-800 font-mono focus:outline-none bg-transparent"
-                      />
-                    </div>
-
-                    <div className="space-y-1">
-                      <label className="block text-xs font-semibold text-slate-700">Return Type</label>
-                      <input
-                        type="text"
-                        value={signature.return_type}
-                        onChange={(e) => setSignature({ ...signature, return_type: e.target.value })}
-                        placeholder="int, string, list[int], void"
-                        className="w-full border-b border-slate-200 focus:border-[#4353a4] py-1 text-xs text-slate-800 font-mono focus:outline-none bg-transparent"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Code Templates / Evaluation Runner Section */}
-                <div className="space-y-4 pt-4 border-t border-slate-100">
-                  <div>
-                    <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
-                      {isLanguageSpecific ? "Language & Code Setup" : "Code Setup"}
-                    </h4>
-                    <p className="text-[11px] text-slate-400">
-                      {isLanguageSpecific
-                        ? "Choose the target programming language, then configure the candidate starter code and hidden evaluation runner."
-                        : "Configure candidate starter code and hidden evaluation runners for each supported language."}
-                    </p>
-                  </div>
-
-                  {isLanguageSpecific ? (
-                    /* Language-Specific: Clean Dropdown matching DoSelect / Slate underline aesthetic */
-                    <div className="space-y-1 max-w-xs">
-                      <label className="block text-xs font-semibold text-[#4353a4]">
-                        Target Programming Language
-                      </label>
-                      <div className="relative border-b-2 border-[#4353a4]">
-                        <select
-                          value={activeCodeLang}
-                          onChange={(e) => {
-                            const selected = e.target.value as "python3" | "javascript" | "java" | "cpp";
-                            setActiveCodeLang(selected);
-                          }}
-                          className="w-full appearance-none bg-transparent py-2 pr-8 text-sm text-slate-800 font-medium focus:outline-none cursor-pointer"
-                        >
-                          <option value="python3">Python 3</option>
-                          <option value="javascript">JavaScript (Node.js)</option>
-                          <option value="java">Java</option>
-                          <option value="cpp">C++</option>
-                        </select>
-                        <ChevronDown className="pointer-events-none absolute right-1 top-1/2 -translate-y-1/2 w-4 h-4 text-[#4353a4]" />
-                      </div>
-                    </div>
-                  ) : (
-                    /* Multi-Language: 4-Column Grid Tabs */
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 w-full bg-slate-100/80 p-1 border border-slate-200">
-                      {(
-                        [
-                          { id: "python3", bLang: "python", label: "Python 3" },
-                          { id: "javascript", bLang: "javascript", label: "JavaScript" },
-                          { id: "java", bLang: "java", label: "Java" },
-                          { id: "cpp", bLang: "cpp", label: "C++" },
-                        ] as const
-                      ).map((lang) => {
-                        const isVerified = verifiedLanguages.includes(lang.bLang);
-                        const isSelected = activeCodeLang === lang.id;
-                        return (
-                          <button
-                            key={lang.id}
-                            type="button"
-                            onClick={() => setActiveCodeLang(lang.id)}
-                            className={`w-full py-2 px-2 text-xs font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
-                              isSelected
-                                ? "bg-white text-slate-900 shadow-xs border border-slate-200/80"
-                                : "text-slate-600 hover:text-slate-900 hover:bg-slate-200/60"
-                            }`}
-                          >
-                            <span>{lang.label}</span>
-                            <span className="text-[10px] font-normal text-slate-400">
-                              ({isVerified ? "Verified" : "Not Tested"})
-                            </span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  )}
-
-                  <div className="space-y-4 pt-2">
-                    {/* Starter Code Template */}
-                    <div className="space-y-1">
-                      <div className="flex items-center justify-between">
-                        <label className="block text-xs font-semibold text-slate-700">
-                          Candidate Starter Code *
-                        </label>
-                        <span className="text-[10px] text-slate-400 font-mono">Visible in candidate code editor</span>
-                      </div>
-                      <textarea
-                        rows={7}
-                        value={codeTemplates[activeCodeLang].template}
-                        onChange={(e) =>
-                          setCodeTemplates({
-                            ...codeTemplates,
-                            [activeCodeLang]: { ...codeTemplates[activeCodeLang], template: e.target.value },
-                          })
-                        }
-                        placeholder={`Initial starter code for candidates in ${activeCodeLang}...`}
-                        className="w-full border border-slate-200 p-3 text-xs font-mono text-slate-800 bg-slate-50/40 focus:bg-white focus:outline-none focus:border-[#4353a4]"
-                      />
-                    </div>
-
-                    {/* Execution Driver */}
-                    <div className="space-y-1">
-                      <div className="flex items-center justify-between">
-                        <label className="block text-xs font-semibold text-slate-700">
-                          Evaluation Runner (Hidden) *
-                        </label>
-                        <span className="text-[10px] text-amber-600 font-mono font-medium">
-                          Editing runner resets verification status
-                        </span>
-                      </div>
-                      <textarea
-                        rows={5}
-                        value={codeTemplates[activeCodeLang].driver}
-                        onChange={(e) => handleDriverChange(activeCodeLang, e.target.value)}
-                        placeholder={`Hidden evaluation runner wrapper for ${activeCodeLang}...`}
-                        className="w-full border border-slate-200 p-3 text-xs font-mono text-slate-800 bg-slate-50/40 focus:bg-white focus:outline-none focus:border-[#4353a4]"
-                      />
-                    </div>
-
-                    {/* Interactive Pre-Flight Verification Panel */}
-                    <PreFlightVerificationPanel
-                      questionId={createdQuestionId || undefined}
-                      language={activeCodeLang}
-                      driverCode={codeTemplates[activeCodeLang].driver}
-                      testCases={testCases.map((tc, idx) => ({ ...tc, id: `tc-${idx}`, codingQuestionId: createdQuestionId || "" }))}
-                      onSaveFirstRequired={handleSaveDraftForVerification}
-                      onVerificationSuccess={(res) => {
-                        const bLang = mapFrontendToBackendLang(activeCodeLang);
-                        setVerifiedLanguages((prev) => Array.from(new Set([...prev, bLang])));
-                        setPendingLanguages((prev) => prev.filter((l) => l !== bLang));
-                        if (res.questionStatus) {
-                          setQuestionStatus(res.questionStatus);
-                        }
-                      }}
-                      className="mt-4"
+                {/* Constraints and Sample Explanation beside each other */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-1">
+                    <label className="block text-xs font-semibold text-slate-700">Constraints</label>
+                    <textarea
+                      rows={4}
+                      value={constraints}
+                      onChange={(e) => setConstraints(e.target.value)}
+                      placeholder="e.g. 1 <= nums.length <= 10^5&#10;-10^9 <= nums[i] <= 10^9"
+                      className="w-full border border-slate-200 p-3 text-xs font-mono text-slate-800 focus:outline-none focus:border-[#4353a4] bg-slate-50/20 focus:bg-white transition-colors"
                     />
                   </div>
-                </div>
 
-                {/* Test Cases Manager */}
-                <div className="space-y-4 pt-4 border-t border-slate-100">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Test Cases</h4>
-                      <p className="text-[11px] text-slate-400">Add sample cases (visible) and hidden test cases (for grading)</p>
-                    </div>
-                    <div className="flex gap-2">
-                      <button
-                        type="button"
-                        onClick={() => addTestCase(true)}
-                        className="px-3 py-1.5 bg-slate-100 text-slate-800 border border-slate-300 text-xs font-semibold hover:bg-slate-200 transition-colors cursor-pointer"
-                      >
-                        + Sample Case
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => addTestCase(false)}
-                        className="px-3 py-1.5 bg-slate-100 text-slate-800 border border-slate-300 text-xs font-semibold hover:bg-slate-200 transition-colors cursor-pointer"
-                      >
-                        + Hidden Case
-                      </button>
-                    </div>
+                  <div className="space-y-1">
+                    <label className="block text-xs font-semibold text-slate-700">Sample Explanation</label>
+                    <textarea
+                      rows={4}
+                      value={sampleExplanation}
+                      onChange={(e) => setSampleExplanation(e.target.value)}
+                      placeholder="Input: nums = [2,7,11,15], target = 9&#10;Output: [0,1]&#10;Explanation: nums[0] + nums[1] == 9, we return [0, 1]."
+                      className="w-full border border-slate-200 p-3 text-xs font-mono text-slate-800 focus:outline-none focus:border-[#4353a4] bg-slate-50/20 focus:bg-white transition-colors"
+                    />
                   </div>
-
-                  <div className="space-y-3">
-                    {testCases.map((tc, idx) => (
-                      <div
-                        key={idx}
-                        className="p-4 border border-slate-200 text-xs space-y-3 bg-white"
-                      >
-                        <div className="flex items-center justify-between">
-                          <span className="font-semibold text-slate-800 flex items-center gap-2">
-                            <span
-                              className={`px-2 py-0.5 text-[10px] font-bold uppercase border ${
-                                tc.sample
-                                  ? "bg-slate-100 text-slate-800 border-slate-300"
-                                  : "bg-slate-50 text-slate-600 border-slate-200"
-                              }`}
-                            >
-                              {tc.sample ? "Sample" : "Hidden"} #{idx + 1}
-                            </span>
-                          </span>
-                          <div className="flex items-center gap-3">
-                            <div className="flex items-center gap-1.5">
-                              <span className="text-[11px] text-slate-500 font-medium">Weight %:</span>
-                              <input
-                                type="number"
-                                min={1}
-                                max={100}
-                                value={tc.weight}
-                                onChange={(e) => updateTestCase(idx, "weight", Number(e.target.value))}
-                                className="w-16 border-b border-slate-200 px-2 py-0.5 text-xs bg-transparent focus:outline-none focus:border-[#4353a4]"
-                              />
-                            </div>
-                            <button
-                              type="button"
-                              onClick={() => removeTestCase(idx)}
-                              className="text-slate-400 hover:text-slate-700 transition-colors cursor-pointer"
-                            >
-                              <X className="w-4 h-4" />
-                            </button>
-                          </div>
-                        </div>
-
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                          <div>
-                            <label className="block text-[11px] font-medium text-slate-600 mb-1">Input</label>
-                            <textarea
-                              rows={2}
-                              value={tc.input}
-                              onChange={(e) => updateTestCase(idx, "input", e.target.value)}
-                              placeholder="e.g. 10"
-                              className="w-full border border-slate-200 p-2 text-xs font-mono bg-slate-50/40 focus:bg-white focus:outline-none"
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-[11px] font-medium text-slate-600 mb-1">Expected Output</label>
-                            <textarea
-                              rows={2}
-                              value={tc.expectedOutput}
-                              onChange={(e) => updateTestCase(idx, "expectedOutput", e.target.value)}
-                              placeholder="e.g. 19"
-                              className="w-full border border-slate-200 p-2 text-xs font-mono bg-slate-50/40 focus:bg-white focus:outline-none"
-                            />
-                          </div>
-                        </div>
-
-                        {tc.sample && (
-                          <div>
-                            <label className="block text-[11px] font-medium text-slate-600 mb-1">Explanation (Optional)</label>
-                            <input
-                              type="text"
-                              value={tc.explanation || ""}
-                              onChange={(e) => updateTestCase(idx, "explanation", e.target.value)}
-                              placeholder="e.g. n = 10 -> 10 + 9 = 19"
-                              className="w-full border-b border-slate-200 py-1 text-xs text-slate-800 bg-transparent focus:outline-none focus:border-[#4353a4]"
-                            />
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            ) : (
-              /* MCQ Options Manager */
-              <div className="space-y-6 pt-4 border-t border-slate-100">
-                <div className="flex items-center justify-between p-3 border border-slate-200/80 bg-slate-50/50">
-                  <div>
-                    <span className="block text-xs font-semibold text-slate-700">Shuffle options</span>
-                    <span className="block text-[11px] text-slate-400">Randomize option order for test takers</span>
-                  </div>
-                  <input
-                    type="checkbox"
-                    checked={shuffleOptions}
-                    onChange={(e) => setShuffleOptions(e.target.checked)}
-                    className="w-4 h-4 text-[#4353a4] focus:ring-[#4353a4] border-slate-300 cursor-pointer"
-                  />
-                </div>
-
-                <div className="space-y-3">
-                  <label className="block text-xs font-semibold text-slate-700">
-                    Options — {mcqType === "MULTIPLE_CORRECT" ? "Check all correct options" : "Click radio button for correct option"}
-                  </label>
-                  <div className="space-y-3">
-                    {mcqOptions.map((opt, i) => (
-                      <div key={i} className="flex items-start gap-3 p-2 bg-slate-50/40 border border-slate-200/80 rounded-sm">
-                        <button
-                          type="button"
-                          onClick={() => toggleCorrect(i)}
-                          className={`shrink-0 w-5 h-5 mt-2.5 ${mcqType === "MULTIPLE_CORRECT" ? "" : "rounded-full"} border-2 flex items-center justify-center transition-colors cursor-pointer ${
-                            opt.isCorrect
-                              ? "border-slate-800 bg-slate-800 text-white"
-                              : "border-slate-300 hover:border-slate-400 bg-white"
-                          }`}
-                          title={opt.isCorrect ? "Correct Option" : "Mark as Correct"}
-                        >
-                          {opt.isCorrect && <Check className="w-3 h-3" />}
-                        </button>
-                        <div className="flex-1 min-w-0">
-                          <RichTextEditor
-                            content={opt.text}
-                            onChange={(html) => setOptionText(i, html)}
-                            placeholder={`Option ${i + 1}`}
-                            minHeight="70px"
-                          />
-                        </div>
-                        {mcqOptions.length > 2 && (
-                          <button
-                            type="button"
-                            onClick={() => removeOption(i)}
-                            className="text-slate-300 hover:text-slate-600 transition-colors p-1 mt-2 cursor-pointer shrink-0"
-                            title="Remove Option"
-                          >
-                            <X className="w-4 h-4" />
-                          </button>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                  <button
-                    type="button"
-                    onClick={addOption}
-                    className="mt-2 flex items-center gap-1.5 text-xs text-slate-700 hover:text-slate-900 font-semibold cursor-pointer"
-                  >
-                    <Plus className="w-3.5 h-3.5" /> Add Option
-                  </button>
                 </div>
               </div>
             )}
 
             {/* Tags (Underline input style) */}
-            <div className="space-y-2 pt-4 border-t border-slate-100">
+            <div className="space-y-2 pt-2 border-t border-slate-100">
               <label className="block text-xs font-semibold text-slate-700">Tags</label>
               <div className="flex gap-2">
                 <input
@@ -1434,10 +1074,441 @@ export default function NewAdminQuestionCreate() {
                 </div>
               )}
             </div>
+
+            {/* Hints Section (Design matching Tags) */}
+            {isCoding && (
+              <div className="space-y-2 pt-2 border-t border-slate-100">
+                <label className="block text-xs font-semibold text-slate-700">Hints</label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    placeholder="e.g. Consider using two pointers or binary search"
+                    value={hintInput}
+                    onChange={(e) => setHintInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        addHint();
+                      }
+                    }}
+                    className="flex-1 border-b border-slate-200 focus:border-[#4353a4] py-1.5 text-xs focus:outline-none bg-transparent"
+                  />
+                  <button
+                    type="button"
+                    onClick={addHint}
+                    className="px-4 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold transition-colors cursor-pointer"
+                  >
+                    Add
+                  </button>
+                </div>
+                {hints.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 mt-2">
+                    {hints.map((h, idx) => (
+                      <span
+                        key={idx}
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-slate-100 text-slate-700 text-xs font-medium border border-slate-200"
+                      >
+                        <span className="text-[10px] text-slate-400 font-semibold">#{idx + 1}</span>
+                        <span>{h}</span>
+                        <button
+                          type="button"
+                          onClick={() => removeHint(idx)}
+                          className="hover:text-slate-900 cursor-pointer"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* MCQ Options Section (If not Coding) */}
+            {!isCoding && (
+              <div className="space-y-6 pt-4 border-t border-slate-100">
+                <div className="flex items-center justify-between p-3 border border-slate-200/80 bg-slate-50/50">
+                  <div>
+                    <span className="block text-xs font-semibold text-slate-700">Shuffle options</span>
+                    <span className="block text-[11px] text-slate-400">Randomize option order for test takers</span>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={shuffleOptions}
+                    onChange={(e) => setShuffleOptions(e.target.checked)}
+                    className="w-4 h-4 text-[#4353a4] focus:ring-[#4353a4] border-slate-300 cursor-pointer"
+                  />
+                </div>
+
+                <div className="space-y-3">
+                  <label className="block text-xs font-semibold text-slate-700">
+                    Options — {mcqType === "MULTIPLE_CORRECT" ? "Check all correct options" : "Click radio button for correct option"}
+                  </label>
+                  <div className="space-y-2.5">
+                    {mcqOptions.map((opt, i) => (
+                      <div key={i} className="flex items-center gap-3">
+                        <button
+                          type="button"
+                          onClick={() => toggleCorrect(i)}
+                          className={`shrink-0 w-4 h-4 ${mcqType === "MULTIPLE_CORRECT" ? "rounded-xs" : "rounded-full"} border-2 flex items-center justify-center transition-colors cursor-pointer ${
+                            opt.isCorrect
+                              ? "border-[#4353a4] bg-[#4353a4] text-white"
+                              : "border-slate-300 hover:border-slate-400 bg-white"
+                          }`}
+                          title={opt.isCorrect ? "Correct Option" : "Mark as Correct"}
+                        >
+                          {opt.isCorrect && <Check className="w-2.5 h-2.5 stroke-[3]" />}
+                        </button>
+                        <div className="flex-1 min-w-0">
+                          <RichTextEditor
+                            compact
+                            content={opt.text}
+                            onChange={(html) => setOptionText(i, html)}
+                            placeholder={`Option ${i + 1}`}
+                            minHeight="36px"
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={addOption}
+                    className="mt-2 flex items-center gap-1.5 text-xs text-[#4353a4] hover:text-[#38468d] font-semibold cursor-pointer"
+                  >
+                    <Plus className="w-3.5 h-3.5" /> Add Option
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
 
-          {/* Right Column: Clean Action Buttons (DoSelect Style without rounded) */}
-          <div className="space-y-4 sticky top-20">
+          {/* ── Additional Coding Modular Boxes ── */}
+          {isCoding && (
+            <>
+              {/* Box 2: Function Definition (Optional) */}
+              <div className="bg-white border border-slate-200/90 shadow-sm p-6 md:p-8 space-y-4">
+                <div className="border-b border-slate-100 pb-3">
+                  <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
+                    Function Definition (Optional)
+                  </h3>
+                  <p className="text-[11px] text-slate-400">
+                    Define the expected function name and return type for candidates.
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-1">
+                    <label className="block text-xs font-semibold text-slate-700">Function Name</label>
+                    <input
+                      type="text"
+                      value={signature.method_name}
+                      onChange={(e) => setSignature({ ...signature, method_name: e.target.value })}
+                      placeholder="solve"
+                      className="w-full border-b border-slate-200 focus:border-[#4353a4] py-1.5 text-xs text-slate-800 font-mono focus:outline-none bg-transparent"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="block text-xs font-semibold text-slate-700">Return Type</label>
+                    <input
+                      type="text"
+                      value={signature.return_type}
+                      onChange={(e) => setSignature({ ...signature, return_type: e.target.value })}
+                      placeholder="int, string, list[int], void"
+                      className="w-full border-b border-slate-200 focus:border-[#4353a4] py-1.5 text-xs text-slate-800 font-mono focus:outline-none bg-transparent"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Box 3: Code Setup & Test Run */}
+              <div className="bg-white border border-slate-200/90 shadow-sm p-6 md:p-8 space-y-6">
+                {/* Header */}
+                <div className="border-b border-slate-100 pb-3">
+                  <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
+                    {isLanguageSpecific ? "Language & Code Setup" : "Code Setup"}
+                  </h3>
+                  <p className="text-[11px] text-slate-400 mt-0.5">
+                    {isLanguageSpecific
+                      ? "Choose the target language, then configure the candidate starter code and hidden evaluation runner."
+                      : "Configure candidate starter code and hidden evaluation runners across supported languages."}
+                  </p>
+                </div>
+
+                {/* Language Selector / Full-Width Tabs Below Header */}
+                {isLanguageSpecific ? (
+                  <div className="space-y-1 max-w-sm">
+                    <label className="block text-xs font-semibold text-[#4353a4]">
+                      Target Programming Language
+                    </label>
+                    <div className="relative border-b-2 border-[#4353a4]">
+                      <select
+                        value={activeCodeLang}
+                        onChange={(e) => {
+                          const selected = e.target.value as "python3" | "javascript" | "java" | "cpp";
+                          setActiveCodeLang(selected);
+                        }}
+                        className="w-full appearance-none bg-transparent py-2 pr-8 text-xs text-slate-800 font-semibold focus:outline-none cursor-pointer"
+                      >
+                        <option value="python3">Python 3</option>
+                        <option value="javascript">JavaScript (Node.js)</option>
+                        <option value="java">Java</option>
+                        <option value="cpp">C++</option>
+                      </select>
+                      <ChevronDown className="pointer-events-none absolute right-1 top-1/2 -translate-y-1/2 w-4 h-4 text-[#4353a4]" />
+                    </div>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 w-full bg-slate-100/90 p-1.5 border border-slate-200">
+                    {(
+                      [
+                        { id: "python3", bLang: "python", label: "Python 3" },
+                        { id: "javascript", bLang: "javascript", label: "JavaScript" },
+                        { id: "java", bLang: "java", label: "Java" },
+                        { id: "cpp", bLang: "cpp", label: "C++" },
+                      ] as const
+                    ).map((lang) => {
+                      const isVerified = verifiedLanguages.includes(lang.bLang);
+                      const isSelected = activeCodeLang === lang.id;
+                      return (
+                        <button
+                          key={lang.id}
+                          type="button"
+                          onClick={() => setActiveCodeLang(lang.id)}
+                          className={`w-full py-2.5 px-3 text-xs font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                            isSelected
+                              ? "bg-white text-slate-900 shadow-xs border border-slate-200"
+                              : "text-slate-600 hover:text-slate-900 hover:bg-slate-200/60"
+                          }`}
+                        >
+                          <span>{lang.label}</span>
+                          <span className={`text-[10px] ${isVerified ? "text-emerald-600 font-bold" : "text-slate-400 font-normal"}`}>
+                            ({isVerified ? "Verified" : "Not Tested"})
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* Starter Code & Evaluation Runner Beside Each Other */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pt-1">
+                  {/* Left: Starter Code */}
+                  <div className="space-y-1.5 flex flex-col">
+                    <div className="flex items-center justify-between">
+                      <label className="block text-xs font-semibold text-slate-700">
+                        Candidate Starter Code <span className="text-rose-500">*</span>
+                      </label>
+                      <span className="text-[10px] text-slate-400 font-mono">Visible in candidate editor</span>
+                    </div>
+                    <div className="border border-slate-700 bg-[#1e1e1e] overflow-hidden shadow-inner">
+                      <Editor
+                        height="260px"
+                        language={mapLanguageToMonaco(activeCodeLang)}
+                        value={codeTemplates[activeCodeLang].template}
+                        onChange={(val) =>
+                          setCodeTemplates({
+                            ...codeTemplates,
+                            [activeCodeLang]: { ...codeTemplates[activeCodeLang], template: val || "" },
+                          })
+                        }
+                        theme="vs-dark"
+                        options={{
+                          minimap: { enabled: false },
+                          fontSize: 13,
+                          fontFamily: "'JetBrains Mono', 'Fira Code', 'Consolas', monospace",
+                          scrollBeyondLastLine: false,
+                          lineNumbers: "on",
+                          renderLineHighlight: "all",
+                          roundedSelection: false,
+                          scrollbar: {
+                            vertical: "auto",
+                            horizontal: "auto",
+                            verticalScrollbarSize: 8,
+                            horizontalScrollbarSize: 8,
+                          },
+                          automaticLayout: true,
+                          padding: { top: 12, bottom: 12 },
+                          tabSize: 4,
+                          formatOnPaste: true,
+                        }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Right: Evaluation Runner */}
+                  <div className="space-y-1.5 flex flex-col">
+                    <div className="flex items-center justify-between">
+                      <label className="block text-xs font-semibold text-slate-700">
+                        Evaluation Runner (Hidden) <span className="text-rose-500">*</span>
+                      </label>
+                      <span className="text-[10px] text-amber-600 font-mono font-medium">
+                        Hidden evaluation wrapper
+                      </span>
+                    </div>
+                    <div className="border border-slate-700 bg-[#1e1e1e] overflow-hidden shadow-inner">
+                      <Editor
+                        height="260px"
+                        language={mapLanguageToMonaco(activeCodeLang)}
+                        value={codeTemplates[activeCodeLang].driver}
+                        onChange={(val) => handleDriverChange(activeCodeLang, val || "")}
+                        theme="vs-dark"
+                        options={{
+                          minimap: { enabled: false },
+                          fontSize: 13,
+                          fontFamily: "'JetBrains Mono', 'Fira Code', 'Consolas', monospace",
+                          scrollBeyondLastLine: false,
+                          lineNumbers: "on",
+                          renderLineHighlight: "all",
+                          roundedSelection: false,
+                          scrollbar: {
+                            vertical: "auto",
+                            horizontal: "auto",
+                            verticalScrollbarSize: 8,
+                            horizontalScrollbarSize: 8,
+                          },
+                          automaticLayout: true,
+                          padding: { top: 12, bottom: 12 },
+                          tabSize: 4,
+                          formatOnPaste: true,
+                        }}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* PreFlight Verification Test Run Panel inside Code Setup */}
+                <PreFlightVerificationPanel
+                  questionId={createdQuestionId || undefined}
+                  language={activeCodeLang}
+                  driverCode={codeTemplates[activeCodeLang].driver}
+                  testCases={testCases.map((tc, idx) => ({ ...tc, id: `tc-${idx}`, codingQuestionId: createdQuestionId || "" }))}
+                  onSaveFirstRequired={handleSaveDraftForVerification}
+                  onVerificationSuccess={(res) => {
+                    const bLang = mapFrontendToBackendLang(activeCodeLang);
+                    setVerifiedLanguages((prev) => Array.from(new Set([...prev, bLang])));
+                    setPendingLanguages((prev) => prev.filter((l) => l !== bLang));
+                    if (res.questionStatus) {
+                      setQuestionStatus(res.questionStatus);
+                    }
+                  }}
+                />
+              </div>
+
+              {/* Box 4: Test Cases in Compact Layout */}
+              <div className="bg-white border border-slate-200/90 shadow-sm p-6 md:p-8 space-y-4">
+                <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                  <div>
+                    <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Test Cases</h3>
+                    <p className="text-[11px] text-slate-400">Add sample cases (visible) and hidden test cases (for grading)</p>
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => addTestCase(true)}
+                      className="px-3 py-1.5 bg-slate-100 text-slate-800 border border-slate-300 text-xs font-semibold hover:bg-slate-200 transition-colors cursor-pointer"
+                    >
+                      + Sample Case
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => addTestCase(false)}
+                      className="px-3 py-1.5 bg-slate-100 text-slate-800 border border-slate-300 text-xs font-semibold hover:bg-slate-200 transition-colors cursor-pointer"
+                    >
+                      + Hidden Case
+                    </button>
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  {testCases.map((tc, idx) => (
+                    <div
+                      key={idx}
+                      className="p-3 border border-slate-200 text-xs space-y-2.5 bg-slate-50/30"
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="font-semibold text-slate-800 flex items-center gap-2">
+                          <span
+                            className={`px-2 py-0.5 text-[10px] font-bold uppercase border ${
+                              tc.sample
+                                ? "bg-white text-slate-800 border-slate-300 shadow-2xs"
+                                : "bg-slate-100 text-slate-600 border-slate-200"
+                            }`}
+                          >
+                            {tc.sample ? "Sample" : "Hidden"} #{idx + 1}
+                          </span>
+                        </span>
+                        <div className="flex items-center gap-3">
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[11px] text-slate-500 font-medium">Weight %:</span>
+                            <input
+                              type="number"
+                              min={1}
+                              max={100}
+                              value={tc.weight}
+                              onChange={(e) => updateTestCase(idx, "weight", Number(e.target.value))}
+                              className="w-14 border-b border-slate-300 px-1 py-0.5 text-xs bg-transparent focus:outline-none focus:border-[#4353a4]"
+                            />
+                          </div>
+                          {testCases.length > 1 && (
+                            <button
+                              type="button"
+                              onClick={() => removeTestCase(idx)}
+                              className="text-slate-400 hover:text-rose-600 p-1 transition-colors cursor-pointer"
+                              title="Remove Test Case"
+                            >
+                              <X className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-[11px] font-medium text-slate-600 mb-1">Input</label>
+                          <textarea
+                            rows={2}
+                            value={tc.input}
+                            onChange={(e) => updateTestCase(idx, "input", e.target.value)}
+                            placeholder="e.g. 10"
+                            className="w-full border border-slate-200 p-2 text-xs font-mono bg-white focus:outline-none focus:border-[#4353a4]"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[11px] font-medium text-slate-600 mb-1">Expected Output</label>
+                          <textarea
+                            rows={2}
+                            value={tc.expectedOutput}
+                            onChange={(e) => updateTestCase(idx, "expectedOutput", e.target.value)}
+                            placeholder="e.g. 19"
+                            className="w-full border border-slate-200 p-2 text-xs font-mono bg-white focus:outline-none focus:border-[#4353a4]"
+                          />
+                        </div>
+                      </div>
+
+                      {tc.sample && (
+                        <div>
+                          <label className="block text-[11px] font-medium text-slate-600 mb-1">Explanation (Optional)</label>
+                          <input
+                            type="text"
+                            value={tc.explanation || ""}
+                            onChange={(e) => updateTestCase(idx, "explanation", e.target.value)}
+                            placeholder="e.g. n = 10 -> 10 + 9 = 19"
+                            className="w-full border-b border-slate-200 py-1 text-xs text-slate-800 bg-transparent focus:outline-none focus:border-[#4353a4]"
+                          />
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* Right Column: Clean Action Buttons (1 col) */}
+        <div className="lg:col-span-1 space-y-4 sticky top-20">
             <div className="bg-white border border-slate-200/90 shadow-sm p-5 space-y-3">
               <button
                 type="button"

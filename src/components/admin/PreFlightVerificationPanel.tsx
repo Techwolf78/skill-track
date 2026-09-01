@@ -24,6 +24,16 @@ import {
 } from "@/types/question";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
+import Editor from "@monaco-editor/react";
+
+const mapLanguageToMonaco = (lang: string): string => {
+  const l = (lang || "").toLowerCase();
+  if (l.includes("python") || l.includes("py")) return "python";
+  if (l.includes("javascript") || l.includes("js") || l.includes("node")) return "javascript";
+  if (l.includes("java")) return "java";
+  if (l.includes("cpp") || l.includes("c++") || l.includes("c")) return "cpp";
+  return "plaintext";
+};
 
 interface PreFlightVerificationPanelProps {
   questionId?: string;
@@ -179,34 +189,31 @@ export const PreFlightVerificationPanel: React.FC<PreFlightVerificationPanelProp
 
   return (
     <div
-      className={`rounded-lg border border-slate-200 bg-slate-50/60 p-5 text-slate-800 shadow-xs space-y-4 ${className}`}
+      className={`border border-slate-200 bg-slate-50/50 p-6 text-slate-800 space-y-4.5 ${className}`}
     >
-      {/* Header */}
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-3">
-        <div className="flex items-center gap-2.5">
-          <div className="flex h-8 w-8 items-center justify-center rounded-md bg-slate-200/80 text-slate-700">
-            <ShieldCheck className="h-4 w-4" />
-          </div>
-          <div>
+      {/* Header with Inline Scope Selector */}
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-3.5">
+        <div>
+          <div className="flex items-center gap-2">
             <h4 className="text-xs font-bold uppercase tracking-wider text-slate-900">
-              Test Run — Verify Question Works ({getLanguageDisplayName(language)})
+              Test Run ({getLanguageDisplayName(language)})
             </h4>
-            <p className="text-[11px] text-slate-500">
-              Run a working solution against your test cases to confirm the question is set up correctly before publishing.
-            </p>
           </div>
+          <p className="text-[11px] text-slate-500 mt-0.5">
+            Verify evaluation drivers and test cases against a working solution.
+          </p>
         </div>
 
-        {/* Scope selector */}
+        {/* Scope selector on the right */}
         <div className="flex items-center gap-2 text-xs">
-          <span className="text-slate-500 font-medium">Scope:</span>
-          <div className="inline-flex rounded-md border border-slate-300 bg-white p-0.5 text-xs">
+          <span className="text-slate-500 font-medium text-[11px]">Scope:</span>
+          <div className="inline-flex border border-slate-200 bg-white p-0.5 text-xs shadow-2xs">
             <button
               type="button"
               onClick={() => setRunScope("SAMPLE")}
-              className={`rounded px-3 py-1 text-xs font-semibold transition-all cursor-pointer ${
+              className={`px-3 py-1 text-[11px] font-semibold transition-all cursor-pointer ${
                 runScope === "SAMPLE"
-                  ? "bg-slate-900 text-white shadow-xs"
+                  ? "bg-slate-800 text-white"
                   : "text-slate-600 hover:text-slate-900"
               }`}
             >
@@ -215,9 +222,9 @@ export const PreFlightVerificationPanel: React.FC<PreFlightVerificationPanelProp
             <button
               type="button"
               onClick={() => setRunScope("ALL")}
-              className={`rounded px-3 py-1 text-xs font-semibold transition-all cursor-pointer ${
+              className={`px-3 py-1 text-[11px] font-semibold transition-all cursor-pointer ${
                 runScope === "ALL"
-                  ? "bg-slate-900 text-white shadow-xs"
+                  ? "bg-slate-800 text-white"
                   : "text-slate-600 hover:text-slate-900"
               }`}
             >
@@ -230,45 +237,63 @@ export const PreFlightVerificationPanel: React.FC<PreFlightVerificationPanelProp
       {/* Reference Solution Editor */}
       <div className="space-y-2">
         <div className="flex items-center justify-between">
-            <label className="text-xs font-semibold text-slate-700 flex items-center gap-1.5">
-              <Code2 className="w-3.5 h-3.5 text-slate-500" />
-              Your Working Solution ({getLanguageDisplayName(language)})
-            </label>
-            <span className="text-[10px] text-slate-400 font-mono">Not shown to candidates — used only to verify the question</span>
+          <label className="text-xs font-semibold text-slate-700">
+            Working Solution ({getLanguageDisplayName(language)})
+          </label>
+          <span className="text-[10px] text-slate-400 font-mono">Used only for driver pre-flight verification</span>
         </div>
 
-        <textarea
-          value={referenceSolution}
-          onChange={(e) => setReferenceSolution(e.target.value)}
-          placeholder={`Enter working code to test and verify the question in ${getLanguageDisplayName(language)}...`}
-          rows={7}
-          className="w-full rounded-md border border-slate-700 bg-slate-900 p-3 font-mono text-xs text-slate-100 placeholder:text-slate-500 focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500 leading-relaxed shadow-inner"
-          spellCheck={false}
-        />
+        <div className="border border-slate-700 bg-[#1e1e1e] overflow-hidden shadow-inner">
+          <Editor
+            height="220px"
+            language={mapLanguageToMonaco(language)}
+            value={referenceSolution}
+            onChange={(val) => setReferenceSolution(val || "")}
+            theme="vs-dark"
+            options={{
+              minimap: { enabled: false },
+              fontSize: 13,
+              fontFamily: "'JetBrains Mono', 'Fira Code', 'Consolas', monospace",
+              scrollBeyondLastLine: false,
+              lineNumbers: "on",
+              renderLineHighlight: "all",
+              roundedSelection: false,
+              scrollbar: {
+                vertical: "auto",
+                horizontal: "auto",
+                verticalScrollbarSize: 8,
+                horizontalScrollbarSize: 8,
+              },
+              automaticLayout: true,
+              padding: { top: 12, bottom: 12 },
+              tabSize: 4,
+              formatOnPaste: true,
+            }}
+          />
+        </div>
       </div>
 
       {/* Action Footer */}
-      <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
-        <div className="text-xs text-slate-500">
-          All test cases must pass before the question can be published as{" "}
-          <span className="font-semibold text-slate-800">ACTIVE</span>.
+      <div className="flex flex-wrap items-center justify-between gap-3 pt-1.5">
+        <div className="text-[11px] text-slate-500">
+          All test cases must pass for the driver to be verified.
         </div>
 
         <button
           type="button"
           onClick={handleRunVerification}
           disabled={isValidating}
-          className="inline-flex items-center gap-2 rounded-md bg-[#10B981] hover:bg-[#059669] px-4 py-2 text-xs font-bold text-white shadow-xs transition-colors cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
+          className="inline-flex items-center gap-2 bg-[#10B981] hover:bg-[#059669] px-4.5 py-2 text-xs font-bold text-white shadow-xs transition-colors cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
         >
           {isValidating ? (
             <>
               <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              <span>Running Test Cases...</span>
+              <span>Running Tests...</span>
             </>
           ) : (
             <>
               <Play className="h-3.5 w-3.5 fill-current" />
-              <span>Run Test & Verify ({getLanguageDisplayName(language)})</span>
+              <span>Run Tests ({getLanguageDisplayName(language)})</span>
             </>
           )}
         </button>
