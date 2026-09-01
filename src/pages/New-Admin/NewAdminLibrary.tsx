@@ -237,6 +237,7 @@ function CreateProblemModal({
     questionType: "CODING" | "MCQ";
     mcqType: McqType;
     difficulty: "EASY" | "MEDIUM" | "HARD";
+    isLanguageSpecific?: boolean;
   }) => void;
   onOpenBulkUploader: () => void;
 }) {
@@ -252,7 +253,8 @@ function CreateProblemModal({
       return;
     }
 
-    const isCoding = problemCategory === "CODING";
+    const isCoding = problemCategory === "CODING" || problemCategory === "LANGUAGE_SPECIFIC_CODING";
+    const isLanguageSpecific = problemCategory === "LANGUAGE_SPECIFIC_CODING";
     let mcqType: McqType = "SINGLE_CORRECT";
     if (problemCategory === "TRUE_FALSE") mcqType = "TRUE_FALSE";
     else if (problemCategory === "ASSERTION_REASON") mcqType = "ASSERTION_REASON";
@@ -264,6 +266,7 @@ function CreateProblemModal({
       questionType: isCoding ? "CODING" : "MCQ",
       mcqType,
       difficulty: level,
+      isLanguageSpecific,
     });
     setName("");
   };
@@ -313,7 +316,8 @@ function CreateProblemModal({
                   onChange={(e) => setProblemCategory(e.target.value)}
                   className="w-full appearance-none bg-transparent py-2 pr-8 text-sm text-slate-800 font-medium focus:outline-none cursor-pointer"
                 >
-                  <option value="CODING">Coding</option>
+                  <option value="CODING">Coding (Multi-Language)</option>
+                  <option value="LANGUAGE_SPECIFIC_CODING">Language-Specific Coding</option>
                   <option value="MCQ">Multiple-choice</option>
                   <option value="TRUE_FALSE">True / False</option>
                   <option value="ASSERTION_REASON">Assertion Reason</option>

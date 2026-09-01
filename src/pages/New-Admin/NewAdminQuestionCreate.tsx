@@ -228,7 +228,7 @@ export default function NewAdminQuestionCreate() {
   // Code Templates & Drivers
   const [codeTemplates, setCodeTemplates] = useState(DEFAULT_CODE_TEMPLATES);
   const [activeCodeLang, setActiveCodeLang] = useState<"python3" | "javascript" | "java" | "cpp">("python3");
-  const [isLanguageSpecific, setIsLanguageSpecific] = useState<boolean>(false);
+  const [isLanguageSpecific] = useState<boolean>(Boolean(initialData.isLanguageSpecific));
   const [verifiedLanguages, setVerifiedLanguages] = useState<string[]>([]);
   const [pendingLanguages, setPendingLanguages] = useState<string[]>(["python", "javascript", "java", "cpp"]);
   const [createdQuestionId, setCreatedQuestionId] = useState<string | null>(null);
@@ -492,11 +492,11 @@ export default function NewAdminQuestionCreate() {
       for (const lang of langsToCheck) {
         const langDisplay = lang === "python3" ? "Python 3" : lang === "javascript" ? "JavaScript" : lang === "java" ? "Java" : "C++";
         if (!codeTemplates[lang].template.trim()) {
-          toast.error(`Starter Code Template for ${langDisplay} cannot be blank.`);
+          toast.error(`Starter code for ${langDisplay} cannot be blank.`);
           return;
         }
         if (!codeTemplates[lang].driver.trim()) {
-          toast.error(`Execution Driver for ${langDisplay} cannot be blank.`);
+          toast.error(`Evaluation runner for ${langDisplay} cannot be blank.`);
           return;
         }
       }
@@ -697,7 +697,7 @@ export default function NewAdminQuestionCreate() {
           </div>
           <div className="flex items-center gap-4 text-xs text-slate-300 font-medium">
             <span className="flex items-center gap-1.5 font-mono text-slate-300">
-              <span className="text-slate-400">=</span> {isCoding ? "Coding" : fmtMcqType(mcqType) || "MCQ"}
+              <span className="text-slate-400">=</span> {isCoding ? (isLanguageSpecific ? "Language-Specific Coding" : "Coding") : fmtMcqType(mcqType) || "MCQ"}
             </span>
             <span className="flex items-center gap-1.5 text-slate-300">
               <DifficultyIcon level={difficulty} />
@@ -955,18 +955,18 @@ export default function NewAdminQuestionCreate() {
                   </div>
                 </div>
 
-                {/* Optional Method Signature Documentation */}
+                {/* Optional Function Definition */}
                 <div className="space-y-4 pt-4 border-t border-slate-100">
                   <div className="flex items-center justify-between">
                     <div>
-                      <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Method Signature (Optional Helper)</h4>
-                      <p className="text-[11px] text-slate-400">Optional method parameters used as reference documentation for problem solvers.</p>
+                      <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Function Definition (Optional)</h4>
+                      <p className="text-[11px] text-slate-400">Define the expected function name and return type for candidates.</p>
                     </div>
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="space-y-1">
-                      <label className="block text-xs font-semibold text-slate-700">Method Name</label>
+                      <label className="block text-xs font-semibold text-slate-700">Function Name</label>
                       <input
                         type="text"
                         value={signature.method_name}
@@ -989,78 +989,84 @@ export default function NewAdminQuestionCreate() {
                   </div>
                 </div>
 
-                {/* Single Language Toggle & Code Templates / Drivers */}
+                {/* Code Templates / Evaluation Runner Section */}
                 <div className="space-y-4 pt-4 border-t border-slate-100">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 bg-slate-50 border border-slate-200">
-                    <div>
-                      <span className="block text-xs font-bold text-slate-800">Language-Specific Question</span>
-                      <span className="block text-[11px] text-slate-500">Restricts candidate submissions and question configuration to a single target language</span>
-                    </div>
-                    <label className="relative inline-flex items-center cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={isLanguageSpecific}
-                        onChange={(e) => {
-                          setIsLanguageSpecific(e.target.checked);
-                          if (e.target.checked) {
-                            toast.info(`Restricted to single language: ${activeCodeLang === 'python3' ? 'Python 3' : activeCodeLang}`);
-                          }
-                        }}
-                        className="sr-only peer"
-                      />
-                      <div className="w-9 h-5 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#4353a4]"></div>
-                    </label>
-                  </div>
-
                   <div>
                     <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
-                      {isLanguageSpecific ? "Target Language Template & Driver" : "Multi-Language Templates & Drivers"}
+                      {isLanguageSpecific ? "Language & Code Setup" : "Multi-Language Code Setup"}
                     </h4>
                     <p className="text-[11px] text-slate-400">
-                      Set candidate-facing starter code and hidden execution drivers. Both are required before saving.
+                      {isLanguageSpecific
+                        ? "Choose the target programming language, then configure the candidate starter code and hidden evaluation runner."
+                        : "Configure candidate starter code and hidden evaluation runners for each supported language."}
                     </p>
                   </div>
 
-                  {/* Language Selector Tabs - Equally Divided & Clean Grey/Slate Styling */}
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 w-full bg-slate-100/80 p-1 border border-slate-200">
-                    {(
-                      [
-                        { id: "python3", bLang: "python", label: "Python 3" },
-                        { id: "javascript", bLang: "javascript", label: "JavaScript" },
-                        { id: "java", bLang: "java", label: "Java" },
-                        { id: "cpp", bLang: "cpp", label: "C++" },
-                      ] as const
-                    ).map((lang) => {
-                      const isVerified = verifiedLanguages.includes(lang.bLang);
-                      const isSelected = activeCodeLang === lang.id;
-                      return (
-                        <button
-                          key={lang.id}
-                          type="button"
-                          onClick={() => setActiveCodeLang(lang.id)}
-                          className={`w-full py-2 px-2 text-xs font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
-                            isSelected
-                              ? "bg-white text-slate-900 shadow-xs border border-slate-200/80"
-                              : "text-slate-600 hover:text-slate-900 hover:bg-slate-200/60"
-                          }`}
+                  {isLanguageSpecific ? (
+                    /* Language-Specific: Clean Dropdown matching DoSelect / Slate underline aesthetic */
+                    <div className="space-y-1 max-w-xs">
+                      <label className="block text-xs font-semibold text-[#4353a4]">
+                        Target Programming Language
+                      </label>
+                      <div className="relative border-b-2 border-[#4353a4]">
+                        <select
+                          value={activeCodeLang}
+                          onChange={(e) => {
+                            const selected = e.target.value as "python3" | "javascript" | "java" | "cpp";
+                            setActiveCodeLang(selected);
+                          }}
+                          className="w-full appearance-none bg-transparent py-2 pr-8 text-sm text-slate-800 font-medium focus:outline-none cursor-pointer"
                         >
-                          <span>{lang.label}</span>
-                          <span className="text-[10px] font-normal text-slate-400">
-                            ({isVerified ? "Verified" : "Pending"})
-                          </span>
-                        </button>
-                      );
-                    })}
-                  </div>
+                          <option value="python3">Python 3</option>
+                          <option value="javascript">JavaScript (Node.js)</option>
+                          <option value="java">Java</option>
+                          <option value="cpp">C++</option>
+                        </select>
+                        <ChevronDown className="pointer-events-none absolute right-1 top-1/2 -translate-y-1/2 w-4 h-4 text-[#4353a4]" />
+                      </div>
+                    </div>
+                  ) : (
+                    /* Multi-Language: 4-Column Grid Tabs */
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 w-full bg-slate-100/80 p-1 border border-slate-200">
+                      {(
+                        [
+                          { id: "python3", bLang: "python", label: "Python 3" },
+                          { id: "javascript", bLang: "javascript", label: "JavaScript" },
+                          { id: "java", bLang: "java", label: "Java" },
+                          { id: "cpp", bLang: "cpp", label: "C++" },
+                        ] as const
+                      ).map((lang) => {
+                        const isVerified = verifiedLanguages.includes(lang.bLang);
+                        const isSelected = activeCodeLang === lang.id;
+                        return (
+                          <button
+                            key={lang.id}
+                            type="button"
+                            onClick={() => setActiveCodeLang(lang.id)}
+                            className={`w-full py-2 px-2 text-xs font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                              isSelected
+                                ? "bg-white text-slate-900 shadow-xs border border-slate-200/80"
+                                : "text-slate-600 hover:text-slate-900 hover:bg-slate-200/60"
+                            }`}
+                          >
+                            <span>{lang.label}</span>
+                            <span className="text-[10px] font-normal text-slate-400">
+                              ({isVerified ? "Verified" : "Not Tested"})
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
 
                   <div className="space-y-4 pt-2">
                     {/* Starter Code Template */}
                     <div className="space-y-1">
                       <div className="flex items-center justify-between">
                         <label className="block text-xs font-semibold text-slate-700">
-                          Starter Code Template (Candidate Facing) *
+                          Candidate Starter Code *
                         </label>
-                        <span className="text-[10px] text-slate-400 font-mono">Visible in candidate IDE</span>
+                        <span className="text-[10px] text-slate-400 font-mono">Visible in candidate code editor</span>
                       </div>
                       <textarea
                         rows={7}
@@ -1071,7 +1077,7 @@ export default function NewAdminQuestionCreate() {
                             [activeCodeLang]: { ...codeTemplates[activeCodeLang], template: e.target.value },
                           })
                         }
-                        placeholder={`Candidate starter code for ${activeCodeLang}...`}
+                        placeholder={`Initial starter code for candidates in ${activeCodeLang}...`}
                         className="w-full border border-slate-200 p-3 text-xs font-mono text-slate-800 bg-slate-50/40 focus:bg-white focus:outline-none focus:border-[#4353a4]"
                       />
                     </div>
@@ -1080,17 +1086,17 @@ export default function NewAdminQuestionCreate() {
                     <div className="space-y-1">
                       <div className="flex items-center justify-between">
                         <label className="block text-xs font-semibold text-slate-700">
-                          Execution Driver (Hidden / Admin Only) *
+                          Evaluation Runner (Hidden) *
                         </label>
                         <span className="text-[10px] text-amber-600 font-mono font-medium">
-                          Editing driver resets verification to Pending
+                          Editing runner resets verification status
                         </span>
                       </div>
                       <textarea
                         rows={5}
                         value={codeTemplates[activeCodeLang].driver}
                         onChange={(e) => handleDriverChange(activeCodeLang, e.target.value)}
-                        placeholder={`Execution driver wrapper for ${activeCodeLang}...`}
+                        placeholder={`Hidden evaluation runner wrapper for ${activeCodeLang}...`}
                         className="w-full border border-slate-200 p-3 text-xs font-mono text-slate-800 bg-slate-50/40 focus:bg-white focus:outline-none focus:border-[#4353a4]"
                       />
                     </div>

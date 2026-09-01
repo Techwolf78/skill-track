@@ -189,10 +189,10 @@ export const PreFlightVerificationPanel: React.FC<PreFlightVerificationPanelProp
           </div>
           <div>
             <h4 className="text-xs font-bold uppercase tracking-wider text-slate-900">
-              Pre-Flight Driver Verification ({getLanguageDisplayName(language)})
+              Test Run — Verify Question Works ({getLanguageDisplayName(language)})
             </h4>
             <p className="text-[11px] text-slate-500">
-              Executes reference solution against test cases via Judge0 to verify harness syntax & IO mapping
+              Run a working solution against your test cases to confirm the question is set up correctly before publishing.
             </p>
           </div>
         </div>
@@ -230,17 +230,17 @@ export const PreFlightVerificationPanel: React.FC<PreFlightVerificationPanelProp
       {/* Reference Solution Editor */}
       <div className="space-y-2">
         <div className="flex items-center justify-between">
-          <label className="text-xs font-semibold text-slate-700 flex items-center gap-1.5">
-            <Code2 className="w-3.5 h-3.5 text-slate-500" />
-            Working Reference Solution ({getLanguageDisplayName(language)})
-          </label>
-          <span className="text-[10px] text-slate-400 font-mono">Hidden • Used only for pre-flight testing</span>
+            <label className="text-xs font-semibold text-slate-700 flex items-center gap-1.5">
+              <Code2 className="w-3.5 h-3.5 text-slate-500" />
+              Your Working Solution ({getLanguageDisplayName(language)})
+            </label>
+            <span className="text-[10px] text-slate-400 font-mono">Not shown to candidates — used only to verify the question</span>
         </div>
 
         <textarea
           value={referenceSolution}
           onChange={(e) => setReferenceSolution(e.target.value)}
-          placeholder={`Enter reference code to prove the ${getLanguageDisplayName(language)} driver works correctly...`}
+          placeholder={`Enter working code to test and verify the question in ${getLanguageDisplayName(language)}...`}
           rows={7}
           className="w-full rounded-md border border-slate-700 bg-slate-900 p-3 font-mono text-xs text-slate-100 placeholder:text-slate-500 focus:border-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-500 leading-relaxed shadow-inner"
           spellCheck={false}
@@ -250,7 +250,7 @@ export const PreFlightVerificationPanel: React.FC<PreFlightVerificationPanelProp
       {/* Action Footer */}
       <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
         <div className="text-xs text-slate-500">
-          Driver must pass against test cases before question status transitions to{" "}
+          All test cases must pass before the question can be published as{" "}
           <span className="font-semibold text-slate-800">ACTIVE</span>.
         </div>
 
@@ -263,12 +263,12 @@ export const PreFlightVerificationPanel: React.FC<PreFlightVerificationPanelProp
           {isValidating ? (
             <>
               <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              <span>Verifying on Judge0...</span>
+              <span>Running Test Cases...</span>
             </>
           ) : (
             <>
               <Play className="h-3.5 w-3.5 fill-current" />
-              <span>Verify {getLanguageDisplayName(language)} Driver</span>
+              <span>Run Test & Verify ({getLanguageDisplayName(language)})</span>
             </>
           )}
         </button>
@@ -282,12 +282,12 @@ export const PreFlightVerificationPanel: React.FC<PreFlightVerificationPanelProp
               {isPassed ? (
                 <div className="flex items-center gap-1.5 text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded text-xs font-bold">
                   <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                  <span>PRE-FLIGHT PASSED</span>
+                  <span>ALL TESTS PASSED — READY</span>
                 </div>
               ) : (
                 <div className="flex items-center gap-1.5 text-rose-700 bg-rose-50 border border-rose-200 px-2.5 py-1 rounded text-xs font-bold">
                   <XCircle className="w-4 h-4 text-rose-600" />
-                  <span>PRE-FLIGHT FAILED ({lastResponse.status})</span>
+                  <span>TEST RUN FAILED ({lastResponse.status})</span>
                 </div>
               )}
 
