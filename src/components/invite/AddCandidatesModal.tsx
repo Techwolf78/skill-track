@@ -63,20 +63,10 @@ export function AddCandidatesModal({
 
   // Tab 1: Pick Existing Candidates state
   const [searchTerm, setSearchTerm] = useState("");
-  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [page, setPage] = useState(0);
   const [pageSize] = useState(15);
   const [loadingCandidates, setLoadingCandidates] = useState(false);
-  const [pageData, setPageData] = useState<SpringPage<Candidate>>({
-    content: [],
-    totalElements: 0,
-    totalPages: 1,
-    size: 15,
-    number: 0,
-    first: true,
-    last: true,
-    empty: true,
-  });
+  const [allCandidates, setAllCandidates] = useState<Candidate[]>([]);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [inviting, setInviting] = useState(false);
   const [lastFailedCount, setLastFailedCount] = useState(0);
@@ -86,6 +76,8 @@ export function AddCandidatesModal({
     if (!open) {
       setLastFailedCount(0);
       setSelectedIds([]);
+      setSearchTerm("");
+      setPage(0);
     }
   }, [open]);
 
@@ -99,46 +91,15 @@ export function AddCandidatesModal({
   const [customFields, setCustomFields] = useState<Array<{ key: string; value: string }>>([]);
   const [creating, setCreating] = useState(false);
 
-  // Debounce search
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setDebouncedSearch(searchTerm);
-      setPage(0);
-    }, 400);
-    return () => clearTimeout(timer);
-  }, [searchTerm]);
-
-  // Fetch paginated candidates
-  const fetchPage = useCallback(async () => {
+  // Fetch all candidates on dialog open
+  const loadCandidates = useCallback(async () => {
     if (!open) return;
     try {
       setLoadingCandidates(true);
-      if (debouncedSearch && debouncedSearch.trim()) {
-        const query = debouncedSearch.trim().toLowerCase();
-        const all = await candidateService.getCandidates();
-        const filtered = all.filter((c) =>
-          c.user?.name?.toLowerCase().includes(query) ||
-          c.user?.email?.toLowerCase().includes(query) ||
-          c.user?.phoneNumber?.toLowerCase().includes(query)
-        );
-        const startIndex = page * pageSize;
-        const paged = filtered.slice(startIndex, startIndex + pageSize);
-        setPageData({
-          content: paged,
-          totalElements: filtered.length,
-          totalPages: Math.ceil(filtered.length / pageSize) || 1,
-          size: pageSize,
-          number: page,
-          first: page === 0,
-          last: startIndex + pageSize >= filtered.length,
-          empty: filtered.length === 0,
-        });
-      } else {
-        const res = await candidateService.getCandidatesPage(page, pageSize);
-        setPageData(res);
-      }
+      const list = await candidateService.getCandidates();
+      setAllCandidates(list);
     } catch (error) {
-      console.error("Failed to fetch candidates page:", error);
+      console.error("Failed to fetch candidates:", error);
       toast({
         title: "Error",
         description: "Failed to load candidate list.",
@@ -147,20 +108,45 @@ export function AddCandidatesModal({
     } finally {
       setLoadingCandidates(false);
     }
-  }, [open, page, pageSize, debouncedSearch, toast]);
+  }, [open, toast]);
 
   useEffect(() => {
     if (open) {
-      fetchPage();
+      loadCandidates();
     }
-  }, [open, fetchPage]);
+  }, [open, loadCandidates]);
+
+  // Client-side search across all candidates
+  const filteredCandidates = useMemo(() => {
+    if (!searchTerm || !searchTerm.trim()) return allCandidates;
+    const query = searchTerm.trim().toLowerCase();
+    return allCandidates.filter(
+      (c) =>
+        c.user?.name?.toLowerCase().includes(query) ||
+        c.user?.email?.toLowerCase().includes(query) ||
+        c.user?.phoneNumber?.toLowerCase().includes(query)
+    );
+  }, [allCandidates, searchTerm]);
+
+  // Reset to page 0 when searching
+  useEffect(() => {
+    setPage(0);
+  }, [searchTerm]);
+
+  const totalElements = filteredCandidates.length;
+  const totalPages = Math.ceil(totalElements / pageSize) || 1;
+
+  const pagedCandidates = useMemo(() => {
+    const startIndex = page * pageSize;
+    return filteredCandidates.slice(startIndex, startIndex + pageSize);
+  }, [filteredCandidates, page, pageSize]);
 
   // Sort candidate list: non-invited first, already-invited at bottom
   const sortedContent = useMemo(() => {
-    const uninvited = pageData.content.filter((c) => !alreadyInvitedIds.has(c.id));
-    const invited = pageData.content.filter((c) => alreadyInvitedIds.has(c.id));
+    const uninvited = pagedCandidates.filter((c) => !alreadyInvitedIds.has(c.id));
+    const invited = pagedCandidates.filter((c) => alreadyInvitedIds.has(c.id));
     return [...uninvited, ...invited];
-  }, [pageData.content, alreadyInvitedIds]);
+  }, [pagedCandidates, alreadyInvitedIds]);
 
   // Select all selectable on current page
   const selectableOnPage = useMemo(() => {
@@ -442,7 +428,7 @@ export function AddCandidatesModal({
                         <Users className="w-8 h-8 mx-auto text-muted-foreground/40 mb-2" />
                         <p className="text-sm font-medium">No candidates found</p>
                         <p className="text-xs text-muted-foreground">
-                          {debouncedSearch
+                          {searchTerm
                             ? "No candidates matched your search query."
                             : "No candidates registered in your organisation."}
                         </p>
@@ -515,9 +501,9 @@ export function AddCandidatesModal({
             {/* Pagination Controls */}
             <div className="flex items-center justify-between pt-1 text-xs text-muted-foreground">
               <span>
-                Showing <strong>{pageData.totalElements === 0 ? 0 : page * pageSize + 1}</strong> to{" "}
-                <strong>{Math.min((page + 1) * pageSize, pageData.totalElements)}</strong> of{" "}
-                <strong>{pageData.totalElements}</strong> candidates
+                Showing <strong>{totalElements === 0 ? 0 : page * pageSize + 1}</strong> to{" "}
+                <strong>{Math.min((page + 1) * pageSize, totalElements)}</strong> of{" "}
+                <strong>{totalElements}</strong> candidates
               </span>
 
               <div className="flex items-center gap-1">
@@ -540,13 +526,13 @@ export function AddCandidatesModal({
                   <ChevronLeft className="h-3.5 w-3.5" />
                 </Button>
                 <span className="px-2 font-medium text-foreground">
-                  Page {pageData.totalPages === 0 ? 1 : page + 1} of {Math.max(1, pageData.totalPages)}
+                  Page {totalPages === 0 ? 1 : page + 1} of {Math.max(1, totalPages)}
                 </span>
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => setPage((p) => Math.min(pageData.totalPages - 1, p + 1))}
-                  disabled={page >= pageData.totalPages - 1 || loadingCandidates}
+                  onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
+                  disabled={page >= totalPages - 1 || loadingCandidates}
                   className="h-7 w-7 p-0"
                 >
                   <ChevronRight className="h-3.5 w-3.5" />
@@ -554,8 +540,8 @@ export function AddCandidatesModal({
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => setPage(Math.max(0, pageData.totalPages - 1))}
-                  disabled={page >= pageData.totalPages - 1 || loadingCandidates}
+                  onClick={() => setPage(Math.max(0, totalPages - 1))}
+                  disabled={page >= totalPages - 1 || loadingCandidates}
                   className="h-7 w-7 p-0"
                 >
                   <ChevronsRight className="h-3.5 w-3.5" />

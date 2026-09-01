@@ -125,15 +125,28 @@ const mapCandidate = (c: Candidate & Record<string, unknown>): Candidate => {
 };
 
 export const candidateService = {
-  /**
-   * Flat list used by non-management pages (InviteCandidates, Reports, etc.)
-   * that need a full candidate lookup map for name resolution.
-   * Continues to use size=5000 to load all records in one shot.
-   */
   getCandidates: async (): Promise<Candidate[]> => {
-    const response = await apiClient.get<Candidate[]>("/candidates");
-    const rawList = unwrapArrayResponse(response);
-    return rawList.map((c) => mapCandidate(c as Candidate & Record<string, unknown>));
+    try {
+      const firstPage = await candidateService.getCandidatesPage(0, 100);
+      let allContent: Candidate[] = [...firstPage.content];
+
+      if (firstPage.totalPages > 1) {
+        const remainingPromises: Promise<SpringPage<Candidate>>[] = [];
+        for (let p = 1; p < firstPage.totalPages; p++) {
+          remainingPromises.push(candidateService.getCandidatesPage(p, 100));
+        }
+        const remainingPages = await Promise.all(remainingPromises);
+        for (const pg of remainingPages) {
+          allContent = allContent.concat(pg.content);
+        }
+      }
+
+      return allContent;
+    } catch {
+      const response = await apiClient.get<Candidate[]>("/candidates");
+      const rawList = unwrapArrayResponse(response);
+      return rawList.map((c) => mapCandidate(c as Candidate & Record<string, unknown>));
+    }
   },
 
   /**

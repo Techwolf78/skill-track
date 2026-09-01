@@ -83,6 +83,7 @@ import {
 } from "@/components/ui/material-pickers";
 import { AddCandidatesModal } from "@/components/invite/AddCandidatesModal";
 import { BulkInviteModal } from "@/components/invite/BulkInviteModal";
+import { RichTextEditor } from "@/components/ui/RichTextEditor";
 import { useAuth } from "@/lib/auth-context";
 import { apiClient } from "@/lib/api-client";
 import {
@@ -1951,16 +1952,15 @@ export default function NewAdminTestEdit() {
               </div>
 
               {/* 5. Candidate Instructions */}
-              <div className="space-y-1 pt-1">
+              <div className="space-y-1.5 pt-1">
                 <label className="block text-xs font-semibold text-slate-700">
                   Instructions for candidates
                 </label>
-                <textarea
-                  rows={6}
-                  value={instructions}
-                  onChange={(e) => setInstructions(e.target.value)}
+                <RichTextEditor
+                  content={instructions}
+                  onChange={setInstructions}
                   placeholder="e.g. Ensure a stable internet connection. All tests are timed and monitored..."
-                  className="w-full border border-slate-200 p-3.5 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#4353a4] leading-relaxed font-mono text-[11px]"
+                  minHeight="140px"
                 />
                 <p className="text-[11px] text-slate-400">Instructions will be displayed to candidates on the assessment landing screen before starting.</p>
               </div>
