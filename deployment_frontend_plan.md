@@ -1,91 +1,99 @@
-# RxOne MVP Deployment & Assessment Report — Frontend (Client-Side)
+# Frontend Production Deployment & Optimization Plan
 
-This report details the readiness, specifications, limitations, rate limits, optimizations, and connection/dependency details for deploying the RxOne frontend client (`skill-track`) to a live production environment.
-
----
-
-## 1. Executive Summary & Production Readiness
-The frontend client includes a highly sophisticated, resource-optimized proctoring suite, a secure invitation validation gateway, and responsive admin/candidate dashboards. 
-
-* **Status:** **REASONS FOR CAUTION** (Ready for deployment pending configuration adjustments, asset optimization, and integration of error/rate-limiting visual overlays).
+**Application**: RxOne SkillTrack Client (`skill-track`)  
+**Target Host**: Vercel / Cloudflare Pages / Static CDN  
+**Backend API Gateway**: `https://api.yourdomain.com` (Airtel Cloud VM 1)
 
 ---
 
-## 2. Core Frontend Features in the MVP
+## 1. Executive Summary
 
-### 2.1 Candidate Onboarding Gateway (`TestAccess.tsx`)
-* **Verification Checks:** Validates candidate tokens via UUID format and queries `GET /candidate-invitations/validate/{token}`.
-* **Hardware Diagnostics:** Orchestrated via `EnvironmentCheck.tsx`. Checks and requests hardware permissions for:
-  - Webcam accessibility.
-  - Microphone accessibility.
-  - Fullscreen display mode capability.
-* **Access Control:** Blocks candidate entry into the test interface if any of the hardware or permissions checks fail.
-
-### 2.2 Proctored Exam Interface (`TestInterface.tsx`)
-* **Active Proctoring Orchestrator:** Powered by `ProctoringProvider.tsx` React context.
-* **Cheat Prevention Restrictions:**
-  - **DevTools / Keystroke Blocking:** Disables `F12`, `Ctrl+Shift+I/J/C`, `Cmd+Alt+I`.
-  - **Clipboard Blocking:** Disables right-clicks, copy, paste, and cut (`Ctrl+C/V/X`). Intercepts `PrintScreen` to clear the clipboard (`navigator.clipboard.writeText("")`).
-  - **Hard 3-Strikes Tab Policy:** Debounced window focus and blur listeners. Warning toasts display on Strike 1 & 2. The 3rd tab switch triggers auto-submission of the assessment.
-  - **Strict Fullscreen Enforcement:** Exiting fullscreen initiates a 10-second warning countdown. Failure to return triggers auto-submission.
-* **Webcam Snapshots Auditing:**
-  - Background worker captures a visual frame every **60 seconds**.
-  - Renders to a miniature canvas (`160x120`), applies a grayscale filter (reducing memory footprint by ~66%), and compresses as a 50% quality JPEG.
-  - Persists rolling queue (maximum 20 snapshots, ~40KB total) in `localStorage` under `rxone_camera_snapshots_${sessionId}` to avoid browser quota exceptions.
-
-### 2.3 Client-Side Artificial Intelligence (AI)
-* **Object Detector (`objectDetector.ts`):** Runs a local **TensorFlow COCO-SSD** model. Runs on a throttled loop (every 5 seconds) to scan the feed for prohibited devices (e.g. `cell phone`, `book`, `laptop`, `tablet`).
-* **Behavior Classifier (`llmDetector.ts`):** Employs Xenova's `@xenova/transformers` (`distilbert-base-uncased-finetuned-sst-2-english`) locally inside the browser to analyze sequence patterns of student actions and detect anomalous behaviors.
-
-### 2.4 Resilient Sync Queue (`violationStorage.ts`)
-* **Tiered Network Synchronization:**
-  - **Immediate Upload:** Critical/High violations (e.g. DevTools detection, Tab switches) are immediately POSTed to the backend. If a violation is flagged, a grayscale visual proof is captured, compressed to JPEG (~3KB base64), and uploaded as evidence.
-  - **Deferred Upload:** Low/Medium warnings are accumulated locally and bulk uploaded right before test submission.
-  - **Offline Resilience:** If network connectivity drops, unsynced violations are cached in `localStorage`. An online reconnect listener (`window.addEventListener('online', ...)`) flushes them to the backend API automatically once connection recovers.
+The React 18 + Vite frontend is production-ready, featuring client-side WebGL neural proctoring, a Monaco IDE sandbox runner, offline violation syncing, and candidate onboarding preflight checks.
 
 ---
 
-## 3. Crucial Gaps & Recommended Additions for Live Release
-To ensure the candidate experience is seamless and secure on live, the following changes are required:
+## 2. Environment Configuration (`.env.production`)
 
-1. **Externalize API Base URL Configurations:**
-   - **Issue:** Currently, endpoints are routed via a relative path or hardcoded local proxy config.
-   - **Fix:** Create a `.env.production` file defining `VITE_API_BASE_URL` pointing to the live API gateway. Configure Axios (`apiClient`) to set its `baseURL` using `import.meta.env.VITE_API_BASE_URL`.
-2. **CDN-Based TensorFlow & Xenova Model Loading:**
-   - **Issue:** Loading heavy ML models (COCO-SSD weights and Xenova models) directly from the application origin or local bundle can result in long download times and high bandwidth charges when hundreds of candidates start simultaneously.
-   - **Fix:** Pre-cache models using a Service Worker, or configure the libraries to load model weights from a public, high-speed CDN (like jsDelivr or Cloudflare CDN).
-3. **Webcam Auditing Snapshot Syncing:**
-   - **Issue:** The periodic 60-second webcam snapshots are saved in the client's local storage but are not currently pushed to the server. If a candidate closes the window or finishes, these audit logs are lost.
-   - **Fix:** Implement a background batch-upload worker that flushes stored snapshots to `POST /test-sessions/{sessionId}/snapshots/batch` every 5 minutes and clears local storage on successful sync.
-4. **Mobile & Tablet Browser Block:**
-   - **Issue:** The screen-sharing API (`getDisplayMedia`) is unsupported on mobile browsers (Safari iOS, Chrome Android). Attempting to take the test on a smartphone will freeze the onboarding wizard.
-   - **Fix:** Add a user-agent device check during the invitation gateway. Block access on mobile devices and instruct the candidate to use a laptop or desktop computer with a working webcam/mic.
+Create `.env.production` in the root of the frontend project:
 
----
+```env
+# Point directly to your Airtel Cloud backend public domain / IP
+VITE_API_BASE_URL=https://api.yourdomain.com
 
-## 4. Frontend Rate Limits & Optimizations
-* **Axios Interceptor for 429 Errors:**
-  - Create a global Axios interceptor that captures HTTP `429 Too Many Requests` responses.
-  - Surface a user-friendly countdown timer toast using the Sonner provider to prevent the candidate from clicking "Run Code" or "Submit Code" repeatedly.
-* **Dynamic AI Processing Degradation:**
-  - Object detection (COCO-SSD) runs every 5 seconds, and face-mesh runs every 1.5 seconds.
-  - On low-end candidate devices, this can cause CPU spikes. Implement a monitor that measures the frame processing time; if it exceeds 1 second, increase the intervals (e.g., run COCO-SSD every 10 seconds) to maintain browser responsiveness.
+# WebSocket feed endpoint for real-time live proctoring
+VITE_WS_BASE_URL=wss://api.yourdomain.com
 
----
+# Production Mode
+VITE_APP_ENV=production
+```
 
-## 5. Connections & Dependencies
+In your Axios / API Client setup (`src/lib/api.ts` or `src/lib/axios.ts`):
+```typescript
+import axios from "axios";
 
-### 5.1 Connection Config (CORS & CSRF)
-* **Axios credentials configuration:**
-  ```typescript
+export const apiClient = axios.create({
+  baseURL: import.meta.env.VITE_API_BASE_URL || "http://localhost:8081",
   withCredentials: true,
-  xsrfCookieName: "XSRF-TOKEN",
-  xsrfHeaderName: "X-XSRF-TOKEN",
-  ```
-  This must match the live backend's CORS origin whitelisting and double-submit CSRF cookie pattern configuration.
+  headers: {
+    "Content-Type": "application/json",
+  },
+});
+```
 
-### 5.2 Key Dependencies
-* **Core React:** `react` & `react-dom` (v18.3.1), `react-router-dom` (v6.30.1) for routing.
-* **State & Queries:** `@tanstack/react-query` (v5.83.0) for server state; `zustand` (v5.0.13) for local client state.
-* **AI/ML Suite:** `@tensorflow/tfjs`, `@tensorflow-models/coco-ssd` for object detection; `@xenova/transformers` for NLP sequence checks.
-* **UI & Animation:** `framer-motion` for animated violation alerts, `lucide-react` for iconography, and Shadcn UI components (Radix primitives).
+---
+
+## 3. Build & Deployment Steps
+
+### Option A: Deploy to Vercel (Recommended)
+1. Install Vercel CLI (or connect GitHub repository):
+   ```bash
+   npm i -g vercel
+   vercel
+   ```
+2. Set Environment Variables in Vercel Project Settings:
+   * `VITE_API_BASE_URL` = `https://api.yourdomain.com`
+   * `VITE_WS_BASE_URL` = `wss://api.yourdomain.com`
+3. Configure `vercel.json` for React Single Page Application (SPA) routing:
+   ```json
+   {
+     "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
+   }
+   ```
+
+### Option B: Build Static Bundle
+To build locally for custom Nginx / S3 / Airtel Object Storage hosting:
+```bash
+npm run build
+```
+This produces the optimized production bundle inside the `dist/` directory.
+
+---
+
+## 4. Key Client-Side Optimizations & Security
+
+### 4.1 Client-Side AI Proctoring (Zero Cloud Bandwidth Cost)
+* **TensorFlow BlazeFace & COCO-SSD**:
+  - Neural models execute locally in the candidate's browser using **WebGL GPU acceleration**.
+  - Camera frames are analyzed at **160x120 grayscale**, requiring negligible CPU and 0 MB of continuous cloud video egress bandwidth.
+* **Proctoring Rules**:
+  - **3-Strikes Tab Policy**: Auto-submits on 3rd external tab switch.
+  - **Fullscreen Enforcement**: 10-second countdown to return to fullscreen.
+  - **Anti-Cheat Shortcuts**: Blocks `F12`, `Ctrl+Shift+I`, `Ctrl+C/V/X`, right-click context menu, and clears the clipboard on `PrintScreen`.
+
+### 4.2 Resilient Offline Sync Queue (`violationStorage.ts`)
+* If candidate's internet disconnects temporarily:
+  - Critical incidents and code progress are safely cached in browser `localStorage`.
+  - A reconnect listener (`window.addEventListener('online', ...)`) automatically flushes queued violation batches to the backend once connectivity returns.
+
+### 4.3 Mobile & Tablet Safeguard
+* Displays an immediate warning overlay blocking smartphone access because mobile browsers lack desktop screen-sharing APIs (`getDisplayMedia`). Instructs candidates to switch to a laptop or PC.
+
+---
+
+## 5. Deployment Verification Checklist
+
+- [ ] `.env.production` contains valid `VITE_API_BASE_URL=https://api.yourdomain.com`.
+- [ ] Backend CORS on Airtel VM 1 allows `https://your-frontend-app.vercel.app` and custom domain.
+- [ ] SPA rewrite rules configured (`/index.html` fallback on all 404s).
+- [ ] Preflight hardware checks (Webcam, Mic, Fullscreen) pass in candidate flow.
+- [ ] Real-time Proctoring feeds connect over `wss://api.yourdomain.com`.

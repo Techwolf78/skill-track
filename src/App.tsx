@@ -38,6 +38,7 @@ const DSAPlayground = React.lazy(() => import("./pages/SuperAdmin/DSAPlayground"
 const Reports = React.lazy(() => import("./pages/SuperAdmin/Reports"));
 const TestSchedules = React.lazy(() => import("./pages/SuperAdmin/TestSchedules"));
 const AuditLogs = React.lazy(() => import("./pages/SuperAdmin/AuditLogs"));
+const Documentation = React.lazy(() => import("./pages/SuperAdmin/Documentation"));
 const SeedData = React.lazy(() => import("./pages/SeedData"));
 const ProctoringDashboard = React.lazy(() => import("@/pages/Admin/ProctoringDashboard"));
 
@@ -145,14 +146,14 @@ const App = () => (
                 <Route path="questions/add" element={<AddQuestion />} />
                 <Route path="questions/create" element={<AddQuestion />} />
                 <Route path="questions/edit/:id" element={<EditQuestion />} />
-                 <Route path="reports" element={<Reports />} />
+                <Route path="reports" element={<Reports />} />
                 <Route path="proctoring" element={<ProctoringDashboard />} />
                 <Route path="proctoring/:sessionId" element={<ProctoringDashboard />} />
                 <Route path="audit-logs" element={<AuditLogs />} />
+                <Route path="docs" element={<Documentation />} />
                 <Route path="settings" element={<Settings />} />
                 <Route path="subjects/manage" element={<ManageSubjects />} />
               </Route>
-
               {/* Student Test Taking */}
               <Route path="/test/:testId" element={<TestInterface />} />
               <Route
