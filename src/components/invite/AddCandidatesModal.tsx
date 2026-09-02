@@ -7,7 +7,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Table,
   TableBody,
@@ -24,6 +23,7 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth-context";
 import { candidateService, Candidate, SpringPage } from "@/lib/candidate-service";
+import { cn } from "@/lib/utils";
 import {
   Search,
   Loader2,
@@ -61,15 +61,34 @@ export function AddCandidatesModal({
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<"pick" | "create">("pick");
 
-  // Tab 1: Pick Existing Candidates state
+  // Tab 1: Pick Existing Candidates state (Server-Side Pagination & Search)
   const [searchTerm, setSearchTerm] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [page, setPage] = useState(0);
   const [pageSize] = useState(15);
   const [loadingCandidates, setLoadingCandidates] = useState(false);
-  const [allCandidates, setAllCandidates] = useState<Candidate[]>([]);
+  const [pageData, setPageData] = useState<SpringPage<Candidate>>({
+    content: [],
+    totalElements: 0,
+    totalPages: 1,
+    size: 15,
+    number: 0,
+    first: true,
+    last: true,
+    empty: true,
+  });
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [inviting, setInviting] = useState(false);
   const [lastFailedCount, setLastFailedCount] = useState(0);
+
+  // Debounce search input by 300ms
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchTerm);
+      setPage(0);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
 
   // Reset errors and selections when dialog opens/closes
   useEffect(() => {
@@ -77,7 +96,9 @@ export function AddCandidatesModal({
       setLastFailedCount(0);
       setSelectedIds([]);
       setSearchTerm("");
+      setDebouncedSearch("");
       setPage(0);
+      setActiveTab("pick");
     }
   }, [open]);
 
@@ -91,15 +112,15 @@ export function AddCandidatesModal({
   const [customFields, setCustomFields] = useState<Array<{ key: string; value: string }>>([]);
   const [creating, setCreating] = useState(false);
 
-  // Fetch all candidates on dialog open
-  const loadCandidates = useCallback(async () => {
+  // Server-side paginated fetch with backend search
+  const fetchPage = useCallback(async () => {
     if (!open) return;
     try {
       setLoadingCandidates(true);
-      const list = await candidateService.getCandidates();
-      setAllCandidates(list);
+      const res = await candidateService.getCandidatesPage(page, pageSize, debouncedSearch);
+      setPageData(res);
     } catch (error) {
-      console.error("Failed to fetch candidates:", error);
+      console.error("Failed to fetch candidates page:", error);
       toast({
         title: "Error",
         description: "Failed to load candidate list.",
@@ -108,45 +129,21 @@ export function AddCandidatesModal({
     } finally {
       setLoadingCandidates(false);
     }
-  }, [open, toast]);
+  }, [open, page, pageSize, debouncedSearch, toast]);
 
   useEffect(() => {
     if (open) {
-      loadCandidates();
+      fetchPage();
     }
-  }, [open, loadCandidates]);
+  }, [open, fetchPage]);
 
-  // Client-side search across all candidates
-  const filteredCandidates = useMemo(() => {
-    if (!searchTerm || !searchTerm.trim()) return allCandidates;
-    const query = searchTerm.trim().toLowerCase();
-    return allCandidates.filter(
-      (c) =>
-        c.user?.name?.toLowerCase().includes(query) ||
-        c.user?.email?.toLowerCase().includes(query) ||
-        c.user?.phoneNumber?.toLowerCase().includes(query)
-    );
-  }, [allCandidates, searchTerm]);
-
-  // Reset to page 0 when searching
-  useEffect(() => {
-    setPage(0);
-  }, [searchTerm]);
-
-  const totalElements = filteredCandidates.length;
-  const totalPages = Math.ceil(totalElements / pageSize) || 1;
-
-  const pagedCandidates = useMemo(() => {
-    const startIndex = page * pageSize;
-    return filteredCandidates.slice(startIndex, startIndex + pageSize);
-  }, [filteredCandidates, page, pageSize]);
-
-  // Sort candidate list: non-invited first, already-invited at bottom
+  // Sort candidate list on the active page: non-invited first, already-invited at bottom
   const sortedContent = useMemo(() => {
-    const uninvited = pagedCandidates.filter((c) => !alreadyInvitedIds.has(c.id));
-    const invited = pagedCandidates.filter((c) => alreadyInvitedIds.has(c.id));
+    const list = pageData.content ?? [];
+    const uninvited = list.filter((c) => !alreadyInvitedIds.has(c.id));
+    const invited = list.filter((c) => alreadyInvitedIds.has(c.id));
     return [...uninvited, ...invited];
-  }, [pagedCandidates, alreadyInvitedIds]);
+  }, [pageData.content, alreadyInvitedIds]);
 
   // Select all selectable on current page
   const selectableOnPage = useMemo(() => {
@@ -208,7 +205,7 @@ export function AddCandidatesModal({
         onSuccess();
         onOpenChange(false);
       } else {
-        // Partial or complete failure: Keep modal open and retain only failed IDs for retry
+        // Partial failure: Keep modal open and retain only failed IDs for retry
         if (successCount > 0) {
           onSuccess();
           fetchPage();
@@ -334,42 +331,62 @@ export function AddCandidatesModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col p-0 overflow-hidden">
-        <DialogHeader className="p-6 pb-2 border-b">
-          <DialogTitle className="flex items-center gap-2">
-            <UserPlus className="w-5 h-5 text-primary" />
-            Add Candidates to Assessment
-          </DialogTitle>
-          <DialogDescription>
-            Select from existing candidates in your organisation or create a new candidate.
-          </DialogDescription>
+      <DialogContent className="max-w-2xl max-h-[88vh] flex flex-col p-0 overflow-hidden bg-white border border-slate-200 shadow-2xl rounded-xl text-slate-900 font-sans">
+        {/* Header */}
+        <DialogHeader className="p-6 pb-4 border-b border-slate-100 flex flex-row items-center gap-3">
+          <div className="w-10 h-10 rounded-full bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-600 shrink-0">
+            <UserPlus className="w-5 h-5" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <DialogTitle className="text-base font-bold text-slate-900">
+              Add Candidates to Assessment
+            </DialogTitle>
+            <DialogDescription className="text-xs text-slate-500 mt-0.5">
+              Select from existing candidates in your organisation or create a new candidate.
+            </DialogDescription>
+          </div>
         </DialogHeader>
 
-        <Tabs
-          value={activeTab}
-          onValueChange={(v) => setActiveTab(v as "pick" | "create")}
-          className="flex-1 flex flex-col overflow-hidden"
-        >
-          <div className="px-6 pt-3">
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="pick" className="gap-2">
-                <Users className="w-4 h-4" />
-                Select Existing Candidates
-              </TabsTrigger>
-              <TabsTrigger value="create" className="gap-2">
-                <Plus className="w-4 h-4" />
-                Create New Candidate
-              </TabsTrigger>
-            </TabsList>
+        {/* Tab Switcher */}
+        <div className="px-6 pt-4">
+          <div className="grid grid-cols-2 p-1 bg-slate-100 rounded-lg text-xs font-medium">
+            <button
+              type="button"
+              onClick={() => setActiveTab("pick")}
+              className={cn(
+                "py-2 px-3 rounded-md flex items-center justify-center gap-2 transition-all cursor-pointer",
+                activeTab === "pick"
+                  ? "bg-white text-slate-900 shadow-xs font-semibold"
+                  : "text-slate-600 hover:text-slate-900"
+              )}
+            >
+              <Users className="w-3.5 h-3.5 text-slate-500" />
+              Select Existing Candidates
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab("create")}
+              className={cn(
+                "py-2 px-3 rounded-md flex items-center justify-center gap-2 transition-all cursor-pointer",
+                activeTab === "create"
+                  ? "bg-white text-slate-900 shadow-xs font-semibold"
+                  : "text-slate-600 hover:text-slate-900"
+              )}
+            >
+              <Plus className="w-3.5 h-3.5 text-slate-500" />
+              Create New Candidate
+            </button>
           </div>
+        </div>
 
-          {/* TAB 1: Pick Existing */}
-          <TabsContent value="pick" className="flex-1 flex flex-col overflow-hidden p-6 pt-3 space-y-3">
+        {/* TAB 1: Pick Existing */}
+        {activeTab === "pick" && (
+          <div className="flex-1 flex flex-col overflow-hidden p-6 pt-3 space-y-3">
             {/* Failure Alert Banner */}
             {lastFailedCount > 0 && (
-              <div className="flex items-center justify-between p-3 rounded-lg border border-destructive/30 bg-destructive/10 text-destructive text-xs">
+              <div className="flex items-center justify-between p-3 rounded-lg border border-red-200 bg-red-50 text-red-700 text-xs">
                 <div className="flex items-center gap-2">
-                  <AlertTriangle className="w-4 h-4 shrink-0" />
+                  <AlertTriangle className="w-4 h-4 shrink-0 text-red-600" />
                   <span>
                     <strong>{lastFailedCount} invitation{lastFailedCount === 1 ? "" : "s"} failed.</strong> The failed candidates remain selected below for you to retry.
                   </span>
@@ -379,57 +396,58 @@ export function AddCandidatesModal({
                   variant="ghost"
                   size="sm"
                   onClick={() => setLastFailedCount(0)}
-                  className="h-6 px-2 text-[11px] text-destructive hover:bg-destructive/20"
+                  className="h-6 px-2 text-[11px] text-red-700 hover:bg-red-100"
                 >
                   Dismiss
                 </Button>
               </div>
             )}
 
-            {/* Search */}
+            {/* Search Input with Server Debounce */}
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
               <Input
                 placeholder="Search candidates by name, email, or phone..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-9 h-9 text-sm"
+                className="pl-9 h-9 text-xs bg-white border border-slate-200 rounded-lg text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500"
               />
             </div>
 
             {/* Candidates Selection Table */}
-            <div className="flex-1 border rounded-lg overflow-y-auto bg-card min-h-[260px]">
+            <div className="flex-1 border border-slate-200 rounded-lg overflow-y-auto bg-white min-h-[260px]">
               <Table>
-                <TableHeader className="bg-muted/50 sticky top-0 z-10">
-                  <TableRow>
-                    <TableHead className="w-[42px]">
+                <TableHeader className="bg-slate-50/90 sticky top-0 z-10 border-b border-slate-200">
+                  <TableRow className="border-b border-slate-200 hover:bg-transparent">
+                    <TableHead className="w-[42px] py-2 px-3">
                       <Checkbox
                         checked={isAllSelectableChecked}
                         onCheckedChange={(c) => toggleSelectAll(Boolean(c))}
                         disabled={selectableOnPage.length === 0}
+                        className="data-[state=checked]:bg-[#10B981] data-[state=checked]:border-[#10B981] border-slate-300"
                       />
                     </TableHead>
-                    <TableHead className="text-xs font-semibold">Candidate</TableHead>
-                    <TableHead className="text-xs font-semibold">Contact</TableHead>
-                    <TableHead className="text-right text-xs font-semibold">Status</TableHead>
+                    <TableHead className="text-xs font-semibold text-slate-600 py-2">Candidate</TableHead>
+                    <TableHead className="text-xs font-semibold text-slate-600 py-2">Contact</TableHead>
+                    <TableHead className="text-right text-xs font-semibold text-slate-600 py-2 pr-4">Status</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {loadingCandidates ? (
                     <TableRow>
                       <TableCell colSpan={4} className="text-center py-12">
-                        <Loader2 className="w-6 h-6 animate-spin mx-auto text-primary mb-2" />
-                        <p className="text-xs text-muted-foreground">Loading candidates...</p>
+                        <Loader2 className="w-6 h-6 animate-spin mx-auto text-emerald-600 mb-2" />
+                        <p className="text-xs text-slate-500">Loading candidates from server...</p>
                       </TableCell>
                     </TableRow>
                   ) : sortedContent.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={4} className="text-center py-12 text-muted-foreground">
-                        <Users className="w-8 h-8 mx-auto text-muted-foreground/40 mb-2" />
-                        <p className="text-sm font-medium">No candidates found</p>
-                        <p className="text-xs text-muted-foreground">
-                          {searchTerm
-                            ? "No candidates matched your search query."
+                      <TableCell colSpan={4} className="text-center py-12 text-slate-500">
+                        <Users className="w-8 h-8 mx-auto text-slate-300 mb-2" />
+                        <p className="text-sm font-medium text-slate-700">No candidates found</p>
+                        <p className="text-xs text-slate-400">
+                          {debouncedSearch
+                            ? `No candidates matched "${debouncedSearch}".`
                             : "No candidates registered in your organisation."}
                         </p>
                       </TableCell>
@@ -442,24 +460,31 @@ export function AddCandidatesModal({
                       return (
                         <TableRow
                           key={c.id}
-                          className={`transition-colors ${
+                          className={cn(
+                            "transition-colors border-b border-slate-100",
                             isAlreadyInvited
-                              ? "opacity-50 bg-muted/20 cursor-not-allowed"
+                              ? "opacity-50 bg-slate-50/50 cursor-not-allowed"
                               : isChecked
-                              ? "bg-primary/5 hover:bg-primary/10"
-                              : "hover:bg-muted/30"
-                          }`}
+                              ? "bg-emerald-50/40 hover:bg-emerald-50/60"
+                              : "hover:bg-slate-50/80"
+                          )}
                         >
-                          <TableCell>
+                          <TableCell className="py-2.5 px-3">
                             <Checkbox
                               checked={isChecked}
                               onCheckedChange={(checked) => toggleCandidate(c.id, Boolean(checked))}
                               disabled={isAlreadyInvited}
+                              className="data-[state=checked]:bg-[#10B981] data-[state=checked]:border-[#10B981] border-slate-300"
                             />
                           </TableCell>
-                          <TableCell>
+                          <TableCell className="py-2.5">
                             <div className="flex items-center gap-2.5">
-                              <div className="w-7 h-7 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-xs shrink-0">
+                              <div className={cn(
+                                "w-7 h-7 rounded-full flex items-center justify-center font-bold text-xs shrink-0 border",
+                                isChecked
+                                  ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                                  : "bg-slate-100 text-slate-700 border-slate-200"
+                              )}>
                                 {c.user.name
                                   ?.split(" ")
                                   .map((n) => n[0])
@@ -468,26 +493,26 @@ export function AddCandidatesModal({
                                   .slice(0, 2) || "C"}
                               </div>
                               <div className="min-w-0">
-                                <p className="font-medium text-xs text-foreground truncate">{c.user.name}</p>
-                                <p className="text-[10px] text-muted-foreground font-mono">ID: {c.id.slice(0, 8)}</p>
+                                <p className="font-semibold text-xs text-slate-900 truncate">{c.user.name}</p>
+                                <p className="text-[10px] text-slate-400 font-mono">ID: {c.id.slice(0, 8)}</p>
                               </div>
                             </div>
                           </TableCell>
-                          <TableCell>
-                            <div className="text-xs text-foreground truncate max-w-[180px]">{c.user.email}</div>
-                            <div className="text-[10px] text-muted-foreground">{c.user.phoneNumber || "-"}</div>
+                          <TableCell className="py-2.5">
+                            <div className="text-xs text-slate-700 truncate max-w-[180px]">{c.user.email}</div>
+                            <div className="text-[10px] text-slate-400">{c.user.phoneNumber || "—"}</div>
                           </TableCell>
-                          <TableCell className="text-right">
+                          <TableCell className="text-right py-2.5 pr-4">
                             {isAlreadyInvited ? (
-                              <Badge variant="outline" className="text-[10px] border-muted-foreground/30 text-muted-foreground">
+                              <Badge variant="outline" className="text-[10px] border-slate-200 text-slate-400 font-normal">
                                 Already Invited
                               </Badge>
                             ) : isChecked ? (
-                              <Badge className="text-[10px] bg-primary/10 text-primary border border-primary/20">
+                              <Badge className="text-[10px] bg-emerald-50 text-emerald-700 border border-emerald-200 font-medium">
                                 Selected
                               </Badge>
                             ) : (
-                              <span className="text-[11px] text-muted-foreground">Available</span>
+                              <span className="text-[11px] text-slate-400 font-medium">Available</span>
                             )}
                           </TableCell>
                         </TableRow>
@@ -498,12 +523,12 @@ export function AddCandidatesModal({
               </Table>
             </div>
 
-            {/* Pagination Controls */}
-            <div className="flex items-center justify-between pt-1 text-xs text-muted-foreground">
+            {/* Server-Side Pagination Controls */}
+            <div className="flex items-center justify-between pt-1 text-xs text-slate-500">
               <span>
-                Showing <strong>{totalElements === 0 ? 0 : page * pageSize + 1}</strong> to{" "}
-                <strong>{Math.min((page + 1) * pageSize, totalElements)}</strong> of{" "}
-                <strong>{totalElements}</strong> candidates
+                Showing <strong>{pageData.totalElements === 0 ? 0 : page * pageSize + 1}</strong> to{" "}
+                <strong>{Math.min((page + 1) * pageSize, pageData.totalElements)}</strong> of{" "}
+                <strong>{pageData.totalElements}</strong> candidates
               </span>
 
               <div className="flex items-center gap-1">
@@ -512,7 +537,7 @@ export function AddCandidatesModal({
                   size="sm"
                   onClick={() => setPage(0)}
                   disabled={page === 0 || loadingCandidates}
-                  className="h-7 w-7 p-0"
+                  className="h-7 w-7 p-0 border-slate-200 text-slate-600 hover:bg-slate-100 hover:text-slate-900 rounded-md"
                 >
                   <ChevronsLeft className="h-3.5 w-3.5" />
                 </Button>
@@ -521,28 +546,28 @@ export function AddCandidatesModal({
                   size="sm"
                   onClick={() => setPage((p) => Math.max(0, p - 1))}
                   disabled={page === 0 || loadingCandidates}
-                  className="h-7 w-7 p-0"
+                  className="h-7 w-7 p-0 border-slate-200 text-slate-600 hover:bg-slate-100 hover:text-slate-900 rounded-md"
                 >
                   <ChevronLeft className="h-3.5 w-3.5" />
                 </Button>
-                <span className="px-2 font-medium text-foreground">
-                  Page {totalPages === 0 ? 1 : page + 1} of {Math.max(1, totalPages)}
+                <span className="px-2 font-semibold text-slate-800">
+                  Page {pageData.totalPages === 0 ? 1 : page + 1} of {Math.max(1, pageData.totalPages)}
                 </span>
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
-                  disabled={page >= totalPages - 1 || loadingCandidates}
-                  className="h-7 w-7 p-0"
+                  onClick={() => setPage((p) => Math.min(pageData.totalPages - 1, p + 1))}
+                  disabled={page >= pageData.totalPages - 1 || loadingCandidates}
+                  className="h-7 w-7 p-0 border-slate-200 text-slate-600 hover:bg-slate-100 hover:text-slate-900 rounded-md"
                 >
                   <ChevronRight className="h-3.5 w-3.5" />
                 </Button>
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => setPage(Math.max(0, totalPages - 1))}
-                  disabled={page >= totalPages - 1 || loadingCandidates}
-                  className="h-7 w-7 p-0"
+                  onClick={() => setPage(Math.max(0, pageData.totalPages - 1))}
+                  disabled={page >= pageData.totalPages - 1 || loadingCandidates}
+                  className="h-7 w-7 p-0 border-slate-200 text-slate-600 hover:bg-slate-100 hover:text-slate-900 rounded-md"
                 >
                   <ChevronsRight className="h-3.5 w-3.5" />
                 </Button>
@@ -550,43 +575,56 @@ export function AddCandidatesModal({
             </div>
 
             {/* Footer Action */}
-            <DialogFooter className="pt-2 border-t mt-auto gap-2">
-              <Button variant="outline" onClick={() => onOpenChange(false)} disabled={inviting}>
+            <DialogFooter className="pt-3 border-t border-slate-100 mt-auto flex items-center justify-end gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => onOpenChange(false)}
+                disabled={inviting}
+                className="text-xs font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100 border-slate-200 rounded-lg px-4 py-2"
+              >
                 Cancel
               </Button>
               <Button
+                type="button"
                 onClick={handleInviteSelected}
                 disabled={selectedIds.length === 0 || inviting}
-                variant={lastFailedCount > 0 ? "destructive" : "default"}
-                className="gap-1.5"
+                className={cn(
+                  "text-xs font-semibold rounded-lg px-4 py-2 shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed",
+                  lastFailedCount > 0
+                    ? "bg-red-600 hover:bg-red-700 text-white"
+                    : "bg-[#10B981] hover:bg-[#059669] text-white"
+                )}
               >
                 {inviting ? (
                   <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
                     {lastFailedCount > 0 ? "Retrying..." : "Inviting..."}
                   </>
                 ) : lastFailedCount > 0 ? (
                   <>
-                    <RefreshCw className="w-4 h-4" />
+                    <RefreshCw className="w-3.5 h-3.5" />
                     Retry Failed Invitations ({selectedIds.length})
                   </>
                 ) : (
                   <>
-                    <Send className="w-4 h-4" />
+                    <Send className="w-3.5 h-3.5" />
                     Invite Selected ({selectedIds.length})
                   </>
                 )}
               </Button>
             </DialogFooter>
-          </TabsContent>
+          </div>
+        )}
 
-          {/* TAB 2: Create New Candidate */}
-          <TabsContent value="create" className="flex-1 flex flex-col overflow-y-auto p-6 pt-3 space-y-4">
+        {/* TAB 2: Create New Candidate */}
+        {activeTab === "create" && (
+          <div className="flex-1 flex flex-col overflow-y-auto p-6 pt-4 space-y-4">
             <form onSubmit={handleCreateAndInvite} className="space-y-4 flex-1">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <Label htmlFor="name" className="text-xs font-semibold">
-                    Full Name <span className="text-destructive">*</span>
+                  <Label htmlFor="name" className="text-xs font-semibold text-slate-700">
+                    Full Name <span className="text-red-500">*</span>
                   </Label>
                   <Input
                     id="name"
@@ -594,13 +632,13 @@ export function AddCandidatesModal({
                     value={createForm.name}
                     onChange={(e) => setCreateForm((prev) => ({ ...prev, name: e.target.value }))}
                     required
-                    className="h-9 text-sm"
+                    className="h-9 text-xs bg-white border border-slate-200 rounded-lg text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500"
                   />
                 </div>
 
                 <div className="space-y-1.5">
-                  <Label htmlFor="email" className="text-xs font-semibold">
-                    Email Address <span className="text-destructive">*</span>
+                  <Label htmlFor="email" className="text-xs font-semibold text-slate-700">
+                    Email Address <span className="text-red-500">*</span>
                   </Label>
                   <Input
                     id="email"
@@ -609,7 +647,7 @@ export function AddCandidatesModal({
                     value={createForm.email}
                     onChange={(e) => setCreateForm((prev) => ({ ...prev, email: e.target.value }))}
                     required
-                    className="h-9 text-sm"
+                    className="h-9 text-xs bg-white border border-slate-200 rounded-lg text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500"
                   />
                 </div>
               </div>
@@ -617,13 +655,13 @@ export function AddCandidatesModal({
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
                   <div className="flex items-center justify-between">
-                    <Label htmlFor="password" className="text-xs font-semibold">
-                      Account Password <span className="text-destructive">*</span>
+                    <Label htmlFor="password" className="text-xs font-semibold text-slate-700">
+                      Account Password <span className="text-red-500">*</span>
                     </Label>
                     <button
                       type="button"
                       onClick={generatePassword}
-                      className="text-[11px] text-primary hover:underline flex items-center gap-1 font-medium"
+                      className="text-[11px] text-emerald-600 hover:text-emerald-700 font-semibold flex items-center gap-1 cursor-pointer"
                     >
                       <KeyRound className="w-3 h-3" />
                       Auto-generate
@@ -636,30 +674,30 @@ export function AddCandidatesModal({
                     value={createForm.password}
                     onChange={(e) => setCreateForm((prev) => ({ ...prev, password: e.target.value }))}
                     required
-                    className="h-9 text-sm font-mono"
+                    className="h-9 text-xs font-mono bg-white border border-slate-200 rounded-lg text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500"
                   />
                 </div>
 
                 <div className="space-y-1.5">
-                  <Label htmlFor="phoneNumber" className="text-xs font-semibold">
-                    Phone Number <span className="text-muted-foreground font-normal">(Optional)</span>
+                  <Label htmlFor="phoneNumber" className="text-xs font-semibold text-slate-700">
+                    Phone Number <span className="text-slate-400 font-normal">(Optional)</span>
                   </Label>
                   <Input
                     id="phoneNumber"
                     placeholder="e.g. +91 9876543210"
                     value={createForm.phoneNumber}
                     onChange={(e) => setCreateForm((prev) => ({ ...prev, phoneNumber: e.target.value }))}
-                    className="h-9 text-sm"
+                    className="h-9 text-xs bg-white border border-slate-200 rounded-lg text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500"
                   />
                 </div>
               </div>
 
               {/* Dynamic Extra Custom Fields */}
-              <div className="space-y-2 pt-2 border-t">
+              <div className="space-y-2 pt-2 border-t border-slate-100">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-xs font-semibold text-foreground">Custom Candidate Attributes</p>
-                    <p className="text-[11px] text-muted-foreground">
+                    <p className="text-xs font-semibold text-slate-800">Custom Candidate Attributes</p>
+                    <p className="text-[11px] text-slate-400">
                       Add optional extra metadata (e.g. College, Department, Graduation Year, Skills).
                     </p>
                   </div>
@@ -668,7 +706,7 @@ export function AddCandidatesModal({
                     variant="outline"
                     size="sm"
                     onClick={addCustomField}
-                    className="h-7 text-xs gap-1"
+                    className="h-7 text-xs gap-1 border-slate-200 text-slate-700 hover:bg-slate-50"
                   >
                     <Plus className="w-3.5 h-3.5" />
                     Add Field
@@ -683,20 +721,20 @@ export function AddCandidatesModal({
                           placeholder="Field name (e.g. College)"
                           value={field.key}
                           onChange={(e) => updateCustomField(idx, "key", e.target.value)}
-                          className="h-8 text-xs flex-1"
+                          className="h-8 text-xs flex-1 bg-white border border-slate-200 rounded-lg text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500"
                         />
                         <Input
                           placeholder="Value (e.g. MIT)"
                           value={field.value}
                           onChange={(e) => updateCustomField(idx, "value", e.target.value)}
-                          className="h-8 text-xs flex-1"
+                          className="h-8 text-xs flex-1 bg-white border border-slate-200 rounded-lg text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500"
                         />
                         <Button
                           type="button"
                           variant="ghost"
                           size="icon"
                           onClick={() => removeCustomField(idx)}
-                          className="h-8 w-8 text-destructive hover:bg-destructive/10"
+                          className="h-8 w-8 text-red-500 hover:bg-red-50"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
                         </Button>
@@ -706,27 +744,37 @@ export function AddCandidatesModal({
                 )}
               </div>
 
-              <DialogFooter className="pt-4 border-t gap-2">
-                <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={creating}>
+              <DialogFooter className="pt-4 border-t border-slate-100 flex items-center justify-end gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => onOpenChange(false)}
+                  disabled={creating}
+                  className="text-xs font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100 border-slate-200 rounded-lg px-4 py-2"
+                >
                   Cancel
                 </Button>
-                <Button type="submit" disabled={creating} className="gap-1.5">
+                <Button
+                  type="submit"
+                  disabled={creating}
+                  className="text-xs font-semibold bg-[#10B981] hover:bg-[#059669] text-white rounded-lg px-4 py-2 shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                >
                   {creating ? (
                     <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
                       Creating...
                     </>
                   ) : (
                     <>
-                      <CheckCircle2 className="w-4 h-4" />
+                      <CheckCircle2 className="w-3.5 h-3.5" />
                       Create & Invite Candidate
                     </>
                   )}
                 </Button>
               </DialogFooter>
             </form>
-          </TabsContent>
-        </Tabs>
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   );

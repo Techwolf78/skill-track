@@ -157,12 +157,17 @@ export const candidateService = {
    */
   getCandidatesPage: async (
     page: number,
-    size: number
+    size: number,
+    search?: string
   ): Promise<SpringPage<Candidate>> => {
     const params = new URLSearchParams({
       page: String(page),
       size: String(size),
     });
+    if (search && search.trim()) {
+      params.append("search", search.trim());
+    }
+
     const response = await apiClient.get<unknown>(`/candidates?${params.toString()}`);
     const raw = response.data as Record<string, unknown>;
 
@@ -191,8 +196,22 @@ export const candidateService = {
 
   // Create a new candidate
   createCandidate: async (dto: CreateCandidateRequest): Promise<string> => {
-    const response = await apiClient.post<string>("/candidates", dto);
-    return unwrapResponse(response);
+    const response = await apiClient.post<unknown>("/candidates", dto);
+    const body = response.data;
+    if (typeof body === "string") return body;
+    if (body && typeof body === "object") {
+      const record = body as Record<string, unknown>;
+      if (typeof record.data === "string" && record.data) return record.data;
+      if (record.data && typeof record.data === "object" && "id" in (record.data as Record<string, unknown>)) {
+        return String((record.data as Record<string, unknown>).id);
+      }
+      if (record.id) return String(record.id);
+      if (typeof record.message === "string") {
+        const match = record.message.match(/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/);
+        if (match) return match[0];
+      }
+    }
+    return unwrapResponse(response as { data: BaseResponse<string> });
   },
 
   // Delete a candidate
