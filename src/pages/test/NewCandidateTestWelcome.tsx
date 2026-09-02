@@ -178,6 +178,10 @@ export default function NewCandidateTestWelcome({
   const [invitationStatus, setInvitationStatus] = useState<{
     scheduleExpired: boolean;
     hasSubmittedSession: boolean;
+    isEarly?: boolean;
+    startTime?: string;
+    endTime?: string;
+    testTitle?: string;
   } | null>(null);
 
   /* ────── Timers ────── */
@@ -506,9 +510,17 @@ export default function NewCandidateTestWelcome({
           const s = res.data?.data || res.data;
           const expired = !!s?.scheduleExpired;
           const submitted = !!s?.hasSubmittedSession;
-          setInvitationStatus({ scheduleExpired: expired, hasSubmittedSession: submitted });
+          const isEarly = !!s?.isEarly;
+          setInvitationStatus({
+            scheduleExpired: expired,
+            hasSubmittedSession: submitted,
+            isEarly,
+            startTime: s?.startTime,
+            endTime: s?.endTime,
+            testTitle: s?.testTitle,
+          });
 
-          if (submitted || expired) {
+          if (submitted || expired || isEarly) {
             setLoading(false);
             return;
           }
@@ -644,6 +656,20 @@ export default function NewCandidateTestWelcome({
     );
   }
 
+  // Candidate is early — schedule has not started yet
+  if (invitationStatus?.isEarly && invitationStatus?.startTime) {
+    return (
+      <EarlyScheduleCountdown
+        startTime={invitationStatus.startTime}
+        testTitle={invitationStatus.testTitle}
+        onStart={() => {
+          setInvitationStatus(prev => prev ? { ...prev, isEarly: false } : null);
+          window.location.reload();
+        }}
+      />
+    );
+  }
+
   // Schedule expired
   if (invitationStatus?.scheduleExpired && !invitationStatus?.hasSubmittedSession) {
     return (
@@ -656,15 +682,23 @@ export default function NewCandidateTestWelcome({
             <div className="mx-auto mb-4 w-16 h-16 rounded-full bg-red-500/10 border border-red-500/20 flex items-center justify-center">
               <AlertTriangle className="w-8 h-8 text-red-400" />
             </div>
-            <CardTitle className="text-2xl font-bold font-mono text-slate-100">Assessment Expired</CardTitle>
+            <CardTitle className="text-2xl font-bold font-mono text-slate-100">Schedule Ended</CardTitle>
             <CardDescription className="text-slate-400 mt-2">
-              The window to take this assessment has passed. The schedule is no longer active.
+              The schedule for this assessment has ended. This test cannot be taken now.
             </CardDescription>
           </CardHeader>
-          <CardContent className="pb-4">
+          <CardContent className="space-y-3 pb-4">
+            {invitationStatus.endTime && (
+              <div className="flex items-center gap-3 rounded-lg bg-slate-800/60 border border-slate-700/50 px-4 py-3">
+                <Clock className="w-4 h-4 text-rose-400 shrink-0" />
+                <span className="text-xs text-slate-300">
+                  Ended at: <strong className="text-slate-200">{new Date(invitationStatus.endTime).toLocaleString()}</strong>
+                </span>
+              </div>
+            )}
             <div className="flex items-center gap-3 rounded-lg bg-slate-800/60 border border-slate-700/50 px-4 py-3">
-              <Clock className="w-4 h-4 text-slate-400 shrink-0" />
-              <span className="text-xs text-slate-400">Contact your administrator if you believe this is an error.</span>
+              <AlertCircle className="w-4 h-4 text-amber-400 shrink-0" />
+              <span className="text-xs text-slate-400">Please reach out to your administrator to request a new assessment window.</span>
             </div>
           </CardContent>
           <CardFooter className="pb-8 flex justify-center">
@@ -1004,6 +1038,115 @@ export default function NewCandidateTestWelcome({
           }
         />
       )}
+    </div>
+  );
+}
+
+/* ──────────────────────────── Early Schedule Countdown Component ──────────────────────────── */
+
+function EarlyScheduleCountdown({
+  startTime,
+  testTitle,
+  onStart,
+}: {
+  startTime: string;
+  testTitle?: string;
+  onStart: () => void;
+}) {
+  const [secondsRemaining, setSecondsRemaining] = useState(() => {
+    const diff = Math.max(0, Math.floor((new Date(startTime).getTime() - Date.now()) / 1000));
+    return diff;
+  });
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const diff = Math.max(0, Math.floor((new Date(startTime).getTime() - Date.now()) / 1000));
+      setSecondsRemaining(diff);
+      if (diff <= 0) {
+        clearInterval(interval);
+        onStart();
+      }
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [startTime, onStart]);
+
+  const days = Math.floor(secondsRemaining / (3600 * 24));
+  const hours = Math.floor((secondsRemaining % (3600 * 24)) / 3600);
+  const minutes = Math.floor((secondsRemaining % 3600) / 60);
+  const seconds = secondsRemaining % 60;
+
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-slate-950 p-4 relative overflow-hidden">
+      <div className="absolute inset-0 bg-[linear-gradient(to_right,#1e293b18_1px,transparent_1px),linear-gradient(to_bottom,#1e293b18_1px,transparent_1px)] bg-[size:28px_28px] pointer-events-none" />
+      <div className="absolute top-1/3 left-1/2 -translate-x-1/2 w-96 h-96 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
+
+      <Card className="max-w-lg w-full border border-slate-800 bg-slate-900/90 backdrop-blur-md shadow-2xl overflow-hidden animate-in fade-in duration-300">
+        <div className="h-1.5 bg-gradient-to-r from-indigo-500 via-sky-400 to-emerald-400 w-full" />
+        <CardHeader className="text-center pt-8 pb-4">
+          <div className="mx-auto mb-4 w-16 h-16 rounded-full bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 animate-pulse">
+            <Clock className="w-8 h-8" />
+          </div>
+          <CardTitle className="text-2xl font-bold font-mono text-slate-100">
+            Assessment Not Started
+          </CardTitle>
+          <CardDescription className="text-slate-400 mt-2">
+            You are early! <strong className="text-slate-200">{testTitle || "This assessment"}</strong> is scheduled to begin soon.
+          </CardDescription>
+        </CardHeader>
+
+        <CardContent className="space-y-6 pb-6">
+          {/* Live Countdown Display */}
+          <div className="grid grid-cols-4 gap-2 text-center">
+            <div className="bg-slate-800/80 border border-slate-700/60 rounded-lg p-3">
+              <span className="text-2xl md:text-3xl font-black font-mono text-white block">
+                {String(days).padStart(2, "0")}
+              </span>
+              <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Days</span>
+            </div>
+            <div className="bg-slate-800/80 border border-slate-700/60 rounded-lg p-3">
+              <span className="text-2xl md:text-3xl font-black font-mono text-indigo-300 block">
+                {String(hours).padStart(2, "0")}
+              </span>
+              <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Hours</span>
+            </div>
+            <div className="bg-slate-800/80 border border-slate-700/60 rounded-lg p-3">
+              <span className="text-2xl md:text-3xl font-black font-mono text-indigo-300 block">
+                {String(minutes).padStart(2, "0")}
+              </span>
+              <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Mins</span>
+            </div>
+            <div className="bg-slate-800/80 border border-slate-700/60 rounded-lg p-3">
+              <span className="text-2xl md:text-3xl font-black font-mono text-emerald-400 block">
+                {String(seconds).padStart(2, "0")}
+              </span>
+              <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Secs</span>
+            </div>
+          </div>
+
+          {/* Scheduled Time Banner */}
+          <div className="flex items-center gap-3 rounded-lg bg-slate-800/60 border border-slate-700/50 px-4 py-3">
+            <Calendar className="w-4 h-4 text-sky-400 shrink-0" />
+            <span className="text-xs text-slate-300">
+              Starts on: <strong className="text-white font-mono">{new Date(startTime).toLocaleString()}</strong>
+            </span>
+          </div>
+
+          <div className="flex items-center gap-3 rounded-lg bg-slate-800/40 border border-slate-700/30 px-4 py-3 text-xs text-slate-400">
+            <Info className="w-4 h-4 text-slate-500 shrink-0" />
+            <span>This page will automatically refresh when the scheduled time arrives.</span>
+          </div>
+        </CardContent>
+
+        <CardFooter className="pb-6 flex justify-center">
+          <Button
+            onClick={() => window.location.reload()}
+            variant="outline"
+            className="w-full border-slate-700 hover:bg-slate-800 text-slate-300 text-xs font-bold uppercase tracking-wider"
+          >
+            Check Again
+          </Button>
+        </CardFooter>
+      </Card>
     </div>
   );
 }

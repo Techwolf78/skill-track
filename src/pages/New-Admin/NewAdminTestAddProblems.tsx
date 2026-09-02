@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import {
   Search,
   BarChart2,
@@ -128,6 +128,9 @@ export default function NewAdminTestAddProblems() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user, logout } = useAuth();
+  const [searchParams] = useSearchParams();
+  // Reads ?section=<name> set by the "Add Here" button in the Problems tab
+  const targetSection = searchParams.get("section") || undefined;
 
   const [test, setTest] = useState<Test | null>(null);
   const [addedQuestionIds, setAddedQuestionIds] = useState<Set<string>>(new Set());
@@ -179,7 +182,7 @@ export default function NewAdminTestAddProblems() {
       const nextOrderIndex = maxOrder + 1;
       const marks = q.marks ?? (q.questionType === "CODING" ? 100 : 10);
 
-      const res = await testService.addQuestionToTestWithWarnings(id, q.id, nextOrderIndex, marks);
+      const res = await testService.addQuestionToTestWithWarnings(id, q.id, nextOrderIndex, marks, undefined, targetSection);
       setAddedQuestionIds((prev) => new Set([...prev, q.id]));
       toast.success(`"${q.title || 'Problem'}" added to test!`);
 

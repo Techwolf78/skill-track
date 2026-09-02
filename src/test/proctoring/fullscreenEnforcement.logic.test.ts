@@ -24,7 +24,7 @@ describe("Fullscreen Enforcement Logic", () => {
       expect(computeFullscreenPolicy({ isProctoringActive: true, isFullscreen: false, fullscreenTimer: 0 })).toBe("auto-submit");
     });
   });
-
+[[]]
   describe("tickFullscreenTimer", () => {
     it("should decrement timer by 1 on normal tick", () => {
       const result = tickFullscreenTimer(5);

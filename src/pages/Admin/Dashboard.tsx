@@ -13,6 +13,7 @@ import { auditLogService, AuditLog } from "@/lib/audit-log-service";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useTestsQuery } from "@/hooks/use-query-hooks";
 import { formatDistanceToNow } from "date-fns";
+import { stripHtml } from "@/lib/utils";
 import axios from "axios";
 
 export default function AdminDashboard() {
@@ -428,7 +429,7 @@ function ActivityFeedItem({ log }: { log: AuditLog; currentUserEmail?: string })
  */
 function parseDoSelectSentence(log: AuditLog, actorName: string = "You") {
   const action = (log.action || "").toUpperCase();
-  const details = log.details || "";
+  const details = stripHtml(log.details || "");
 
   let afterObj: Record<string, any> = {};
   if (log.afterSnapshot) {
@@ -447,7 +448,7 @@ function parseDoSelectSentence(log: AuditLog, actorName: string = "You") {
   // 1. Candidate Invitations / Test Invites
   if (details.toLowerCase().includes("invited") || details.toLowerCase().includes("candidate")) {
     const emailMatches = details.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g) || [];
-    const testTitle = afterObj.testTitle || afterObj.title || beforeObj.testTitle || "the test";
+    const testTitle = stripHtml(afterObj.testTitle || afterObj.title || beforeObj.testTitle || extractTestTitleFromDetails(details) || "the test");
     
     if (emailMatches.length > 0) {
       const primaryEmail = emailMatches[0];
@@ -467,7 +468,7 @@ function parseDoSelectSentence(log: AuditLog, actorName: string = "You") {
   if (details.toLowerCase().includes("added") && details.toLowerCase().includes("problem")) {
     const numMatch = details.match(/\d+/);
     const count = numMatch ? numMatch[0] : "1";
-    const testTitle = afterObj.testTitle || afterObj.title || "the test";
+    const testTitle = stripHtml(afterObj.testTitle || afterObj.title || "the test");
     return {
       prefix: `${actorName} added`,
       highlighted: `${count} problems`,
@@ -477,8 +478,8 @@ function parseDoSelectSentence(log: AuditLog, actorName: string = "You") {
   }
 
   if (action === "DELETE" && (details.toLowerCase().includes("problem") || details.toLowerCase().includes("question"))) {
-    const questionName = afterObj.title || beforeObj.title || afterObj.name || beforeObj.name || "the problem";
-    const testTitle = afterObj.testTitle || beforeObj.testTitle || "the test";
+    const questionName = stripHtml(afterObj.title || beforeObj.title || afterObj.name || beforeObj.name || extractQuestionFromDetails(details) || "the problem");
+    const testTitle = stripHtml(afterObj.testTitle || beforeObj.testTitle || "the test");
     return {
       prefix: `${actorName} removed the problem`,
       highlighted: questionName,
@@ -489,7 +490,7 @@ function parseDoSelectSentence(log: AuditLog, actorName: string = "You") {
 
   // 3. Test Duration / Configuration Updates
   if (action === "UPDATE" && (details.toLowerCase().includes("duration") || afterObj.durationMinutes)) {
-    const testTitle = afterObj.title || beforeObj.title || "the test";
+    const testTitle = stripHtml(afterObj.title || beforeObj.title || "the test");
     const duration = afterObj.durationMinutes || afterObj.timeLimit || "updated";
     return {
       prefix: `${actorName} updated the duration of the test`,
@@ -499,9 +500,9 @@ function parseDoSelectSentence(log: AuditLog, actorName: string = "You") {
     };
   }
 
-  // 4. Question Creation
+  // 4. Question Creation & Update
   if (action === "CREATE" && (details.toLowerCase().includes("question") || log.afterSnapshot?.includes("prompt"))) {
-    const qTitle = afterObj.title || afterObj.prompt?.slice(0, 30) || "New Question";
+    const qTitle = stripHtml(afterObj.title || afterObj.prompt?.slice(0, 60) || extractQuestionFromDetails(details) || "New Question");
     return {
       prefix: `${actorName} created the question`,
       highlighted: qTitle,
@@ -510,9 +511,19 @@ function parseDoSelectSentence(log: AuditLog, actorName: string = "You") {
     };
   }
 
+  if (action === "UPDATE" && (details.toLowerCase().includes("question") || log.afterSnapshot?.includes("prompt"))) {
+    const qTitle = stripHtml(afterObj.title || afterObj.prompt?.slice(0, 60) || beforeObj.title || beforeObj.prompt?.slice(0, 60) || extractQuestionFromDetails(details) || "the question");
+    return {
+      prefix: `${actorName} updated the question`,
+      highlighted: qTitle,
+      textAfter: "",
+      entityName: "",
+    };
+  }
+
   // 5. User / Admin creation
   if (action === "CREATE" && (details.toLowerCase().includes("user") || details.toLowerCase().includes("admin"))) {
-    const userName = afterObj.name || afterObj.email || "a new user";
+    const userName = stripHtml(afterObj.name || afterObj.email || "a new user");
     return {
       prefix: `${actorName} created user account`,
       highlighted: userName,
@@ -523,7 +534,7 @@ function parseDoSelectSentence(log: AuditLog, actorName: string = "You") {
 
   // 6. Test Creation / Modification
   if (action === "CREATE" && details.toLowerCase().includes("test")) {
-    const tTitle = afterObj.title || afterObj.name || "a new test";
+    const tTitle = stripHtml(afterObj.title || afterObj.name || "a new test");
     return {
       prefix: `${actorName} created the test`,
       highlighted: tTitle,
@@ -534,7 +545,7 @@ function parseDoSelectSentence(log: AuditLog, actorName: string = "You") {
 
   // 7. Test Activation / Deactivation
   if (action.includes("DEACTIVATE") || details.toLowerCase().includes("deactivate")) {
-    const testTitle = afterObj.title || beforeObj.title || extractTestTitleFromDetails(details);
+    const testTitle = stripHtml(afterObj.title || beforeObj.title || extractTestTitleFromDetails(details));
     return {
       prefix: `${actorName} deactivated the test`,
       highlighted: testTitle,
@@ -544,7 +555,7 @@ function parseDoSelectSentence(log: AuditLog, actorName: string = "You") {
   }
 
   if (action.includes("ACTIVATE") || details.toLowerCase().includes("activate")) {
-    const testTitle = afterObj.title || beforeObj.title || extractTestTitleFromDetails(details);
+    const testTitle = stripHtml(afterObj.title || beforeObj.title || extractTestTitleFromDetails(details));
     return {
       prefix: `${actorName} activated the test`,
       highlighted: testTitle,
@@ -554,13 +565,26 @@ function parseDoSelectSentence(log: AuditLog, actorName: string = "You") {
   }
 
   // 8. Dynamic sentence formatter for any other Admin action
-  // Replace technical HTTP verb 'patch' with user-friendly 'updated'
   const rawAction = action.toLowerCase();
-  const actionFormatted = rawAction === "patch" ? "updated" : rawAction;
+  let actionFormatted = "performed action on";
+  if (rawAction === "patch" || rawAction === "update" || rawAction === "put") {
+    actionFormatted = "updated";
+  } else if (rawAction === "create" || rawAction === "post") {
+    actionFormatted = "created";
+  } else if (rawAction === "delete") {
+    actionFormatted = "deleted";
+  } else if (rawAction === "get") {
+    actionFormatted = "viewed";
+  } else if (rawAction) {
+    actionFormatted = rawAction.endsWith("e") ? `${rawAction}d` : `${rawAction}ed`;
+  }
   
   let cleanDetails = details
     .replace(/^(Performed|Executed)\s+/i, "")
     .replace(/\(ID:[^)]+\)/gi, "")
+    .replace(/^(update|patch)\s+question\s+on\s+question/i, "question")
+    .replace(/^(create|post)\s+question\s+on\s+question/i, "question")
+    .replace(/^on\s+question/i, "question")
     .replace(/^patch\s+/i, "updated ")
     .trim();
   
@@ -579,10 +603,19 @@ function parseDoSelectSentence(log: AuditLog, actorName: string = "You") {
   };
 }
 
+function extractQuestionFromDetails(details: string): string {
+  const match = details.match(/Question\s+["']?([^"']+)["']?/i);
+  if (match && match[1]) {
+    return stripHtml(match[1]).trim();
+  }
+  return "";
+}
+
 function extractTestTitleFromDetails(details: string): string {
   const match = details.match(/Test\s+["']?([^"']+)["']?/i);
   if (match && match[1]) {
-    return match[1].trim();
+    return stripHtml(match[1]).trim();
   }
   return "the test";
 }
+

@@ -607,19 +607,33 @@ export default function NewCandidateOnboardingWizard({
           {/* 1. Left Sidebar Navigation */}
           <div className="w-full md:w-64 shrink-0 flex flex-col gap-1">
             <div className="bg-white border border-slate-200 shadow-xs rounded-xs overflow-hidden divide-y divide-slate-100">
-              {steps.map((step) => {
+              {steps.map((step, index) => {
                 const isActive = activeStep === step.id;
+                const activeIndex = steps.findIndex((s) => s.id === activeStep);
+                // Can only jump to previous steps or currently active step
+                const isNavigable = index <= activeIndex;
+
                 return (
                   <button
                     key={step.id}
-                    onClick={() => setActiveStep(step.id)}
-                    className={`w-full text-left px-5 py-3.5 text-xs md:text-sm font-semibold transition-all cursor-pointer flex items-center justify-between ${
+                    onClick={() => {
+                      if (isNavigable) {
+                        setActiveStep(step.id);
+                      }
+                    }}
+                    disabled={!isNavigable}
+                    className={`w-full text-left px-5 py-3.5 text-xs md:text-sm font-semibold transition-all flex items-center justify-between ${
                       isActive
-                        ? "bg-[#5b6bbd] text-white shadow-xs font-bold"
-                        : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+                        ? "bg-[#5b6bbd] text-white shadow-xs font-bold cursor-default"
+                        : isNavigable
+                        ? "text-slate-600 hover:bg-slate-50 hover:text-slate-900 cursor-pointer"
+                        : "text-slate-300 bg-slate-50/50 cursor-not-allowed"
                     }`}
                   >
                     <span>{step.label}</span>
+                    {index < activeIndex && (
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+                    )}
                   </button>
                 );
               })}
@@ -1194,13 +1208,30 @@ export default function NewCandidateOnboardingWizard({
                 </Button>
               )}
 
-              <Button
-                onClick={handleNext}
-                disabled={activeStep === "declaration" && !isDeclarationAgreed}
-                className="bg-[#5b6bbd] hover:bg-[#4a589e] disabled:opacity-50 disabled:cursor-not-allowed text-white px-8 py-2 text-xs font-bold uppercase tracking-wider rounded-xs shadow-xs transition-all cursor-pointer"
-              >
-                <span>{activeStep === "declaration" ? "Start Test" : "NEXT"}</span>
-              </Button>
+              {(() => {
+                let isStepValid = true;
+                if (activeStep === "system_checks") {
+                  if (isWebcamRequired && webcamStatus !== "success") isStepValid = false;
+                  if (isMicRequired && micStatus !== "success") isStepValid = false;
+                  if (isScreenRequired && screenStatus !== "success") isStepValid = false;
+                } else if (activeStep === "candidate_details") {
+                  if (!candidateName.trim() || !candidateEmail.trim()) isStepValid = false;
+                  if (isWebcamRequired && !snapshotImage) isStepValid = false;
+                } else if (activeStep === "declaration") {
+                  if (!isDeclarationAgreed) isStepValid = false;
+                }
+
+                return (
+                  <Button
+                    onClick={handleNext}
+                    disabled={!isStepValid || isLaunching}
+                    className="bg-[#5b6bbd] hover:bg-[#4a589e] disabled:opacity-50 disabled:cursor-not-allowed text-white px-8 py-2 text-xs font-bold uppercase tracking-wider rounded-xs shadow-xs transition-all cursor-pointer flex items-center gap-1.5"
+                  >
+                    {isLaunching && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                    <span>{activeStep === "declaration" ? "Start Test" : "NEXT"}</span>
+                  </Button>
+                );
+              })()}
             </div>
           </div>
         </div>

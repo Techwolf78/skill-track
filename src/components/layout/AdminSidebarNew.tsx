@@ -10,6 +10,7 @@ import {
   PanelLeftClose,
   ShieldAlert,
   User,
+  BookOpen,
 } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -27,6 +28,7 @@ const navItems = [
   { icon: Users, label: "Candidates", path: "/admin/candidates" },
   { icon: FileQuestion, label: "Question Bank", path: "/admin/questions" },
   { icon: ShieldAlert, label: "Proctoring", path: "/admin/proctoring" },
+  { icon: BookOpen, label: "Docs", path: "/admin/docs" },
   { icon: User, label: "Profile", path: "/admin/profile" },
 ];
 

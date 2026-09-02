@@ -57,6 +57,7 @@ export interface CreateTestQuestionRequest {
   orderIndex: number;
   marks: number;
   timeLimitSecs?: number;
+  sectionName?: string;
 }
 
 export interface BulkAddQuestionsRequest {
@@ -65,6 +66,7 @@ export interface BulkAddQuestionsRequest {
   startOrderIndex: number;
   defaultMarks: number;
   defaultTimeLimitSecs: number;
+  sectionName?: string;
 }
 
 export interface SaveAnswerResponse {
@@ -1023,7 +1025,7 @@ export const testService = {
     id: string,
     dto: Partial<CreateTestQuestionRequest>,
   ): Promise<TestQuestion> => {
-    const response = await apiClient.put<TestQuestion>(`/test-questions/${id}`, dto);
+    const response = await apiClient.patch<TestQuestion>(`/test-questions/${id}`, dto);
     return unwrapResponse(response);
   },
 
@@ -1037,6 +1039,7 @@ export const testService = {
     orderIndex: number,
     marks: number,
     timeLimitSecs?: number,
+    sectionName?: string,
   ): Promise<TestQuestion> => {
     return testService.createTestQuestion({
       testId,
@@ -1044,6 +1047,7 @@ export const testService = {
       orderIndex,
       marks,
       timeLimitSecs,
+      sectionName,
     });
   },
 
@@ -1053,6 +1057,7 @@ export const testService = {
     orderIndex: number,
     marks: number,
     timeLimitSecs?: number,
+    sectionName?: string,
   ): Promise<{ testQuestion: TestQuestion; warnings: string[] }> => {
     return testService.createTestQuestionWithWarnings({
       testId,
@@ -1060,6 +1065,7 @@ export const testService = {
       orderIndex,
       marks,
       timeLimitSecs,
+      sectionName,
     });
   },
 

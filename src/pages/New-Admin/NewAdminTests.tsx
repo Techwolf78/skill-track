@@ -214,16 +214,16 @@ export default function NewAdminTests() {
         ) : (
           <div className="divide-y divide-slate-200">
             {filteredTests.map((test) => {
-              const questionCount =
-                test.questions?.length ||
-                test.testQuestions?.length ||
-                (test as any).questionCount ||
-                100;
+              const testQuestionsList = test.questions || test.testQuestions || [];
+              const questionCount = testQuestionsList.length || (test as any).questionCount || 0;
 
-              const sectionCount =
-                (test as any).sections?.length ||
-                (test as any).sectionCount ||
-                1;
+              // Calculate unique distinct sections from questions list
+              const uniqueSections = new Set(
+                testQuestionsList
+                  .map((q: any) => q.sectionName?.trim())
+                  .filter((s: any) => Boolean(s))
+              );
+              const sectionCount = uniqueSections.size > 0 ? uniqueSections.size : 1;
 
               const candidateCount =
                 (test as any).candidateCount ??

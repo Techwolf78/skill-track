@@ -14,6 +14,7 @@ import {
   UserRound,
   ScrollText,
   ShieldAlert,
+  BookOpen,
 } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -34,6 +35,7 @@ const navItems = [
   { icon: ShieldAlert, label: "Proctoring", path: "/superadmin/proctoring" },
   { icon: BarChart3, label: "Reports", path: "/superadmin/reports" },
   { icon: ScrollText, label: "Audit Logs", path: "/superadmin/audit-logs" },
+  { icon: BookOpen, label: "Docs", path: "/superadmin/docs" },
   { icon: Settings, label: "Settings", path: "/superadmin/settings" },
 ];
 
