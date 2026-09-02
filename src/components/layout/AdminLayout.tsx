@@ -19,11 +19,13 @@ function AdminContentWrapper() {
 
 export function AdminLayout() {
   const { user } = useAuth();
+  const location = useLocation();
   const isSuperAdmin = user?.role === ROLES.SUPERADMIN;
+  const isDocsPage = location.pathname.endsWith("/docs") || location.pathname.includes("/docs/");
 
   return (
     <div className="flex min-h-screen bg-background">
-      {isSuperAdmin ? <SuperAdminSidebar /> : <AdminSidebar />}
+      {!isDocsPage && (isSuperAdmin ? <SuperAdminSidebar /> : <AdminSidebar />)}
       <main className="flex-1 overflow-auto">
         <AdminContentWrapper />
       </main>

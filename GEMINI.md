@@ -82,26 +82,20 @@ CRITICAL REMINDER: AESTHETICS ARE VERY IMPORTANT. If your web app looks simple a
 # FRONTEND DESIGN PRINCIPLES (MANDATORY FOR ALL WEB DEVELOPMENT TASKS)
 Always apply these guidelines when building new UI or modifying existing frontend code in this project:
 
-## 1. Ground Design in the Subject (Developer-Focused Proctored IDE)
-- Reject generic SaaS template aesthetics (cream/terracotta high-contrast serif themes or basic plain cards).
-- Use a **Tech-Industrial / Cyber-Minimalist** look. Pair technical layout aesthetics with crisp structural elements rather than generic drop shadows.
+## 1. Ground Design in the Subject (RxOne Proctored Assessment Platform)
+- Clean, modern, enterprise SaaS aesthetic matching the established RxOne theme.
+- Premium crisp cards, subtle borders, rounded containers (`rounded-xl` / `rounded-2xl`), and subtle soft shadows (`shadow-sm`).
 
-## 2. Opinionated Typography
-- Do NOT use plain, default font families (like Inter/Montserrat).
-- Use **JetBrains Mono** or **Fira Code** for display headers, numeric data, and code blocks.
-- Use a modern, readable sans-serif like **Plus Jakarta Sans** or **Space Grotesk** for body text and navigation labels.
+## 2. Color Themes & Palette (MANDATORY)
+- **Primary Theme**: Clean White / Slate Light Theme (`bg-slate-50/50`, `bg-white`, `border-slate-200/80`).
+- **Brand Accent**: **Sunset Orange** (`#f97316` / `hsl(24.6, 95%, 53%)` / `bg-orange-500`, `text-orange-600`, `hover:bg-orange-600`).
+- **Dark Sidebar**: Dark obsidian / slate sidebar with vivid Sunset Orange active states (`bg-sidebar-primary` orange glow).
+- **Status Accents**: Soft pastel badges with dark readable text (Emerald green for success, Amber for medium/warning, Rose/Red for critical violations, Sky/Blue for info).
 
-## 3. High-Performance Color Themes
-- Customize theme variables using curated, HSL-based colors.
-- Use a default Dark Theme matching a terminal console: deep obsidian/slate background (`hsl(224, 25%, 8%)`), bordered dividers, and status indicators using high-saturation neon accents (e.g. Matrix Green for successes, Laser Crimson for proctor warnings/violations, and Laser Cyan for active code execution).
-
-## 4. Layout as Information Structure
-- Render workspaces like professional IDEs (using vertical panels, resizable containers, and clear division).
-- Use numbering, visual anchors, and indicators only if they encode actual sequence or progress data.
-
-## 5. Micro-Animations & Dynamic Interactions
-- Use Framer Motion and custom CSS animations for meaningful state transitions (e.g. terminal logs printing line-by-line during compiles, warning border-pulse for tab switch violations).
-- Keep animations quiet and disciplined; avoid excessive decoration that feels AI-generated.
+## 3. Typography & Layout Structure
+- Modern, clean, crisp sans-serif headers and body text.
+- Clean code blocks and monospace metrics (`JetBrains Mono` / `font-mono`) with light/slate high-contrast formatting.
+- Organized panel headers, sticky search bars, filter dropdowns, and clean white data tables.
 
 # PONYTAIL RULESET (MINIMUM CODE FOR TOKEN EFFICIENCY)
 When writing, modifying, or refactoring code, follow the Ponytail ladder:
