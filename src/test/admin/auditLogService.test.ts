@@ -129,6 +129,57 @@ describe("auditLogService", () => {
       expect(response.content[0].details).toBe("Performed delete user on User (ID: u-999)");
     });
 
+    it("should strip HTML tags from afterSnapshot prompt when generating details", async () => {
+      vi.mocked(apiClient.get).mockResolvedValue({
+        data: {
+          success: true,
+          data: {
+            content: [
+              {
+                id: "log-html",
+                actor: "admin",
+                action: "UPDATE_QUESTION",
+                entityType: "Question",
+                timestamp: "2026-06-19T12:00:00.000Z",
+                afterSnapshot: JSON.stringify({
+                  prompt: "<p>Which standard HTTP status code should be returned?&nbsp;</p>",
+                }),
+              },
+            ],
+          },
+        },
+      });
+
+      const response = await auditLogService.getAuditLogs();
+      expect(response.content[0].details).toBe(
+        'Performed update question on Question "Which standard HTTP status code should be returned?"'
+      );
+    });
+
+    it("should strip HTML tags from raw backend details if provided", async () => {
+      vi.mocked(apiClient.get).mockResolvedValue({
+        data: {
+          success: true,
+          data: {
+            content: [
+              {
+                id: "log-raw-html",
+                actor: "admin",
+                action: "UPDATE",
+                details: 'Performed update question on Question "<p>Which status code?</p>"',
+                timestamp: "2026-06-19T12:00:00.000Z",
+              },
+            ],
+          },
+        },
+      });
+
+      const response = await auditLogService.getAuditLogs();
+      expect(response.content[0].details).toBe(
+        'Performed update question on Question "Which status code?"'
+      );
+    });
+
     it("should handle direct array response from backend without pagination wrapper", async () => {
       vi.mocked(apiClient.get).mockResolvedValue({
         data: {

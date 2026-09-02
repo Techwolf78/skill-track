@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Terminal, ShieldAlert, CheckCircle, AlertTriangle, Play, Loader2 } from "lucide-react";
 import { auditLogService, AuditLog } from "@/lib/audit-log-service";
-import { getTimeframeCutoff } from "@/lib/utils";
+import { getTimeframeCutoff, stripHtml } from "@/lib/utils";
 
 interface LiveProctoringFeedProps {
   timeframe?: string;
@@ -101,7 +101,7 @@ export function LiveProctoringFeed({ timeframe = "7D" }: LiveProctoringFeedProps
                   {/* Action & Details */}
                   <span className="text-foreground font-sans text-xs truncate">
                     <strong className="font-mono text-muted-foreground mr-1.5">{log.action || "EVENT"}:</strong>
-                    {log.details || `Executed by ${log.actor || "system"}`}
+                    {stripHtml(log.details) || `Executed by ${log.actor || "system"}`}
                   </span>
 
                   {/* Actor */}

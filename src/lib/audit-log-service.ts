@@ -1,6 +1,7 @@
 // src/lib/audit-log-service.ts
 import { apiClient } from "./api-client";
 import { BaseResponse } from "./auth-service";
+import { stripHtml } from "./utils";
 
 export interface AuditLog {
   id: string;
@@ -81,7 +82,7 @@ export const auditLogService = {
       }
 
       // Dynamically build user-friendly details if not provided by backend
-      let details = log.details || "";
+      let details = stripHtml(log.details || "");
       if (!details) {
         const actionText = (log.action || "").toLowerCase().replace(/_/g, " ");
         const entityLabel = log.entityType || "entity";
@@ -90,7 +91,7 @@ export const auditLogService = {
         if (log.afterSnapshot) {
           try {
             const parsed = JSON.parse(log.afterSnapshot);
-            entityName = parsed.name || parsed.title || parsed.prompt || parsed.email || parsed.label || parsed.description || "";
+            entityName = stripHtml(parsed.name || parsed.title || parsed.prompt || parsed.email || parsed.label || parsed.description || "");
           } catch (e) {
             // Ignore JSON parsing errors
           }
@@ -109,7 +110,7 @@ export const auditLogService = {
         id: log.id || String(Math.random()),
         actor: log.actor || "system",
         action: log.action || "UNKNOWN",
-        details: details,
+        details: stripHtml(details),
         ipAddress: log.ipAddress || "—",
         status: log.status || "SUCCESS",
         timestamp: timestamp,
@@ -117,6 +118,7 @@ export const auditLogService = {
         afterSnapshot: log.afterSnapshot,
       };
     };
+
 
     if (data && typeof data === "object" && "content" in data) {
       return {

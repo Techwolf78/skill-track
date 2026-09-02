@@ -40,6 +40,7 @@ import {
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { auditLogService, AuditLog } from "@/lib/audit-log-service";
+import { stripHtml } from "@/lib/utils";
 import * as XLSX from "xlsx";
 import { saveAs } from "file-saver";
 
@@ -834,7 +835,7 @@ export default function AuditLogs() {
                     ) : (
                       <TableCell colSpan={2}>
                         <span className="text-xs font-medium text-foreground leading-normal block max-w-lg break-words">
-                          {log.details}
+                          {stripHtml(log.details)}
                         </span>
                       </TableCell>
                     )}
