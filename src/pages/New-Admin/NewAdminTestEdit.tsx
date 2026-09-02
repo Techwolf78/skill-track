@@ -1400,12 +1400,12 @@ export default function NewAdminTestEdit() {
           const enrichedQuestion = enrichedTQ?.question;
           const correctOptions = (enrichedQuestion?.mcqOptions && enrichedQuestion.mcqOptions.length > 0)
             ? enrichedQuestion.mcqOptions
-            : (enrichedQuestion?.options && enrichedQuestion.options.length > 0)
-              ? enrichedQuestion.options
+            : ((enrichedQuestion as any)?.options?.length > 0)
+              ? (enrichedQuestion as any).options
               : (q.mcqOptions && q.mcqOptions.length > 0)
                 ? q.mcqOptions
-                : (q.options && q.options.length > 0)
-                  ? q.options
+                : ((q as any).options?.length > 0)
+                  ? (q as any).options
                   : [];
 
           // Calculate time spent telemetry
@@ -1449,12 +1449,12 @@ export default function NewAdminTestEdit() {
           } else {
             const optionsList = (q.mcqOptions && q.mcqOptions.length > 0)
               ? q.mcqOptions
-              : (q.options && q.options.length > 0)
-                ? q.options
+              : ((q as any).options?.length > 0)
+                ? (q as any).options
                 : (enrichedQuestion?.mcqOptions && enrichedQuestion.mcqOptions.length > 0)
                   ? enrichedQuestion.mcqOptions
-                  : (enrichedQuestion?.options && enrichedQuestion.options.length > 0)
-                    ? enrichedQuestion.options
+                  : ((enrichedQuestion as any)?.options?.length > 0)
+                    ? (enrichedQuestion as any).options
                     : [];
             optionsList.forEach(
               (
