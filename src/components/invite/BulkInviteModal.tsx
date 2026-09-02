@@ -57,6 +57,20 @@ interface ParsedCandidateRow {
   errorMessage?: string;
 }
 
+interface BulkUploadRow {
+  rowNumber: number;
+  email: string;
+  status: string;
+  errorMessage?: string;
+}
+
+interface BulkUploadResponseData {
+  totalRows?: number;
+  successCount?: number;
+  failCount?: number;
+  rows?: BulkUploadRow[];
+}
+
 type ModalStep = "upload" | "review" | "sending" | "complete";
 
 // Circular Progress Component
@@ -263,7 +277,7 @@ export function BulkInviteModal({
       const ws = wb.Sheets[wb.SheetNames[0]];
       const rows: Record<string, unknown>[] = XLSX.utils.sheet_to_json(ws);
 
-      const parsed: ParsedCandidateRow[] = rows.map((r) => {
+      const parsed: ParsedCandidateRow[] = rows.map((r): ParsedCandidateRow => {
         const name = String(r["Name"] || r["name"] || r["Full Name"] || r["Candidate Name"] || "");
         const email = String(
           r["Email"] || r["email"] || r["EMAIL"] || r["Email Address"] || r["email address"] || "",
@@ -301,20 +315,12 @@ export function BulkInviteModal({
       formData.append("organisationId", orgId);
 
       const bulkRes = await apiClient.post<{
-        data?: {
-          totalRows?: number;
-          successCount?: number;
-          failCount?: number;
-          rows?: { rowNumber: number; email: string; status: string; errorMessage?: string }[];
-        };
-        totalRows?: number;
-        successCount?: number;
-        failCount?: number;
-      }>("/candidates/bulk-upload", formData, {
+        data?: BulkUploadResponseData;
+      } & BulkUploadResponseData>("/candidates/bulk-upload", formData, {
         headers: { "Content-Type": "multipart/form-data" },
       });
 
-      const resData = bulkRes.data?.data || bulkRes.data || {};
+      const resData: BulkUploadResponseData = bulkRes.data?.data || bulkRes.data || {};
       const total = resData.totalRows || parsed.length;
       const successCount = resData.successCount ?? total;
       const failCount = resData.failCount ?? 0;
@@ -323,7 +329,7 @@ export function BulkInviteModal({
       let failedCount = 0;
 
       if (resData.rows && Array.isArray(resData.rows)) {
-        const rowMap = new Map(resData.rows.map((r) => [r.email.toLowerCase(), r]));
+        const rowMap = new Map<string, BulkUploadRow>(resData.rows.map((r) => [r.email.toLowerCase(), r]));
         parsed.forEach((p) => {
           const matched = rowMap.get(p.email.toLowerCase());
           if (matched) {

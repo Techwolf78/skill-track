@@ -44,7 +44,8 @@ import {
   ParsedQuestionRow,
   TaxonomyContext,
   parseImportRow,
-  generateDynamicExcelTemplate,
+  generateMcqExcelTemplate,
+  generateCodingExcelTemplate,
 } from "@/lib/admin/questionImport";
 import { testService, Question, McqOption, McqType, CreateQuestionRequest } from "@/lib/test-service";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -594,81 +595,24 @@ function ImportQuestionsDialog({
     });
   };
 
-  // Download Dynamic Standard Sample Excel
+  // Download Dynamic MCQ Sample Excel
   const downloadDynamicExcel = () => {
-    const wb = generateDynamicExcelTemplate({
+    const wb = generateMcqExcelTemplate({
       subjects,
       topics: allTopics,
       subtopics: allSubtopics,
     });
-    XLSX.writeFile(wb, "admin_question_template.xlsx");
+    XLSX.writeFile(wb, "mcq_question_template.xlsx");
   };
 
-  // Download Sample Coding Excel
+  // Download Dynamic Coding Sample Excel
   const downloadSampleCodingExcel = () => {
-    const a = document.createElement("a");
-    a.href = "/coding_questions_sample.xlsx";
-    a.download = "coding_questions_sample.xlsx";
-    a.click();
-  };
-
-  // Download Sample JSON
-  const downloadSampleJson = () => {
-    const sampleSub = subjects[0]?.name || "Computer Science";
-    const sampleTop = allTopics.find((t) => subjects[0] && (t.subjectId === subjects[0].id || t.subject?.id === subjects[0].id))?.name || "Data Structures";
-
-    const sampleJson = [
-      {
-        questionType: "MCQ",
-        title: "Thread Safety in Java HashMap",
-        subject: sampleSub,
-        topic: sampleTop,
-        prompt: "Which data structure provides synchronized thread-safe access in Java collections?",
-        difficulty: "MEDIUM",
-        marks: 3,
-        visibility: "ORG_OWNED",
-        mcqType: "SINGLE_CORRECT",
-        multipleCorrect: false,
-        shuffleOptions: true,
-        tags: ["java", "concurrency"],
-        avg_time_seconds: 90,
-        mcqOptions: [
-          { text: "ConcurrentHashMap", isCorrect: true },
-          { text: "HashMap", isCorrect: false },
-          { text: "TreeMap", isCorrect: false },
-          { text: "WeakHashMap", isCorrect: false },
-        ],
-      },
-      {
-        questionType: "CODING",
-        title: "LRU Cache Implementation",
-        subject: sampleSub,
-        topic: sampleTop,
-        prompt: "Design a data structure that follows the constraints of a Least Recently Used (LRU) Cache.\n\nImplement the LRUCache class with get and put methods in O(1) time complexity.",
-        difficulty: "HARD",
-        marks: 10,
-        visibility: "ORG_OWNED",
-        timeLimitSecs: 3,
-        memoryLimitMb: 512,
-        constraints: "1 <= capacity <= 3000\n0 <= key <= 10^4\n0 <= value <= 10^5",
-        sampleExplanation: "LRUCache cache = new LRUCache(2);\ncache.put(1, 1);\ncache.get(1); // returns 1",
-        tags: ["data-structures", "lru-cache", "design"],
-        avg_time_seconds: 1200,
-        languageTemplates: {
-          java: { code: "// Write your code here", lang: "java", langSlug: "java" },
-          python: { code: "# Write your code here", lang: "python", langSlug: "python" },
-        },
-        signatureMetadata: { functionName: "LRUCache" },
-      },
-    ];
-
-    const blob = new Blob([JSON.stringify(sampleJson, null, 2)], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "admin_questions_template.json";
-    a.click();
-    URL.revokeObjectURL(url);
+    const wb = generateCodingExcelTemplate({
+      subjects,
+      topics: allTopics,
+      subtopics: allSubtopics,
+    });
+    XLSX.writeFile(wb, "coding_question_template.xlsx");
   };
 
   // Check metrics for preview table
@@ -708,60 +652,49 @@ function ImportQuestionsDialog({
               Import Questions
             </DialogTitle>
             <p className="text-xs text-slate-500 mt-0.5">
-              Upload an Excel (.xlsx, .csv) or JSON file with intelligent taxonomy mapping & pre-flight verification.
+              Upload an Excel (.xlsx, .xls, .csv) spreadsheet with automatic taxonomy mapping.
             </p>
           </div>
-          <div className="flex flex-wrap items-center gap-1.5 shrink-0">
+          <div className="flex flex-wrap items-center gap-2 shrink-0">
             <button
               onClick={downloadDynamicExcel}
-              className="flex items-center gap-1 px-2 py-1.5 border border-slate-200 text-[11px] font-medium text-slate-700 hover:bg-slate-50 transition-colors cursor-pointer"
-              title="Download Dynamic Excel Template with System Taxonomy Reference"
+              className="flex items-center gap-1.5 px-3 py-1.5 border border-slate-200 text-xs font-medium text-slate-700 hover:bg-slate-50 hover:text-slate-900 transition-colors cursor-pointer"
+              title="Download MCQ Questions Excel Template"
             >
               <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
-              <span>Excel Template</span>
+              <span>MCQ Template</span>
             </button>
             <button
               onClick={downloadSampleCodingExcel}
-              className="flex items-center gap-1 px-2 py-1.5 border border-slate-200 text-[11px] font-medium text-slate-700 hover:bg-slate-50 transition-colors cursor-pointer"
-              title="Download Sample Coding Questions Excel Template"
+              className="flex items-center gap-1.5 px-3 py-1.5 border border-slate-200 text-xs font-medium text-slate-700 hover:bg-slate-50 hover:text-slate-900 transition-colors cursor-pointer"
+              title="Download Coding Questions Excel Template"
             >
-              <FileSpreadsheet className="w-3.5 h-3.5 text-blue-600" />
-              <span>Coding Samples</span>
-            </button>
-            <button
-              onClick={downloadSampleJson}
-              className="flex items-center gap-1 px-2 py-1.5 border border-slate-200 text-[11px] font-medium text-slate-700 hover:bg-slate-50 transition-colors cursor-pointer"
-              title="Download Sample JSON Template"
-            >
-              <FileCode className="w-3.5 h-3.5 text-amber-600" />
-              <span>JSON</span>
+              <FileSpreadsheet className="w-3.5 h-3.5 text-[#3b4992]" />
+              <span>Coding Template</span>
             </button>
           </div>
         </DialogHeader>
 
-        {/* 1. Cascading Batch Hierarchy Selector */}
-        <div className="p-3.5 bg-slate-50 border border-slate-200/80 rounded-lg space-y-2.5">
+        {/* 1. Batch Hierarchy Selector */}
+        <div className="p-3.5 bg-slate-50/70 border border-slate-200 rounded space-y-2.5">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-              <FolderTree className="w-3.5 h-3.5 text-indigo-600" />
-              Batch Hierarchy Defaults (Fallback Selector)
-            </span>
-            <span className="text-[11px] text-slate-500 hidden sm:inline">
-              Auto-inherited by rows without specific taxonomy
+            <span className="text-xs font-semibold text-slate-800 flex items-center gap-1.5">
+              <FolderTree className="w-3.5 h-3.5 text-[#3b4992]" />
+              Default Hierarchy
             </span>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             {/* Target Subject (Required) */}
             <div className="space-y-1">
-              <label className="text-[11px] font-semibold text-slate-700 flex items-center gap-1">
-                <span>Target Subject</span>
+              <label className="text-xs font-medium text-slate-700 flex items-center gap-1">
+                <span>Subject</span>
                 <span className="text-rose-500">*</span>
               </label>
               <select
                 value={defaultSubjectId}
                 onChange={(e) => handleDefaultSubjectChange(e.target.value)}
-                className="w-full bg-white border border-slate-200 rounded px-2.5 py-1.5 text-xs text-slate-800 focus:outline-none focus:ring-1 focus:ring-indigo-500 cursor-pointer"
+                className="w-full bg-white border border-slate-200 rounded px-2.5 py-1.5 text-xs text-slate-800 focus:outline-none focus:ring-1 focus:ring-indigo-500 cursor-pointer h-8"
               >
                 {subjects.map((s) => (
                   <option key={s.id} value={s.id}>
@@ -773,15 +706,15 @@ function ImportQuestionsDialog({
 
             {/* Target Topic (Optional) */}
             <div className="space-y-1">
-              <label className="text-[11px] font-semibold text-slate-700">
-                Target Topic <span className="text-[10px] text-slate-400 font-normal">(Optional)</span>
+              <label className="text-xs font-medium text-slate-700">
+                Topic <span className="text-[10px] text-slate-400 font-normal">(Optional)</span>
               </label>
               <select
                 value={defaultTopicId}
                 onChange={(e) => handleDefaultTopicChange(e.target.value)}
-                className="w-full bg-white border border-slate-200 rounded px-2.5 py-1.5 text-xs text-slate-800 focus:outline-none focus:ring-1 focus:ring-indigo-500 cursor-pointer"
+                className="w-full bg-white border border-slate-200 rounded px-2.5 py-1.5 text-xs text-slate-800 focus:outline-none focus:ring-1 focus:ring-indigo-500 cursor-pointer h-8"
               >
-                <option value="">-- All Topics / Unassigned --</option>
+                <option value="">-- All Topics --</option>
                 {availableDefaultTopics.map((t) => (
                   <option key={t.id} value={t.id}>
                     {t.name}
@@ -792,16 +725,16 @@ function ImportQuestionsDialog({
 
             {/* Target Subtopic (Optional) */}
             <div className="space-y-1">
-              <label className="text-[11px] font-semibold text-slate-700">
-                Target Subtopic <span className="text-[10px] text-slate-400 font-normal">(Optional)</span>
+              <label className="text-xs font-medium text-slate-700">
+                Subtopic <span className="text-[10px] text-slate-400 font-normal">(Optional)</span>
               </label>
               <select
                 value={defaultSubtopicId}
                 disabled={!defaultTopicId || availableDefaultSubtopics.length === 0}
                 onChange={(e) => handleDefaultSubtopicChange(e.target.value)}
-                className="w-full bg-white border border-slate-200 rounded px-2.5 py-1.5 text-xs text-slate-800 focus:outline-none focus:ring-1 focus:ring-indigo-500 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full bg-white border border-slate-200 rounded px-2.5 py-1.5 text-xs text-slate-800 focus:outline-none focus:ring-1 focus:ring-indigo-500 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed h-8"
               >
-                <option value="">-- All Subtopics / Unassigned --</option>
+                <option value="">-- All Subtopics --</option>
                 {availableDefaultSubtopics.map((st) => (
                   <option key={st.id} value={st.id}>
                     {st.name}
@@ -812,69 +745,28 @@ function ImportQuestionsDialog({
           </div>
         </div>
 
-        {/* Tab Selection */}
-        <div className="flex items-center gap-2 border-b border-slate-100 pb-2.5">
-          <button
-            onClick={() => setActiveTab("FILE")}
-            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold transition-all cursor-pointer ${
-              activeTab === "FILE"
-                ? "bg-indigo-50 text-indigo-700 border border-indigo-200"
-                : "text-slate-600 hover:bg-slate-100"
-            }`}
-          >
-            <Upload className="w-3.5 h-3.5" />
-            <span>Upload File (.xlsx / .csv / .json)</span>
-          </button>
-          <button
-            onClick={() => setActiveTab("JSON")}
-            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold transition-all cursor-pointer ${
-              activeTab === "JSON"
-                ? "bg-indigo-50 text-indigo-700 border border-indigo-200"
-                : "text-slate-600 hover:bg-slate-100"
-            }`}
-          >
-            <FileCode className="w-3.5 h-3.5" />
-            <span>Direct JSON Editor</span>
-          </button>
-        </div>
-
-        {/* Tab Content */}
-        {activeTab === "FILE" ? (
-          <div className="w-full">
-            <label className="flex flex-col items-center justify-center p-5 sm:p-6 border-2 border-dashed border-slate-200 hover:border-indigo-400 bg-slate-50/50 hover:bg-slate-50 cursor-pointer transition-colors w-full">
-              <Upload className="w-7 h-7 text-indigo-600 mb-1.5" />
-              <p className="text-xs font-semibold text-slate-700 text-center truncate max-w-full px-2">
-                {fileName ? fileName : "Click to browse or drag & drop question spreadsheet"}
-              </p>
-              <p className="text-[11px] text-slate-400 mt-0.5 text-center">
-                Supports Excel (.xlsx, .xls, .csv) and JSON (.json) with case-insensitive taxonomy matching
-              </p>
-              <input
-                type="file"
-                accept=".xlsx,.xls,.csv,.json"
-                onChange={handleFileUpload}
-                className="hidden"
-              />
-            </label>
-          </div>
-        ) : (
-          <div className="space-y-1.5 w-full">
-            <label className="block text-xs font-semibold text-slate-700">
-              Paste Questions JSON Array:
-            </label>
-            <textarea
-              rows={7}
-              value={jsonText}
-              onChange={(e) => handleJsonChange(e.target.value)}
-              placeholder="[ { &quot;questionType&quot;: &quot;MCQ&quot;, &quot;prompt&quot;: &quot;...&quot;, &quot;title&quot;: &quot;...&quot; } ]"
-              className="w-full font-mono text-xs p-3 border border-slate-200 bg-slate-50 focus:outline-none focus:bg-white focus:ring-1 focus:ring-indigo-400 box-border"
+        {/* Upload File Zone */}
+        <div className="w-full">
+          <label className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-slate-200 hover:border-indigo-400 bg-slate-50/50 hover:bg-slate-50 cursor-pointer transition-colors w-full rounded">
+            <Upload className="w-6 h-6 text-[#3b4992] mb-1.5" />
+            <p className="text-xs font-semibold text-slate-700 text-center truncate max-w-full px-2">
+              {fileName ? fileName : "Click to browse or drag & drop question spreadsheet"}
+            </p>
+            <p className="text-[11px] text-slate-400 mt-0.5 text-center">
+              Supports Excel (.xlsx, .xls, .csv) spreadsheets
+            </p>
+            <input
+              type="file"
+              accept=".xlsx,.xls,.csv"
+              onChange={handleFileUpload}
+              className="hidden"
             />
-          </div>
-        )}
+          </label>
+        </div>
 
         {/* Error Alert */}
         {parseError && (
-          <div className="flex items-center gap-2 p-3 bg-rose-50 border border-rose-200 text-rose-700 text-xs">
+          <div className="flex items-center gap-2 p-3 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded">
             <AlertCircle className="w-4 h-4 shrink-0" />
             <span className="flex-1 break-words">{parseError}</span>
           </div>
@@ -886,14 +778,14 @@ function ImportQuestionsDialog({
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="flex items-center gap-2">
                 <span className="text-xs font-bold text-slate-800">
-                  Pre-Flight Mapping & Preview ({totalRows} Questions)
+                  Import Preview ({totalRows} Questions)
                 </span>
-                <Badge variant="outline" className="text-[10px] text-emerald-600 border-emerald-500/20 bg-emerald-500/5">
-                  ✅ {matchedCount} Ready
+                <Badge variant="outline" className="text-[10px] text-emerald-700 border-emerald-200 bg-emerald-50">
+                  {matchedCount} Ready
                 </Badge>
                 {unmatchedCount > 0 && (
-                  <Badge variant="outline" className="text-[10px] text-amber-600 border-amber-500/20 bg-amber-500/10 animate-pulse">
-                    ⚠️ {unmatchedCount} Require Mapping
+                  <Badge variant="outline" className="text-[10px] text-slate-700 border-slate-300 bg-slate-100">
+                    {unmatchedCount} Require Mapping
                   </Badge>
                 )}
               </div>
@@ -903,10 +795,10 @@ function ImportQuestionsDialog({
             </div>
 
             {unmatchedCount > 0 && (
-              <div className="flex items-center gap-2 p-2.5 bg-amber-50 border border-amber-200 rounded text-amber-700 text-xs">
-                <AlertCircle className="w-4 h-4 shrink-0" />
+              <div className="flex items-center gap-2 p-2.5 bg-slate-50 border border-slate-200 rounded text-slate-700 text-xs">
+                <AlertCircle className="w-4 h-4 text-slate-500 shrink-0" />
                 <span>
-                  {unmatchedCount} question(s) contain topic/subject names not found in the database. Use the inline dropdowns below to map them.
+                  {unmatchedCount} question(s) contain topic/subject names not found in the database. Use the dropdowns below to map them.
                 </span>
               </div>
             )}
@@ -918,8 +810,8 @@ function ImportQuestionsDialog({
                     <TableHead className="w-8 py-2 text-[11px]">#</TableHead>
                     <TableHead className="w-16 py-2 text-[11px]">Type</TableHead>
                     <TableHead className="py-2 text-[11px] min-w-[160px]">Title / Prompt</TableHead>
-                    <TableHead className="py-2 text-[11px] min-w-[120px]">Detected Subject</TableHead>
-                    <TableHead className="py-2 text-[11px] min-w-[180px]">Detected Topic</TableHead>
+                    <TableHead className="py-2 text-[11px] min-w-[120px]">Subject</TableHead>
+                    <TableHead className="py-2 text-[11px] min-w-[180px]">Topic</TableHead>
                     <TableHead className="py-2 text-[11px] min-w-[150px]">Subtopic</TableHead>
                     <TableHead className="w-20 py-2 text-[11px] text-right">Status</TableHead>
                   </TableRow>
@@ -941,17 +833,17 @@ function ImportQuestionsDialog({
                       row.taxonomy.subjectStatus === "UNMATCHED";
 
                     return (
-                      <TableRow key={row.id} className={hasIssue ? "bg-amber-50/60 hover:bg-amber-50" : "hover:bg-slate-50/70"}>
+                      <TableRow key={row.id} className={hasIssue ? "bg-slate-50/90 hover:bg-slate-100/70" : "hover:bg-slate-50/70"}>
                         <TableCell className="py-2 text-slate-400 font-mono text-[11px]">
                           {idx + 1}
                         </TableCell>
                         <TableCell className="py-2">
                           <Badge
                             variant="secondary"
-                            className={`text-[9px] px-1 py-0 font-medium ${
+                            className={`text-[9px] px-1.5 py-0 font-medium ${
                               row.question.questionType === "CODING"
-                                ? "bg-blue-50 text-blue-600 border border-blue-200"
-                                : "bg-emerald-50 text-emerald-600 border border-emerald-200"
+                                ? "bg-slate-100 text-slate-700 border border-slate-200"
+                                : "bg-slate-100 text-slate-700 border border-slate-200"
                             }`}
                           >
                             {row.question.questionType}
@@ -971,7 +863,7 @@ function ImportQuestionsDialog({
                               <span className="text-[10px] text-slate-400">(Inherited)</span>
                             )}
                             {row.taxonomy.subjectStatus === "UNMATCHED" && (
-                              <span className="text-[10px] text-amber-600">
+                              <span className="text-[10px] text-slate-500">
                                 Unmatched ("{row.taxonomy.rawSubject}")
                               </span>
                             )}
@@ -980,20 +872,19 @@ function ImportQuestionsDialog({
                         <TableCell className="py-2">
                           {row.taxonomy.topicStatus === "MATCHED" ? (
                             <div className="flex items-center gap-1.5">
-                              <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200 text-[10px] py-0 font-normal">
-                                {row.taxonomy.topicName} (Matched)
-                              </Badge>
+                              <span className="text-xs text-slate-700">
+                                {row.taxonomy.topicName}
+                              </span>
                             </div>
                           ) : row.taxonomy.topicStatus === "UNMATCHED" ? (
                             <div className="space-y-1">
-                              <div className="text-[10px] text-amber-600 font-semibold flex items-center gap-1">
-                                <AlertCircle className="w-3 h-3 shrink-0" />
+                              <div className="text-[10px] text-slate-600 font-medium flex items-center gap-1">
                                 <span>Unmatched ("{row.taxonomy.rawTopic}")</span>
                               </div>
                               <select
                                 value={row.taxonomy.topicId || ""}
                                 onChange={(e) => handleRowTopicChange(idx, e.target.value)}
-                                className="w-full bg-white border border-amber-300 rounded px-2 py-0.5 text-xs text-slate-800 focus:ring-1 focus:ring-amber-500 cursor-pointer"
+                                className="w-full bg-white border border-slate-300 rounded px-2 py-0.5 text-xs text-slate-800 focus:ring-1 focus:ring-indigo-500 cursor-pointer"
                               >
                                 <option value="">-- Map to Topic --</option>
                                 {rowSubjectTopics.map((t) => (
@@ -1014,7 +905,7 @@ function ImportQuestionsDialog({
                             <select
                               value={row.taxonomy.topicId || ""}
                               onChange={(e) => handleRowTopicChange(idx, e.target.value)}
-                              className="w-full bg-slate-50 border border-slate-200 rounded px-1.5 py-0.5 text-[11px] text-slate-600 cursor-pointer"
+                              className="w-full bg-white border border-slate-200 rounded px-1.5 py-0.5 text-[11px] text-slate-600 cursor-pointer"
                             >
                               <option value="">-- Assign Topic --</option>
                               {rowSubjectTopics.map((t) => (
@@ -1027,18 +918,18 @@ function ImportQuestionsDialog({
                         </TableCell>
                         <TableCell className="py-2">
                           {row.taxonomy.subtopicStatus === "MATCHED" ? (
-                            <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200 text-[10px] py-0 font-normal">
+                            <span className="text-xs text-slate-700">
                               {row.taxonomy.subtopicName}
-                            </Badge>
+                            </span>
                           ) : row.taxonomy.subtopicStatus === "UNMATCHED" ? (
                             <div className="space-y-1">
-                              <div className="text-[10px] text-amber-600 font-semibold">
+                              <div className="text-[10px] text-slate-600 font-medium">
                                 Unmatched ("{row.taxonomy.rawSubtopic}")
                               </div>
                               <select
                                 value={row.taxonomy.subtopicId || ""}
                                 onChange={(e) => handleRowSubtopicChange(idx, e.target.value)}
-                                className="w-full bg-white border border-amber-300 rounded px-2 py-0.5 text-xs text-slate-800 focus:ring-1 focus:ring-amber-500 cursor-pointer"
+                                className="w-full bg-white border border-slate-300 rounded px-2 py-0.5 text-xs text-slate-800 focus:ring-1 focus:ring-indigo-500 cursor-pointer"
                               >
                                 <option value="">-- Map Subtopic --</option>
                                 {rowTopicSubtopics.map((st) => (
@@ -1056,7 +947,7 @@ function ImportQuestionsDialog({
                             <select
                               value={row.taxonomy.subtopicId || ""}
                               onChange={(e) => handleRowSubtopicChange(idx, e.target.value)}
-                              className="w-full bg-slate-50 border border-slate-200 rounded px-1.5 py-0.5 text-[11px] text-slate-600 cursor-pointer"
+                              className="w-full bg-white border border-slate-200 rounded px-1.5 py-0.5 text-[11px] text-slate-600 cursor-pointer"
                             >
                               <option value="">-- Subtopic --</option>
                               {rowTopicSubtopics.map((st) => (
@@ -1071,12 +962,12 @@ function ImportQuestionsDialog({
                         </TableCell>
                         <TableCell className="py-2 text-right">
                           {hasIssue ? (
-                            <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200 text-[10px] font-semibold whitespace-nowrap">
-                              ⚠️ Action
+                            <Badge variant="outline" className="bg-slate-100 text-slate-700 border-slate-300 text-[10px] font-semibold whitespace-nowrap">
+                              Action Required
                             </Badge>
                           ) : (
                             <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200 text-[10px] font-semibold whitespace-nowrap">
-                              ✅ Ready
+                              Ready
                             </Badge>
                           )}
                         </TableCell>
@@ -1093,14 +984,14 @@ function ImportQuestionsDialog({
         <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
           <button
             onClick={onClose}
-            className="px-4 py-2 border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition-colors cursor-pointer"
+            className="px-4 py-2 border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition-colors cursor-pointer rounded"
           >
             Cancel
           </button>
           <button
             onClick={handleBulkSubmit}
             disabled={bulkCreateMutation.isPending || parsedRows.length === 0}
-            className="px-4 py-2 bg-[#6366F1] hover:bg-[#4F46E5] disabled:opacity-50 text-white text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-sm cursor-pointer"
+            className="px-4 py-2 bg-[#3b4992] hover:bg-[#2f3b75] disabled:opacity-50 text-white text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-sm cursor-pointer rounded"
           >
             {bulkCreateMutation.isPending ? (
               <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Importing...</>

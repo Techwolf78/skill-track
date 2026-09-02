@@ -40,6 +40,8 @@ import {
   User as UserIcon,
   CheckCircle2,
   ShieldAlert,
+  Settings,
+  GripVertical,
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
@@ -281,6 +283,8 @@ export default function NewAdminTestEdit() {
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
   const [addSectionOpen, setAddSectionOpen] = useState(false);
   const [newSectionName, setNewSectionName] = useState("");
+  const [editingSectionName, setEditingSectionName] = useState<string | null>(null);
+  const [editingSectionValue, setEditingSectionValue] = useState("");
   const [movingSectionFor, setMovingSectionFor] = useState<string | null>(null); // tq.id being moved
 
   // General Settings Form States
@@ -698,6 +702,53 @@ export default function NewAdminTestEdit() {
     setNewSectionName("");
     setAddSectionOpen(false);
     toast.success(`Section "${name}" created`);
+  };
+
+  const handleRenameSection = async (oldName: string, newName: string) => {
+    const trimmed = newName.trim();
+    if (!trimmed) {
+      toast.error("Section name cannot be empty");
+      return;
+    }
+    if (trimmed === oldName) {
+      setEditingSectionName(null);
+      setEditingSectionValue("");
+      return;
+    }
+    if (sectionOrder.includes(trimmed)) {
+      toast.error(`Section "${trimmed}" already exists`);
+      return;
+    }
+
+    const sectionQs = groupedQuestions[oldName] || [];
+    try {
+      if (sectionQs.length > 0) {
+        await Promise.all(
+          sectionQs.map((tq) => testService.updateTestQuestion(tq.id, { sectionName: trimmed }))
+        );
+      }
+      setGroupedQuestions((prev) => {
+        const next = { ...prev };
+        const updated = (next[oldName] || []).map((tq) => ({ ...tq, sectionName: trimmed }));
+        delete next[oldName];
+        next[trimmed] = updated;
+        return next;
+      });
+      setSectionOrder((prev) => prev.map((s) => (s === oldName ? trimmed : s)));
+      setCollapsedSections((prev) => {
+        const next = new Set(prev);
+        if (next.has(oldName)) {
+          next.delete(oldName);
+          next.add(trimmed);
+        }
+        return next;
+      });
+      setEditingSectionName(null);
+      setEditingSectionValue("");
+      toast.success(`Section renamed to "${trimmed}"`);
+    } catch (err: any) {
+      toast.error("Failed to rename section: " + (err.message || "Unknown error"));
+    }
   };
 
   const handleDeleteSection = async (sectionName: string) => {
@@ -2111,50 +2162,80 @@ export default function NewAdminTestEdit() {
         <div>
           {/* ── PROBLEMS TAB ── */}
           {activeTab === "PROBLEMS" && (
-            <div className="border border-slate-200/90 shadow-sm bg-white overflow-hidden">
+            <div className="space-y-4">
               {/* Header Bar */}
-              <div className="p-4 bg-white flex items-center justify-between border-b border-slate-100">
+              <div className="p-4 bg-white border border-slate-200/90 shadow-sm flex items-center justify-between">
                 <span className="text-xs font-semibold text-slate-700">Problems</span>
                 <div className="flex items-center gap-2">
-                  {/* Add Section */}
-                  {addSectionOpen ? (
-                    <div className="flex items-center gap-1.5">
+                  {/* Inline Add Section input if active */}
+                  {addSectionOpen && (
+                    <div className="flex items-center gap-1.5 mr-2">
                       <input
                         autoFocus
                         type="text"
                         value={newSectionName}
                         onChange={(e) => setNewSectionName(e.target.value)}
-                        onKeyDown={(e) => { if (e.key === "Enter") handleConfirmNewSection(); if (e.key === "Escape") { setAddSectionOpen(false); setNewSectionName(""); } }}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") handleConfirmNewSection();
+                          if (e.key === "Escape") {
+                            setAddSectionOpen(false);
+                            setNewSectionName("");
+                          }
+                        }}
                         placeholder="Section name…"
-                        className="text-xs border border-indigo-300 rounded px-2 py-1 focus:outline-none focus:border-indigo-500 w-36"
+                        className="text-xs border border-indigo-300 rounded px-2.5 py-1 focus:outline-none focus:border-indigo-500 w-44"
                       />
-                      <button onClick={handleConfirmNewSection} className="text-xs px-2 py-1 bg-indigo-600 text-white rounded hover:bg-indigo-700 cursor-pointer">✓</button>
-                      <button onClick={() => { setAddSectionOpen(false); setNewSectionName(""); }} className="text-xs px-2 py-1 text-slate-500 hover:text-slate-800 cursor-pointer">✕</button>
+                      <button
+                        onClick={handleConfirmNewSection}
+                        className="text-xs px-2.5 py-1 bg-indigo-600 text-white rounded hover:bg-indigo-700 cursor-pointer font-medium"
+                      >
+                        Add
+                      </button>
+                      <button
+                        onClick={() => {
+                          setAddSectionOpen(false);
+                          setNewSectionName("");
+                        }}
+                        className="text-xs px-2 py-1 text-slate-500 hover:text-slate-800 cursor-pointer"
+                      >
+                        ✕
+                      </button>
                     </div>
-                  ) : (
-                    <button
-                      onClick={() => setAddSectionOpen(true)}
-                      className="text-xs px-2.5 py-1 border border-slate-200 text-slate-600 hover:border-indigo-400 hover:text-indigo-700 transition-colors cursor-pointer flex items-center gap-1"
-                      title="Add a section"
-                    >
-                      <Plus className="w-3 h-3" />
-                      <span>Add Section</span>
-                    </button>
                   )}
-                  {/* Add Problem */}
-                  <button
-                    onClick={() => navigate(id ? `/admin/tests/${id}/add-problems` : "/admin/library")}
-                    className="p-1 text-indigo-700 hover:text-indigo-900 transition-colors cursor-pointer"
-                    title="Add problem from library"
-                  >
-                    <Plus className="w-4 h-4" />
-                  </button>
+
+                  {/* Header Plus Action Dropdown */}
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <button
+                        className="p-1.5 text-indigo-700 hover:text-indigo-900 hover:bg-indigo-50/80 rounded transition-colors cursor-pointer flex items-center justify-center border border-indigo-200/60"
+                        title="Add problems or section"
+                      >
+                        <Plus className="w-4 h-4" />
+                      </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-56 bg-white border border-slate-200 shadow-xl p-1 text-xs">
+                      <DropdownMenuItem
+                        onClick={() => navigate(id ? `/admin/tests/${id}/add-problems` : "/admin/library")}
+                        className="cursor-pointer py-2 px-3 flex items-center gap-2.5 text-slate-700 hover:bg-slate-50 font-medium"
+                      >
+                        <Plus className="w-4 h-4 text-slate-500" />
+                        <span>Add problems in this section</span>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => setAddSectionOpen(true)}
+                        className="cursor-pointer py-2 px-3 flex items-center gap-2.5 text-slate-700 hover:bg-slate-50 font-medium"
+                      >
+                        <LayoutGrid className="w-4 h-4 text-slate-500" />
+                        <span>Add a new section in test</span>
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </div>
               </div>
 
               {/* Problems — section-grouped list */}
               {questions.length === 0 && sectionOrder.length === 0 ? (
-                <div className="py-12 px-4 text-center text-slate-400 text-xs space-y-2">
+                <div className="bg-white border border-slate-200/90 shadow-sm py-12 px-4 text-center text-slate-400 text-xs space-y-2">
                   <p>No problems added to this test yet.</p>
                   <button
                     onClick={() => navigate(id ? `/admin/tests/${id}/add-problems` : "/admin/library")}
@@ -2165,7 +2246,7 @@ export default function NewAdminTestEdit() {
                   </button>
                 </div>
               ) : (
-                <div>
+                <div className="space-y-4">
                   {sectionOrder
                     .filter((section) => {
                       if (section === "Ungrouped") {
@@ -2176,141 +2257,261 @@ export default function NewAdminTestEdit() {
                       return true;
                     })
                     .map((section) => {
-                    const sectionQs = groupedQuestions[section] || [];
-                    const isCollapsed = collapsedSections.has(section);
-                    const answeredHere = sectionQs.length;
-                    return (
-                      <div key={section} className="border-b border-slate-100 last:border-b-0">
-                        {/* Section Header */}
-                        <div className="flex items-center justify-between px-5 py-3 bg-slate-50/70 hover:bg-slate-100/60 transition-colors">
-                          <button
-                            onClick={() => setCollapsedSections((prev) => {
-                              const next = new Set(prev);
-                              if (next.has(section)) next.delete(section); else next.add(section);
-                              return next;
-                            })}
-                            className="flex items-center gap-2 text-xs font-semibold text-slate-700 cursor-pointer flex-1 text-left"
-                          >
-                            {isCollapsed ? <ChevronRight className="w-3.5 h-3.5 text-slate-400" /> : <ChevronDown className="w-3.5 h-3.5 text-slate-400" />}
-                            <span>{section}</span>
-                            <span className="ml-1 px-1.5 py-0.5 bg-slate-200 text-slate-600 rounded text-[10px] font-bold">{answeredHere}</span>
-                          </button>
-                          <div className="flex items-center gap-2">
-                            <button
-                              onClick={() => navigate(`/admin/tests/${id}/add-problems?section=${encodeURIComponent(section)}`)}
-                              className="flex items-center gap-1 text-[11px] font-medium text-indigo-600 hover:text-indigo-800 transition-colors cursor-pointer px-2 py-1 rounded bg-indigo-50/80 hover:bg-indigo-100"
-                              title={`Add questions directly to ${section}`}
-                            >
-                              <Plus className="w-3 h-3" />
-                              <span>Add Here</span>
-                            </button>
-                            {section !== "Ungrouped" && (
-                              <button
-                                onClick={() => handleDeleteSection(section)}
-                                className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded transition-colors cursor-pointer"
-                                title={`Delete section "${section}"`}
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
-                            )}
-                          </div>
-                        </div>
+                      const sectionQs = groupedQuestions[section] || [];
+                      const isCollapsed = collapsedSections.has(section);
+                      const totalSectionCount = sectionQs.length;
+                      const isEditingThisSection = editingSectionName === section;
 
-                        {/* Questions in this section */}
-                        {!isCollapsed && (
-                          <div className="divide-y divide-slate-50">
-                            {sectionQs.length === 0 ? (
-                              <div className="px-8 py-3 text-xs text-slate-400 italic">No questions in this section yet.</div>
-                            ) : (
-                              sectionQs.map((tq, index) => {
-                                const q = tq.question;
-                                const isCoding = (q?.questionType ?? "").toUpperCase() === "CODING";
-                                const qTitle = q?.title || `Question ${index + 1}`;
-                                const marks = tq.marks ?? q?.marks ?? 10;
-                                const difficulty = q?.difficulty || "MEDIUM";
-                                const mcqSubtype = q?.mcqType ? fmtMcqType(q.mcqType) : undefined;
-                                const testCasesCount = isCoding
-                                  ? `${(q as any)?.testCases?.length || (q as any)?.testCaseCount || 0} test cases`
-                                  : undefined;
-
-                                return (
-                                  <div
-                                    key={tq.id || index}
-                                    className="pl-9 pr-5 py-4 hover:bg-slate-50/60 transition-colors space-y-1.5"
+                      return (
+                        <div
+                          key={section}
+                          className="bg-white border border-slate-200/90 shadow-sm overflow-hidden"
+                        >
+                          {/* 1. Section Header Bar */}
+                          <div className="flex items-center justify-between px-5 py-3.5 bg-white border-b border-slate-100">
+                            {/* Left: Section Title */}
+                            <div className="flex items-center gap-2.5 flex-1 min-w-0">
+                              {isEditingThisSection ? (
+                                <div className="flex items-center gap-1.5">
+                                  <input
+                                    autoFocus
+                                    type="text"
+                                    value={editingSectionValue}
+                                    onChange={(e) => setEditingSectionValue(e.target.value)}
+                                    onKeyDown={(e) => {
+                                      if (e.key === "Enter") handleRenameSection(section, editingSectionValue);
+                                      if (e.key === "Escape") {
+                                        setEditingSectionName(null);
+                                        setEditingSectionValue("");
+                                      }
+                                    }}
+                                    className="text-sm font-semibold text-slate-800 border border-indigo-400 rounded px-2 py-0.5 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                                  />
+                                  <button
+                                    onClick={() => handleRenameSection(section, editingSectionValue)}
+                                    className="text-xs px-2 py-1 bg-indigo-600 text-white rounded hover:bg-indigo-700 cursor-pointer font-medium"
                                   >
-                                    <div className="flex items-start justify-between gap-4">
-                                      <h3 className="font-bold text-slate-900 text-sm leading-snug">{qTitle}</h3>
+                                    Save
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      setEditingSectionName(null);
+                                      setEditingSectionValue("");
+                                    }}
+                                    className="text-xs px-1.5 py-1 text-slate-500 hover:text-slate-800 cursor-pointer"
+                                  >
+                                    ✕
+                                  </button>
+                                </div>
+                              ) : (
+                                <span className="text-sm font-semibold text-slate-800 truncate">
+                                  {section}
+                                </span>
+                              )}
+                            </div>
 
-                                      <DropdownMenu>
-                                        <DropdownMenuTrigger asChild>
-                                          <button className="p-1 text-slate-400 hover:text-slate-700 transition-colors cursor-pointer">
-                                            <MoreVertical className="w-4 h-4" />
-                                          </button>
-                                        </DropdownMenuTrigger>
-                                        <DropdownMenuContent align="end" className="w-52 bg-white border border-slate-200 shadow-xl p-1 text-xs">
-                                          <DropdownMenuItem
-                                            onClick={() => { if (q) navigate(`/admin/questions/preview/${q.id}`, { state: q }); }}
-                                            className="cursor-pointer py-1.5 px-2.5 flex items-center gap-2 text-slate-700 hover:bg-slate-50"
-                                          >
-                                            <ExternalLink className="w-3.5 h-3.5 text-slate-500" />
-                                            <span>Preview Problem</span>
-                                          </DropdownMenuItem>
-                                          {/* Move to Section */}
-                                          {sectionOrder.filter((s) => s !== section).length > 0 && (
-                                            <>
-                                              <DropdownMenuSeparator className="bg-slate-100" />
-                                              <DropdownMenuLabel className="text-[10px] text-slate-400 px-2.5 py-1">Move to section</DropdownMenuLabel>
-                                              {sectionOrder.filter((s) => s !== section).map((targetSection) => (
-                                                <DropdownMenuItem
-                                                  key={targetSection}
-                                                  onClick={() => handleMoveToSection(tq, targetSection)}
-                                                  className="cursor-pointer py-1.5 px-2.5 text-slate-700 hover:bg-slate-50"
-                                                >
-                                                  → {targetSection}
-                                                </DropdownMenuItem>
-                                              ))}
-                                            </>
-                                          )}
-                                          <DropdownMenuSeparator className="bg-slate-100" />
-                                          <DropdownMenuItem
-                                            onClick={() => handleRemoveQuestion(tq.id)}
-                                            className="cursor-pointer py-1.5 px-2.5 flex items-center gap-2 text-red-600 hover:bg-red-50"
-                                          >
-                                            <Trash2 className="w-3.5 h-3.5 text-red-500" />
-                                            <span>Remove from Test</span>
-                                          </DropdownMenuItem>
-                                        </DropdownMenuContent>
-                                      </DropdownMenu>
-                                    </div>
+                            {/* Right Actions: Settings Dropdown, Plus, Collapse/Expand Toggle */}
+                            <div className="flex items-center gap-3 shrink-0 ml-3">
+                              {/* Settings Menu */}
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <button
+                                    className="p-1 text-[#3b4992] hover:text-indigo-900 transition-colors cursor-pointer"
+                                    title="Section options"
+                                  >
+                                    <Settings className="w-4 h-4" />
+                                  </button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end" className="w-48 bg-white border border-slate-200 shadow-xl p-1 text-xs">
+                                  <DropdownMenuItem
+                                    onClick={() => {
+                                      setEditingSectionName(section);
+                                      setEditingSectionValue(section);
+                                    }}
+                                    className="cursor-pointer py-1.5 px-2.5 flex items-center gap-2 text-slate-700 hover:bg-slate-50"
+                                  >
+                                    <Edit className="w-3.5 h-3.5 text-slate-500" />
+                                    <span>Edit Section Name</span>
+                                  </DropdownMenuItem>
+                                  {section !== "Ungrouped" && (
+                                    <>
+                                      <DropdownMenuSeparator className="bg-slate-100" />
+                                      <DropdownMenuItem
+                                        onClick={() => handleDeleteSection(section)}
+                                        className="cursor-pointer py-1.5 px-2.5 flex items-center gap-2 text-red-600 hover:bg-red-50"
+                                      >
+                                        <Trash2 className="w-3.5 h-3.5 text-red-500" />
+                                        <span>Delete Section</span>
+                                      </DropdownMenuItem>
+                                    </>
+                                  )}
+                                </DropdownMenuContent>
+                              </DropdownMenu>
 
-                                    {/* Metadata row */}
-                                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-500 font-medium">
-                                      <div className="flex items-center gap-1 font-mono text-slate-400">
-                                        <span>=</span>
-                                        <span className="text-slate-600 font-sans">{isCoding ? "Coding" : "MCQ"}</span>
-                                      </div>
-                                      {!isCoding && mcqSubtype && (
-                                        <div className="flex items-center gap-1"><span className="text-slate-400 text-[11px]">⊙</span><span>{mcqSubtype}</span></div>
-                                      )}
-                                      {difficulty && (
-                                        <div className="flex items-center gap-1"><span className="text-slate-400 text-[10px]">❖</span><span>{fmt(difficulty)}</span></div>
-                                      )}
-                                      {marks !== undefined && (
-                                        <div className="flex items-center gap-1"><LayoutGrid className="w-3 h-3 text-slate-400" /><span>{marks} points</span></div>
-                                      )}
-                                      {testCasesCount && (
-                                        <div className="flex items-center gap-1"><span className="text-slate-400 font-mono text-[11px]">⊘</span><span>{testCasesCount}</span></div>
-                                      )}
-                                    </div>
-                                  </div>
-                                );
-                              })
-                            )}
+                              {/* Plus Icon: Add question to this section */}
+                              <button
+                                onClick={() => navigate(`/admin/tests/${id}/add-problems?section=${encodeURIComponent(section)}`)}
+                                className="p-1 text-[#3b4992] hover:text-indigo-900 transition-colors cursor-pointer"
+                                title={`Add problems to ${section}`}
+                              >
+                                <Plus className="w-4 h-4" />
+                              </button>
+
+                              {/* Collapse / Expand Toggle Button */}
+                              <button
+                                onClick={() =>
+                                  setCollapsedSections((prev) => {
+                                    const next = new Set(prev);
+                                    if (next.has(section)) next.delete(section);
+                                    else next.add(section);
+                                    return next;
+                                  })
+                                }
+                                className="p-1 text-[#3b4992] hover:text-indigo-900 transition-colors cursor-pointer"
+                                title={isCollapsed ? "Expand section" : "Collapse section"}
+                              >
+                                {isCollapsed ? (
+                                  <ChevronDown className="w-4 h-4" />
+                                ) : (
+                                  <ChevronUp className="w-4 h-4" />
+                                )}
+                              </button>
+                            </div>
                           </div>
-                        )}
-                      </div>
-                    );
-                  })}
+
+                          {/* 2. Sub-Header: Using X of X problems banner */}
+                          <div className="px-5 py-2.5 bg-slate-50/50 border-b border-slate-100 flex items-center gap-2 text-xs text-slate-600">
+                            <span className="text-slate-400 font-serif italic text-sm">ⓘ</span>
+                            <span>
+                              Using {totalSectionCount} of {totalSectionCount} problems in this section.
+                            </span>
+                          </div>
+
+                          {/* 3. Section Problems Content */}
+                          {!isCollapsed && (
+                            <div>
+                              {sectionQs.length === 0 ? (
+                                <div className="py-12 px-4 text-center space-y-3">
+                                  <p className="text-xs text-slate-500 font-medium">No problems added yet.</p>
+                                  <button
+                                    onClick={() => navigate(`/admin/tests/${id}/add-problems?section=${encodeURIComponent(section)}`)}
+                                    className="text-xs font-bold tracking-wider text-[#3b4992] hover:text-indigo-800 transition-colors cursor-pointer uppercase underline underline-offset-4"
+                                  >
+                                    ADD PROBLEMS
+                                  </button>
+                                </div>
+                              ) : (
+                                <div className="divide-y divide-slate-100">
+                                  {sectionQs.map((tq, index) => {
+                                    const q = tq.question;
+                                    const isCoding = (q?.questionType ?? "").toUpperCase() === "CODING";
+                                    const qTitle = q?.title || `Question ${index + 1}`;
+                                    const marks = tq.marks ?? q?.marks ?? 10;
+                                    const difficulty = q?.difficulty || "MEDIUM";
+                                    const mcqSubtype = q?.mcqType ? fmtMcqType(q.mcqType) : undefined;
+                                    const testCasesCount = isCoding
+                                      ? `${(q as any)?.testCases?.length || (q as any)?.testCaseCount || 0} test cases`
+                                      : undefined;
+
+                                    return (
+                                      <div
+                                        key={tq.id || index}
+                                        className="pl-9 pr-5 py-4 hover:bg-slate-50/60 transition-colors space-y-1.5"
+                                      >
+                                        <div className="flex items-start justify-between gap-4">
+                                          <h3 className="font-bold text-slate-900 text-sm leading-snug">{qTitle}</h3>
+
+                                          <DropdownMenu>
+                                            <DropdownMenuTrigger asChild>
+                                              <button className="p-1 text-slate-400 hover:text-slate-700 transition-colors cursor-pointer">
+                                                <MoreVertical className="w-4 h-4" />
+                                              </button>
+                                            </DropdownMenuTrigger>
+                                            <DropdownMenuContent align="end" className="w-52 bg-white border border-slate-200 shadow-xl p-1 text-xs">
+                                              <DropdownMenuItem
+                                                onClick={() => {
+                                                  if (q) navigate(`/admin/questions/preview/${q.id}`, { state: q });
+                                                }}
+                                                className="cursor-pointer py-1.5 px-2.5 flex items-center gap-2 text-slate-700 hover:bg-slate-50"
+                                              >
+                                                <ExternalLink className="w-3.5 h-3.5 text-slate-500" />
+                                                <span>Preview Problem</span>
+                                              </DropdownMenuItem>
+                                              {/* Move to Section */}
+                                              {sectionOrder.filter((s) => s !== section).length > 0 && (
+                                                <>
+                                                  <DropdownMenuSeparator className="bg-slate-100" />
+                                                  <DropdownMenuLabel className="text-[10px] text-slate-400 px-2.5 py-1">
+                                                    Move to section
+                                                  </DropdownMenuLabel>
+                                                  {sectionOrder
+                                                    .filter((s) => s !== section)
+                                                    .map((targetSection) => (
+                                                      <DropdownMenuItem
+                                                        key={targetSection}
+                                                        onClick={() => handleMoveToSection(tq, targetSection)}
+                                                        className="cursor-pointer py-1.5 px-2.5 text-slate-700 hover:bg-slate-50"
+                                                      >
+                                                        → {targetSection}
+                                                      </DropdownMenuItem>
+                                                    ))}
+                                                </>
+                                              )}
+                                              <DropdownMenuSeparator className="bg-slate-100" />
+                                              <DropdownMenuItem
+                                                onClick={() => handleRemoveQuestion(tq.id)}
+                                                className="cursor-pointer py-1.5 px-2.5 flex items-center gap-2 text-red-600 hover:bg-red-50"
+                                              >
+                                                <Trash2 className="w-3.5 h-3.5 text-red-500" />
+                                                <span>Remove from Test</span>
+                                              </DropdownMenuItem>
+                                            </DropdownMenuContent>
+                                          </DropdownMenu>
+                                        </div>
+
+                                        {/* Metadata row */}
+                                        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-500 font-medium">
+                                          <div className="flex items-center gap-1 font-mono text-slate-400">
+                                            <span>=</span>
+                                            <span className="text-slate-600 font-sans">
+                                              {isCoding ? "Coding" : "MCQ"}
+                                            </span>
+                                          </div>
+                                          {!isCoding && mcqSubtype && (
+                                            <div className="flex items-center gap-1">
+                                              <span className="text-slate-400 text-[11px]">⊙</span>
+                                              <span>{mcqSubtype}</span>
+                                            </div>
+                                          )}
+                                          {difficulty && (
+                                            <div className="flex items-center gap-1">
+                                              <span className="text-slate-400 text-[10px]">❖</span>
+                                              <span>{fmt(difficulty)}</span>
+                                            </div>
+                                          )}
+                                          {marks !== undefined && (
+                                            <div className="flex items-center gap-1">
+                                              <LayoutGrid className="w-3 h-3 text-slate-400" />
+                                              <span>{marks} points</span>
+                                            </div>
+                                          )}
+                                          {testCasesCount && (
+                                            <div className="flex items-center gap-1">
+                                              <span className="text-slate-400 font-mono text-[11px]">⊘</span>
+                                              <span>{testCasesCount}</span>
+                                            </div>
+                                          )}
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
                 </div>
               )}
             </div>

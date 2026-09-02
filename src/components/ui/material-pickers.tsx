@@ -77,8 +77,8 @@ export function MaterialDatePickerDialog({ isOpen, onClose, value, onChange }: D
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="p-0 overflow-hidden max-w-[480px] border-none rounded-lg shadow-2xl flex flex-row min-h-[380px]">
-        {/* Left Sidebar using Sunset Orange brand color and larger min-height */}
-        <div className="w-[140px] bg-[#FF5733] text-white p-5 flex flex-col justify-start select-none min-h-[380px]">
+        {/* Left Sidebar using DoSelect / RxOne Blue brand color and larger min-height */}
+        <div className="w-[140px] bg-[#3b4992] text-white p-5 flex flex-col justify-start select-none min-h-[380px]">
           <div className="text-xs opacity-75 font-medium tracking-wider">{year}</div>
           <div className="text-2xl font-bold leading-tight mt-2">{displayDateStr}</div>
         </div>
@@ -135,8 +135,8 @@ export function MaterialDatePickerDialog({ isOpen, onClose, value, onChange }: D
                     onClick={() => handleDaySelect(day)}
                     className={`w-8 h-8 mx-auto flex items-center justify-center rounded-full transition-all ${
                       isSelected 
-                        ? "bg-[#FF5733] text-white font-bold" 
-                        : "text-slate-700 hover:bg-slate-100"
+                        ? "bg-[#3b4992] text-white font-bold shadow-xs" 
+                        : "text-slate-700 hover:bg-indigo-50 hover:text-[#3b4992]"
                     }`}
                   >
                     {day.getDate()}
@@ -151,14 +151,14 @@ export function MaterialDatePickerDialog({ isOpen, onClose, value, onChange }: D
             <button 
               type="button" 
               onClick={onClose} 
-              className="text-[#FF5733] hover:bg-slate-50 px-3 py-2 rounded"
+              className="text-[#3b4992] hover:bg-indigo-50 px-3 py-2 rounded transition-colors"
             >
               CANCEL
             </button>
             <button 
               type="button" 
               onClick={handleOk} 
-              className="text-[#FF5733] hover:bg-slate-50 px-3 py-2 rounded"
+              className="text-[#3b4992] hover:bg-indigo-50 px-3 py-2 rounded transition-colors"
             >
               OK
             </button>
@@ -248,10 +248,10 @@ export function MaterialTimePickerDialog({ isOpen, onClose, value, onChange }: T
           style={{
             transform: `translate(${x}px, ${y}px)`,
           }}
-          className={`absolute w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold select-none ${
+          className={`absolute w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold select-none transition-all ${
             isSelected 
-              ? "bg-[#FF5733] text-white" 
-              : "text-slate-700 hover:bg-slate-100"
+              ? "bg-[#3b4992] text-white font-bold shadow-xs" 
+              : "text-slate-700 hover:bg-indigo-50 hover:text-[#3b4992]"
           }`}
         >
           {pickingMode === "minutes" && num === 0 ? "00" : num}
@@ -269,8 +269,8 @@ export function MaterialTimePickerDialog({ isOpen, onClose, value, onChange }: T
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="p-0 overflow-hidden max-w-[480px] border-none rounded-lg shadow-2xl flex flex-row min-h-[330px]">
-        {/* Left Sidebar using Sunset Orange brand color */}
-        <div className="w-[140px] bg-[#FF5733] text-white p-5 flex flex-col justify-between select-none min-h-[330px]">
+        {/* Left Sidebar using DoSelect / RxOne Blue brand color */}
+        <div className="w-[140px] bg-[#3b4992] text-white p-5 flex flex-col justify-between select-none min-h-[330px]">
           <div className="flex flex-col mt-4">
             <span className="text-3xl font-bold">
               {hour}:{String(minute).padStart(2, "0")}
@@ -279,14 +279,14 @@ export function MaterialTimePickerDialog({ isOpen, onClose, value, onChange }: T
               <button 
                 type="button" 
                 onClick={() => handleToggleAmPm("AM")}
-                className={`text-left transition-all ${amPm === "AM" ? "text-white scale-110 opacity-100 font-extrabold" : "text-orange-200"}`}
+                className={`text-left transition-all ${amPm === "AM" ? "text-white scale-110 opacity-100 font-extrabold" : "text-indigo-200"}`}
               >
                 AM
               </button>
               <button 
                 type="button" 
                 onClick={() => handleToggleAmPm("PM")}
-                className={`text-left transition-all ${amPm === "PM" ? "text-white scale-110 opacity-100 font-extrabold" : "text-orange-200"}`}
+                className={`text-left transition-all ${amPm === "PM" ? "text-white scale-110 opacity-100 font-extrabold" : "text-indigo-200"}`}
               >
                 PM
               </button>
@@ -296,7 +296,7 @@ export function MaterialTimePickerDialog({ isOpen, onClose, value, onChange }: T
             <button 
               type="button" 
               onClick={() => setPickingMode("hours")}
-              className={`hover:underline ${pickingMode === "hours" ? "text-white font-bold" : "text-orange-200"}`}
+              className={`hover:underline ${pickingMode === "hours" ? "text-white font-bold" : "text-indigo-200"}`}
             >
               HOURS
             </button>
@@ -304,7 +304,7 @@ export function MaterialTimePickerDialog({ isOpen, onClose, value, onChange }: T
             <button 
               type="button" 
               onClick={() => setPickingMode("minutes")}
-              className={`hover:underline ${pickingMode === "minutes" ? "text-white font-bold" : "text-orange-200"}`}
+              className={`hover:underline ${pickingMode === "minutes" ? "text-white font-bold" : "text-indigo-200"}`}
             >
               MINS
             </button>
@@ -316,7 +316,7 @@ export function MaterialTimePickerDialog({ isOpen, onClose, value, onChange }: T
           {/* Clock Face Circle */}
           <div className="w-48 h-48 rounded-full bg-slate-50 border relative flex items-center justify-center mt-2">
             {/* Center dot */}
-            <div className="w-1.5 h-1.5 rounded-full bg-[#FF5733] z-10" />
+            <div className="w-1.5 h-1.5 rounded-full bg-[#3b4992] z-10" />
             
             {/* Hand Line */}
             <div 
@@ -326,7 +326,7 @@ export function MaterialTimePickerDialog({ isOpen, onClose, value, onChange }: T
                 height: "68px",
                 bottom: "50%",
               }}
-              className="absolute w-[2px] bg-[#FF5733] z-0 transition-transform duration-200"
+              className="absolute w-[2px] bg-[#3b4992] z-0 transition-transform duration-200"
             />
             
             {/* Clock Numbers */}
@@ -338,14 +338,14 @@ export function MaterialTimePickerDialog({ isOpen, onClose, value, onChange }: T
             <button 
               type="button" 
               onClick={onClose} 
-              className="text-[#FF5733] hover:bg-slate-50 px-3 py-2 rounded"
+              className="text-[#3b4992] hover:bg-indigo-50 px-3 py-2 rounded transition-colors"
             >
               CANCEL
             </button>
             <button 
               type="button" 
               onClick={handleOk} 
-              className="text-[#FF5733] hover:bg-slate-50 px-3 py-2 rounded"
+              className="text-[#3b4992] hover:bg-indigo-50 px-3 py-2 rounded transition-colors"
             >
               OK
             </button>

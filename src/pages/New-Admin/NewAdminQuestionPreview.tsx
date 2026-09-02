@@ -812,15 +812,17 @@ export default function NewAdminQuestionPreview() {
 
               {/* Bottom Metadata & Feedback Section */}
               <div className="mt-8 pt-6 border-t border-slate-200 space-y-3">
-                {/* Execution Time Limit */}
-                <div>
-                  <p className="text-[11px] font-bold uppercase tracking-wider text-slate-700 mb-0.5">
-                    EXECUTION TIME LIMIT
-                  </p>
-                  <p className="text-xs text-slate-600">
-                    {question.timeLimitSecs || 10} seconds.
-                  </p>
-                </div>
+                {/* Execution Time Limit (Only for Coding Questions) */}
+                {isCoding && (
+                  <div>
+                    <p className="text-[11px] font-bold uppercase tracking-wider text-slate-700 mb-0.5">
+                      EXECUTION TIME LIMIT
+                    </p>
+                    <p className="text-xs text-slate-600">
+                      {question.timeLimitSecs || 10} seconds.
+                    </p>
+                  </div>
+                )}
 
                 {/* Additional Question Metrics: Marks, Duration, Subject */}
                 <div className="flex flex-wrap items-center gap-2 pt-1 text-xs text-slate-600">

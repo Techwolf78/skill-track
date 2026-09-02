@@ -1235,59 +1235,46 @@ function SuperAdminImportQuestionsDialog({
             <Button
               variant="outline"
               size="sm"
-              onClick={downloadDoSelectSampleExcel}
-              className="flex items-center gap-1 h-7 px-2 text-[11px] font-medium border-indigo-200 text-indigo-700 bg-indigo-50/50 hover:bg-indigo-100/60 transition-colors"
-              title="Download DoSelect-style Professional 5-Question Excel Template"
-            >
-              <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
-              <span>DoSelect Sample</span>
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
               onClick={downloadDynamicExcel}
-              className="flex items-center gap-1 h-7 px-2 text-[11px] font-medium border-border"
-              title="Download Dynamic Excel Template with System Taxonomy Reference"
+              className="flex items-center gap-1 h-7 px-2.5 text-xs font-medium border-slate-200"
+              title="Download MCQ Questions Excel Template"
             >
               <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
-              <span>Excel Template</span>
+              <span>MCQ Template</span>
             </Button>
             <Button
               variant="outline"
               size="sm"
-              onClick={downloadSampleJson}
-              className="flex items-center gap-1 h-7 px-2 text-[11px] font-medium border-border"
-              title="Download Sample JSON Template"
+              onClick={downloadSampleCodingExcel}
+              className="flex items-center gap-1 h-7 px-2.5 text-xs font-medium border-slate-200"
+              title="Download Coding Questions Excel Template"
             >
-              <FileCode className="w-3.5 h-3.5 text-amber-600" />
-              <span>JSON</span>
+              <FileSpreadsheet className="w-3.5 h-3.5 text-[#3b4992]" />
+              <span>Coding Template</span>
             </Button>
           </div>
         </DialogHeader>
 
-        {/* 1. Cascading Batch Hierarchy Selector */}
-        <div className="p-3.5 bg-muted/40 rounded-xl border border-border space-y-2.5">
+        {/* 1. Batch Hierarchy Selector */}
+        <div className="p-3.5 bg-slate-50/70 rounded-lg border border-slate-200 space-y-2.5">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-foreground flex items-center gap-1.5">
-              <FolderTree className="w-3.5 h-3.5 text-primary" />
-              Batch Hierarchy Defaults (Fallback Selector)
-            </span>
-            <span className="text-[11px] text-muted-foreground hidden sm:inline">
-              Auto-inherited by rows without specific taxonomy
+            <span className="text-xs font-semibold text-slate-800 flex items-center gap-1.5">
+              <FolderTree className="w-3.5 h-3.5 text-[#3b4992]" />
+              Default Hierarchy
             </span>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             {/* Target Subject (Required) */}
             <div className="space-y-1">
-              <label className="text-[11px] font-semibold text-foreground flex items-center gap-1">
-                <span>Target Subject</span>
+              <label className="text-xs font-medium text-slate-700 flex items-center gap-1">
+                <span>Subject</span>
                 <span className="text-destructive">*</span>
               </label>
               <select
                 value={defaultSubjectId}
                 onChange={(e) => handleDefaultSubjectChange(e.target.value)}
-                className="w-full bg-background border border-input rounded-md px-2.5 py-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring cursor-pointer"
+                className="w-full bg-background border border-input rounded px-2.5 py-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring cursor-pointer h-8"
               >
                 {subjects.map((s) => (
                   <option key={s.id} value={s.id}>
@@ -1299,15 +1286,15 @@ function SuperAdminImportQuestionsDialog({
 
             {/* Target Topic (Optional) */}
             <div className="space-y-1">
-              <label className="text-[11px] font-semibold text-foreground">
-                Target Topic <span className="text-[10px] text-muted-foreground font-normal">(Optional)</span>
+              <label className="text-xs font-medium text-slate-700">
+                Topic <span className="text-[10px] text-muted-foreground font-normal">(Optional)</span>
               </label>
               <select
                 value={defaultTopicId}
                 onChange={(e) => handleDefaultTopicChange(e.target.value)}
-                className="w-full bg-background border border-input rounded-md px-2.5 py-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring cursor-pointer"
+                className="w-full bg-background border border-input rounded px-2.5 py-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring cursor-pointer h-8"
               >
-                <option value="">-- All Topics / Unassigned --</option>
+                <option value="">-- All Topics --</option>
                 {availableDefaultTopics.map((t) => (
                   <option key={t.id} value={t.id}>
                     {t.name}
@@ -1318,14 +1305,14 @@ function SuperAdminImportQuestionsDialog({
 
             {/* Target Subtopic (Optional) */}
             <div className="space-y-1">
-              <label className="text-[11px] font-semibold text-foreground">
-                Target Subtopic <span className="text-[10px] text-muted-foreground font-normal">(Optional)</span>
+              <label className="text-xs font-medium text-slate-700">
+                Subtopic <span className="text-[10px] text-muted-foreground font-normal">(Optional)</span>
               </label>
               <select
                 value={defaultSubtopicId}
                 disabled={!defaultTopicId || availableDefaultSubtopics.length === 0}
                 onChange={(e) => handleDefaultSubtopicChange(e.target.value)}
-                className="w-full bg-background border border-input rounded-md px-2.5 py-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full bg-background border border-input rounded px-2.5 py-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed h-8"
               >
                 <option value="">-- All Subtopics / Unassigned --</option>
                 {availableDefaultSubtopics.map((st) => (

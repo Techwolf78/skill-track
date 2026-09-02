@@ -375,11 +375,9 @@ export function parseImportRow(
 }
 
 /**
- * Generates an Enterprise Excel Template with:
- * 1. Questions Template sheet containing sample MCQ & Coding rows
- * 2. Active_Taxonomy_Reference sheet with current system Subjects, Topics, and Subtopics
+ * Generates an MCQ-only Excel Template with only MCQ-specific columns.
  */
-export function generateDynamicExcelTemplate(context: {
+export function generateMcqExcelTemplate(context: {
   subjects: Subject[];
   topics: Topic[];
   subtopics: Subtopic[];
@@ -388,7 +386,6 @@ export function generateDynamicExcelTemplate(context: {
 
   const sampleSub = subjects[0]?.name || "Computer Science";
   const sampleTop1 = topics.find((t) => subjects[0] && (t.subjectId === subjects[0].id || t.subject?.id === subjects[0].id))?.name || topics[0]?.name || "Data Structures";
-  const sampleTop2 = topics.find((t) => t.name !== sampleTop1)?.name || "Algorithms";
   const sampleSubtop = subtopics.find((st) => topics[0] && (st.topicId === topics[0].id || st.topic?.id === topics[0].id))?.name || subtopics[0]?.name || "Arrays & Hash Tables";
 
   const sampleRows = [
@@ -408,31 +405,6 @@ export function generateDynamicExcelTemplate(context: {
       "Correct Option": "1",
       Tags: "java, concurrency, collections",
       "Avg Time (s)": 90,
-      "Time Limit (s)": "",
-      "Memory Limit (MB)": "",
-      Constraints: "",
-      "Sample Explanation": "",
-    },
-    {
-      Title: "Two Sum Problem",
-      Type: "CODING",
-      Subject: sampleSub,
-      Topic: sampleTop2,
-      Subtopic: sampleSubtop,
-      Difficulty: "EASY",
-      Marks: 5,
-      Prompt: "Given an array of integers nums and an integer target, return indices of the two numbers such that they add up to target.",
-      "Option 1": "",
-      "Option 2": "",
-      "Option 3": "",
-      "Option 4": "",
-      "Correct Option": "",
-      Tags: "arrays, hashmap, algorithms",
-      "Avg Time (s)": 300,
-      "Time Limit (s)": 2,
-      "Memory Limit (MB)": 256,
-      Constraints: "2 <= nums.length <= 10^4\n-10^9 <= nums[i] <= 10^9\nOnly one valid answer exists.",
-      "Sample Explanation": "nums = [2,7,11,15], target = 9 -> Output: [0,1] because nums[0] + nums[1] == 9",
     },
     {
       Title: "SQL Transaction Isolation Levels",
@@ -450,16 +422,10 @@ export function generateDynamicExcelTemplate(context: {
       "Correct Option": "1",
       Tags: "sql, dbms, acid",
       "Avg Time (s)": 120,
-      "Time Limit (s)": "",
-      "Memory Limit (MB)": "",
-      Constraints: "",
-      "Sample Explanation": "",
     },
   ];
 
   const wsQuestions = XLSX.utils.json_to_sheet(sampleRows);
-
-  // Set explicit column widths for questions sheet
   wsQuestions["!cols"] = [
     { wch: 32 }, // Title
     { wch: 10 }, // Type
@@ -476,13 +442,92 @@ export function generateDynamicExcelTemplate(context: {
     { wch: 14 }, // Correct Option
     { wch: 28 }, // Tags
     { wch: 14 }, // Avg Time (s)
-    { wch: 14 }, // Time Limit (s)
-    { wch: 16 }, // Memory Limit (MB)
-    { wch: 30 }, // Constraints
-    { wch: 35 }, // Sample Explanation
   ];
 
-  // 2. Build Taxonomy Reference Sheet
+  const taxonomyRows = buildTaxonomyReferenceRows(subjects, topics, subtopics);
+  const wsTaxonomy = XLSX.utils.json_to_sheet(taxonomyRows);
+  wsTaxonomy["!cols"] = [{ wch: 28 }, { wch: 28 }, { wch: 28 }];
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, wsQuestions, "MCQ_Questions");
+  XLSX.utils.book_append_sheet(wb, wsTaxonomy, "Taxonomy_Reference");
+  return wb;
+}
+
+/**
+ * Generates a Coding-only Excel Template with only Coding-specific columns.
+ */
+export function generateCodingExcelTemplate(context: {
+  subjects: Subject[];
+  topics: Topic[];
+  subtopics: Subtopic[];
+}) {
+  const { subjects, topics, subtopics } = context;
+
+  const sampleSub = subjects[0]?.name || "Computer Science";
+  const sampleTop2 = topics.find((t) => subjects[0] && (t.subjectId === subjects[0].id || t.subject?.id === subjects[0].id))?.name || topics[0]?.name || "Algorithms";
+  const sampleSubtop = subtopics.find((st) => topics[0] && (st.topicId === topics[0].id || st.topic?.id === topics[0].id))?.name || subtopics[0]?.name || "Arrays & Hash Tables";
+
+  const sampleRows = [
+    {
+      Title: "Two Sum Problem",
+      Type: "CODING",
+      Subject: sampleSub,
+      Topic: sampleTop2,
+      Subtopic: sampleSubtop,
+      Difficulty: "EASY",
+      Marks: 5,
+      Prompt: "Given an array of integers nums and an integer target, return indices of the two numbers such that they add up to target.",
+      Constraints: "2 <= nums.length <= 10^4\n-10^9 <= nums[i] <= 10^9\nOnly one valid answer exists.",
+      "Sample Input 1": "[2, 7, 11, 15]\n9",
+      "Sample Output 1": "[0, 1]",
+      "Sample Explanation 1": "nums = [2,7,11,15], target = 9 -> Output: [0,1] because nums[0] + nums[1] == 9",
+      "Hidden Input 1": "[3, 2, 4]\n6",
+      "Hidden Output 1": "[1, 2]",
+      "Time Limit (s)": 2,
+      "Memory Limit (MB)": 256,
+      Tags: "arrays, hashmap, algorithms",
+      "Avg Time (s)": 300,
+    },
+  ];
+
+  const wsQuestions = XLSX.utils.json_to_sheet(sampleRows);
+  wsQuestions["!cols"] = [
+    { wch: 32 }, // Title
+    { wch: 10 }, // Type
+    { wch: 22 }, // Subject
+    { wch: 22 }, // Topic
+    { wch: 22 }, // Subtopic
+    { wch: 12 }, // Difficulty
+    { wch: 8 },  // Marks
+    { wch: 50 }, // Prompt
+    { wch: 30 }, // Constraints
+    { wch: 24 }, // Sample Input 1
+    { wch: 24 }, // Sample Output 1
+    { wch: 35 }, // Sample Explanation 1
+    { wch: 24 }, // Hidden Input 1
+    { wch: 24 }, // Hidden Output 1
+    { wch: 14 }, // Time Limit (s)
+    { wch: 16 }, // Memory Limit (MB)
+    { wch: 28 }, // Tags
+    { wch: 14 }, // Avg Time (s)
+  ];
+
+  const taxonomyRows = buildTaxonomyReferenceRows(subjects, topics, subtopics);
+  const wsTaxonomy = XLSX.utils.json_to_sheet(taxonomyRows);
+  wsTaxonomy["!cols"] = [{ wch: 28 }, { wch: 28 }, { wch: 28 }];
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, wsQuestions, "Coding_Questions");
+  XLSX.utils.book_append_sheet(wb, wsTaxonomy, "Taxonomy_Reference");
+  return wb;
+}
+
+function buildTaxonomyReferenceRows(
+  subjects: Subject[],
+  topics: Topic[],
+  subtopics: Subtopic[]
+): Array<{ "Subject Name": string; "Topic Name": string; "Subtopic Name": string }> {
   const taxonomyRows: Array<{
     "Subject Name": string;
     "Topic Name": string;
@@ -527,16 +572,18 @@ export function generateDynamicExcelTemplate(context: {
     });
   }
 
-  const wsTaxonomy = XLSX.utils.json_to_sheet(taxonomyRows);
-  wsTaxonomy["!cols"] = [
-    { wch: 28 }, // Subject Name
-    { wch: 28 }, // Topic Name
-    { wch: 28 }, // Subtopic Name
-  ];
+  return taxonomyRows;
+}
 
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, wsQuestions, "Questions");
-  XLSX.utils.book_append_sheet(wb, wsTaxonomy, "Taxonomy_Reference");
-
-  return wb;
+/**
+ * Generates an Enterprise Excel Template with:
+ * 1. Questions Template sheet containing sample MCQ & Coding rows
+ * 2. Active_Taxonomy_Reference sheet with current system Subjects, Topics, and Subtopics
+ */
+export function generateDynamicExcelTemplate(context: {
+  subjects: Subject[];
+  topics: Topic[];
+  subtopics: Subtopic[];
+}) {
+  return generateMcqExcelTemplate(context);
 }

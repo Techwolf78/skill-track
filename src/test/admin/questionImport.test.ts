@@ -165,14 +165,14 @@ describe("Question Import Taxonomy Resolver", () => {
     expect(parsed?.question.testCases?.[1].sample).toBe(false);
   });
 
-  it("should generate dynamic Excel template containing active taxonomy reference sheet", () => {
-    const wb = generateDynamicExcelTemplate({
+  it("should generate dynamic MCQ and Coding Excel templates containing active taxonomy reference sheet", () => {
+    const wbMcq = generateDynamicExcelTemplate({
       subjects: sampleSubjects,
       topics: sampleTopics,
       subtopics: sampleSubtopics,
     });
 
-    expect(wb.SheetNames).toContain("Questions");
-    expect(wb.SheetNames).toContain("Taxonomy_Reference");
+    expect(wbMcq.SheetNames).toContain("MCQ_Questions");
+    expect(wbMcq.SheetNames).toContain("Taxonomy_Reference");
   });
 });
