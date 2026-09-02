@@ -2004,11 +2004,7 @@ export default function NewAdminTestEdit() {
                               <DropdownMenuItem
                                 onClick={() => {
                                   if (q) {
-                                    if (isCoding) {
-                                      navigate(`/admin/playground/${q.id}`);
-                                    } else {
-                                      navigate(`/admin/questions/preview/${q.id}`, { state: q });
-                                    }
+                                    navigate(`/admin/questions/preview/${q.id}`, { state: q });
                                   }
                                 }}
                                 className="cursor-pointer py-1.5 px-2.5 flex items-center gap-2 text-slate-700 hover:bg-slate-50"
