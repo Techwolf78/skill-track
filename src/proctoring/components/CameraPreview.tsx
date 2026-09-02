@@ -31,7 +31,7 @@ export const CameraPreview: React.FC<CameraPreviewProps> = ({
     large: "w-80 h-60",
   };
 
-  if (!isProctoringActive || !config?.requireWebcam) return null;
+  if (!isProctoringActive || (!config?.requireWebcam && !config?.camera && !(config as any)?.webcamRequired)) return null;
 
   return (
     <div 

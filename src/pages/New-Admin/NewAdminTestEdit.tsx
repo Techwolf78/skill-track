@@ -274,6 +274,13 @@ export default function NewAdminTestEdit() {
   const [loading, setLoading] = useState(Boolean(id));
   const [test, setTest] = useState<Test | null>(null);
   const [questions, setQuestions] = useState<Array<TestQuestion & { question?: Question }>>([]);
+  // Section UI state
+  const [groupedQuestions, setGroupedQuestions] = useState<Record<string, Array<TestQuestion & { question?: Question }>>>({});
+  const [sectionOrder, setSectionOrder] = useState<string[]>([]);
+  const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
+  const [addSectionOpen, setAddSectionOpen] = useState(false);
+  const [newSectionName, setNewSectionName] = useState("");
+  const [movingSectionFor, setMovingSectionFor] = useState<string | null>(null); // tq.id being moved
 
   // General Settings Form States
   const [title, setTitle] = useState("");
@@ -366,11 +373,10 @@ export default function NewAdminTestEdit() {
 
     Promise.all([
       testService.getTestById(id),
-      testService.getTestQuestions(id),
-      testService.getAllQuestions(),
+      testService.getGroupedTestQuestions(id),
       testService.getAllTestSchedules(),
     ])
-      .then(([testData, testQuestionsData, allQuestions, allSchedules]) => {
+      .then(([testData, groupedData, allSchedules]) => {
         setTest(testData);
 
         // Populate General Settings Form
@@ -406,12 +412,9 @@ export default function NewAdminTestEdit() {
           setInitialScheduleStart(start);
           setInitialScheduleEnd(end);
 
-          // Fetch candidate invitations for schedule
           candidateService
             .getInvitationsBySchedule(activeSchedule.id)
-            .then((invs) => {
-              setInvitations(invs || []);
-            })
+            .then((invs) => setInvitations(invs || []))
             .catch((e) => console.warn("Failed to load invitations:", e));
         }
 
@@ -461,20 +464,25 @@ export default function NewAdminTestEdit() {
           maxCriticalViolations: testData.maxCriticalViolations || 0,
         });
 
-        const questionMap = new Map((allQuestions || []).map((q) => [q.id, q]));
-        const enriched = (testQuestionsData || []).map((tq) => ({
-          ...tq,
-          question: tq.question || questionMap.get(tq.questionId),
-        }));
-        setQuestions(enriched);
+        // Build section-aware state from grouped API response
+        const grouped = groupedData || {};
+        // Keep "Ungrouped" last, otherwise preserve insertion order
+        const orderedKeys = Object.keys(grouped).sort((a, b) => {
+          if (a === "Ungrouped") return 1;
+          if (b === "Ungrouped") return -1;
+          return 0;
+        });
+        setGroupedQuestions(grouped as Record<string, Array<TestQuestion & { question?: Question }>>);
+        setSectionOrder(orderedKeys);
+        // Derive flat list (order within each section, sections in order)
+        const flat = orderedKeys.flatMap((key) => grouped[key] || []) as Array<TestQuestion & { question?: Question }>;
+        setQuestions(flat);
       })
       .catch((err) => {
         console.error("[NewAdminTestEdit] Error loading test:", err);
         toast.error("Failed to load test details");
       })
-      .finally(() => {
-        setLoading(false);
-      });
+      .finally(() => setLoading(false));
   }, [id]);
 
   useEffect(() => {
@@ -636,9 +644,89 @@ export default function NewAdminTestEdit() {
     try {
       await testService.deleteTestQuestion(testQuestionId);
       setQuestions((prev) => prev.filter((tq) => tq.id !== testQuestionId));
+      setGroupedQuestions((prev) => {
+        const next = { ...prev };
+        for (const key of Object.keys(next)) {
+          next[key] = next[key].filter((tq) => tq.id !== testQuestionId);
+        }
+        return next;
+      });
       toast.success("Problem removed from test");
     } catch (err: any) {
       toast.error("Failed to remove problem: " + (err.message || "Unknown error"));
+    }
+  };
+
+  const handleMoveToSection = async (tq: TestQuestion & { question?: Question }, targetSection: string) => {
+    try {
+      await testService.updateTestQuestion(tq.id, { sectionName: targetSection });
+      // Update groupedQuestions optimistically
+      setGroupedQuestions((prev) => {
+        const next: Record<string, Array<TestQuestion & { question?: Question }>> = {};
+        for (const key of Object.keys(prev)) {
+          next[key] = prev[key].filter((q) => q.id !== tq.id);
+        }
+        const updated = { ...tq, sectionName: targetSection };
+        next[targetSection] = [...(next[targetSection] || []), updated];
+        return next;
+      });
+      // Add section to order if not already present
+      setSectionOrder((prev) => prev.includes(targetSection) ? prev : [...prev, targetSection]);
+      setMovingSectionFor(null);
+      toast.success(`Moved to "${targetSection}"`);
+    } catch (err: any) {
+      toast.error("Failed to move question: " + (err.message || "Unknown error"));
+    }
+  };
+
+  const handleConfirmNewSection = () => {
+    const name = newSectionName.trim();
+    if (!name) { toast.error("Section name cannot be empty"); return; }
+    if (sectionOrder.includes(name)) { toast.error(`Section "${name}" already exists`); return; }
+    setSectionOrder((prev) => {
+      // Insert before "Ungrouped" if it exists, otherwise append
+      const ungroupedIdx = prev.indexOf("Ungrouped");
+      if (ungroupedIdx === -1) return [...prev, name];
+      return [...prev.slice(0, ungroupedIdx), name, ...prev.slice(ungroupedIdx)];
+    });
+    setGroupedQuestions((prev) => ({ ...prev, [name]: [] }));
+    setNewSectionName("");
+    setAddSectionOpen(false);
+    toast.success(`Section "${name}" created`);
+  };
+
+  const handleDeleteSection = async (sectionName: string) => {
+    const sectionQs = groupedQuestions[sectionName] || [];
+    if (sectionQs.length > 0) {
+      // Reassign questions to "Ungrouped" (empty/null section)
+      try {
+        await Promise.all(
+          sectionQs.map((tq) => testService.updateTestQuestion(tq.id, { sectionName: "" }))
+        );
+        setGroupedQuestions((prev) => {
+          const next = { ...prev };
+          const unassigned = (next[sectionName] || []).map((tq) => ({ ...tq, sectionName: undefined }));
+          delete next[sectionName];
+          next["Ungrouped"] = [...(next["Ungrouped"] || []), ...unassigned];
+          return next;
+        });
+        setSectionOrder((prev) => {
+          const filtered = prev.filter((s) => s !== sectionName);
+          return filtered.includes("Ungrouped") ? filtered : [...filtered, "Ungrouped"];
+        });
+        toast.success(`Section "${sectionName}" deleted, questions moved to Ungrouped`);
+      } catch (err: any) {
+        toast.error("Failed to delete section: " + (err.message || "Unknown error"));
+      }
+    } else {
+      // Empty section, simply remove from state
+      setSectionOrder((prev) => prev.filter((s) => s !== sectionName));
+      setGroupedQuestions((prev) => {
+        const next = { ...prev };
+        delete next[sectionName];
+        return next;
+      });
+      toast.success(`Section "${sectionName}" deleted`);
     }
   };
 
@@ -1183,6 +1271,65 @@ export default function NewAdminTestEdit() {
         },
       });
 
+      // Render Identity Verification Photo & Snapshots Evidence if present
+      const candidatePhotoUrl = detailData?.candidatePhoto?.imageUrl || detailData?.candidatePhoto?.imageData;
+      const allEvidence: Array<{ imageUrl?: string; imageData?: string; snapshotType?: string; capturedAt?: string }> = [
+        ...(detailData?.candidatePhoto ? [detailData.candidatePhoto] : []),
+        ...(detailData?.evidence || []),
+        ...(detailData?.snapshots || []),
+      ].filter((item) => Boolean(item?.imageUrl || item?.imageData));
+
+      if (candidatePhotoUrl || allEvidence.length > 0) {
+        let currentY = (doc as JsPDFWithAutoTable).lastAutoTable.finalY + 10;
+        
+        // Page overflow check
+        if (currentY + 45 > 280) {
+          doc.addPage();
+          currentY = 20;
+        }
+
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(11);
+        doc.setTextColor(30, 41, 59);
+        doc.text("IDENTITY VERIFICATION & PROCTORING SNAPSHOTS", 14, currentY);
+
+        let imgX = 14;
+        let imgY = currentY + 6;
+        const imgW = 42;
+        const imgH = 32;
+
+        for (let sIdx = 0; sIdx < Math.min(allEvidence.length, 8); sIdx++) {
+          const snap = allEvidence[sIdx];
+          const src = snap.imageUrl || snap.imageData;
+          if (!src) continue;
+
+          if (imgX + imgW > 196) {
+            imgX = 14;
+            imgY += imgH + 12;
+            if (imgY + imgH > 280) {
+              doc.addPage();
+              imgY = 20;
+            }
+          }
+
+          try {
+            doc.setFillColor(241, 245, 249);
+            doc.roundedRect(imgX, imgY, imgW, imgH, 2, 2, "F");
+            doc.addImage(src, "JPEG", imgX, imgY, imgW, imgH);
+            doc.setFontSize(7);
+            doc.setTextColor(71, 85, 105);
+            const label = snap.snapshotType ? snap.snapshotType.replace(/_/g, " ") : `Snapshot #${sIdx + 1}`;
+            doc.text(label, imgX, imgY + imgH + 4);
+          } catch {
+            // fallback if canvas cross-origin or format error
+          }
+          imgX += imgW + 6;
+        }
+
+        // Advance finalY after images grid
+        (doc as JsPDFWithAutoTable).lastAutoTable.finalY = imgY + imgH + 8;
+      }
+
       // Section Separator Label
       doc.setFont("helvetica", "bold");
       doc.setFontSize(11);
@@ -1243,10 +1390,18 @@ export default function NewAdminTestEdit() {
 
           // Fetch true correct options list
           const enrichedTQ = questions.find(
-            (tq) => tq.questionId === questionId || tq.id === questionId,
+            (tq) => tq.questionId === questionId || tq.id === questionId || tq.question?.id === questionId,
           );
           const enrichedQuestion = enrichedTQ?.question;
-          const correctOptions = enrichedQuestion?.mcqOptions || q.mcqOptions || [];
+          const correctOptions = (enrichedQuestion?.mcqOptions && enrichedQuestion.mcqOptions.length > 0)
+            ? enrichedQuestion.mcqOptions
+            : (enrichedQuestion?.options && enrichedQuestion.options.length > 0)
+              ? enrichedQuestion.options
+              : (q.mcqOptions && q.mcqOptions.length > 0)
+                ? q.mcqOptions
+                : (q.options && q.options.length > 0)
+                  ? q.options
+                  : [];
 
           // Calculate time spent telemetry
           const timeItem = timingsList.find(
@@ -1287,7 +1442,15 @@ export default function NewAdminTestEdit() {
               },
             ]);
           } else {
-            const optionsList = q.mcqOptions || enrichedQuestion?.mcqOptions || [];
+            const optionsList = (q.mcqOptions && q.mcqOptions.length > 0)
+              ? q.mcqOptions
+              : (q.options && q.options.length > 0)
+                ? q.options
+                : (enrichedQuestion?.mcqOptions && enrichedQuestion.mcqOptions.length > 0)
+                  ? enrichedQuestion.mcqOptions
+                  : (enrichedQuestion?.options && enrichedQuestion.options.length > 0)
+                    ? enrichedQuestion.options
+                    : [];
             optionsList.forEach(
               (
                 opt: { id: string; text: string; isCorrect: boolean },
@@ -1947,10 +2110,36 @@ export default function NewAdminTestEdit() {
               {/* Header Bar */}
               <div className="p-4 bg-white flex items-center justify-between border-b border-slate-100">
                 <span className="text-xs font-semibold text-slate-700">Problems</span>
-                <div className="flex items-center gap-3 text-indigo-700">
+                <div className="flex items-center gap-2">
+                  {/* Add Section */}
+                  {addSectionOpen ? (
+                    <div className="flex items-center gap-1.5">
+                      <input
+                        autoFocus
+                        type="text"
+                        value={newSectionName}
+                        onChange={(e) => setNewSectionName(e.target.value)}
+                        onKeyDown={(e) => { if (e.key === "Enter") handleConfirmNewSection(); if (e.key === "Escape") { setAddSectionOpen(false); setNewSectionName(""); } }}
+                        placeholder="Section name…"
+                        className="text-xs border border-indigo-300 rounded px-2 py-1 focus:outline-none focus:border-indigo-500 w-36"
+                      />
+                      <button onClick={handleConfirmNewSection} className="text-xs px-2 py-1 bg-indigo-600 text-white rounded hover:bg-indigo-700 cursor-pointer">✓</button>
+                      <button onClick={() => { setAddSectionOpen(false); setNewSectionName(""); }} className="text-xs px-2 py-1 text-slate-500 hover:text-slate-800 cursor-pointer">✕</button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => setAddSectionOpen(true)}
+                      className="text-xs px-2.5 py-1 border border-slate-200 text-slate-600 hover:border-indigo-400 hover:text-indigo-700 transition-colors cursor-pointer flex items-center gap-1"
+                      title="Add a section"
+                    >
+                      <Plus className="w-3 h-3" />
+                      <span>Add Section</span>
+                    </button>
+                  )}
+                  {/* Add Problem */}
                   <button
                     onClick={() => navigate(id ? `/admin/tests/${id}/add-problems` : "/admin/library")}
-                    className="p-1 hover:text-indigo-900 transition-colors cursor-pointer"
+                    className="p-1 text-indigo-700 hover:text-indigo-900 transition-colors cursor-pointer"
                     title="Add problem from library"
                   >
                     <Plus className="w-4 h-4" />
@@ -1958,8 +2147,8 @@ export default function NewAdminTestEdit() {
                 </div>
               </div>
 
-              {/* Problems List */}
-              {questions.length === 0 ? (
+              {/* Problems — section-grouped list */}
+              {questions.length === 0 && sectionOrder.length === 0 ? (
                 <div className="py-12 px-4 text-center text-slate-400 text-xs space-y-2">
                   <p>No problems added to this test yet.</p>
                   <button
@@ -1971,94 +2160,149 @@ export default function NewAdminTestEdit() {
                   </button>
                 </div>
               ) : (
-                <div className="divide-y divide-slate-100">
-                  {questions.map((tq, index) => {
-                    const q = tq.question;
-                    const isCoding = (q?.questionType ?? "").toUpperCase() === "CODING";
-                    const title = q?.title || `Question ${index + 1}`;
-                    const marks = tq.marks ?? q?.marks ?? 10;
-                    const difficulty = q?.difficulty || "MEDIUM";
-                    const mcqSubtype = q?.mcqType ? fmtMcqType(q.mcqType) : undefined;
-                    const testCasesCount = isCoding
-                      ? `${(q as any)?.testCases?.length || (q as any)?.testCaseCount || 0} test cases`
-                      : undefined;
-
+                <div>
+                  {sectionOrder
+                    .filter((section) => {
+                      if (section === "Ungrouped") {
+                        const hasOtherSections = sectionOrder.some((s) => s !== "Ungrouped");
+                        const ungroupedCount = (groupedQuestions["Ungrouped"] || []).length;
+                        return !hasOtherSections || ungroupedCount > 0;
+                      }
+                      return true;
+                    })
+                    .map((section) => {
+                    const sectionQs = groupedQuestions[section] || [];
+                    const isCollapsed = collapsedSections.has(section);
+                    const answeredHere = sectionQs.length;
                     return (
-                      <div
-                        key={tq.id || index}
-                        className="p-5 hover:bg-slate-50/60 transition-colors space-y-1.5"
-                      >
-                        {/* Row 1: Title & 3-dots Menu */}
-                        <div className="flex items-start justify-between gap-4">
-                          <h3 className="font-bold text-slate-900 text-sm leading-snug">
-                            {title}
-                          </h3>
-
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <button className="p-1 text-slate-400 hover:text-slate-700 transition-colors cursor-pointer">
-                                <MoreVertical className="w-4 h-4" />
+                      <div key={section} className="border-b border-slate-100 last:border-b-0">
+                        {/* Section Header */}
+                        <div className="flex items-center justify-between px-5 py-3 bg-slate-50/70 hover:bg-slate-100/60 transition-colors">
+                          <button
+                            onClick={() => setCollapsedSections((prev) => {
+                              const next = new Set(prev);
+                              if (next.has(section)) next.delete(section); else next.add(section);
+                              return next;
+                            })}
+                            className="flex items-center gap-2 text-xs font-semibold text-slate-700 cursor-pointer flex-1 text-left"
+                          >
+                            {isCollapsed ? <ChevronRight className="w-3.5 h-3.5 text-slate-400" /> : <ChevronDown className="w-3.5 h-3.5 text-slate-400" />}
+                            <span>{section}</span>
+                            <span className="ml-1 px-1.5 py-0.5 bg-slate-200 text-slate-600 rounded text-[10px] font-bold">{answeredHere}</span>
+                          </button>
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => navigate(`/admin/tests/${id}/add-problems?section=${encodeURIComponent(section)}`)}
+                              className="flex items-center gap-1 text-[11px] font-medium text-indigo-600 hover:text-indigo-800 transition-colors cursor-pointer px-2 py-1 rounded bg-indigo-50/80 hover:bg-indigo-100"
+                              title={`Add questions directly to ${section}`}
+                            >
+                              <Plus className="w-3 h-3" />
+                              <span>Add Here</span>
+                            </button>
+                            {section !== "Ungrouped" && (
+                              <button
+                                onClick={() => handleDeleteSection(section)}
+                                className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded transition-colors cursor-pointer"
+                                title={`Delete section "${section}"`}
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
                               </button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="w-44 bg-white border border-slate-200 shadow-xl p-1 text-xs">
-                              <DropdownMenuItem
-                                onClick={() => {
-                                  if (q) {
-                                    navigate(`/admin/questions/preview/${q.id}`, { state: q });
-                                  }
-                                }}
-                                className="cursor-pointer py-1.5 px-2.5 flex items-center gap-2 text-slate-700 hover:bg-slate-50"
-                              >
-                                <ExternalLink className="w-3.5 h-3.5 text-slate-500" />
-                                <span>Preview Problem</span>
-                              </DropdownMenuItem>
-                              <DropdownMenuSeparator className="bg-slate-100" />
-                              <DropdownMenuItem
-                                onClick={() => handleRemoveQuestion(tq.id)}
-                                className="cursor-pointer py-1.5 px-2.5 flex items-center gap-2 text-red-600 hover:bg-red-50"
-                              >
-                                <Trash2 className="w-3.5 h-3.5 text-red-500" />
-                                <span>Remove from Test</span>
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </div>
-
-                        {/* Row 2: Metadata */}
-                        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-500 font-medium">
-                          <div className="flex items-center gap-1 font-mono text-slate-400">
-                            <span>=</span>
-                            <span className="text-slate-600 font-sans">{isCoding ? "Coding" : "MCQ"}</span>
+                            )}
                           </div>
-
-                          {!isCoding && mcqSubtype && (
-                            <div className="flex items-center gap-1">
-                              <span className="text-slate-400 text-[11px]">⊙</span>
-                              <span>{mcqSubtype}</span>
-                            </div>
-                          )}
-
-                          {difficulty && (
-                            <div className="flex items-center gap-1">
-                              <span className="text-slate-400 text-[10px]">❖</span>
-                              <span>{fmt(difficulty)}</span>
-                            </div>
-                          )}
-
-                          {marks !== undefined && (
-                            <div className="flex items-center gap-1">
-                              <LayoutGrid className="w-3 h-3 text-slate-400" />
-                              <span>{marks} points</span>
-                            </div>
-                          )}
-
-                          {testCasesCount && (
-                            <div className="flex items-center gap-1">
-                              <span className="text-slate-400 font-mono text-[11px]">⊘</span>
-                              <span>{testCasesCount}</span>
-                            </div>
-                          )}
                         </div>
+
+                        {/* Questions in this section */}
+                        {!isCollapsed && (
+                          <div className="divide-y divide-slate-50">
+                            {sectionQs.length === 0 ? (
+                              <div className="px-8 py-3 text-xs text-slate-400 italic">No questions in this section yet.</div>
+                            ) : (
+                              sectionQs.map((tq, index) => {
+                                const q = tq.question;
+                                const isCoding = (q?.questionType ?? "").toUpperCase() === "CODING";
+                                const qTitle = q?.title || `Question ${index + 1}`;
+                                const marks = tq.marks ?? q?.marks ?? 10;
+                                const difficulty = q?.difficulty || "MEDIUM";
+                                const mcqSubtype = q?.mcqType ? fmtMcqType(q.mcqType) : undefined;
+                                const testCasesCount = isCoding
+                                  ? `${(q as any)?.testCases?.length || (q as any)?.testCaseCount || 0} test cases`
+                                  : undefined;
+
+                                return (
+                                  <div
+                                    key={tq.id || index}
+                                    className="pl-9 pr-5 py-4 hover:bg-slate-50/60 transition-colors space-y-1.5"
+                                  >
+                                    <div className="flex items-start justify-between gap-4">
+                                      <h3 className="font-bold text-slate-900 text-sm leading-snug">{qTitle}</h3>
+
+                                      <DropdownMenu>
+                                        <DropdownMenuTrigger asChild>
+                                          <button className="p-1 text-slate-400 hover:text-slate-700 transition-colors cursor-pointer">
+                                            <MoreVertical className="w-4 h-4" />
+                                          </button>
+                                        </DropdownMenuTrigger>
+                                        <DropdownMenuContent align="end" className="w-52 bg-white border border-slate-200 shadow-xl p-1 text-xs">
+                                          <DropdownMenuItem
+                                            onClick={() => { if (q) navigate(`/admin/questions/preview/${q.id}`, { state: q }); }}
+                                            className="cursor-pointer py-1.5 px-2.5 flex items-center gap-2 text-slate-700 hover:bg-slate-50"
+                                          >
+                                            <ExternalLink className="w-3.5 h-3.5 text-slate-500" />
+                                            <span>Preview Problem</span>
+                                          </DropdownMenuItem>
+                                          {/* Move to Section */}
+                                          {sectionOrder.filter((s) => s !== section).length > 0 && (
+                                            <>
+                                              <DropdownMenuSeparator className="bg-slate-100" />
+                                              <DropdownMenuLabel className="text-[10px] text-slate-400 px-2.5 py-1">Move to section</DropdownMenuLabel>
+                                              {sectionOrder.filter((s) => s !== section).map((targetSection) => (
+                                                <DropdownMenuItem
+                                                  key={targetSection}
+                                                  onClick={() => handleMoveToSection(tq, targetSection)}
+                                                  className="cursor-pointer py-1.5 px-2.5 text-slate-700 hover:bg-slate-50"
+                                                >
+                                                  → {targetSection}
+                                                </DropdownMenuItem>
+                                              ))}
+                                            </>
+                                          )}
+                                          <DropdownMenuSeparator className="bg-slate-100" />
+                                          <DropdownMenuItem
+                                            onClick={() => handleRemoveQuestion(tq.id)}
+                                            className="cursor-pointer py-1.5 px-2.5 flex items-center gap-2 text-red-600 hover:bg-red-50"
+                                          >
+                                            <Trash2 className="w-3.5 h-3.5 text-red-500" />
+                                            <span>Remove from Test</span>
+                                          </DropdownMenuItem>
+                                        </DropdownMenuContent>
+                                      </DropdownMenu>
+                                    </div>
+
+                                    {/* Metadata row */}
+                                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-500 font-medium">
+                                      <div className="flex items-center gap-1 font-mono text-slate-400">
+                                        <span>=</span>
+                                        <span className="text-slate-600 font-sans">{isCoding ? "Coding" : "MCQ"}</span>
+                                      </div>
+                                      {!isCoding && mcqSubtype && (
+                                        <div className="flex items-center gap-1"><span className="text-slate-400 text-[11px]">⊙</span><span>{mcqSubtype}</span></div>
+                                      )}
+                                      {difficulty && (
+                                        <div className="flex items-center gap-1"><span className="text-slate-400 text-[10px]">❖</span><span>{fmt(difficulty)}</span></div>
+                                      )}
+                                      {marks !== undefined && (
+                                        <div className="flex items-center gap-1"><LayoutGrid className="w-3 h-3 text-slate-400" /><span>{marks} points</span></div>
+                                      )}
+                                      {testCasesCount && (
+                                        <div className="flex items-center gap-1"><span className="text-slate-400 font-mono text-[11px]">⊘</span><span>{testCasesCount}</span></div>
+                                      )}
+                                    </div>
+                                  </div>
+                                );
+                              })
+                            )}
+                          </div>
+                        )}
                       </div>
                     );
                   })}

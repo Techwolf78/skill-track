@@ -48,13 +48,13 @@ import { AnswerStore, computeContentHash } from "@/lib/exam/answerStorage";
 
 import { mapBackendToFrontendLang } from "../../types/question";
 
-// Types
 interface Question {
   id: string;
   type: "MCQ" | "CODING";
   prompt: string;
   marks: number;
   options?: unknown[];
+  sectionName?: string;
   problemStatement?: string;
   sampleInput?: string;
   sampleOutput?: string;
@@ -77,6 +77,7 @@ interface RawPaperQuestion {
   marks: number;
   type: "MCQ" | "CODING";
   prompt: string;
+  sectionName?: string;
   options?: unknown[];
   coding?: {
     timeLimitSecs?: number;
@@ -132,6 +133,7 @@ interface TestQuestion {
   questionId: string;
   orderIndex: number;
   marks: number;
+  sectionName?: string;
   timeLimitSecs?: number;
   question?: {
     id: string;
@@ -303,6 +305,8 @@ function TestInterfaceContent({ testId, sessionId, navigate, toast }: { testId?:
   const [test, setTest] = useState<TestDetails | null>(null);
   const [session, setSession] = useState<TestSession | null>(null);
   const [questions, setQuestions] = useState<Question[]>([]);
+  const [questionSectionMap, setQuestionSectionMap] = useState<Record<string, string>>({});
+  const [sectionOrder, setSectionOrder] = useState<string[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [answers, setAnswers] = useState<Record<string, unknown>>({});
   const [flagged, setFlagged] = useState<Set<string>>(new Set());
@@ -446,6 +450,7 @@ function TestInterfaceContent({ testId, sessionId, navigate, toast }: { testId?:
             questionId: q.sourceQuestionId,
             orderIndex: q.orderIndex,
             marks: q.marks,
+            sectionName: q.sectionName,
             timeLimitSecs: q.coding?.timeLimitSecs,
             question: {
               id: q.sourceQuestionId,
@@ -544,7 +549,6 @@ function TestInterfaceContent({ testId, sessionId, navigate, toast }: { testId?:
   }, [sessionId, fetchTestSession]);
 
   // Process questions when test data is loaded
-// Update this useEffect in TestInterface.tsx
 useEffect(() => {
   if (test && test.questions && test.questions.length > 0) {
     console.log("🔍 Processing test data:", test);
@@ -553,17 +557,6 @@ useEffect(() => {
     const qs = test.questions
       .sort((a, b) => a.orderIndex - b.orderIndex)
       .map(tq => {
-        // Log the question data to debug
-        console.log("🔍 Mapping test question - raw tq:", tq);
-        console.log("🔍 tq.question:", tq.question);
-        console.log("🔍 tq.question?.codeTemplate:", tq.question?.codeTemplate);
-        
-        // Check if codeTemplate exists and has content
-        const hasCodeTemplate = tq.question?.codeTemplate && 
-          Object.keys(tq.question.codeTemplate).length > 0;
-        
-        console.log("🔍 Has code template?", hasCodeTemplate);
-        
         const rawStarterCode = tq.question?.coding?.starterCode || tq.question?.starterCode;
         const processedStarterCode: Record<string, string> = {};
         if (rawStarterCode) {
@@ -578,6 +571,7 @@ useEffect(() => {
           type: tq.question?.questionType || tq.question?.type || "MCQ",
           prompt: tq.question?.prompt || "No prompt",
           marks: tq.marks,
+          sectionName: tq.sectionName || (tq as any).section || undefined,
           options: tq.question?.mcqOptions || [],
           problemStatement: tq.question?.prompt,
           sampleInput: tq.question?.sampleInput,
@@ -596,8 +590,28 @@ useEffect(() => {
       });
     
     console.log("🔍 Processed questions:", qs);
-    console.log("🔍 First question codeTemplate:", qs[0]?.codeTemplate);
     setQuestions(qs);
+
+    // Build section mapping directly from questions
+    const map: Record<string, string> = {};
+    const order: string[] = [];
+    let hasNamedSection = false;
+
+    qs.forEach((q) => {
+      const sName = q.sectionName?.trim() || "Ungrouped";
+      map[q.id] = sName;
+      if (q.sectionName?.trim()) {
+        hasNamedSection = true;
+      }
+      if (!order.includes(sName)) {
+        order.push(sName);
+      }
+    });
+
+    if (hasNamedSection || order.length > 1) {
+      setQuestionSectionMap(map);
+      setSectionOrder(order.sort((a, b) => (a === "Ungrouped" ? 1 : b === "Ungrouped" ? -1 : 0)));
+    }
   }
 }, [test]);
 
@@ -667,14 +681,14 @@ useEffect(() => {
 
   // Set time left from session or test
   useEffect(() => {
-    if (session && session.remainingTimeSecs > 0) {
+    if (session && session.remainingTimeSecs !== undefined && session.remainingTimeSecs > 0) {
       setTimeLeft(session.remainingTimeSecs);
       setIsTimerInitialized(true);
-    } else if (test?.durationMins) {
+    } else if (test?.durationMins && test.durationMins > 0 && !isTimerInitialized) {
       setTimeLeft(test.durationMins * 60);
       setIsTimerInitialized(true);
     }
-  }, [session, test]);
+  }, [session, test, isTimerInitialized]);
 
   // Timer effect
 
@@ -1943,26 +1957,67 @@ useEffect(() => {
         <aside className="lg:w-80 border-l bg-card/50 p-4 space-y-4 overflow-y-auto">
           <div>
             <div className="text-xs uppercase tracking-wider text-muted-foreground mb-3 font-semibold">Question Navigator</div>
-            <div className="grid grid-cols-5 gap-2">
-              {questions.map((q, idx) => {
-                const isAnswered = !!answers[q.id];
-                return (
-                  <button
-                    key={q.id}
-                    onClick={() => handleNavigateIndex(idx)}
-                    className={cn(
-                      "h-10 rounded-lg font-mono text-sm transition-all",
-                      idx === currentIndex && "ring-2 ring-primary bg-primary text-white",
-                      isAnswered && !flagged.has(q.id) && idx !== currentIndex && "bg-green-500/20 text-green-700",
-                      flagged.has(q.id) && "bg-yellow-500/20 text-yellow-700",
-                      !isAnswered && !flagged.has(q.id) && idx !== currentIndex && "bg-muted hover:bg-muted/70"
-                    )}
-                  >
-                    {idx + 1}
-                  </button>
-                );
-              })}
-            </div>
+            {sectionOrder.length > 0 && !(sectionOrder.length === 1 && sectionOrder[0] === "Ungrouped") ? (
+              // Section-grouped palette
+              <div className="space-y-4">
+                {sectionOrder.map((section) => {
+                  const sectionQs = questions
+                    .map((q, idx) => ({ q, idx }))
+                    .filter(({ q }) => (questionSectionMap[q.id] ?? "Ungrouped") === section);
+                  const answeredInSection = sectionQs.filter(({ q }) => !!answers[q.id]).length;
+                  return (
+                    <div key={section}>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{section}</span>
+                        <span className="text-[10px] text-muted-foreground">{answeredInSection}/{sectionQs.length}</span>
+                      </div>
+                      <div className="grid grid-cols-5 gap-1.5">
+                        {sectionQs.map(({ q, idx }) => {
+                          const isAnswered = !!answers[q.id];
+                          return (
+                            <button
+                              key={q.id}
+                              onClick={() => handleNavigateIndex(idx)}
+                              className={cn(
+                                "h-8 rounded text-xs font-mono transition-all",
+                                idx === currentIndex && "ring-2 ring-primary bg-primary text-white",
+                                isAnswered && !flagged.has(q.id) && idx !== currentIndex && "bg-green-500/20 text-green-700",
+                                flagged.has(q.id) && "bg-yellow-500/20 text-yellow-700",
+                                !isAnswered && !flagged.has(q.id) && idx !== currentIndex && "bg-muted hover:bg-muted/70"
+                              )}
+                            >
+                              {idx + 1}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              // Flat palette (no sections or single section)
+              <div className="grid grid-cols-5 gap-2">
+                {questions.map((q, idx) => {
+                  const isAnswered = !!answers[q.id];
+                  return (
+                    <button
+                      key={q.id}
+                      onClick={() => handleNavigateIndex(idx)}
+                      className={cn(
+                        "h-10 rounded-lg font-mono text-sm transition-all",
+                        idx === currentIndex && "ring-2 ring-primary bg-primary text-white",
+                        isAnswered && !flagged.has(q.id) && idx !== currentIndex && "bg-green-500/20 text-green-700",
+                        flagged.has(q.id) && "bg-yellow-500/20 text-yellow-700",
+                        !isAnswered && !flagged.has(q.id) && idx !== currentIndex && "bg-muted hover:bg-muted/70"
+                      )}
+                    >
+                      {idx + 1}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
           <div className="flex gap-2">
