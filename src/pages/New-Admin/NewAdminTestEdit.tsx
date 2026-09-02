@@ -96,6 +96,7 @@ import {
 } from "@/lib/test-service";
 import { candidateService, CandidateInvitation } from "@/lib/candidate-service";
 import { PublishTestConfirmationModal } from "@/components/admin/PublishTestConfirmationModal";
+import { ExtendTimeModal, ExtendTimeCandidateSession } from "@/components/admin/ExtendTimeModal";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import * as XLSX from "xlsx";
@@ -354,6 +355,10 @@ export default function NewAdminTestEdit() {
   const [candidateToRevoke, setCandidateToRevoke] = useState<CandidateInvitation | null>(null);
   const [isRevokeModalOpen, setIsRevokeModalOpen] = useState(false);
   const [revoking, setRevoking] = useState(false);
+
+  // ── Time Extension Modal State ──
+  const [isExtendTimeModalOpen, setIsExtendTimeModalOpen] = useState(false);
+  const [candidateForTimeExtension, setCandidateForTimeExtension] = useState<ExtendTimeCandidateSession | null>(null);
 
   const alreadyInvitedCandidateIds = useMemo(() => {
     return new Set(invitations.map((i) => i.candidateId));
@@ -3285,6 +3290,41 @@ export default function NewAdminTestEdit() {
                                       <span>Resend Invitation</span>
                                     </DropdownMenuItem>
 
+                                    <DropdownMenuItem
+                                      onClick={() => {
+                                        const scoreEntry = candidateResults[inv.id];
+                                        const sessionId =
+                                          scoreEntry?.sessionId ||
+                                          scoreEntry?.session?.id ||
+                                          scoreEntry?.detail?.systemInfo?.sessionId ||
+                                          scoreEntry?.detail?.sessionId ||
+                                          (inv as any).sessionId ||
+                                          (inv as any).testSessionId;
+
+                                        if (!sessionId) {
+                                          toast.error("No active test session found for this candidate yet.");
+                                          return;
+                                        }
+
+                                        const candName = inv.candidateName || inv.candidate?.user?.name || "Candidate";
+                                        const candEmail = inv.candidateEmail || inv.candidate?.user?.email;
+
+                                        setCandidateForTimeExtension({
+                                          id: sessionId,
+                                          candidateId: inv.candidateId,
+                                          candidateName: candName,
+                                          candidateEmail: candEmail,
+                                          testTitle: title || test?.title || "Assessment",
+                                          formattedRemaining: "Active",
+                                        });
+                                        setIsExtendTimeModalOpen(true);
+                                      }}
+                                      className="cursor-pointer py-2 px-2.5 flex items-center gap-2 text-amber-600 hover:bg-amber-50 font-medium"
+                                    >
+                                      <Clock className="w-3.5 h-3.5 text-amber-500" />
+                                      <span>Extend Time</span>
+                                    </DropdownMenuItem>
+
                                     <DropdownMenuSeparator className="bg-slate-100" />
 
                                     <DropdownMenuItem
@@ -3542,6 +3582,20 @@ export default function NewAdminTestEdit() {
           setActiveTab("PROBLEMS");
         }}
         isPublishing={savingGeneralSettings}
+      />
+
+      {/* Time Extension Modal */}
+      <ExtendTimeModal
+        isOpen={isExtendTimeModalOpen}
+        session={candidateForTimeExtension}
+        onClose={() => {
+          setIsExtendTimeModalOpen(false);
+          setCandidateForTimeExtension(null);
+        }}
+        onSuccess={() => {
+          toast.success("Candidate session time successfully extended!");
+          loadCandidatesData();
+        }}
       />
     </div>
   );

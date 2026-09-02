@@ -424,6 +424,7 @@ export interface Test {
   instructions?: Record<string, unknown>;
   status: "DRAFT" | "PUBLISHED" | "ARCHIVED";
   passMark: number;
+  totalMarks?: number;
   createdAt?: string;
   updatedAt?: string;
   questions?: TestQuestion[];
@@ -510,7 +511,6 @@ export interface CreateTestScheduleExtendedRequest {
   maxCandidates?: number;
 }
 
-// Test Session
 export interface TestSession {
   id: string;
   testId: string;
@@ -520,6 +520,10 @@ export interface TestSession {
   startedAt: string;
   submittedAt?: string;
   expiresAt: string;
+  timerRemainingSecs?: number;
+  remainingSeconds?: number;
+  remainingTimeSecs?: number;
+  fullscreenViolations?: number;
 }
 
 // Test Result
@@ -1274,6 +1278,13 @@ export const testService = {
 
   getTestPaper: async (sessionId: string): Promise<Test> => {
     const response = await apiClient.get<Test>(`/test-sessions/${sessionId}/paper`);
+    return unwrapResponse(response);
+  },
+
+  extendTime: async (sessionId: string, minutes: number): Promise<TestSession> => {
+    const response = await apiClient.post<TestSession>(`/test-sessions/${sessionId}/extend-time`, {
+      minutes,
+    });
     return unwrapResponse(response);
   },
 

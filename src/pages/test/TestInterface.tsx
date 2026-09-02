@@ -45,6 +45,7 @@ import { EnvironmentCheck } from "@/proctoring/components/EnvironmentCheck";
 import { IdentityVerification } from "@/proctoring/components/IdentityVerification";
 import { Shield, ShieldAlert, ShieldCheck as ShieldCheckIcon, Camera } from "lucide-react";
 import { AnswerStore, computeContentHash } from "@/lib/exam/answerStorage";
+import { detectTimeExtension } from "@/lib/exam/sessionLogic";
 
 import { mapBackendToFrontendLang } from "../../types/question";
 
@@ -307,9 +308,24 @@ function TestInterfaceContent({ testId, sessionId, navigate, toast }: { testId?:
   const [answers, setAnswers] = useState<Record<string, unknown>>({});
   const [flagged, setFlagged] = useState<Set<string>>(new Set());
   const [timeLeft, setTimeLeft] = useState(0);
+  const [timeExtensionNotice, setTimeExtensionNotice] = useState<{ addedMinutes: number } | null>(null);
+  const prevRemainingRef = useRef<number>(0);
+  const noticeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [isTimerInitialized, setIsTimerInitialized] = useState(false);
   const [showSubmitDialog, setShowSubmitDialog] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+
+  // Keep prevRemainingRef updated with local clock tick
+  useEffect(() => {
+    prevRemainingRef.current = timeLeft;
+  }, [timeLeft]);
+
+  // Clean up notice timeout
+  useEffect(() => {
+    return () => {
+      if (noticeTimeoutRef.current) clearTimeout(noticeTimeoutRef.current);
+    };
+  }, []);
 
   const lastSavedHashes = useRef<Record<string, string>>({});
 
@@ -1002,26 +1018,51 @@ useEffect(() => {
     }
   }, [isTimerInitialized, timeLeft, sessionId, loading, handleAutoSubmit]);
 
-  // Periodic server timer synchronization to prevent clock tampering
+  // Heartbeat / Server sync handler to detect extra time extensions seamlessly
+  const handleServerTimerSync = useCallback((sessionData: { timerRemainingSecs?: number; remainingSeconds?: number; remainingTimeSecs?: number }) => {
+    const serverSecs = sessionData.timerRemainingSecs ?? sessionData.remainingSeconds ?? sessionData.remainingTimeSecs;
+    if (typeof serverSecs === "number" && !isNaN(serverSecs) && serverSecs > 0) {
+      const currentLocal = prevRemainingRef.current;
+      const { extended, addedMinutes } = detectTimeExtension(serverSecs, currentLocal, 10);
+      if (extended) {
+        setTimeExtensionNotice({ addedMinutes });
+        if (noticeTimeoutRef.current) clearTimeout(noticeTimeoutRef.current);
+        noticeTimeoutRef.current = setTimeout(() => {
+          setTimeExtensionNotice(null);
+        }, 4500);
+      }
+
+      setTimeLeft(serverSecs);
+      prevRemainingRef.current = serverSecs;
+    }
+  }, []);
+
+  // Periodic server timer synchronization to prevent clock tampering & auto-receive extensions
   useEffect(() => {
     if (!sessionId) return;
 
     const syncInterval = setInterval(async () => {
       if (!navigator.onLine) return;
       try {
-        const sessionResponse = await apiClient.get(`/test-sessions/${sessionId}/resume`);
-        const sessionData = sessionResponse.data?.data || sessionResponse.data;
-        const remainingSeconds = sessionData.remainingSeconds || sessionData.remainingTimeSecs || 0;
-        if (remainingSeconds > 0) {
-          setTimeLeft(remainingSeconds);
+        let sessionData: { timerRemainingSecs?: number; remainingSeconds?: number; remainingTimeSecs?: number } | null = null;
+        try {
+          const hbRes = await apiClient.post(`/test-sessions/${sessionId}/heartbeat`, {});
+          sessionData = hbRes.data?.data ?? hbRes.data;
+        } catch {
+          const sessionResponse = await apiClient.get(`/test-sessions/${sessionId}/resume`);
+          sessionData = sessionResponse.data?.data ?? sessionResponse.data;
+        }
+
+        if (sessionData) {
+          handleServerTimerSync(sessionData);
         }
       } catch (err) {
         console.warn("Failed to sync timer with server:", err);
       }
-    }, 60000); // sync every 60 seconds
+    }, 30000); // sync every 30 seconds for responsive auto-sync
 
     return () => clearInterval(syncInterval);
-  }, [sessionId]);
+  }, [sessionId, handleServerTimerSync]);
 
 
   const handleRunCode = useCallback(async () => {
@@ -1516,12 +1557,35 @@ useEffect(() => {
             </div>
           )}
 
-          <div className={cn(
-            "rounded-lg px-3 py-2 text-sm font-mono font-medium",
-            timeLeft < 300 ? "bg-red-500/10 text-red-500 animate-pulse" : "bg-muted"
-          )}>
-            <Clock className="w-4 h-4 inline mr-2" />
-            {formatTime(timeLeft)}
+          <div className="relative">
+            <div
+              className={cn(
+                "rounded-lg px-3 py-2 text-sm font-mono font-medium flex items-center transition-all duration-300",
+                timeLeft < 300
+                  ? "bg-red-500/10 text-red-500 animate-pulse"
+                  : timeExtensionNotice
+                  ? "bg-emerald-500/15 text-emerald-600 ring-2 ring-emerald-500/40 shadow-xs shadow-emerald-500/10 font-bold"
+                  : "bg-muted"
+              )}
+            >
+              <Clock className="w-4 h-4 mr-2" />
+              {formatTime(timeLeft)}
+            </div>
+
+            {/* Subtle floating badge when time is extended - positioned below the clock */}
+            <AnimatePresence>
+              {timeExtensionNotice && (
+                <motion.div
+                  initial={{ opacity: 0, y: -4, scale: 0.85 }}
+                  animate={{ opacity: 1, y: 4, scale: 1 }}
+                  exit={{ opacity: 0, y: 10, scale: 0.85 }}
+                  transition={{ duration: 0.35, ease: "easeOut" }}
+                  className="absolute top-full mt-1.5 left-1/2 -translate-x-1/2 px-2 py-0.5 rounded-full bg-emerald-600 text-white font-mono text-[11px] font-bold shadow-md pointer-events-none flex items-center gap-1 whitespace-nowrap z-30"
+                >
+                  <span>+{timeExtensionNotice.addedMinutes}m</span>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
           
           <div className={cn(

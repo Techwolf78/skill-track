@@ -94,7 +94,9 @@ import {
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiClient } from "@/lib/api-client";
+import { TestSession } from "@/lib/test-service";
 import { TestPhotoUploadModal } from "@/proctoring/components/TestPhotoUploadModal";
+import { ExtendTimeModal, ExtendTimeCandidateSession } from "@/components/admin/ExtendTimeModal";
 
 // ==========================================
 // 7. TypeScript Types & Enums
@@ -175,6 +177,7 @@ export interface SystemInfo {
 
 export interface CandidateProctoringDetail {
   id: string;
+  sessionId?: string;
   name: string;
   email: string;
   testStatus: TestStatus;
@@ -261,12 +264,51 @@ export default function ProctoringDashboard() {
   // Test Photo Upload Modal State
   const [showTestUploadModal, setShowTestUploadModal] = useState(false);
 
+  // Time Extension Modal State
+  const [isExtendTimeModalOpen, setIsExtendTimeModalOpen] = useState(false);
+  const [selectedCandidateForExtension, setSelectedCandidateForExtension] = useState<ExtendTimeCandidateSession | null>(null);
+
+  const handleOpenExtendTimeModal = (candidate: ProctoringCandidate | CandidateProctoringDetail) => {
+    const currentSchedule = schedules.find((s) => s.id === selectedScheduleId);
+    const resolvedSessionId = candidate.sessionId || candidates.find((c) => c.id === candidate.id)?.sessionId;
+
+    if (!resolvedSessionId) {
+      toast({
+        title: "Session Not Active",
+        description: "No active test session found for this candidate yet.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const sessionData: ExtendTimeCandidateSession = {
+      id: resolvedSessionId,
+      candidateId: candidate.id,
+      candidateName: candidate.name,
+      candidateEmail: candidate.email,
+      testTitle: currentSchedule?.assessmentName || "Active Assessment",
+      formattedRemaining: "Active",
+    };
+    setSelectedCandidateForExtension(sessionData);
+    setIsExtendTimeModalOpen(true);
+  };
+
+  const handleExtendTimeSuccess = (_updatedSession: TestSession) => {
+    toast({
+      title: "Time Extended",
+      description: `Successfully granted extra time for candidate.`,
+    });
+    if (selectedScheduleId) {
+      loadCandidates(selectedScheduleId);
+    }
+  };
+
   // Fetch Schedules API
   const loadSchedules = useCallback(async () => {
     setLoadingSchedules(true);
     setErrorSchedules(null);
     try {
-      const response = await apiClient.get("/api/admin/proctoring/assessment-schedules");
+      const response = await apiClient.get("/admin/proctoring/assessment-schedules");
       const data = response.data?.data ?? response.data;
       if (Array.isArray(data) && data.length > 0) {
         setSchedules(data);
@@ -291,7 +333,7 @@ export default function ProctoringDashboard() {
     setErrorCandidates(null);
     try {
       const response = await apiClient.get(
-        `/api/admin/proctoring/assessment-schedules/${scheduleId}/candidates`,
+        `/admin/proctoring/assessment-schedules/${scheduleId}/candidates`,
       );
       const data = response.data?.data ?? response.data;
       const mappedCandidates = Array.isArray(data) ? data.map((cand: { candidateId: string; sessionId?: string; candidateName: string; email: string; testStatus: string; proctoringMode: ProctoringMode; riskLevel: RiskLevel; violationCount: number; criticalViolationCount: number; lastActivityAt?: string; reviewStatus?: ReviewStatus }) => ({
@@ -327,7 +369,7 @@ export default function ProctoringDashboard() {
     setErrorDetails(null);
     try {
       const response = await apiClient.get(
-        `/api/admin/proctoring/candidates/${candidate.id}/details?scheduleId=${selectedScheduleId}`,
+        `/admin/proctoring/candidates/${candidate.id}/details?scheduleId=${selectedScheduleId}`,
       );
       const data = response.data?.data ?? response.data;
       console.log(`[Proctoring Dashboard] loadCandidateDetails response:`, data);
@@ -338,6 +380,7 @@ export default function ProctoringDashboard() {
       if (data && typeof data === "object") {
         const mappedDetail: CandidateProctoringDetail = {
           id: data.candidate?.candidateId || candidate.id,
+          sessionId: data.systemInfo?.sessionId || candidate.sessionId,
           name: data.candidate?.candidateName || candidate.name,
           email: data.candidate?.email || candidate.email,
           testStatus: data.testStatus === "ACTIVE" ? "IN_PROGRESS" : data.testStatus,
@@ -422,7 +465,7 @@ export default function ProctoringDashboard() {
     setIsSavingReview(true);
     try {
       await apiClient.patch(
-        `/api/admin/proctoring/candidates/${selectedCandidate.id}/review-status`,
+        `/admin/proctoring/candidates/${selectedCandidate.id}/review-status`,
         {
           scheduleId: selectedScheduleId,
           reviewStatus: newStatus,
@@ -1598,15 +1641,29 @@ export default function ProctoringDashboard() {
                           {getReviewStatusBadge(cand.reviewStatus)}
                         </TableCell>
                         <TableCell className={`text-right pr-6 ${isCompact ? "py-2" : "py-3.5"}`}>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => loadCandidateDetails(cand)}
-                            className="h-8 text-xs border-border/80 hover:border-rose-500/30 text-foreground hover:bg-rose-500/5 transition-colors gap-1.5 font-semibold"
-                          >
-                            <Eye className="h-3.5 w-3.5 text-muted-foreground" />
-                            View Details
-                          </Button>
+                          <div className="flex items-center justify-end gap-2">
+                            {cand.testStatus === "IN_PROGRESS" && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleOpenExtendTimeModal(cand)}
+                                className="h-8 text-xs text-amber-400 bg-amber-500/10 border-amber-500/20 hover:bg-amber-500/20 hover:text-amber-300 transition-colors gap-1.5 font-semibold"
+                                title="Extend Time"
+                              >
+                                <Clock className="h-3.5 w-3.5" />
+                                <span>+ Time</span>
+                              </Button>
+                            )}
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => loadCandidateDetails(cand)}
+                              className="h-8 text-xs border-border/80 hover:border-rose-500/30 text-foreground hover:bg-rose-500/5 transition-colors gap-1.5 font-semibold"
+                            >
+                              <Eye className="h-3.5 w-3.5 text-muted-foreground" />
+                              View Details
+                            </Button>
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -1669,13 +1726,25 @@ export default function ProctoringDashboard() {
 
                       <div className="flex items-center justify-between pt-2 border-t text-[10px] text-muted-foreground font-mono">
                         <span>Last active: {cand.lastActivity}</span>
-                        <Button
-                          size="sm"
-                          onClick={() => loadCandidateDetails(cand)}
-                          className="h-8 text-xs bg-rose-600 hover:bg-rose-700 text-white font-semibold flex gap-1 items-center"
-                        >
-                          <Eye className="h-3.5 w-3.5" /> Details
-                        </Button>
+                        <div className="flex items-center gap-2">
+                          {cand.testStatus === "IN_PROGRESS" && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleOpenExtendTimeModal(cand)}
+                              className="h-8 text-xs text-amber-400 bg-amber-500/10 border-amber-500/20 hover:bg-amber-500/20 text-white font-semibold flex gap-1 items-center"
+                            >
+                              <Clock className="h-3.5 w-3.5" /> + Time
+                            </Button>
+                          )}
+                          <Button
+                            size="sm"
+                            onClick={() => loadCandidateDetails(cand)}
+                            className="h-8 text-xs bg-rose-600 hover:bg-rose-700 text-white font-semibold flex gap-1 items-center"
+                          >
+                            <Eye className="h-3.5 w-3.5" /> Details
+                          </Button>
+                        </div>
                       </div>
                     </CardContent>
                   </Card>
@@ -1796,10 +1865,21 @@ export default function ProctoringDashboard() {
                       <p className="text-xs text-muted-foreground">
                         {candidateDetails.email}
                       </p>
-                      <div className="flex flex-wrap gap-2 mt-2">
+                      <div className="flex flex-wrap items-center gap-2 mt-2">
                         {getTestStatusBadge(candidateDetails.testStatus)}
                         {getRiskBadge(candidateDetails.riskLevel)}
                         {getReviewStatusBadge(candidateDetails.reviewStatus)}
+                        {candidateDetails.testStatus === "IN_PROGRESS" && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleOpenExtendTimeModal(candidateDetails)}
+                            className="h-6 text-xs text-amber-400 bg-amber-500/10 border-amber-500/30 hover:bg-amber-500/20 hover:text-amber-300 font-semibold gap-1 px-2.5 ml-2"
+                          >
+                            <Clock className="h-3 w-3 text-amber-400" />
+                            Add Extra Time
+                          </Button>
+                        )}
                       </div>
                     </div>
 
@@ -2316,6 +2396,17 @@ export default function ProctoringDashboard() {
           sessionId={selectedCandidate?.sessionId || candidates[0]?.sessionId || candidates[0]?.id || "375840ee-0c05-4ba5-8db9-1299021c7508"}
         />
       )}
+
+      {/* ExtendTimeModal */}
+      <ExtendTimeModal
+        isOpen={isExtendTimeModalOpen}
+        session={selectedCandidateForExtension}
+        onClose={() => {
+          setIsExtendTimeModalOpen(false);
+          setSelectedCandidateForExtension(null);
+        }}
+        onSuccess={handleExtendTimeSuccess}
+      />
     </div>
   );
 }
