@@ -401,7 +401,7 @@ export default function NewAdminTestAddProblems() {
             className="px-5 py-2.5 bg-[#10B981] hover:bg-[#059669] text-white text-sm font-semibold rounded-none shadow-xs transition-colors inline-flex items-center gap-2 self-start sm:self-auto cursor-pointer"
           >
             <Check className="w-4 h-4 stroke-[3]" />
-            <span>Done & Return to Test</span>
+            <span>Done</span>
           </button>
         </div>
       </div>
@@ -631,25 +631,26 @@ export default function NewAdminTestAddProblems() {
                           </h3>
 
                           <div className="flex items-center gap-2 shrink-0">
-                            {/* ── Prominent Add / Added Action Button ── */}
+                            {/* ── Add / Added Action Button ── */}
                             {isAlreadyAdded ? (
-                              <span className="px-2.5 py-1 bg-emerald-50 text-emerald-700 border border-emerald-300 rounded-none text-xs font-semibold inline-flex items-center gap-1">
-                                <Check className="w-3.5 h-3.5 stroke-[3]" />
-                                <span>Added</span>
+                              <span 
+                                className="p-1.5 bg-emerald-50 text-emerald-700 border border-emerald-300 text-xs font-semibold inline-flex items-center justify-center"
+                                title="Already added to test"
+                              >
+                                <Check className="w-4 h-4 stroke-[3]" />
                               </span>
                             ) : (
                               <button
                                 onClick={() => handleAddQuestion(q)}
                                 disabled={isCurrentlyAdding}
-                                className="px-3 py-1 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-none text-xs font-semibold shadow-xs transition-colors inline-flex items-center gap-1 cursor-pointer"
-                                title="Add question to test"
+                                className="p-1.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-xs font-semibold shadow-xs transition-colors inline-flex items-center justify-center cursor-pointer"
+                                title="Add to test"
                               >
                                 {isCurrentlyAdding ? (
-                                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                  <Loader2 className="w-4 h-4 animate-spin" />
                                 ) : (
-                                  <Plus className="w-3.5 h-3.5 stroke-[3]" />
+                                  <Plus className="w-4 h-4 stroke-[3]" />
                                 )}
-                                <span>Add to Test</span>
                               </button>
                             )}
                           </div>
