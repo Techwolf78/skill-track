@@ -22,6 +22,7 @@ const ProctoringContext = createContext<ProctoringContextType | undefined>(undef
 
 export interface ProctoringConfigDto {
   camera: boolean;
+  requireWebcam?: boolean;
   audio: boolean;
   tabSwitch: boolean;
   devtools: boolean;
