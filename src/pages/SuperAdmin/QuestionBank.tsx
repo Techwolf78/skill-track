@@ -78,6 +78,7 @@ import {
   TaxonomyContext,
   parseImportRow,
   generateDynamicExcelTemplate,
+  generateCodingExcelTemplate,
   resolveTaxonomyForRow,
 } from "@/lib/admin/questionImport";
 import { QuestionPreview } from "./QuestionPreview";
@@ -1116,6 +1117,16 @@ function SuperAdminImportQuestionsDialog({
     XLSX.writeFile(wb, "superadmin_question_template.xlsx");
   };
 
+  // Download Dynamic Coding Sample Excel
+  const downloadSampleCodingExcel = () => {
+    const wb = generateCodingExcelTemplate({
+      subjects,
+      topics: allTopics,
+      subtopics: allSubtopics,
+    });
+    XLSX.writeFile(wb, "superadmin_coding_template.xlsx");
+  };
+
   // Download Sample JSON
   const downloadSampleJson = () => {
     const sampleSub = subjects[0]?.name || "Computer Science";
@@ -1514,6 +1525,7 @@ function SuperAdminImportQuestionsDialog({
               </Table>
             </div>
           </div>
+        )}
         </div>
 
         {/* Footer Actions (Sticky Bottom) */}

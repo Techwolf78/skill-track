@@ -18,7 +18,9 @@ import {
   User as UserIcon,
   Code2,
   Sparkles,
+  FolderTree,
 } from "lucide-react";
+import QuickManageSubjects from "@/components/QuickManageSubjects";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
@@ -221,6 +223,7 @@ export default function NewAdminQuestionCreate() {
   const [subjectId, setSubjectId] = useState("");
   const [topicId, setTopicId] = useState("");
   const [subtopicId, setSubtopicId] = useState("");
+  const [manageSubjectsOpen, setManageSubjectsOpen] = useState(false);
   const [tags, setTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState("");
   const [subtopics, setSubtopics] = useState<{ id: string; name: string }[]>([]);
@@ -1538,9 +1541,34 @@ export default function NewAdminQuestionCreate() {
                 Cancel
               </button>
             </div>
+
+            {/* Taxonomy Management Quick Card */}
+            <div className="bg-white border border-slate-200/90 shadow-sm p-4 space-y-2.5">
+              <div className="flex items-center gap-2 text-slate-800">
+                <FolderTree className="w-4 h-4 text-[#4353a4]" />
+                <h3 className="text-xs font-bold uppercase tracking-wider">Taxonomy</h3>
+              </div>
+              <p className="text-[11px] text-slate-500 leading-relaxed">
+                Need a new subject or topic? Add, rename, or organize them here anytime.
+              </p>
+              <button
+                type="button"
+                onClick={() => setManageSubjectsOpen(true)}
+                className="w-full py-2 bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+              >
+                <Plus className="w-3.5 h-3.5 text-[#4353a4]" />
+                <span>Manage Subjects & Topics</span>
+              </button>
+            </div>
           </div>
         </div>
       </main>
+
+      {/* Quick Manage Subjects / Topics / Subtopics Dialog */}
+      <QuickManageSubjects
+        open={manageSubjectsOpen}
+        onOpenChange={setManageSubjectsOpen}
+      />
     </div>
   );
 }

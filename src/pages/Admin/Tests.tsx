@@ -176,7 +176,7 @@ export default function AdminTests() {
         title: newTestName.trim(),
         durationMins: newTestDuration,
         difficulty: "MEDIUM" as const,
-        status: "DRAFT" as const,
+        status: "PUBLISHED" as const,
         passMark: 40,
         isActive: true,
       };

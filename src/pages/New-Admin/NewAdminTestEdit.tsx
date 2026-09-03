@@ -42,6 +42,7 @@ import {
   ShieldAlert,
   Settings,
   GripVertical,
+  Info,
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
@@ -84,7 +85,6 @@ import {
   MaterialTimePickerDialog,
 } from "@/components/ui/material-pickers";
 import { AddCandidatesModal } from "@/components/invite/AddCandidatesModal";
-import { BulkInviteModal } from "@/components/invite/BulkInviteModal";
 import { RichTextEditor } from "@/components/ui/RichTextEditor";
 import { useAuth } from "@/lib/auth-context";
 import { apiClient } from "@/lib/api-client";
@@ -343,9 +343,9 @@ export default function NewAdminTestEdit() {
   // ── Candidate Invitations & Performance States ──
   const [invitations, setInvitations] = useState<CandidateInvitation[]>([]);
   const [isAddCandidatesOpen, setIsAddCandidatesOpen] = useState(false);
-  const [isBulkInviteOpen, setIsBulkInviteOpen] = useState(false);
   const [candidateResults, setCandidateResults] = useState<Record<string, any>>({});
   const [loadingCandidatesData, setLoadingCandidatesData] = useState(false);
+  const [showCandidateGuide, setShowCandidateGuide] = useState(true);
 
   // Candidate Reports Filtering & Pagination
   const [candidateSearchQuery, setCandidateSearchQuery] = useState("");
@@ -3354,498 +3354,620 @@ export default function NewAdminTestEdit() {
 
           {/* ── CANDIDATES (Merged Reports & Invitations) ── */}
           {activeTab === "CANDIDATES" && (
-            <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 items-start">
-              {/* Left Filter Sidebar */}
-              <div className="lg:col-span-1 border border-slate-200 bg-white shadow-xs p-5 space-y-5">
-                <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                  <h3 className="text-sm font-bold text-slate-900">Filters</h3>
+            <div className="space-y-5">
+              {/* 1. Schedule Status Banner & Workflow Guide */}
+              {!selectedScheduleId || !scheduleStartTime || !scheduleEndTime ? (
+                <div className="p-4 bg-amber-50 border border-amber-200 text-amber-900 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-xs">
+                  <div className="space-y-1">
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-amber-950">
+                      Test Not Scheduled Yet
+                    </h4>
+                    <p className="text-xs text-amber-800 leading-relaxed">
+                      A test schedule window is required before you can invite candidates or dispatch access links. Please configure the start and end accessibility dates first.
+                    </p>
+                  </div>
                   <button
-                    onClick={() => {
-                      setCandidateStatusFilter("ALL");
-                      setCandidateSearchQuery("");
-                      setInvitedByMe(false);
-                    }}
-                    className="text-xs font-semibold text-[#4353a4] hover:text-[#324080] cursor-pointer"
+                    onClick={() => setActiveTab("ADVANCED_SETTINGS")}
+                    className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold tracking-wider uppercase inline-flex items-center gap-2 transition-colors cursor-pointer shrink-0 shadow-xs"
                   >
-                    Clear
+                    <Calendar className="w-3.5 h-3.5" />
+                    <span>Configure Schedule</span>
                   </button>
                 </div>
-
-                {/* Status Accordion */}
-                <div className="space-y-2 border-b border-slate-100 pb-4">
+              ) : (
+                <div className="p-3.5 bg-slate-50 border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+                  <div className="flex items-center gap-2.5 text-slate-700">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0"></span>
+                    <span className="font-bold text-slate-900">Active Test Schedule:</span>
+                    <span className="font-mono text-slate-600">
+                      {formatDateTime(scheduleStartTime)} — {formatDateTime(scheduleEndTime)}
+                    </span>
+                  </div>
                   <button
-                    onClick={() => setStatusAccordionOpen(!statusAccordionOpen)}
-                    className="w-full flex items-center justify-between text-xs font-bold text-slate-800 cursor-pointer"
+                    onClick={() => setActiveTab("ADVANCED_SETTINGS")}
+                    className="text-xs font-semibold text-[#4353a4] hover:text-[#324080] inline-flex items-center gap-1 cursor-pointer self-start sm:self-auto"
                   >
-                    <span>Status</span>
-                    {statusAccordionOpen ? (
-                      <ChevronUp className="w-3.5 h-3.5 text-slate-400" />
-                    ) : (
-                      <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
-                    )}
+                    <span>Edit Schedule Window</span>
+                    <ChevronRight className="w-3.5 h-3.5" />
                   </button>
+                </div>
+              )}
 
-                  {statusAccordionOpen && (
-                    <div className="pt-2 space-y-1.5 text-xs text-slate-600">
-                      {[
-                        { key: "ALL", label: `All (${invitations.length})` },
-                        { key: "PASSED", label: "Passed" },
-                        { key: "FAILED", label: "Failed" },
-                        { key: "INVITED", label: "Invited (Pending)" },
-                      ].map((st) => (
-                        <label
-                          key={st.key}
-                          className="flex items-center gap-2 cursor-pointer py-1 px-1.5 hover:bg-slate-50 rounded"
-                        >
-                          <input
-                            type="radio"
-                            name="candidateStatus"
-                            checked={candidateStatusFilter === st.key}
-                            onChange={() => setCandidateStatusFilter(st.key)}
-                            className="text-[#4353a4] focus:ring-0 w-3.5 h-3.5 cursor-pointer"
-                          />
-                          <span>{st.label}</span>
-                        </label>
-                      ))}
+              {/* 2. Operations & Workflow Instructions Card */}
+              {showCandidateGuide && (
+                <div className="p-4 bg-white border border-slate-200 shadow-xs space-y-3">
+                  <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
+                    <div className="flex items-center gap-2">
+                      <Info className="w-4 h-4 text-[#4353a4]" />
+                      <h4 className="text-xs font-bold uppercase tracking-wider text-slate-900">
+                        Candidate Management & Operations Workflow
+                      </h4>
                     </div>
-                  )}
-                </div>
+                    <button
+                      onClick={() => setShowCandidateGuide(false)}
+                      className="text-slate-400 hover:text-slate-600 text-xs font-medium cursor-pointer p-0.5"
+                      title="Dismiss instructions"
+                    >
+                      ✕
+                    </button>
+                  </div>
 
-                {/* Invited on Accordion */}
-                <div className="space-y-2 border-b border-slate-100 pb-4">
-                  <button
-                    onClick={() => setInvitedOnAccordionOpen(!invitedOnAccordionOpen)}
-                    className="w-full flex items-center justify-between text-xs font-bold text-slate-800 cursor-pointer"
-                  >
-                    <span>Invited on</span>
-                    {invitedOnAccordionOpen ? (
-                      <ChevronUp className="w-3.5 h-3.5 text-slate-400" />
-                    ) : (
-                      <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
-                    )}
-                  </button>
-                  {invitedOnAccordionOpen && (
-                    <div className="pt-1 text-xs text-slate-500">
-                      <p className="text-[11px] text-slate-400">All recent invitation batches</p>
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-xs text-slate-600">
+                    <div className="space-y-1 p-2.5 bg-slate-50/70 border border-slate-100">
+                      <div className="font-bold text-slate-900 flex items-center gap-1.5">
+                        <span className="w-4 h-4 rounded-full bg-indigo-100 text-indigo-700 text-[10px] flex items-center justify-center font-bold">1</span>
+                        <span>Schedule Window</span>
+                      </div>
+                      <p className="text-[11px] text-slate-500 leading-snug">
+                        Ensure the test schedule is configured in Advanced Settings so candidate links are active.
+                      </p>
                     </div>
-                  )}
-                </div>
 
-                {/* Invited by me Checkbox */}
-                <div className="pt-1">
-                  <label className="flex items-center gap-2.5 text-xs font-medium text-slate-700 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={invitedByMe}
-                      onChange={(e) => setInvitedByMe(e.target.checked)}
-                      className="w-4 h-4 text-[#4353a4] rounded-none border-slate-300 focus:ring-0 cursor-pointer"
-                    />
-                    <span>Invited by me</span>
-                  </label>
-                </div>
-              </div>
+                    <div className="space-y-1 p-2.5 bg-slate-50/70 border border-slate-100">
+                      <div className="font-bold text-slate-900 flex items-center gap-1.5">
+                        <span className="w-4 h-4 rounded-full bg-indigo-100 text-indigo-700 text-[10px] flex items-center justify-center font-bold">2</span>
+                        <span>Invite Candidates</span>
+                      </div>
+                      <p className="text-[11px] text-slate-500 leading-snug">
+                        Click "Add Candidates" to select existing candidates or use the built-in Excel/CSV bulk import.
+                      </p>
+                    </div>
 
-              {/* Right Main Table & Actions Area */}
-              <div className="lg:col-span-3 border border-slate-200 bg-white shadow-xs">
-                {/* 1. Search Bar & Action Buttons */}
-                <div className="p-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                  <div className="relative flex-1 max-w-md">
-                    <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                    <input
-                      type="text"
-                      value={candidateSearchQuery}
-                      onChange={(e) => {
-                        setCandidateSearchQuery(e.target.value);
-                        setCandidatePage(1);
+                    <div className="space-y-1 p-2.5 bg-slate-50/70 border border-slate-100">
+                      <div className="font-bold text-slate-900 flex items-center gap-1.5">
+                        <span className="w-4 h-4 rounded-full bg-indigo-100 text-indigo-700 text-[10px] flex items-center justify-center font-bold">3</span>
+                        <span>Dispatch & Resend</span>
+                      </div>
+                      <p className="text-[11px] text-slate-500 leading-snug">
+                        Candidates receive automated invitation emails. Use bulk toolbar or 3-dots menu to resend anytime.
+                      </p>
+                    </div>
+
+                    <div className="space-y-1 p-2.5 bg-slate-50/70 border border-slate-100">
+                      <div className="font-bold text-slate-900 flex items-center gap-1.5">
+                        <span className="w-4 h-4 rounded-full bg-indigo-100 text-indigo-700 text-[10px] flex items-center justify-center font-bold">4</span>
+                        <span>Monitor & Reports</span>
+                      </div>
+                      <p className="text-[11px] text-slate-500 leading-snug">
+                        Track live attempt statuses, extend exam timers, and download comprehensive candidate reports.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* 3. Main Filter & Candidate Table Area */}
+              <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 items-start">
+                {/* Left Filter Sidebar */}
+                <div className="lg:col-span-1 border border-slate-200 bg-white shadow-xs p-5 space-y-5">
+                  <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                    <h3 className="text-sm font-bold text-slate-900">Filters</h3>
+                    <button
+                      onClick={() => {
+                        setCandidateStatusFilter("ALL");
+                        setCandidateSearchQuery("");
+                        setInvitedByMe(false);
                       }}
-                      placeholder="Search for a candidate..."
-                      className="w-full pl-9 pr-4 py-2 text-xs border border-slate-200 rounded-none focus:outline-none focus:border-[#4353a4] bg-white text-slate-800 placeholder-slate-400"
-                    />
-                  </div>
-
-                  <div className="flex flex-wrap items-center gap-2 shrink-0">
-                    <button
-                      onClick={() => setIsBulkInviteOpen(true)}
-                      className="px-3.5 py-2 border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-semibold inline-flex items-center gap-1.5 transition-colors cursor-pointer"
+                      className="text-xs font-semibold text-[#4353a4] hover:text-[#324080] cursor-pointer"
                     >
-                      <FileSpreadsheet className="w-3.5 h-3.5 text-slate-500" />
-                      <span>Bulk Import</span>
-                    </button>
-
-                    <button
-                      onClick={() => setIsAddCandidatesOpen(true)}
-                      className="px-4 py-2 bg-[#10B981] hover:bg-[#059669] text-white text-xs font-bold tracking-wider uppercase inline-flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs"
-                    >
-                      <Plus className="w-3.5 h-3.5" />
-                      <span>Add Candidates</span>
-                    </button>
-
-                    <button
-                      onClick={handleDownloadReport}
-                      className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold tracking-wider uppercase inline-flex items-center gap-2 transition-colors cursor-pointer shadow-xs"
-                    >
-                      <CloudDownload className="w-4 h-4" />
-                      <span>Download Report</span>
+                      Clear
                     </button>
                   </div>
-                </div>
 
-                {/* 2. Bulk Action Toolbar (Resend & Revoke shifted right) */}
-                <div className="px-4 py-2.5 bg-slate-50/70 border-b border-slate-100 flex items-center justify-between gap-3 text-[11px] font-semibold text-slate-500">
-                  <div className="flex items-center">
-                    <label className="flex items-center gap-2 cursor-pointer text-slate-700">
+                  {/* Status Accordion */}
+                  <div className="space-y-2 border-b border-slate-100 pb-4">
+                    <button
+                      onClick={() => setStatusAccordionOpen(!statusAccordionOpen)}
+                      className="w-full flex items-center justify-between text-xs font-bold text-slate-800 cursor-pointer"
+                    >
+                      <span>Status</span>
+                      {statusAccordionOpen ? (
+                        <ChevronUp className="w-3.5 h-3.5 text-slate-400" />
+                      ) : (
+                        <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+                      )}
+                    </button>
+
+                    {statusAccordionOpen && (
+                      <div className="pt-2 space-y-1.5 text-xs text-slate-600">
+                        {[
+                          { key: "ALL", label: `All (${invitations.length})` },
+                          { key: "PASSED", label: "Passed" },
+                          { key: "FAILED", label: "Failed" },
+                          { key: "INVITED", label: "Invited (Pending)" },
+                        ].map((st) => (
+                          <label
+                            key={st.key}
+                            className="flex items-center gap-2 cursor-pointer py-1 px-1.5 hover:bg-slate-50 rounded"
+                          >
+                            <input
+                              type="radio"
+                              name="candidateStatus"
+                              checked={candidateStatusFilter === st.key}
+                              onChange={() => setCandidateStatusFilter(st.key)}
+                              className="text-[#4353a4] focus:ring-0 w-3.5 h-3.5 cursor-pointer"
+                            />
+                            <span>{st.label}</span>
+                          </label>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Invited on Accordion */}
+                  <div className="space-y-2 border-b border-slate-100 pb-4">
+                    <button
+                      onClick={() => setInvitedOnAccordionOpen(!invitedOnAccordionOpen)}
+                      className="w-full flex items-center justify-between text-xs font-bold text-slate-800 cursor-pointer"
+                    >
+                      <span>Invited on</span>
+                      {invitedOnAccordionOpen ? (
+                        <ChevronUp className="w-3.5 h-3.5 text-slate-400" />
+                      ) : (
+                        <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+                      )}
+                    </button>
+                    {invitedOnAccordionOpen && (
+                      <div className="pt-1 text-xs text-slate-500">
+                        <p className="text-[11px] text-slate-400">All recent invitation batches</p>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Invited by me Checkbox */}
+                  <div className="pt-1">
+                    <label className="flex items-center gap-2.5 text-xs font-medium text-slate-700 cursor-pointer">
                       <input
                         type="checkbox"
-                        checked={
-                          paginatedCandidates.length > 0 &&
-                          selectedCandidateIds.length === paginatedCandidates.length
-                        }
-                        onChange={(e) => handleSelectAllCandidates(e.target.checked)}
-                        className="w-3.5 h-3.5 text-indigo-600 rounded-none border-slate-300 focus:ring-0 cursor-pointer"
+                        checked={invitedByMe}
+                        onChange={(e) => setInvitedByMe(e.target.checked)}
+                        className="w-4 h-4 text-[#4353a4] rounded-none border-slate-300 focus:ring-0 cursor-pointer"
                       />
+                      <span>Invited by me</span>
                     </label>
                   </div>
-
-                  <div className="flex items-center gap-6">
-                    <button
-                      onClick={handleBulkResend}
-                      disabled={selectedCandidateIds.length === 0}
-                      className="hover:text-slate-900 disabled:opacity-40 transition-colors inline-flex items-center gap-1.5 uppercase tracking-wider cursor-pointer"
-                    >
-                      <Mail className="w-3 h-3 text-slate-400" />
-                      <span>Re-send Invitation</span>
-                    </button>
-
-                    <button
-                      onClick={handleBulkRevoke}
-                      disabled={selectedCandidateIds.length === 0}
-                      className="hover:text-red-600 disabled:opacity-40 transition-colors inline-flex items-center gap-1.5 uppercase tracking-wider cursor-pointer text-slate-500"
-                    >
-                      <Trash2 className="w-3 h-3 text-red-400" />
-                      <span>Delete Invitations</span>
-                    </button>
-                  </div>
                 </div>
 
-                {/* 3. Candidate Table */}
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left border-collapse">
-                    <thead>
-                      <tr className="border-b border-slate-100 bg-white text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-                        <th className="py-3 px-4 w-10"></th>
-                        <th className="py-3 px-4">Candidate</th>
-                        <th className="py-3 px-4">Status</th>
-                        <th className="py-3 px-4">Time</th>
-                        <th className="py-3 px-4">Total Score</th>
-                        <th className="py-3 px-4">% Score</th>
-                        <th className="py-3 px-4 text-right">More Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100 text-xs text-slate-700">
-                      {loadingCandidatesData ? (
-                        <tr>
-                          <td colSpan={7} className="py-12 text-center text-slate-400">
-                            <Loader2 className="w-6 h-6 animate-spin mx-auto text-emerald-500 mb-2" />
-                            <span>Loading candidates...</span>
-                          </td>
-                        </tr>
-                      ) : paginatedCandidates.length === 0 ? (
-                        <tr>
-                          <td colSpan={7} className="py-12 text-center text-slate-400 space-y-2">
-                            <p>No candidates invited yet or none match filters.</p>
-                            <button
-                              onClick={() => setIsAddCandidatesOpen(true)}
-                              className="px-3 py-1.5 bg-[#10B981] hover:bg-[#059669] text-white font-semibold text-xs inline-flex items-center gap-1.5 cursor-pointer shadow-xs"
-                            >
-                              <Plus className="w-3.5 h-3.5" />
-                              <span>Add Candidates</span>
-                            </button>
-                          </td>
-                        </tr>
-                      ) : (
-                        paginatedCandidates.map((inv) => {
-                          const name = inv.candidateName || inv.candidate?.user?.name || "Candidate";
-                          const email = inv.candidateEmail || inv.candidate?.user?.email || "—";
-                          const scoreEntry = candidateResults[inv.id];
-                          const result = scoreEntry?.result;
-                          const isPassed = result?.passed === true;
-                          const isFailed = result && result.passed === false;
-                          const scoreVal =
-                            result?.score !== undefined
-                              ? result.score
-                              : result?.totalScore !== undefined
-                              ? result.totalScore
-                              : "—";
-                          const percentVal =
-                            result?.percentage !== undefined
-                              ? `${result.percentage}%`
-                              : result?.scorePercentage !== undefined
-                              ? `${result.scorePercentage}%`
-                              : "—";
-                          const rawDate = inv.createdAt || inv.sentAt;
-                          const dateStr = rawDate ? new Date(rawDate).toLocaleDateString() : "—";
+                {/* Right Main Table & Actions Area */}
+                <div className="lg:col-span-3 border border-slate-200 bg-white shadow-xs">
+                  {/* 1. Search Bar & Action Buttons */}
+                  <div className="p-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div className="relative flex-1 max-w-md">
+                      <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                      <input
+                        type="text"
+                        value={candidateSearchQuery}
+                        onChange={(e) => {
+                          setCandidateSearchQuery(e.target.value);
+                          setCandidatePage(1);
+                        }}
+                        placeholder="Search for a candidate..."
+                        className="w-full pl-9 pr-4 py-2 text-xs border border-slate-200 rounded-none focus:outline-none focus:border-[#4353a4] bg-white text-slate-800 placeholder-slate-400"
+                      />
+                    </div>
 
-                          let timeStr = "—";
-                          const startedAt =
-                            scoreEntry?.session?.startedAt ||
-                            scoreEntry?.session?.startTime ||
-                            scoreEntry?.session?.createdAt ||
-                            scoreEntry?.detail?.systemInfo?.startedAt ||
-                            scoreEntry?.detail?.startedAt ||
-                            scoreEntry?.detail?.createdAt;
-
-                          const endedAt =
-                            scoreEntry?.session?.submittedAt ||
-                            scoreEntry?.session?.endedAt ||
-                            scoreEntry?.session?.endTime ||
-                            scoreEntry?.session?.updatedAt ||
-                            scoreEntry?.detail?.systemInfo?.endedAt ||
-                            scoreEntry?.detail?.systemInfo?.submittedAt ||
-                            scoreEntry?.detail?.submittedAt ||
-                            scoreEntry?.detail?.endedAt ||
-                            result?.evaluatedAt ||
-                            result?.createdAt;
-
-                          if (result?.timeTakenSeconds) {
-                            timeStr = formatTimeTaken(result.timeTakenSeconds);
-                          } else if (startedAt && endedAt) {
-                            const diffSec = Math.max(0, Math.floor((new Date(endedAt).getTime() - new Date(startedAt).getTime()) / 1000));
-                            timeStr = formatTimeTaken(diffSec);
-                          } else if (result?.timeTaken) {
-                            timeStr = String(result.timeTaken);
-                          } else if (scoreEntry?.detail?.timeTaken) {
-                            timeStr = String(scoreEntry.detail.timeTaken);
+                    <div className="flex flex-wrap items-center gap-2 shrink-0">
+                      <button
+                        onClick={() => {
+                          if (!selectedScheduleId || !scheduleStartTime || !scheduleEndTime) {
+                            toast.error("Please configure the test schedule in Advanced Settings before inviting candidates.");
+                            setActiveTab("ADVANCED_SETTINGS");
+                            return;
                           }
+                          setIsAddCandidatesOpen(true);
+                        }}
+                        className="px-4 py-2 bg-[#10B981] hover:bg-[#059669] text-white text-xs font-bold tracking-wider uppercase inline-flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        <span>Add Candidates</span>
+                      </button>
 
-                          let statusBadge = (
-                            <span className="font-semibold text-slate-600">
-                              {inv.status === "ACCEPTED"
-                                ? "Accepted"
-                                : inv.status === "PENDING"
-                                ? "Invited"
-                                : inv.status || "Pending"}
-                            </span>
-                          );
+                      <button
+                        onClick={handleDownloadReport}
+                        className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold tracking-wider uppercase inline-flex items-center gap-2 transition-colors cursor-pointer shadow-xs"
+                      >
+                        <CloudDownload className="w-4 h-4" />
+                        <span>Download Report</span>
+                      </button>
+                    </div>
+                  </div>
 
-                          if (isPassed) {
-                            statusBadge = (
-                              <span className="font-semibold text-emerald-700">Passed</span>
-                            );
-                          } else if (isFailed) {
-                            statusBadge = (
-                              <span className="font-semibold text-rose-600">Failed</span>
-                            );
-                          } else if (inv.status === "SUBMITTED" || inv.sessionStatus === "SUBMITTED" || inv.sessionStatus === "AUTO_SUBMITTED") {
-                            statusBadge = (
-                              <span className="font-semibold text-emerald-700">Submitted</span>
-                            );
-                          } else if (inv.status === "ACCEPTED" || inv.sessionStatus === "IN_PROGRESS") {
-                            statusBadge = (
-                              <span className="font-semibold text-amber-600">In Progress</span>
-                            );
+                  {/* 2. Bulk Action Toolbar (Resend & Revoke shifted right) */}
+                  <div className="px-4 py-2.5 bg-slate-50/70 border-b border-slate-100 flex items-center justify-between gap-3 text-[11px] font-semibold text-slate-500">
+                    <div className="flex items-center">
+                      <label className="flex items-center gap-2 cursor-pointer text-slate-700">
+                        <input
+                          type="checkbox"
+                          checked={
+                            paginatedCandidates.length > 0 &&
+                            selectedCandidateIds.length === paginatedCandidates.length
                           }
+                          onChange={(e) => handleSelectAllCandidates(e.target.checked)}
+                          className="w-3.5 h-3.5 text-indigo-600 rounded-none border-slate-300 focus:ring-0 cursor-pointer"
+                        />
+                      </label>
+                    </div>
 
-                          return (
-                            <tr
-                              key={inv.id}
-                              className={`hover:bg-amber-50/40 transition-colors ${
-                                selectedCandidateIds.includes(inv.id) ? "bg-amber-50/50" : ""
-                              }`}
-                            >
-                              {/* Checkbox */}
-                              <td className="py-3.5 px-4">
-                                <input
-                                  type="checkbox"
-                                  checked={selectedCandidateIds.includes(inv.id)}
-                                  onChange={() => handleToggleCandidateSelect(inv.id)}
-                                  className="w-3.5 h-3.5 text-indigo-600 rounded-none border-slate-300 focus:ring-0 cursor-pointer"
-                                />
-                              </td>
+                    <div className="flex items-center gap-6">
+                      <button
+                        onClick={handleBulkResend}
+                        disabled={selectedCandidateIds.length === 0}
+                        className="hover:text-slate-900 disabled:opacity-40 transition-colors inline-flex items-center gap-1.5 uppercase tracking-wider cursor-pointer"
+                      >
+                        <Mail className="w-3 h-3 text-slate-400" />
+                        <span>Re-send Invitation</span>
+                      </button>
 
-                              {/* Candidate Info */}
-                              <td className="py-3.5 px-4">
-                                <div className="flex items-center gap-3">
-                                  <Avatar className="w-8 h-8 border border-slate-200">
-                                    <AvatarFallback className="bg-amber-100 text-amber-800 text-xs font-bold">
-                                      {name.slice(0, 2).toUpperCase()}
-                                    </AvatarFallback>
-                                  </Avatar>
-                                  <div className="space-y-0.5">
-                                    <div className="flex items-center gap-2">
-                                      <span className="font-bold text-slate-900">{name}</span>
-                                    </div>
-                                    <div className="flex items-center gap-3 text-[11px] text-slate-400 font-normal">
-                                      <span className="flex items-center gap-1">
-                                        <Mail className="w-3 h-3 text-slate-400" />
-                                        <span>{email}</span>
-                                      </span>
-                                      <span className="flex items-center gap-1">
-                                        <Clock className="w-3 h-3 text-slate-400" />
-                                        <span>{dateStr}</span>
-                                      </span>
+                      <button
+                        onClick={handleBulkRevoke}
+                        disabled={selectedCandidateIds.length === 0}
+                        className="hover:text-red-600 disabled:opacity-40 transition-colors inline-flex items-center gap-1.5 uppercase tracking-wider cursor-pointer text-slate-500"
+                      >
+                        <Trash2 className="w-3 h-3 text-red-400" />
+                        <span>Delete Invitations</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* 3. Candidate Table */}
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left border-collapse">
+                      <thead>
+                        <tr className="border-b border-slate-100 bg-white text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                          <th className="py-3 px-4 w-10"></th>
+                          <th className="py-3 px-4">Candidate</th>
+                          <th className="py-3 px-4">Status</th>
+                          <th className="py-3 px-4">Time</th>
+                          <th className="py-3 px-4">Total Score</th>
+                          <th className="py-3 px-4">% Score</th>
+                          <th className="py-3 px-4 text-right">More Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 text-xs text-slate-700">
+                        {loadingCandidatesData ? (
+                          <tr>
+                            <td colSpan={7} className="py-12 text-center text-slate-400">
+                              <Loader2 className="w-6 h-6 animate-spin mx-auto text-emerald-500 mb-2" />
+                              <span>Loading candidates...</span>
+                            </td>
+                          </tr>
+                        ) : !selectedScheduleId || !scheduleStartTime || !scheduleEndTime ? (
+                          <tr>
+                            <td colSpan={7} className="py-12 text-center text-slate-400 space-y-3">
+                              <div className="w-10 h-10 rounded-full bg-amber-50 border border-amber-200 text-amber-600 flex items-center justify-center mx-auto">
+                                <Calendar className="w-5 h-5" />
+                              </div>
+                              <p className="font-semibold text-slate-700">Test schedule has not been set yet.</p>
+                              <p className="text-xs text-slate-400 max-w-sm mx-auto">
+                                You need to configure the start and end dates in Advanced Settings before candidates can be invited.
+                              </p>
+                              <button
+                                onClick={() => setActiveTab("ADVANCED_SETTINGS")}
+                                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs inline-flex items-center gap-1.5 cursor-pointer shadow-xs"
+                              >
+                                <Calendar className="w-3.5 h-3.5" />
+                                <span>Configure Schedule Now</span>
+                              </button>
+                            </td>
+                          </tr>
+                        ) : paginatedCandidates.length === 0 ? (
+                          <tr>
+                            <td colSpan={7} className="py-12 text-center text-slate-400 space-y-2">
+                              <p>No candidates invited yet or none match filters.</p>
+                              <button
+                                onClick={() => setIsAddCandidatesOpen(true)}
+                                className="px-3 py-1.5 bg-[#10B981] hover:bg-[#059669] text-white font-semibold text-xs inline-flex items-center gap-1.5 cursor-pointer shadow-xs"
+                              >
+                                <Plus className="w-3.5 h-3.5" />
+                                <span>Add Candidates</span>
+                              </button>
+                            </td>
+                          </tr>
+                        ) : (
+                          paginatedCandidates.map((inv) => {
+                            const name = inv.candidateName || inv.candidate?.user?.name || "Candidate";
+                            const email = inv.candidateEmail || inv.candidate?.user?.email || "—";
+                            const scoreEntry = candidateResults[inv.id];
+                            const result = scoreEntry?.result;
+                            const isPassed = result?.passed === true;
+                            const isFailed = result && result.passed === false;
+                            const scoreVal =
+                              result?.score !== undefined
+                                ? result.score
+                                : result?.totalScore !== undefined
+                                ? result.totalScore
+                                : "—";
+                            const percentVal =
+                              result?.percentage !== undefined
+                                ? `${result.percentage}%`
+                                : result?.scorePercentage !== undefined
+                                ? `${result.scorePercentage}%`
+                                : "—";
+                            const rawDate = inv.createdAt || inv.sentAt;
+                            const dateStr = rawDate ? new Date(rawDate).toLocaleDateString() : "—";
+
+                            let timeStr = "—";
+                            const startedAt =
+                              scoreEntry?.session?.startedAt ||
+                              scoreEntry?.session?.startTime ||
+                              scoreEntry?.session?.createdAt ||
+                              scoreEntry?.detail?.systemInfo?.startedAt ||
+                              scoreEntry?.detail?.startedAt ||
+                              scoreEntry?.detail?.createdAt;
+
+                            const endedAt =
+                              scoreEntry?.session?.submittedAt ||
+                              scoreEntry?.session?.endedAt ||
+                              scoreEntry?.session?.endTime ||
+                              scoreEntry?.session?.updatedAt ||
+                              scoreEntry?.detail?.systemInfo?.endedAt ||
+                              scoreEntry?.detail?.systemInfo?.submittedAt ||
+                              scoreEntry?.detail?.submittedAt ||
+                              scoreEntry?.detail?.endedAt ||
+                              result?.evaluatedAt ||
+                              result?.createdAt;
+
+                            if (result?.timeTakenSeconds) {
+                              timeStr = formatTimeTaken(result.timeTakenSeconds);
+                            } else if (startedAt && endedAt) {
+                              const diffSec = Math.max(0, Math.floor((new Date(endedAt).getTime() - new Date(startedAt).getTime()) / 1000));
+                              timeStr = formatTimeTaken(diffSec);
+                            } else if (result?.timeTaken) {
+                              timeStr = String(result.timeTaken);
+                            } else if (scoreEntry?.detail?.timeTaken) {
+                              timeStr = String(scoreEntry.detail.timeTaken);
+                            }
+
+                            let statusBadge = (
+                              <span className="inline-flex items-center px-2 py-0.5 text-[11px] font-bold tracking-wider uppercase bg-amber-50 text-amber-700 border border-amber-200/80">
+                                {inv.status === "ACCEPTED"
+                                  ? "Accepted"
+                                  : inv.status === "PENDING"
+                                  ? "Invited"
+                                  : inv.status || "Pending"}
+                              </span>
+                            );
+
+                            if (isPassed) {
+                              statusBadge = (
+                                <span className="inline-flex items-center px-2 py-0.5 text-[11px] font-bold tracking-wider uppercase bg-emerald-50 text-emerald-700 border border-emerald-200/80">Passed</span>
+                              );
+                            } else if (isFailed) {
+                              statusBadge = (
+                                <span className="inline-flex items-center px-2 py-0.5 text-[11px] font-bold tracking-wider uppercase bg-rose-50 text-rose-700 border border-rose-200/80">Failed</span>
+                              );
+                            } else if (inv.status === "SUBMITTED" || inv.sessionStatus === "SUBMITTED" || inv.sessionStatus === "AUTO_SUBMITTED") {
+                              statusBadge = (
+                                <span className="inline-flex items-center px-2 py-0.5 text-[11px] font-bold tracking-wider uppercase bg-slate-100 text-slate-700 border border-slate-200">Submitted</span>
+                              );
+                            } else if (inv.status === "ACCEPTED" || inv.sessionStatus === "IN_PROGRESS") {
+                              statusBadge = (
+                                <span className="inline-flex items-center px-2 py-0.5 text-[11px] font-bold tracking-wider uppercase bg-blue-50 text-blue-700 border border-blue-200/80">In Progress</span>
+                              );
+                            }
+
+                            return (
+                              <tr
+                                key={inv.id}
+                                className={`hover:bg-amber-50/40 transition-colors ${
+                                  selectedCandidateIds.includes(inv.id) ? "bg-amber-50/50" : ""
+                                }`}
+                              >
+                                {/* Checkbox */}
+                                <td className="py-3.5 px-4">
+                                  <input
+                                    type="checkbox"
+                                    checked={selectedCandidateIds.includes(inv.id)}
+                                    onChange={() => handleToggleCandidateSelect(inv.id)}
+                                    className="w-3.5 h-3.5 text-indigo-600 rounded-none border-slate-300 focus:ring-0 cursor-pointer"
+                                  />
+                                </td>
+
+                                {/* Candidate Info */}
+                                <td className="py-3.5 px-4">
+                                  <div className="flex items-center gap-3">
+                                    <Avatar className="w-8 h-8 border border-slate-200">
+                                      <AvatarFallback className="bg-amber-100 text-amber-800 text-xs font-bold">
+                                        {name.slice(0, 2).toUpperCase()}
+                                      </AvatarFallback>
+                                    </Avatar>
+                                    <div className="space-y-0.5">
+                                      <div className="flex items-center gap-2">
+                                        <span className="font-bold text-slate-900">{name}</span>
+                                      </div>
+                                      <div className="flex items-center gap-3 text-[11px] text-slate-400 font-normal">
+                                        <span className="flex items-center gap-1">
+                                          <Mail className="w-3 h-3 text-slate-400" />
+                                          <span>{email}</span>
+                                        </span>
+                                        <span className="flex items-center gap-1">
+                                          <Clock className="w-3 h-3 text-slate-400" />
+                                          <span>{dateStr}</span>
+                                        </span>
+                                      </div>
                                     </div>
                                   </div>
-                                </div>
-                              </td>
+                                </td>
 
-                              {/* Status */}
-                              <td className="py-3.5 px-4">{statusBadge}</td>
+                                {/* Status */}
+                                <td className="py-3.5 px-4">{statusBadge}</td>
 
-                              {/* Time */}
-                              <td className="py-3.5 px-4 font-medium text-slate-700">{timeStr}</td>
+                                {/* Time */}
+                                <td className="py-3.5 px-4 font-medium text-slate-700">{timeStr}</td>
 
-                              {/* Total Score */}
-                              <td className="py-3.5 px-4 font-bold text-slate-900">{scoreVal}</td>
+                                {/* Total Score */}
+                                <td className="py-3.5 px-4 font-bold text-slate-900">{scoreVal}</td>
 
-                              {/* % Score */}
-                              <td className="py-3.5 px-4 font-bold text-slate-900">{percentVal}</td>
+                                {/* % Score */}
+                                <td className="py-3.5 px-4 font-bold text-slate-900">{percentVal}</td>
 
-                              {/* 3-dots Menu */}
-                              <td className="py-3.5 px-4 text-right">
-                                <DropdownMenu>
-                                  <DropdownMenuTrigger asChild>
-                                    <button className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer rounded">
-                                      <MoreVertical className="w-4 h-4" />
-                                    </button>
-                                  </DropdownMenuTrigger>
-                                  <DropdownMenuContent
-                                    align="end"
-                                    className="w-48 bg-white border border-slate-200 shadow-xl p-1 text-xs"
-                                  >
-                                    <DropdownMenuItem
-                                      onClick={() => downloadAdvancedReport(inv)}
-                                      className="cursor-pointer py-2 px-2.5 flex items-center gap-2 text-slate-700 hover:bg-slate-50"
+                                {/* 3-dots Menu */}
+                                <td className="py-3.5 px-4 text-right">
+                                  <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                      <button className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer rounded">
+                                        <MoreVertical className="w-4 h-4" />
+                                      </button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent
+                                      align="end"
+                                      className="w-48 bg-white border border-slate-200 shadow-xl p-1 text-xs"
                                     >
-                                      <Download className="w-3.5 h-3.5 text-indigo-600" />
-                                      <span>Download Report</span>
-                                    </DropdownMenuItem>
+                                      <DropdownMenuItem
+                                        onClick={() => downloadAdvancedReport(inv)}
+                                        className="cursor-pointer py-2 px-2.5 flex items-center gap-2 text-slate-700 hover:bg-slate-50"
+                                      >
+                                        <Download className="w-3.5 h-3.5 text-indigo-600" />
+                                        <span>Download Report</span>
+                                      </DropdownMenuItem>
 
-                                    <DropdownMenuItem
-                                      onClick={() => {
-                                        setCandidateToResend(inv);
-                                        setIsResendModalOpen(true);
-                                      }}
-                                      className="cursor-pointer py-2 px-2.5 flex items-center gap-2 text-slate-700 hover:bg-slate-50"
-                                    >
-                                      <Send className="w-3.5 h-3.5 text-emerald-600" />
-                                      <span>Resend Invitation</span>
-                                    </DropdownMenuItem>
+                                      <DropdownMenuItem
+                                        onClick={() => {
+                                          setCandidateToResend(inv);
+                                          setIsResendModalOpen(true);
+                                        }}
+                                        className="cursor-pointer py-2 px-2.5 flex items-center gap-2 text-slate-700 hover:bg-slate-50"
+                                      >
+                                        <Send className="w-3.5 h-3.5 text-emerald-600" />
+                                        <span>Resend Invitation</span>
+                                      </DropdownMenuItem>
 
-                                    <DropdownMenuItem
-                                      onClick={() => {
-                                        const scoreEntry = candidateResults[inv.id];
-                                        const sessionId =
-                                          scoreEntry?.sessionId ||
-                                          scoreEntry?.session?.id ||
-                                          scoreEntry?.detail?.systemInfo?.sessionId ||
-                                          scoreEntry?.detail?.sessionId ||
-                                          (inv as any).sessionId ||
-                                          (inv as any).testSessionId;
+                                      <DropdownMenuItem
+                                        onClick={() => {
+                                          const scoreEntry = candidateResults[inv.id];
+                                          const sessionId =
+                                            scoreEntry?.sessionId ||
+                                            scoreEntry?.session?.id ||
+                                            scoreEntry?.detail?.systemInfo?.sessionId ||
+                                            scoreEntry?.detail?.sessionId ||
+                                            (inv as any).sessionId ||
+                                            (inv as any).testSessionId;
 
-                                        if (!sessionId) {
-                                          toast.error("No active test session found for this candidate yet.");
-                                          return;
-                                        }
+                                          if (!sessionId) {
+                                            toast.error("No active test session found for this candidate yet.");
+                                            return;
+                                          }
 
-                                        const candName = inv.candidateName || inv.candidate?.user?.name || "Candidate";
-                                        const candEmail = inv.candidateEmail || inv.candidate?.user?.email;
+                                          const candName = inv.candidateName || inv.candidate?.user?.name || "Candidate";
+                                          const candEmail = inv.candidateEmail || inv.candidate?.user?.email;
 
-                                        setCandidateForTimeExtension({
-                                          id: sessionId,
-                                          candidateId: inv.candidateId,
-                                          candidateName: candName,
-                                          candidateEmail: candEmail,
-                                          testTitle: title || test?.title || "Assessment",
-                                          formattedRemaining: "Active",
-                                        });
-                                        setIsExtendTimeModalOpen(true);
-                                      }}
-                                      className="cursor-pointer py-2 px-2.5 flex items-center gap-2 text-amber-600 hover:bg-amber-50 font-medium"
-                                    >
-                                      <Clock className="w-3.5 h-3.5 text-amber-500" />
-                                      <span>Extend Time</span>
-                                    </DropdownMenuItem>
+                                          setCandidateForTimeExtension({
+                                            id: sessionId,
+                                            candidateId: inv.candidateId,
+                                            candidateName: candName,
+                                            candidateEmail: candEmail,
+                                            testTitle: title || test?.title || "Assessment",
+                                            formattedRemaining: "Active",
+                                          });
+                                          setIsExtendTimeModalOpen(true);
+                                        }}
+                                        className="cursor-pointer py-2 px-2.5 flex items-center gap-2 text-amber-600 hover:bg-amber-50 font-medium"
+                                      >
+                                        <Clock className="w-3.5 h-3.5 text-amber-500" />
+                                        <span>Extend Time</span>
+                                      </DropdownMenuItem>
 
-                                    <DropdownMenuSeparator className="bg-slate-100" />
+                                      <DropdownMenuSeparator className="bg-slate-100" />
 
-                                    <DropdownMenuItem
-                                      onClick={() => {
-                                        setCandidateToRevoke(inv);
-                                        setIsRevokeModalOpen(true);
-                                      }}
-                                      className="cursor-pointer py-2 px-2.5 flex items-center gap-2 text-red-600 hover:bg-red-50"
-                                    >
-                                      <Trash2 className="w-3.5 h-3.5 text-red-500" />
-                                      <span>Revoke Invitation</span>
-                                    </DropdownMenuItem>
-                                  </DropdownMenuContent>
-                                </DropdownMenu>
-                              </td>
-                            </tr>
-                          );
-                        })
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-
-                {/* 4. Bottom Pagination Bar */}
-                <div className="px-4 py-3 border-t border-slate-100 flex items-center justify-end gap-6 text-[11px] font-medium text-slate-500">
-                  <div className="flex items-center gap-2">
-                    <span className="uppercase text-slate-400 font-bold">PAGE:</span>
-                    <select
-                      value={candidatePage}
-                      onChange={(e) => setCandidatePage(Number(e.target.value))}
-                      className="border border-slate-200 bg-white py-1 px-2 text-xs text-slate-700 focus:outline-none cursor-pointer"
-                    >
-                      {Array.from({ length: totalCandidatePages }, (_, i) => i + 1).map((p) => (
-                        <option key={p} value={p}>
-                          {p}
-                        </option>
-                      ))}
-                    </select>
+                                      <DropdownMenuItem
+                                        onClick={() => {
+                                          setCandidateToRevoke(inv);
+                                          setIsRevokeModalOpen(true);
+                                        }}
+                                        className="cursor-pointer py-2 px-2.5 flex items-center gap-2 text-red-600 hover:bg-red-50"
+                                      >
+                                        <Trash2 className="w-3.5 h-3.5 text-red-500" />
+                                        <span>Revoke Invitation</span>
+                                      </DropdownMenuItem>
+                                    </DropdownMenuContent>
+                                  </DropdownMenu>
+                                </td>
+                              </tr>
+                            );
+                          })
+                        )}
+                      </tbody>
+                    </table>
                   </div>
 
-                  <div className="flex items-center gap-2">
-                    <span className="uppercase text-slate-400 font-bold">ROWS PER PAGE:</span>
-                    <select
-                      value={candidateRowsPerPage}
-                      onChange={(e) => {
-                        setCandidateRowsPerPage(Number(e.target.value));
-                        setCandidatePage(1);
-                      }}
-                      className="border border-slate-200 bg-white py-1 px-2 text-xs text-slate-700 focus:outline-none cursor-pointer"
-                    >
-                      <option value={15}>15</option>
-                      <option value={25}>25</option>
-                      <option value={50}>50</option>
-                    </select>
-                  </div>
+                  {/* 4. Bottom Pagination Bar */}
+                  <div className="px-4 py-3 border-t border-slate-100 flex items-center justify-end gap-6 text-[11px] font-medium text-slate-500">
+                    <div className="flex items-center gap-2">
+                      <span className="uppercase text-slate-400 font-bold">PAGE:</span>
+                      <select
+                        value={candidatePage}
+                        onChange={(e) => setCandidatePage(Number(e.target.value))}
+                        className="border border-slate-200 bg-white py-1 px-2 text-xs text-slate-700 focus:outline-none cursor-pointer"
+                      >
+                        {Array.from({ length: totalCandidatePages }, (_, i) => i + 1).map((p) => (
+                          <option key={p} value={p}>
+                            {p}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
 
-                  <div>
-                    {filteredCandidates.length === 0
-                      ? "0 OF 0"
-                      : `${(candidatePage - 1) * candidateRowsPerPage + 1}-${Math.min(
-                          candidatePage * candidateRowsPerPage,
-                          filteredCandidates.length
-                        )} OF ${filteredCandidates.length}`}
-                  </div>
+                    <div className="flex items-center gap-2">
+                      <span className="uppercase text-slate-400 font-bold">ROWS PER PAGE:</span>
+                      <select
+                        value={candidateRowsPerPage}
+                        onChange={(e) => {
+                          setCandidateRowsPerPage(Number(e.target.value));
+                          setCandidatePage(1);
+                        }}
+                        className="border border-slate-200 bg-white py-1 px-2 text-xs text-slate-700 focus:outline-none cursor-pointer"
+                      >
+                        <option value={15}>15</option>
+                        <option value={25}>25</option>
+                        <option value={50}>50</option>
+                      </select>
+                    </div>
 
-                  <div className="flex items-center gap-1">
-                    <button
-                      onClick={() => setCandidatePage((p) => Math.max(1, p - 1))}
-                      disabled={candidatePage === 1}
-                      className="p-1 hover:bg-slate-100 disabled:opacity-30 transition-colors cursor-pointer text-slate-600"
-                    >
-                      <ChevronLeft className="w-4 h-4" />
-                    </button>
-                    <button
-                      onClick={() => setCandidatePage((p) => Math.min(totalCandidatePages, p + 1))}
-                      disabled={candidatePage === totalCandidatePages}
-                      className="p-1 hover:bg-slate-100 disabled:opacity-30 transition-colors cursor-pointer text-slate-600"
-                    >
-                      <ChevronRight className="w-4 h-4" />
-                    </button>
+                    <div>
+                      {filteredCandidates.length === 0
+                        ? "0 OF 0"
+                        : `${(candidatePage - 1) * candidateRowsPerPage + 1}-${Math.min(
+                            candidatePage * candidateRowsPerPage,
+                            filteredCandidates.length
+                          )} OF ${filteredCandidates.length}`}
+                    </div>
+
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => setCandidatePage((p) => Math.max(1, p - 1))}
+                        disabled={candidatePage === 1}
+                        className="p-1 hover:bg-slate-100 disabled:opacity-30 transition-colors cursor-pointer text-slate-600"
+                      >
+                        <ChevronLeft className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => setCandidatePage((p) => Math.min(totalCandidatePages, p + 1))}
+                        disabled={candidatePage === totalCandidatePages}
+                        className="p-1 hover:bg-slate-100 disabled:opacity-30 transition-colors cursor-pointer text-slate-600"
+                      >
+                        <ChevronRight className="w-4 h-4" />
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -3854,7 +3976,7 @@ export default function NewAdminTestEdit() {
         </div>
       </main>
 
-      {/* ── 5. Add Candidates Modal ── */}
+      {/* ── 5. Add Candidates Modal (includes CSV / Excel Bulk Import) ── */}
       {selectedScheduleId && (
         <AddCandidatesModal
           open={isAddCandidatesOpen}
@@ -3863,19 +3985,6 @@ export default function NewAdminTestEdit() {
           alreadyInvitedIds={alreadyInvitedCandidateIds}
           testTitle={title || test?.title || "Assessment"}
           organisationName={user?.organisationData?.name}
-          onSuccess={() => {
-            loadCandidatesData();
-            fetchTest();
-          }}
-        />
-      )}
-
-      {/* ── 6. Bulk Invite Modal (CSV Upload) ── */}
-      {selectedScheduleId && (
-        <BulkInviteModal
-          open={isBulkInviteOpen}
-          onOpenChange={setIsBulkInviteOpen}
-          scheduleId={selectedScheduleId}
           onSuccess={() => {
             loadCandidatesData();
             fetchTest();

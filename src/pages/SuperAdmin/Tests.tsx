@@ -144,7 +144,7 @@ export default function Tests() {
         durationMins: test.duration,
         difficulty: test.difficulty.toUpperCase() as "EASY" | "MEDIUM" | "HARD",
         instructions: {},
-        status: "DRAFT" as const,
+        status: "PUBLISHED" as const,
         passMark: test.passMark,
         isActive: true, // New tests should be active
       };

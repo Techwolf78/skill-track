@@ -18,9 +18,19 @@ import {
   Copy,
   Trash2,
   Calendar,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
-import { useTestsQuery, useCreateTestMutation, useDeleteTestMutation } from "@/hooks/use-query-hooks";
+import {
+  useTestsQuery,
+  useCreateTestMutation,
+  useDeleteTestMutation,
+  useTestSchedulesQuery,
+} from "@/hooks/use-query-hooks";
+import { useQuery } from "@tanstack/react-query";
+import { apiClient } from "@/lib/api-client";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -45,6 +55,8 @@ export default function NewAdminTests() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [search, setSearch] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
 
   // Create Test Dialog State
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
@@ -52,7 +64,54 @@ export default function NewAdminTests() {
   const [newTestDuration, setNewTestDuration] = useState(60);
   const [isCreating, setIsCreating] = useState(false);
 
-  const { data: tests = [], isLoading } = useTestsQuery();
+  const { data: tests = [], isLoading: testsLoading } = useTestsQuery();
+  const { data: schedules = [], isLoading: schedulesLoading } = useTestSchedulesQuery();
+  const { data: invitations = [], isLoading: invitationsLoading } = useQuery<any[]>({
+    queryKey: ["all-candidate-invitations"],
+    queryFn: async () => {
+      try {
+        const res = await apiClient.get("/candidate-invitations");
+        const data = res.data?.data ?? res.data;
+        if (Array.isArray(data)) return data;
+        if (data && typeof data === "object" && Array.isArray(data.content)) {
+          return data.content;
+        }
+        return [];
+      } catch (err) {
+        console.warn("Failed to fetch candidate invitations:", err);
+        return [];
+      }
+    },
+  });
+
+  const isLoading = testsLoading || schedulesLoading || invitationsLoading;
+
+  // Map testId to candidates count
+  const testTakersCountMap = useMemo(() => {
+    const counts: Record<string, number> = {};
+
+    // Map scheduleId to testId
+    const scheduleToTestMap: Record<string, string> = {};
+    schedules.forEach((schedule) => {
+      if (schedule.id && schedule.testId) {
+        scheduleToTestMap[schedule.id] = schedule.testId;
+      }
+    });
+
+    // Count invitations per test
+    invitations.forEach((invitation) => {
+      const scheduleId = invitation.scheduleId || invitation.schedule?.id;
+      if (scheduleId) {
+        const testId = scheduleToTestMap[scheduleId];
+        if (testId) {
+          counts[testId] = (counts[testId] || 0) + 1;
+        }
+      }
+    });
+
+    return counts;
+  }, [schedules, invitations]);
+
   const createTestMutation = useCreateTestMutation();
   const deleteTestMutation = useDeleteTestMutation();
 
@@ -73,7 +132,7 @@ export default function NewAdminTests() {
         description: test.description || "",
         durationMins: test.durationMins,
         difficulty: test.difficulty || "MEDIUM",
-        status: "DRAFT" as const,
+        status: "PUBLISHED" as const,
         passMark: test.passMark || 40,
         isActive: true,
         questions: questionsPayload,
@@ -99,24 +158,21 @@ export default function NewAdminTests() {
         maxCriticalViolations: test.maxCriticalViolations,
       };
 
-      const created = await createTestMutation.mutateAsync(duplicateTest);
+      const newTest = await createTestMutation.mutateAsync(duplicateTest);
       toast.success("Test duplicated successfully!");
-      if (created?.id) {
-        navigate(`/admin/tests/edit/${created.id}`);
-      }
+      navigate(`/admin/tests/edit/${newTest.id}`);
     } catch (error: any) {
       toast.error(error?.response?.data?.message || error?.message || "Failed to duplicate test");
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (window.confirm("Are you sure you want to delete this test?")) {
-      try {
-        await deleteTestMutation.mutateAsync(id);
-        toast.success("Test deleted successfully");
-      } catch (error: any) {
-        toast.error(error?.response?.data?.message || error?.message || "Failed to delete test");
-      }
+  const handleDelete = async (testId: string) => {
+    if (!confirm("Are you sure you want to delete this test?")) return;
+    try {
+      await deleteTestMutation.mutateAsync(testId);
+      toast.success("Test deleted successfully");
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message || error?.message || "Failed to delete test");
     }
   };
 
@@ -125,18 +181,18 @@ export default function NewAdminTests() {
       toast.error("Please enter a test name");
       return;
     }
+    setIsCreating(true);
     try {
-      setIsCreating(true);
-      const payload = {
+      const newTest = await createTestMutation.mutateAsync({
         title: newTestName.trim(),
-        durationMins: Number(newTestDuration) || 60,
-        difficulty: "MEDIUM" as const,
-        status: "DRAFT" as const,
+        durationMins: newTestDuration || 60,
+        difficulty: "MEDIUM",
+        status: "PUBLISHED",
         passMark: 40,
         isActive: true,
-      };
-      const newTest = await createTestMutation.mutateAsync(payload);
-      toast.success("Test created successfully");
+        questions: [],
+      });
+      toast.success("Test created successfully!");
       setIsCreateDialogOpen(false);
       setNewTestName("");
       setNewTestDuration(60);
@@ -148,11 +204,40 @@ export default function NewAdminTests() {
     }
   };
 
-  const filteredTests = useMemo(() => {
-    return tests.filter((t) =>
+  // Filter and sort tests newest on top
+  const sortedAndFilteredTests = useMemo(() => {
+    const filtered = tests.filter((t) =>
       (t.title || "").toLowerCase().includes(search.toLowerCase())
     );
+
+    // Sort newest on top: by createdAt, updatedAt, or id descending
+    return filtered.slice().sort((a, b) => {
+      const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      if (timeA && timeB && timeA !== timeB) {
+        return timeB - timeA;
+      }
+      const updateA = a.updatedAt ? new Date(a.updatedAt).getTime() : 0;
+      const updateB = b.updatedAt ? new Date(b.updatedAt).getTime() : 0;
+      if (updateA && updateB && updateA !== updateB) {
+        return updateB - updateA;
+      }
+      // Fallback to string comparison of id if UUID or alphanumeric
+      return (b.id || "").localeCompare(a.id || "");
+    });
   }, [tests, search]);
+
+  // Pagination metrics
+  const totalTests = sortedAndFilteredTests.length;
+  const totalPages = Math.max(1, Math.ceil(totalTests / pageSize));
+  const safeCurrentPage = Math.min(currentPage, totalPages);
+  const paginatedTests = useMemo(() => {
+    const startIndex = (safeCurrentPage - 1) * pageSize;
+    return sortedAndFilteredTests.slice(startIndex, startIndex + pageSize);
+  }, [sortedAndFilteredTests, safeCurrentPage, pageSize]);
+
+  const startRecord = totalTests > 0 ? (safeCurrentPage - 1) * pageSize + 1 : 0;
+  const endRecord = Math.min(safeCurrentPage * pageSize, totalTests);
 
   const formatDuration = (mins?: number) => {
     if (!mins || mins <= 0) return "3 hours";
@@ -200,7 +285,7 @@ export default function NewAdminTests() {
             <Loader2 className="w-5 h-5 animate-spin text-[#4353a4]" />
             <span>Loading tests...</span>
           </div>
-        ) : filteredTests.length === 0 ? (
+        ) : sortedAndFilteredTests.length === 0 ? (
           <div className="py-20 text-center text-slate-400 text-sm space-y-3">
             <p>No tests found.</p>
             <button
@@ -213,7 +298,7 @@ export default function NewAdminTests() {
           </div>
         ) : (
           <div className="divide-y divide-slate-200">
-            {filteredTests.map((test) => {
+            {paginatedTests.map((test) => {
               const testQuestionsList = test.questions || test.testQuestions || [];
               const questionCount = testQuestionsList.length || (test as any).questionCount || 0;
 
@@ -226,9 +311,10 @@ export default function NewAdminTests() {
               const sectionCount = uniqueSections.size > 0 ? uniqueSections.size : 1;
 
               const candidateCount =
+                testTakersCountMap[test.id] ??
                 (test as any).candidateCount ??
-                test.testSchedules?.length ??
                 (test as any).totalCandidates ??
+                test.testSchedules?.length ??
                 0;
 
               const orgName =
@@ -353,6 +439,80 @@ export default function NewAdminTests() {
           </div>
         )}
       </div>
+
+      {/* ── Pagination Card (Same DoSelect Style as Question Library) ── */}
+      {!isLoading && totalTests > 0 && (
+        <div className="border-t border-slate-200 bg-white p-3 flex flex-wrap items-center justify-end gap-5 text-xs text-slate-600">
+          {/* Page Selector */}
+          <div className="flex items-center gap-1.5">
+            <span className="px-1.5 py-0.5 bg-slate-100 text-[10px] font-semibold text-slate-500 tracking-wider">
+              PAGE:
+            </span>
+            <div className="relative flex items-center">
+              <select
+                value={safeCurrentPage}
+                onChange={(e) => setCurrentPage(Number(e.target.value))}
+                className="appearance-none bg-transparent pr-4 pl-1 py-0.5 text-xs font-medium text-slate-700 focus:outline-none cursor-pointer"
+              >
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
+                  <option key={p} value={p}>
+                    {p}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown className="pointer-events-none absolute right-0 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-500" />
+            </div>
+          </div>
+
+          {/* Rows per page selector */}
+          <div className="flex items-center gap-1.5">
+            <span className="px-1.5 py-0.5 bg-slate-100 text-[10px] font-semibold text-slate-500 tracking-wider">
+              ROWS PER PAGE:
+            </span>
+            <div className="relative flex items-center">
+              <select
+                value={pageSize}
+                onChange={(e) => {
+                  setPageSize(Number(e.target.value));
+                  setCurrentPage(1);
+                }}
+                className="appearance-none bg-transparent pr-4 pl-1 py-0.5 text-xs font-medium text-slate-700 focus:outline-none cursor-pointer"
+              >
+                <option value={10}>10</option>
+                <option value={20}>20</option>
+                <option value={50}>50</option>
+                <option value={100}>100</option>
+              </select>
+              <ChevronDown className="pointer-events-none absolute right-0 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-500" />
+            </div>
+          </div>
+
+          {/* Record range badge */}
+          <span className="px-2 py-0.5 bg-slate-100 text-[11px] font-medium text-slate-600">
+            {startRecord} - {endRecord} OF {totalTests}
+          </span>
+
+          {/* Navigation Arrows */}
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+              disabled={safeCurrentPage <= 1}
+              className="p-1 hover:bg-slate-100 text-slate-500 hover:text-slate-800 disabled:opacity-30 disabled:hover:bg-transparent transition-colors cursor-pointer disabled:cursor-not-allowed"
+              title="Previous page"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+              disabled={safeCurrentPage >= totalPages}
+              className="p-1 hover:bg-slate-100 text-slate-500 hover:text-slate-800 disabled:opacity-30 disabled:hover:bg-transparent transition-colors cursor-pointer disabled:cursor-not-allowed"
+              title="Next page"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* ── 3. Create Test Modal (Flat Square DoSelect / New-Admin Theme) ── */}
       <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>

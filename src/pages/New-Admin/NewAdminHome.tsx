@@ -77,7 +77,7 @@ export default function NewAdminHome() {
         description: test.description || "",
         durationMins: test.durationMins,
         difficulty: test.difficulty || "MEDIUM",
-        status: "DRAFT" as const,
+        status: "PUBLISHED" as const,
         passMark: test.passMark || 40,
         isActive: true,
         questions: questionsPayload,
@@ -135,7 +135,7 @@ export default function NewAdminHome() {
         title: newTestName.trim(),
         durationMins: Number(newTestDuration) || 60,
         difficulty: "MEDIUM" as const,
-        status: "DRAFT" as const,
+        status: "PUBLISHED" as const,
         passMark: 40,
         isActive: true,
       };

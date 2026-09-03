@@ -121,7 +121,7 @@ export default function TestCreate() {
     durationMins: 60,
     difficulty: "MEDIUM",
     passMark: 40,
-    status: "DRAFT",
+    status: "PUBLISHED",
     instructions: {},
     questions: [],
     proctoringMode: "NONE",
