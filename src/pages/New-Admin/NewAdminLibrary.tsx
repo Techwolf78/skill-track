@@ -618,7 +618,7 @@ function ImportQuestionsDialog({
   // Check metrics for preview table
   const totalRows = parsedRows.length;
   const unmatchedRows = parsedRows.filter(
-    (r) => r.taxonomy.topicStatus === "UNMATCHED" || r.taxonomy.subtopicStatus === "UNMATCHED" || r.taxonomy.subjectStatus === "UNMATCHED"
+    (r) => r.taxonomy.subjectStatus === "UNMATCHED"
   );
   const unmatchedCount = unmatchedRows.length;
   const matchedCount = totalRows - unmatchedCount;
@@ -645,9 +645,10 @@ function ImportQuestionsDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="w-[96vw] max-w-4xl bg-white border border-slate-200/90 p-5 sm:p-6 space-y-4 max-h-[90vh] overflow-y-auto overflow-x-hidden box-border shadow-2xl">
-        <DialogHeader className="pr-8 pb-3 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5">
-          <div className="min-w-0 flex-1">
+      <DialogContent className="w-[95vw] sm:max-w-5xl md:max-w-6xl max-h-[90vh] bg-white border border-slate-200/90 p-0 flex flex-col shadow-2xl overflow-hidden">
+        {/* Header */}
+        <DialogHeader className="px-6 py-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 shrink-0">
+          <div className="min-w-0 flex-1 pr-6">
             <DialogTitle className="text-base font-bold text-slate-900 leading-tight">
               Import Questions
             </DialogTitle>
@@ -655,10 +656,10 @@ function ImportQuestionsDialog({
               Upload an Excel (.xlsx, .xls, .csv) spreadsheet with automatic taxonomy mapping.
             </p>
           </div>
-          <div className="flex flex-wrap items-center gap-2 shrink-0">
+          <div className="flex flex-wrap items-center gap-2 shrink-0 pr-8">
             <button
               onClick={downloadDynamicExcel}
-              className="flex items-center gap-1.5 px-3 py-1.5 border border-slate-200 text-xs font-medium text-slate-700 hover:bg-slate-50 hover:text-slate-900 transition-colors cursor-pointer"
+              className="flex items-center gap-1.5 px-3 py-1.5 border border-slate-200 text-xs font-medium text-slate-700 hover:bg-slate-50 hover:text-slate-900 transition-colors cursor-pointer rounded"
               title="Download MCQ Questions Excel Template"
             >
               <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
@@ -666,7 +667,7 @@ function ImportQuestionsDialog({
             </button>
             <button
               onClick={downloadSampleCodingExcel}
-              className="flex items-center gap-1.5 px-3 py-1.5 border border-slate-200 text-xs font-medium text-slate-700 hover:bg-slate-50 hover:text-slate-900 transition-colors cursor-pointer"
+              className="flex items-center gap-1.5 px-3 py-1.5 border border-slate-200 text-xs font-medium text-slate-700 hover:bg-slate-50 hover:text-slate-900 transition-colors cursor-pointer rounded"
               title="Download Coding Questions Excel Template"
             >
               <FileSpreadsheet className="w-3.5 h-3.5 text-[#3b4992]" />
@@ -674,6 +675,9 @@ function ImportQuestionsDialog({
             </button>
           </div>
         </DialogHeader>
+
+        {/* Scrollable Body */}
+        <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4 min-h-0">
 
         {/* 1. Batch Hierarchy Selector */}
         <div className="p-3.5 bg-slate-50/70 border border-slate-200 rounded space-y-2.5">
@@ -684,17 +688,17 @@ function ImportQuestionsDialog({
             </span>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
             {/* Target Subject (Required) */}
             <div className="space-y-1">
-              <label className="text-xs font-medium text-slate-700 flex items-center gap-1">
+              <label className="text-xs font-medium text-slate-700 flex items-center gap-1 h-5">
                 <span>Subject</span>
                 <span className="text-rose-500">*</span>
               </label>
               <select
                 value={defaultSubjectId}
                 onChange={(e) => handleDefaultSubjectChange(e.target.value)}
-                className="w-full bg-white border border-slate-200 rounded px-2.5 py-1.5 text-xs text-slate-800 focus:outline-none focus:ring-1 focus:ring-indigo-500 cursor-pointer h-8"
+                className="w-full bg-white border border-slate-200 rounded px-2.5 py-1.5 text-xs text-slate-800 focus:outline-none focus:ring-1 focus:ring-indigo-500 cursor-pointer h-9 leading-tight"
               >
                 {subjects.map((s) => (
                   <option key={s.id} value={s.id}>
@@ -706,13 +710,14 @@ function ImportQuestionsDialog({
 
             {/* Target Topic (Optional) */}
             <div className="space-y-1">
-              <label className="text-xs font-medium text-slate-700">
-                Topic <span className="text-[10px] text-slate-400 font-normal">(Optional)</span>
+              <label className="text-xs font-medium text-slate-700 flex items-center gap-1 h-5">
+                <span>Topic</span>
+                <span className="text-[10px] text-slate-400 font-normal">(Optional)</span>
               </label>
               <select
                 value={defaultTopicId}
                 onChange={(e) => handleDefaultTopicChange(e.target.value)}
-                className="w-full bg-white border border-slate-200 rounded px-2.5 py-1.5 text-xs text-slate-800 focus:outline-none focus:ring-1 focus:ring-indigo-500 cursor-pointer h-8"
+                className="w-full bg-white border border-slate-200 rounded px-2.5 py-1.5 text-xs text-slate-800 focus:outline-none focus:ring-1 focus:ring-indigo-500 cursor-pointer h-9 leading-tight"
               >
                 <option value="">-- All Topics --</option>
                 {availableDefaultTopics.map((t) => (
@@ -725,14 +730,15 @@ function ImportQuestionsDialog({
 
             {/* Target Subtopic (Optional) */}
             <div className="space-y-1">
-              <label className="text-xs font-medium text-slate-700">
-                Subtopic <span className="text-[10px] text-slate-400 font-normal">(Optional)</span>
+              <label className="text-xs font-medium text-slate-700 flex items-center gap-1 h-5">
+                <span>Subtopic</span>
+                <span className="text-[10px] text-slate-400 font-normal">(Optional)</span>
               </label>
               <select
                 value={defaultSubtopicId}
                 disabled={!defaultTopicId || availableDefaultSubtopics.length === 0}
                 onChange={(e) => handleDefaultSubtopicChange(e.target.value)}
-                className="w-full bg-white border border-slate-200 rounded px-2.5 py-1.5 text-xs text-slate-800 focus:outline-none focus:ring-1 focus:ring-indigo-500 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed h-8"
+                className="w-full bg-white border border-slate-200 rounded px-2.5 py-1.5 text-xs text-slate-800 focus:outline-none focus:ring-1 focus:ring-indigo-500 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed h-9 leading-tight"
               >
                 <option value="">-- All Subtopics --</option>
                 {availableDefaultSubtopics.map((st) => (
@@ -798,39 +804,25 @@ function ImportQuestionsDialog({
               <div className="flex items-center gap-2 p-2.5 bg-slate-50 border border-slate-200 rounded text-slate-700 text-xs">
                 <AlertCircle className="w-4 h-4 text-slate-500 shrink-0" />
                 <span>
-                  {unmatchedCount} question(s) contain topic/subject names not found in the database. Use the dropdowns below to map them.
+                  {unmatchedCount} question(s) contain subject names not found in the database.
                 </span>
               </div>
             )}
 
-            <div className="max-h-56 overflow-y-auto border border-slate-200 rounded">
-              <Table className="text-xs">
+            <div className="w-full max-h-64 overflow-x-auto overflow-y-auto border border-slate-200 rounded">
+              <Table className="text-xs w-full">
                 <TableHeader className="bg-slate-50 sticky top-0 z-10">
                   <TableRow>
                     <TableHead className="w-8 py-2 text-[11px]">#</TableHead>
                     <TableHead className="w-16 py-2 text-[11px]">Type</TableHead>
-                    <TableHead className="py-2 text-[11px] min-w-[160px]">Title / Prompt</TableHead>
-                    <TableHead className="py-2 text-[11px] min-w-[120px]">Subject</TableHead>
-                    <TableHead className="py-2 text-[11px] min-w-[180px]">Topic</TableHead>
-                    <TableHead className="py-2 text-[11px] min-w-[150px]">Subtopic</TableHead>
-                    <TableHead className="w-20 py-2 text-[11px] text-right">Status</TableHead>
+                    <TableHead className="py-2 text-[11px] min-w-[200px]">Title / Prompt</TableHead>
+                    <TableHead className="py-2 text-[11px] min-w-[160px]">Subject</TableHead>
+                    <TableHead className="w-24 py-2 text-[11px] text-right">Status</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {parsedRows.map((row, idx) => {
-                    const rowSubjectTopics = allTopics.filter(
-                      (t) => t.subjectId === row.taxonomy.subjectId || (t.subject && t.subject.id === row.taxonomy.subjectId)
-                    );
-                    const rowTopicSubtopics = row.taxonomy.topicId
-                      ? allSubtopics.filter(
-                          (st) => st.topicId === row.taxonomy.topicId || (st.topic && st.topic.id === row.taxonomy.topicId)
-                        )
-                      : [];
-
-                    const hasIssue =
-                      row.taxonomy.topicStatus === "UNMATCHED" ||
-                      row.taxonomy.subtopicStatus === "UNMATCHED" ||
-                      row.taxonomy.subjectStatus === "UNMATCHED";
+                    const hasIssue = row.taxonomy.subjectStatus === "UNMATCHED";
 
                     return (
                       <TableRow key={row.id} className={hasIssue ? "bg-slate-50/90 hover:bg-slate-100/70" : "hover:bg-slate-50/70"}>
@@ -840,23 +832,19 @@ function ImportQuestionsDialog({
                         <TableCell className="py-2">
                           <Badge
                             variant="secondary"
-                            className={`text-[9px] px-1.5 py-0 font-medium ${
-                              row.question.questionType === "CODING"
-                                ? "bg-slate-100 text-slate-700 border border-slate-200"
-                                : "bg-slate-100 text-slate-700 border border-slate-200"
-                            }`}
+                            className="text-[9px] px-1.5 py-0 font-medium bg-slate-100 text-slate-700 border border-slate-200"
                           >
                             {row.question.questionType}
                           </Badge>
                         </TableCell>
-                        <TableCell className="py-2 max-w-[200px] truncate text-slate-800 font-medium text-[11px]">
+                        <TableCell className="py-2 max-w-[240px] truncate text-slate-800 font-medium text-[11px]">
                           <span title={row.question.prompt}>
                             {row.question.title || row.question.prompt}
                           </span>
                         </TableCell>
                         <TableCell className="py-2">
                           <div className="flex flex-col">
-                            <span className="text-xs text-slate-800 font-medium truncate max-w-[120px]">
+                            <span className="text-xs text-slate-800 font-medium truncate max-w-[150px]">
                               {row.taxonomy.subjectName || "Default Subject"}
                             </span>
                             {row.taxonomy.subjectStatus === "FALLBACK" && (
@@ -868,97 +856,6 @@ function ImportQuestionsDialog({
                               </span>
                             )}
                           </div>
-                        </TableCell>
-                        <TableCell className="py-2">
-                          {row.taxonomy.topicStatus === "MATCHED" ? (
-                            <div className="flex items-center gap-1.5">
-                              <span className="text-xs text-slate-700">
-                                {row.taxonomy.topicName}
-                              </span>
-                            </div>
-                          ) : row.taxonomy.topicStatus === "UNMATCHED" ? (
-                            <div className="space-y-1">
-                              <div className="text-[10px] text-slate-600 font-medium flex items-center gap-1">
-                                <span>Unmatched ("{row.taxonomy.rawTopic}")</span>
-                              </div>
-                              <select
-                                value={row.taxonomy.topicId || ""}
-                                onChange={(e) => handleRowTopicChange(idx, e.target.value)}
-                                className="w-full bg-white border border-slate-300 rounded px-2 py-0.5 text-xs text-slate-800 focus:ring-1 focus:ring-indigo-500 cursor-pointer"
-                              >
-                                <option value="">-- Map to Topic --</option>
-                                {rowSubjectTopics.map((t) => (
-                                  <option key={t.id} value={t.id}>
-                                    {t.name}
-                                  </option>
-                                ))}
-                              </select>
-                            </div>
-                          ) : row.taxonomy.topicStatus === "FALLBACK" ? (
-                            <div className="flex items-center gap-1">
-                              <span className="text-xs text-slate-600">
-                                {row.taxonomy.topicName}
-                              </span>
-                              <span className="text-[10px] text-slate-400">(Default)</span>
-                            </div>
-                          ) : (
-                            <select
-                              value={row.taxonomy.topicId || ""}
-                              onChange={(e) => handleRowTopicChange(idx, e.target.value)}
-                              className="w-full bg-white border border-slate-200 rounded px-1.5 py-0.5 text-[11px] text-slate-600 cursor-pointer"
-                            >
-                              <option value="">-- Assign Topic --</option>
-                              {rowSubjectTopics.map((t) => (
-                                <option key={t.id} value={t.id}>
-                                  {t.name}
-                                </option>
-                              ))}
-                            </select>
-                          )}
-                        </TableCell>
-                        <TableCell className="py-2">
-                          {row.taxonomy.subtopicStatus === "MATCHED" ? (
-                            <span className="text-xs text-slate-700">
-                              {row.taxonomy.subtopicName}
-                            </span>
-                          ) : row.taxonomy.subtopicStatus === "UNMATCHED" ? (
-                            <div className="space-y-1">
-                              <div className="text-[10px] text-slate-600 font-medium">
-                                Unmatched ("{row.taxonomy.rawSubtopic}")
-                              </div>
-                              <select
-                                value={row.taxonomy.subtopicId || ""}
-                                onChange={(e) => handleRowSubtopicChange(idx, e.target.value)}
-                                className="w-full bg-white border border-slate-300 rounded px-2 py-0.5 text-xs text-slate-800 focus:ring-1 focus:ring-indigo-500 cursor-pointer"
-                              >
-                                <option value="">-- Map Subtopic --</option>
-                                {rowTopicSubtopics.map((st) => (
-                                  <option key={st.id} value={st.id}>
-                                    {st.name}
-                                  </option>
-                                ))}
-                              </select>
-                            </div>
-                          ) : row.taxonomy.subtopicStatus === "FALLBACK" ? (
-                            <span className="text-xs text-slate-600">
-                              {row.taxonomy.subtopicName} <span className="text-[10px] text-slate-400">(Default)</span>
-                            </span>
-                          ) : rowTopicSubtopics.length > 0 ? (
-                            <select
-                              value={row.taxonomy.subtopicId || ""}
-                              onChange={(e) => handleRowSubtopicChange(idx, e.target.value)}
-                              className="w-full bg-white border border-slate-200 rounded px-1.5 py-0.5 text-[11px] text-slate-600 cursor-pointer"
-                            >
-                              <option value="">-- Subtopic --</option>
-                              {rowTopicSubtopics.map((st) => (
-                                <option key={st.id} value={st.id}>
-                                  {st.name}
-                                </option>
-                              ))}
-                            </select>
-                          ) : (
-                            <span className="text-[11px] text-slate-400">--</span>
-                          )}
                         </TableCell>
                         <TableCell className="py-2 text-right">
                           {hasIssue ? (
@@ -980,11 +877,13 @@ function ImportQuestionsDialog({
           </div>
         )}
 
-        {/* Footer Actions */}
-        <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+        </div>
+
+        {/* Footer Actions (Sticky Bottom) */}
+        <div className="flex items-center justify-end gap-2 px-6 py-3 border-t border-slate-100 bg-slate-50/50 shrink-0">
           <button
             onClick={onClose}
-            className="px-4 py-2 border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition-colors cursor-pointer rounded"
+            className="px-4 py-2 border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer rounded"
           >
             Cancel
           </button>
