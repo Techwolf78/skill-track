@@ -42,7 +42,6 @@ import {
   ShieldAlert,
   Settings,
   GripVertical,
-  Info,
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
@@ -345,7 +344,6 @@ export default function NewAdminTestEdit() {
   const [isAddCandidatesOpen, setIsAddCandidatesOpen] = useState(false);
   const [candidateResults, setCandidateResults] = useState<Record<string, any>>({});
   const [loadingCandidatesData, setLoadingCandidatesData] = useState(false);
-  const [showCandidateGuide, setShowCandidateGuide] = useState(true);
 
   // Candidate Reports Filtering & Pagination
   const [candidateSearchQuery, setCandidateSearchQuery] = useState("");
@@ -3393,70 +3391,7 @@ export default function NewAdminTestEdit() {
                 </div>
               )}
 
-              {/* 2. Operations & Workflow Instructions Card */}
-              {showCandidateGuide && (
-                <div className="p-4 bg-white border border-slate-200 shadow-xs space-y-3">
-                  <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
-                    <div className="flex items-center gap-2">
-                      <Info className="w-4 h-4 text-[#4353a4]" />
-                      <h4 className="text-xs font-bold uppercase tracking-wider text-slate-900">
-                        Candidate Management & Operations Workflow
-                      </h4>
-                    </div>
-                    <button
-                      onClick={() => setShowCandidateGuide(false)}
-                      className="text-slate-400 hover:text-slate-600 text-xs font-medium cursor-pointer p-0.5"
-                      title="Dismiss instructions"
-                    >
-                      ✕
-                    </button>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-xs text-slate-600">
-                    <div className="space-y-1 p-2.5 bg-slate-50/70 border border-slate-100">
-                      <div className="font-bold text-slate-900 flex items-center gap-1.5">
-                        <span className="w-4 h-4 rounded-full bg-indigo-100 text-indigo-700 text-[10px] flex items-center justify-center font-bold">1</span>
-                        <span>Schedule Window</span>
-                      </div>
-                      <p className="text-[11px] text-slate-500 leading-snug">
-                        Ensure the test schedule is configured in Advanced Settings so candidate links are active.
-                      </p>
-                    </div>
-
-                    <div className="space-y-1 p-2.5 bg-slate-50/70 border border-slate-100">
-                      <div className="font-bold text-slate-900 flex items-center gap-1.5">
-                        <span className="w-4 h-4 rounded-full bg-indigo-100 text-indigo-700 text-[10px] flex items-center justify-center font-bold">2</span>
-                        <span>Invite Candidates</span>
-                      </div>
-                      <p className="text-[11px] text-slate-500 leading-snug">
-                        Click "Add Candidates" to select existing candidates or use the built-in Excel/CSV bulk import.
-                      </p>
-                    </div>
-
-                    <div className="space-y-1 p-2.5 bg-slate-50/70 border border-slate-100">
-                      <div className="font-bold text-slate-900 flex items-center gap-1.5">
-                        <span className="w-4 h-4 rounded-full bg-indigo-100 text-indigo-700 text-[10px] flex items-center justify-center font-bold">3</span>
-                        <span>Dispatch & Resend</span>
-                      </div>
-                      <p className="text-[11px] text-slate-500 leading-snug">
-                        Candidates receive automated invitation emails. Use bulk toolbar or 3-dots menu to resend anytime.
-                      </p>
-                    </div>
-
-                    <div className="space-y-1 p-2.5 bg-slate-50/70 border border-slate-100">
-                      <div className="font-bold text-slate-900 flex items-center gap-1.5">
-                        <span className="w-4 h-4 rounded-full bg-indigo-100 text-indigo-700 text-[10px] flex items-center justify-center font-bold">4</span>
-                        <span>Monitor & Reports</span>
-                      </div>
-                      <p className="text-[11px] text-slate-500 leading-snug">
-                        Track live attempt statuses, extend exam timers, and download comprehensive candidate reports.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* 3. Main Filter & Candidate Table Area */}
+              {/* 2. Main Filter & Candidate Table Area */}
               <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 items-start">
                 {/* Left Filter Sidebar */}
                 <div className="lg:col-span-1 border border-slate-200 bg-white shadow-xs p-5 space-y-5">
