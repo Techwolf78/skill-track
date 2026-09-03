@@ -666,10 +666,10 @@ export default function NewCandidateOnboardingWizard({
                     </div>
                   )}
 
-                  {/* 2-Column Content: Rules on Left, Guidelines on Right */}
-                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start pt-2">
+                  {/* 2-Column Content: Rules on Left, Guidelines on Right (Vertically Centered) */}
+                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center pt-2">
                     {/* Left Points */}
-                    <div className="lg:col-span-6 space-y-4">
+                    <div className="lg:col-span-6 space-y-4 my-auto">
                       <div className="flex items-center gap-2 text-xs md:text-sm font-bold text-slate-800">
                         <div className="w-5 h-5 rounded-full bg-emerald-500 text-white flex items-center justify-center text-[10px] font-bold">
                           i
@@ -722,17 +722,13 @@ export default function NewCandidateOnboardingWizard({
                     </div>
 
                     {/* Right Visual Guidelines */}
-                    <div className="lg:col-span-6 flex flex-col items-center justify-center space-y-2">
-                      <div className="w-full bg-slate-50 border border-slate-200 rounded-sm p-6 text-center text-slate-600 space-y-3">
-                        <div className="w-12 h-12 rounded-full bg-indigo-50 border border-indigo-100 flex items-center justify-center text-[#4353a4] mx-auto">
-                          <Shield className="w-6 h-6 stroke-[1.75]" />
-                        </div>
-                        <p className="text-xs font-bold text-slate-800 uppercase tracking-wider">
-                          Proctored Environment Standard
-                        </p>
-                        <p className="text-[11px] text-slate-500 max-w-xs mx-auto leading-relaxed">
-                          Sit in a well-lit room with your face clearly visible to the webcam. Avoid background chatter or other persons in the camera frame.
-                        </p>
+                    <div className="lg:col-span-6 flex flex-col items-center justify-center">
+                      <div className="w-full bg-white border border-slate-200 rounded-lg p-2 flex items-center justify-center overflow-hidden shadow-2xs">
+                        <img
+                          src="/proctoringGuide.png"
+                          alt="Proctoring Guide"
+                          className="w-full h-auto max-h-[300px] object-contain rounded-md"
+                        />
                       </div>
                     </div>
                   </div>
@@ -1235,16 +1231,6 @@ export default function NewCandidateOnboardingWizard({
             </div>
           </div>
         </div>
-      </div>
-
-      {/* ── Support Bubble ── */}
-      <div className="fixed bottom-6 right-6 z-50">
-        <button
-          className="w-12 h-12 rounded-full bg-[#5b6bbd] hover:bg-[#4a589e] text-white flex items-center justify-center shadow-lg transition-all cursor-pointer"
-          title="Need Help?"
-        >
-          <MessageSquare className="w-5 h-5" />
-        </button>
       </div>
     </div>
   );

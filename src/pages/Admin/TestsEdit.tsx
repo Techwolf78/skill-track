@@ -4241,6 +4241,8 @@ To refer to the FAQ document, you can click on the HELP button which is present 
             onOpenChange={setIsAddCandidatesOpen}
             scheduleId={selectedSchedule}
             alreadyInvitedIds={alreadyInvitedCandidateIds}
+            testTitle={test?.title || "Assessment"}
+            organisationName={adminOrgName}
             onSuccess={() => {
               // Trigger reload in table
               setInvitations((prev) => [...prev]);

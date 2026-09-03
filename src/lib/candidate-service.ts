@@ -168,7 +168,61 @@ export const candidateService = {
       params.append("search", search.trim());
     }
 
-    const response = await apiClient.get<unknown>(`/candidates?${params.toString()}`);
+    let response: { data: unknown };
+    try {
+      response = await apiClient.get<unknown>(`/candidates?${params.toString()}`);
+    } catch (err) {
+      // If backend throws 500 on search query, fall back to fetching candidates and filtering client-side
+      if (search && search.trim()) {
+        try {
+          const fallbackParams = new URLSearchParams({
+            page: "0",
+            size: "1000",
+          });
+          const fbResponse = await apiClient.get<unknown>(`/candidates?${fallbackParams.toString()}`);
+          const fbRaw = fbResponse.data as Record<string, unknown>;
+          const fbPageData = (
+            fbRaw && typeof fbRaw === "object" && "data" in fbRaw && "success" in fbRaw
+              ? (fbRaw as { data: Record<string, unknown> }).data
+              : fbRaw
+          ) as Record<string, unknown>;
+
+          const rawList = Array.isArray(fbPageData?.content)
+            ? (fbPageData.content as (Candidate & Record<string, unknown>)[])
+            : Array.isArray(fbRaw)
+            ? (fbRaw as (Candidate & Record<string, unknown>)[])
+            : [];
+
+          const query = search.trim().toLowerCase();
+          const filtered = rawList
+            .map(mapCandidate)
+            .filter((c) => {
+              const name = c.user?.name?.toLowerCase() || "";
+              const email = c.user?.email?.toLowerCase() || "";
+              const phone = c.user?.phoneNumber?.toLowerCase() || "";
+              return name.includes(query) || email.includes(query) || phone.includes(query);
+            });
+
+          const startIndex = page * size;
+          const paginated = filtered.slice(startIndex, startIndex + size);
+
+          return {
+            content: paginated,
+            totalElements: filtered.length,
+            totalPages: Math.ceil(filtered.length / size) || 1,
+            size,
+            number: page,
+            first: page === 0,
+            last: startIndex + size >= filtered.length,
+            empty: filtered.length === 0,
+          };
+        } catch {
+          // Re-throw original error if fallback fails
+          throw err;
+        }
+      }
+      throw err;
+    }
     const raw = response.data as Record<string, unknown>;
 
     // Unwrap BaseResponse<Page<CandidateResponse>>

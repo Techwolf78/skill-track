@@ -3861,6 +3861,8 @@ export default function NewAdminTestEdit() {
           onOpenChange={setIsAddCandidatesOpen}
           scheduleId={selectedScheduleId}
           alreadyInvitedIds={alreadyInvitedCandidateIds}
+          testTitle={title || test?.title || "Assessment"}
+          organisationName={user?.organisationData?.name}
           onSuccess={() => {
             loadCandidatesData();
             fetchTest();
