@@ -194,26 +194,124 @@ const App = () => (
               </Route>
 
               {/* Standalone Full-Screen Question Create / Edit for Admin */}
-              <Route path="/admin/questions/create" element={<NewAdminQuestionCreate />} />
-              <Route path="/admin/library/create" element={<NewAdminQuestionCreate />} />
-              <Route path="/admin/questions/edit/:id" element={<NewAdminQuestionCreate />} />
-              <Route path="/admin/library/edit/:id" element={<NewAdminQuestionCreate />} />
+              <Route
+                path="/admin/questions/create"
+                element={
+                  <ProtectedRoute requiredRoles={[ROLES.ADMIN, ROLES.SUPERADMIN]}>
+                    <NewAdminQuestionCreate />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/library/create"
+                element={
+                  <ProtectedRoute requiredRoles={[ROLES.ADMIN, ROLES.SUPERADMIN]}>
+                    <NewAdminQuestionCreate />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/questions/edit/:id"
+                element={
+                  <ProtectedRoute requiredRoles={[ROLES.ADMIN, ROLES.SUPERADMIN]}>
+                    <NewAdminQuestionCreate />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/library/edit/:id"
+                element={
+                  <ProtectedRoute requiredRoles={[ROLES.ADMIN, ROLES.SUPERADMIN]}>
+                    <NewAdminQuestionCreate />
+                  </ProtectedRoute>
+                }
+              />
 
               {/* Standalone Full-Screen Question Preview (DoSelect / Learn Style) */}
-              <Route path="/admin/questions/preview/:id" element={<NewAdminQuestionPreview />} />
-              <Route path="/admin/library/preview/:id" element={<NewAdminQuestionPreview />} />
-              <Route path="/superadmin/questions/preview/:id" element={<NewAdminQuestionPreview />} />
+              <Route
+                path="/admin/questions/preview/:id"
+                element={
+                  <ProtectedRoute requiredRoles={[ROLES.ADMIN, ROLES.SUPERADMIN]}>
+                    <NewAdminQuestionPreview />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/library/preview/:id"
+                element={
+                  <ProtectedRoute requiredRoles={[ROLES.ADMIN, ROLES.SUPERADMIN]}>
+                    <NewAdminQuestionPreview />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/superadmin/questions/preview/:id"
+                element={
+                  <ProtectedRoute requiredRoles={[ROLES.SUPERADMIN]}>
+                    <NewAdminQuestionPreview />
+                  </ProtectedRoute>
+                }
+              />
 
               {/* Standalone Full-Screen Test Edit for Admin */}
-              <Route path="/admin/tests/:id" element={<NewAdminTestEdit />} />
-              <Route path="/admin/tests/edit/:id" element={<NewAdminTestEdit />} />
-              <Route path="/admin/tests/edit" element={<NewAdminTestEdit />} />
-              <Route path="/admin/tests/:id/add-problems" element={<NewAdminTestAddProblems />} />
-              <Route path="/admin/tests/edit/:id/library" element={<NewAdminTestAddProblems />} />
+              <Route
+                path="/admin/tests/:id"
+                element={
+                  <ProtectedRoute requiredRoles={[ROLES.ADMIN, ROLES.SUPERADMIN]}>
+                    <NewAdminTestEdit />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/tests/edit/:id"
+                element={
+                  <ProtectedRoute requiredRoles={[ROLES.ADMIN, ROLES.SUPERADMIN]}>
+                    <NewAdminTestEdit />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/tests/edit"
+                element={
+                  <ProtectedRoute requiredRoles={[ROLES.ADMIN, ROLES.SUPERADMIN]}>
+                    <NewAdminTestEdit />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/tests/:id/add-problems"
+                element={
+                  <ProtectedRoute requiredRoles={[ROLES.ADMIN, ROLES.SUPERADMIN]}>
+                    <NewAdminTestAddProblems />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/tests/edit/:id/library"
+                element={
+                  <ProtectedRoute requiredRoles={[ROLES.ADMIN, ROLES.SUPERADMIN]}>
+                    <NewAdminTestAddProblems />
+                  </ProtectedRoute>
+                }
+              />
 
               {/* Standalone Full-Screen Playground for Admin */}
-              <Route path="/admin/playground/:id" element={<DSAPlayground />} />
-              <Route path="/admin/questions/playground/:id" element={<DSAPlayground />} />
+              <Route
+                path="/admin/playground/:id"
+                element={
+                  <ProtectedRoute requiredRoles={[ROLES.ADMIN, ROLES.SUPERADMIN]}>
+                    <DSAPlayground />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/questions/playground/:id"
+                element={
+                  <ProtectedRoute requiredRoles={[ROLES.ADMIN, ROLES.SUPERADMIN]}>
+                    <DSAPlayground />
+                  </ProtectedRoute>
+                }
+              />
 
               {/* Backwards compatibility for /new-admin routes */}
               <Route path="/new-admin/*" element={<Navigate to="/admin" replace />} />

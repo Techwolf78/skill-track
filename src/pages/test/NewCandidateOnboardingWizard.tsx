@@ -65,6 +65,8 @@ export default function NewCandidateOnboardingWizard({
   const { toast } = useToast();
   const { user } = useAuth();
   const [activeStep, setActiveStep] = useState<OnboardingStep>("proctoring");
+  const [maxReachedIndex, setMaxReachedIndex] = useState(0);
+  const [completedSteps, setCompletedSteps] = useState<Set<OnboardingStep>>(new Set());
   const [isDeclarationAgreed, setIsDeclarationAgreed] = useState(false);
 
   // Candidate Details state
@@ -453,10 +455,17 @@ export default function NewCandidateOnboardingWizard({
   const [isLaunching, setIsLaunching] = useState(false);
 
   const handleNext = async () => {
-    if (activeStep === "proctoring") setActiveStep("system_checks");
-    else if (activeStep === "system_checks") setActiveStep("candidate_details");
-    else if (activeStep === "candidate_details") setActiveStep("declaration");
-    else if (activeStep === "declaration") {
+    setCompletedSteps((prev) => new Set(prev).add(activeStep));
+    if (activeStep === "proctoring") {
+      setMaxReachedIndex((prev) => Math.max(prev, 1));
+      setActiveStep("system_checks");
+    } else if (activeStep === "system_checks") {
+      setMaxReachedIndex((prev) => Math.max(prev, 2));
+      setActiveStep("candidate_details");
+    } else if (activeStep === "candidate_details") {
+      setMaxReachedIndex((prev) => Math.max(prev, 3));
+      setActiveStep("declaration");
+    } else if (activeStep === "declaration") {
       if (isLaunching) return;
       setIsLaunching(true);
 
@@ -609,9 +618,9 @@ export default function NewCandidateOnboardingWizard({
             <div className="bg-white border border-slate-200 shadow-xs rounded-xs overflow-hidden divide-y divide-slate-100">
               {steps.map((step, index) => {
                 const isActive = activeStep === step.id;
-                const activeIndex = steps.findIndex((s) => s.id === activeStep);
-                // Can only jump to previous steps or currently active step
-                const isNavigable = index <= activeIndex;
+                const isCompleted = completedSteps.has(step.id);
+                // Can jump to any step that has been reached or already completed
+                const isNavigable = index <= maxReachedIndex || isCompleted;
 
                 return (
                   <button
@@ -631,7 +640,7 @@ export default function NewCandidateOnboardingWizard({
                     }`}
                   >
                     <span>{step.label}</span>
-                    {index < activeIndex && (
+                    {isCompleted && !isActive && (
                       <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
                     )}
                   </button>
@@ -964,29 +973,25 @@ export default function NewCandidateOnboardingWizard({
                         </p>
                       </div>
 
-                      {/* Candidate Form Fields */}
+                      {/* Candidate Verified Details (Read-Only) */}
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-slate-50 p-4 border border-slate-200 rounded-sm">
-                        <div className="space-y-1.5">
-                          <Label className="text-xs font-semibold text-slate-700">
+                        <div className="space-y-1">
+                          <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
                             Candidate Name
-                          </Label>
-                          <Input
-                            value={candidateName}
-                            onChange={(e) => setCandidateName(e.target.value)}
-                            placeholder="e.g. John Doe"
-                            className="bg-white border-slate-300 text-xs h-9"
-                          />
+                          </span>
+                          <div className="text-sm font-semibold text-slate-800 bg-white border border-slate-200/80 px-3 py-2 rounded-xs flex items-center justify-between">
+                            <span className="truncate">{candidateName || "—"}</span>
+                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0 ml-1.5" />
+                          </div>
                         </div>
-                        <div className="space-y-1.5">
-                          <Label className="text-xs font-semibold text-slate-700">
+                        <div className="space-y-1">
+                          <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
                             Candidate Email
-                          </Label>
-                          <Input
-                            value={candidateEmail}
-                            onChange={(e) => setCandidateEmail(e.target.value)}
-                            placeholder="e.g. candidate@example.com"
-                            className="bg-white border-slate-300 text-xs h-9"
-                          />
+                          </span>
+                          <div className="text-sm font-semibold text-slate-800 bg-white border border-slate-200/80 px-3 py-2 rounded-xs flex items-center justify-between">
+                            <span className="truncate">{candidateEmail || "—"}</span>
+                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0 ml-1.5" />
+                          </div>
                         </div>
                       </div>
 

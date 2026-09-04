@@ -23,6 +23,9 @@ export const useAuthStore = create<AuthState>((set) => ({
     localStorage.removeItem("token");
     localStorage.removeItem("user");
     set({ token: null, user: null, isLoading: false });
+    if (window.location.pathname !== "/login") {
+      window.location.href = "/login";
+    }
   },
   initialize: () => {
     const savedToken = localStorage.getItem("token");
