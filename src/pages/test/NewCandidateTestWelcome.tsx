@@ -546,7 +546,7 @@ export default function NewCandidateTestWelcome({
     const total = questions.length;
     let mcqCount = 0, codingCount = 0, otherCount = 0;
     questions.forEach((q) => {
-      const type = q.question?.questionType || (q as Record<string, unknown>).type;
+      const type = q.question?.questionType || (q as unknown as Record<string, unknown>).type;
       if (type === "MCQ") mcqCount++;
       else if (type === "CODING") codingCount++;
       else otherCount++;
@@ -586,7 +586,7 @@ export default function NewCandidateTestWelcome({
     if (isValid((inst as Record<string, unknown>).description)) return (inst as Record<string, unknown>).description as string;
 
     if (test) {
-      if (isValid((test as Record<string, unknown>).instructions)) return (test as Record<string, unknown>).instructions as string;
+      if (isValid((test as unknown as Record<string, unknown>).instructions)) return (test as unknown as Record<string, unknown>).instructions as string;
       if (isValid(test.description)) return test.description;
     }
     return null;
