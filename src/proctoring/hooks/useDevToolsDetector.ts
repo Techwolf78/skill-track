@@ -26,19 +26,38 @@ export function useDevToolsDetector(
     
     const interval = setInterval(checkDevTools, 2000);
 
-    // Another trick: debugger statement
-    const checkDebugger = () => {
-      const start = Date.now();
-      // eslint-disable-next-line no-debugger
-      debugger;
-      const end = Date.now();
-      if (end - start > 100) {
-        // debugger took a long time, likely devtools is open
-        // But this can be annoying for legitimate users if it pauses their execution
-        // Maybe just stick to the size check for now
+    // Keyboard shortcut interception for developer tools
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // F12
+      if (e.key === "F12" || e.keyCode === 123) {
+        e.preventDefault();
+        e.stopPropagation();
+        onViolation("DEVTOOLS_OPEN");
+        return false;
+      }
+
+      // Ctrl+Shift+I (Inspect), Ctrl+Shift+J (Console), Ctrl+Shift+C (Elements)
+      if (e.ctrlKey && e.shiftKey && (e.key === "I" || e.key === "i" || e.key === "J" || e.key === "j" || e.key === "C" || e.key === "c")) {
+        e.preventDefault();
+        e.stopPropagation();
+        onViolation("DEVTOOLS_OPEN");
+        return false;
+      }
+
+      // Ctrl+U (View Source)
+      if (e.ctrlKey && (e.key === "u" || e.key === "U")) {
+        e.preventDefault();
+        e.stopPropagation();
+        onViolation("DEVTOOLS_OPEN");
+        return false;
       }
     };
 
-    return () => clearInterval(interval);
+    window.addEventListener("keydown", handleKeyDown, true);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("keydown", handleKeyDown, true);
+    };
   }, [isActive, onViolation]);
 }

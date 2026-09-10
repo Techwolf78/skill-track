@@ -96,7 +96,6 @@ import { useToast } from "@/hooks/use-toast";
 import { apiClient } from "@/lib/api-client";
 import { testService, TestSession } from "@/lib/test-service";
 import { candidateService } from "@/lib/candidate-service";
-import { TestPhotoUploadModal } from "@/proctoring/components/TestPhotoUploadModal";
 import { ExtendTimeModal, ExtendTimeCandidateSession } from "@/components/admin/ExtendTimeModal";
 
 // ==========================================
@@ -262,9 +261,6 @@ export default function ProctoringDashboard() {
   const [compareWithBaseline, setCompareWithBaseline] = useState<string | null>(null); // frame ID being compared
   const [activeViolationId, setActiveViolationId] = useState<string | null>(null);
 
-  // Test Photo Upload Modal State
-  const [showTestUploadModal, setShowTestUploadModal] = useState(false);
-
   // Time Extension Modal State
   const [isExtendTimeModalOpen, setIsExtendTimeModalOpen] = useState(false);
   const [selectedCandidateForExtension, setSelectedCandidateForExtension] = useState<ExtendTimeCandidateSession | null>(null);
@@ -408,11 +404,8 @@ export default function ProctoringDashboard() {
             description: v.metadata?.description || `Triggered ${v.eventType?.replace(/_/g, " ") || "violation"}`,
             evidenceAvailable: data.evidence?.some((e: { eventId?: string }) => e.eventId === v.eventId) || false,
           })) || [],
-          evidences: data.evidence?.map((e: { id?: string; imageData?: string; s3Key?: string; snapshotType?: string; capturedAt?: string }) => {
-            const key = e.imageData || e.s3Key || "";
-            const fullUrl = key && !key.startsWith("http") && !key.startsWith("data:")
-              ? `https://bcugndjwwyckvwctfdus.supabase.co/storage/v1/object/public/proctoring-evidence/${key}`
-              : key;
+          evidences: data.evidence?.map((e: { id?: string; imageUrl?: string; imageData?: string; s3Key?: string; snapshotType?: string; capturedAt?: string }) => {
+            const fullUrl = e.imageUrl || (e.s3Key && e.s3Key.startsWith("http") ? e.s3Key : (e.imageData ? (e.imageData.startsWith("data:") ? e.imageData : `data:image/jpeg;base64,${e.imageData}`) : e.s3Key || ""));
             return {
               id: e.id,
               imageUrl: fullUrl,
@@ -422,11 +415,8 @@ export default function ProctoringDashboard() {
               description: e.s3Key || "Attached Frame Capture",
             };
           }) || [],
-          snapshots: data.snapshots?.map((s: { id?: string; imageData?: string; s3Key?: string; capturedAt?: string }) => {
-            const key = s.imageData || s.s3Key || "";
-            const fullUrl = key && !key.startsWith("http") && !key.startsWith("data:")
-              ? `https://bcugndjwwyckvwctfdus.supabase.co/storage/v1/object/public/proctoring-evidence/${key}`
-              : key;
+          snapshots: data.snapshots?.map((s: { id?: string; imageUrl?: string; imageData?: string; s3Key?: string; capturedAt?: string }) => {
+            const fullUrl = s.imageUrl || (s.s3Key && s.s3Key.startsWith("http") ? s.s3Key : (s.imageData ? (s.imageData.startsWith("data:") ? s.imageData : `data:image/jpeg;base64,${s.imageData}`) : s.s3Key || ""));
             return {
               id: s.id,
               imageUrl: fullUrl,
@@ -434,16 +424,16 @@ export default function ProctoringDashboard() {
             };
           }) || [],
           candidatePhoto: data.candidatePhoto ? {
-            imageUrl: data.candidatePhoto.imageData
+            imageUrl: data.candidatePhoto.imageUrl || (data.candidatePhoto.imageData
               ? (data.candidatePhoto.imageData.startsWith("data:") ? data.candidatePhoto.imageData : `data:image/jpeg;base64,${data.candidatePhoto.imageData}`)
-              : (data.candidatePhoto.s3Key ? (data.candidatePhoto.s3Key.startsWith("http") ? data.candidatePhoto.s3Key : `https://bcugndjwwyckvwctfdus.supabase.co/storage/v1/object/public/proctoring-evidence/${data.candidatePhoto.s3Key}`) : ""),
+              : (data.candidatePhoto.s3Key || "")),
             capturedAt: data.candidatePhoto.capturedAt ? new Date(data.candidatePhoto.capturedAt).toLocaleString() : "N/A",
           } : (() => {
             const photoEvidence = data.evidence?.find((e: { snapshotType?: string }) => e.snapshotType === "CANDIDATE_PHOTO");
             return photoEvidence ? {
-              imageUrl: photoEvidence.imageData
+              imageUrl: photoEvidence.imageUrl || (photoEvidence.imageData
                 ? (photoEvidence.imageData.startsWith("data:") ? photoEvidence.imageData : `data:image/jpeg;base64,${photoEvidence.imageData}`)
-                : (photoEvidence.s3Key ? (photoEvidence.s3Key.startsWith("http") ? photoEvidence.s3Key : `https://bcugndjwwyckvwctfdus.supabase.co/storage/v1/object/public/proctoring-evidence/${photoEvidence.s3Key}`) : ""),
+                : (photoEvidence.s3Key || "")),
               capturedAt: photoEvidence.capturedAt ? new Date(photoEvidence.capturedAt).toLocaleString() : "N/A",
             } : null;
           })(),
@@ -593,11 +583,8 @@ export default function ProctoringDashboard() {
                   description: v.metadata?.description || `Triggered ${v.eventType?.replace(/_/g, " ") || "violation"}`,
                   evidenceAvailable: data.evidence?.some((e: { eventId?: string }) => e.eventId === v.eventId) || false,
                 })) || [],
-                evidences: data.evidence?.map((e: { id?: string; imageData?: string; s3Key?: string; snapshotType?: string; capturedAt?: string }) => {
-                  const key = e.imageData || e.s3Key || "";
-                  const fullUrl = key && !key.startsWith("http") && !key.startsWith("data:")
-                    ? `https://bcugndjwwyckvwctfdus.supabase.co/storage/v1/object/public/proctoring-evidence/${key}`
-                    : key;
+                evidences: data.evidence?.map((e: { id?: string; imageUrl?: string; imageData?: string; s3Key?: string; snapshotType?: string; capturedAt?: string }) => {
+                  const fullUrl = e.imageUrl || (e.s3Key && e.s3Key.startsWith("http") ? e.s3Key : (e.imageData ? (e.imageData.startsWith("data:") ? e.imageData : `data:image/jpeg;base64,${e.imageData}`) : e.s3Key || ""));
                   return {
                     id: e.id,
                     imageUrl: fullUrl,
@@ -607,11 +594,8 @@ export default function ProctoringDashboard() {
                     description: e.s3Key || "Attached Frame Capture",
                   };
                 }) || [],
-                snapshots: data.snapshots?.map((s: { id?: string; imageData?: string; s3Key?: string; capturedAt?: string }) => {
-                  const key = s.imageData || s.s3Key || "";
-                  const fullUrl = key && !key.startsWith("http") && !key.startsWith("data:")
-                    ? `https://bcugndjwwyckvwctfdus.supabase.co/storage/v1/object/public/proctoring-evidence/${key}`
-                    : key;
+                snapshots: data.snapshots?.map((s: { id?: string; imageUrl?: string; imageData?: string; s3Key?: string; capturedAt?: string }) => {
+                  const fullUrl = s.imageUrl || (s.s3Key && s.s3Key.startsWith("http") ? s.s3Key : (s.imageData ? (s.imageData.startsWith("data:") ? s.imageData : `data:image/jpeg;base64,${s.imageData}`) : s.s3Key || ""));
                   return {
                     id: s.id,
                     imageUrl: fullUrl,
@@ -619,16 +603,16 @@ export default function ProctoringDashboard() {
                   };
                 }) || [],
                 candidatePhoto: data.candidatePhoto ? {
-                  imageUrl: data.candidatePhoto.imageData
+                  imageUrl: data.candidatePhoto.imageUrl || (data.candidatePhoto.imageData
                     ? (data.candidatePhoto.imageData.startsWith("data:") ? data.candidatePhoto.imageData : `data:image/jpeg;base64,${data.candidatePhoto.imageData}`)
-                    : (data.candidatePhoto.s3Key ? (data.candidatePhoto.s3Key.startsWith("http") ? data.candidatePhoto.s3Key : `https://bcugndjwwyckvwctfdus.supabase.co/storage/v1/object/public/proctoring-evidence/${data.candidatePhoto.s3Key}`) : ""),
+                    : (data.candidatePhoto.s3Key || "")),
                   capturedAt: data.candidatePhoto.capturedAt ? new Date(data.candidatePhoto.capturedAt).toLocaleString() : "N/A",
                 } : (() => {
                   const photoEvidence = data.evidence?.find((e: { snapshotType?: string }) => e.snapshotType === "CANDIDATE_PHOTO");
                   return photoEvidence ? {
-                    imageUrl: photoEvidence.imageData
+                    imageUrl: photoEvidence.imageUrl || (photoEvidence.imageData
                       ? (photoEvidence.imageData.startsWith("data:") ? photoEvidence.imageData : `data:image/jpeg;base64,${photoEvidence.imageData}`)
-                      : (photoEvidence.s3Key ? (photoEvidence.s3Key.startsWith("http") ? photoEvidence.s3Key : `https://bcugndjwwyckvwctfdus.supabase.co/storage/v1/object/public/proctoring-evidence/${photoEvidence.s3Key}`) : ""),
+                      : (photoEvidence.s3Key || "")),
                     capturedAt: photoEvidence.capturedAt ? new Date(photoEvidence.capturedAt).toLocaleString() : "N/A",
                   } : null;
                 })(),
@@ -2397,15 +2381,6 @@ export default function ProctoringDashboard() {
           </div>
         </DialogContent>
       </Dialog>
-
-      {/* Test Photo Upload & Supabase Diagnostics Modal */}
-      {showTestUploadModal && (
-        <TestPhotoUploadModal
-          isOpen={showTestUploadModal}
-          onClose={() => setShowTestUploadModal(false)}
-          sessionId={selectedCandidate?.sessionId || candidates[0]?.sessionId || candidates[0]?.id || "375840ee-0c05-4ba5-8db9-1299021c7508"}
-        />
-      )}
 
       {/* ExtendTimeModal */}
       <ExtendTimeModal

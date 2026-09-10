@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import * as tf from "@tensorflow/tfjs-core";
 import "@tensorflow/tfjs-backend-webgl";
 import "@tensorflow/tfjs-backend-cpu";
@@ -65,64 +65,84 @@ export default function NewCandidateOnboardingWizard({
   const navigate = useNavigate();
   const { toast } = useToast();
   const { user } = useAuth();
-  const [activeStep, setActiveStep] = useState<OnboardingStep>("proctoring");
-  const [maxReachedIndex, setMaxReachedIndex] = useState(0);
-  const [completedSteps, setCompletedSteps] = useState<Set<OnboardingStep>>(new Set());
-  const [isDeclarationAgreed, setIsDeclarationAgreed] = useState(false);
 
-  // Candidate Details state
-  const [candidateName, setCandidateName] = useState(user?.name || "");
-  const [candidateEmail, setCandidateEmail] = useState(user?.email || "");
-  const [snapshotImage, setSnapshotImage] = useState<string | null>(null);
-  const [isPhotoVerified, setIsPhotoVerified] = useState(false);
-  const [isVerifyingCapture, setIsVerifyingCapture] = useState(false);
-  const [captureError, setCaptureError] = useState<string | null>(null);
-  const [isUploading, setIsUploading] = useState(false);
-
-  // Media Streams & Diagnostics state
-  const [webcamStatus, setWebcamStatus] = useState<"idle" | "testing" | "success" | "error">("idle");
-  const [micStatus, setMicStatus] = useState<"idle" | "testing" | "success" | "error">("idle");
-  const [screenStatus, setScreenStatus] = useState<"idle" | "testing" | "success" | "error">("idle");
-  const [micLevel, setMicLevel] = useState(0);
-
-  // BlazeFace Detector & Real-time Alignment state
-  const [blazeModel, setBlazeModel] = useState<blazeface.BlazeFaceModel | null>(null);
-  const [isModelLoading, setIsModelLoading] = useState(false);
-  const [faceCheck, setFaceCheck] = useState<{
-    isValid: boolean;
-    status: "initializing" | "no_face" | "multiple_faces" | "face_turned" | "too_far" | "dark" | "ready";
-    message: string;
-  }>({
-    isValid: false,
-    status: "initializing",
-    message: "Initializing face detector...",
-  });
-
-  const videoRef = useRef<HTMLVideoElement | null>(null);
-  const streamRef = useRef<MediaStream | null>(null);
-  const audioContextRef = useRef<AudioContext | null>(null);
-  const animationFrameRef = useRef<number | null>(null);
-  const detectionLoopRef = useRef<number | null>(null);
+  const proctorMode = test?.proctoringMode || "NONE";
+  const isProctoringActive = proctorMode !== "NONE";
 
   // Detect proctoring requirements from test
   const isWebcamRequired =
     isWebcamMonitored ??
     !!(
       test?.requireWebcam ||
-      test?.proctoringMode === "HIGH" ||
-      test?.proctoringMode === "MEDIUM" ||
-      test?.proctoringMode === "CUSTOM"
+      proctorMode === "HIGH" ||
+      proctorMode === "MEDIUM"
     );
 
-  const isMicRequired = !!test?.requireMicrophone;
-  const isScreenRequired = !!test?.requireScreenShare;
+  const isMicRequired = !!test?.requireMicrophone || proctorMode === "HIGH";
+  const isScreenRequired = !!test?.requireScreenShare || proctorMode === "HIGH";
 
-  const steps: { id: OnboardingStep; label: string }[] = [
-    { id: "proctoring", label: "Proctoring Instructions" },
-    { id: "system_checks", label: "System Checks" },
-    { id: "candidate_details", label: "Candidate Details" },
-    { id: "declaration", label: "Declaration" },
-  ];
+  const steps = useMemo(() => {
+    const list: { id: OnboardingStep; label: string }[] = [];
+    if (isProctoringActive) {
+      list.push({ id: "proctoring", label: "Proctoring Instructions" });
+    }
+    list.push({ id: "system_checks", label: "System Checks" });
+    if (isWebcamRequired) {
+      list.push({ id: "candidate_details", label: "Candidate Details" });
+    }
+    list.push({ id: "declaration", label: "Declaration" });
+    return list;
+  }, [isProctoringActive, isWebcamRequired]);
+
+  const [activeStep, setActiveStep] = useState<OnboardingStep>(() =>
+    isProctoringActive ? "proctoring" : "system_checks"
+  );
+  const [maxReachedIndex, setMaxReachedIndex] = useState(0);
+  const [completedSteps, setCompletedSteps] = useState<Set<OnboardingStep>>(new Set());
+  const [isDeclarationAgreed, setIsDeclarationAgreed] = useState(false);
+
+  // Candidate Details Form State
+  const [candidateName, setCandidateName] = useState(user?.name || "");
+  const [candidateEmail, setCandidateEmail] = useState(user?.email || "");
+
+  // Model & Real-time AI Face Detection State
+  const [blazeModel, setBlazeModel] = useState<blazeface.BlazeFaceModel | null>(null);
+  const [isModelLoading, setIsModelLoading] = useState(false);
+  const [faceCheck, setFaceCheck] = useState<{
+    isValid: boolean;
+    status: "no_face" | "multiple_faces" | "face_turned" | "too_far" | "dark" | "low_confidence" | "ready";
+    message: string;
+  }>({
+    isValid: false,
+    status: "no_face",
+    message: "Position face inside oval",
+  });
+
+  // Snapshot Capture & S3 Direct Upload State
+  const [snapshotImage, setSnapshotImage] = useState<string | null>(null);
+  const [isPhotoVerified, setIsPhotoVerified] = useState(false);
+  const [isVerifyingCapture, setIsVerifyingCapture] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [captureError, setCaptureError] = useState<string | null>(null);
+
+  // System Check Statuses
+  const [webcamStatus, setWebcamStatus] = useState<"idle" | "testing" | "success" | "error">("idle");
+  const [micStatus, setMicStatus] = useState<"idle" | "testing" | "success" | "error">("idle");
+  const [micLevel, setMicLevel] = useState(0);
+  const [screenStatus, setScreenStatus] = useState<"idle" | "testing" | "success" | "error">("idle");
+
+  // Media Refs
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const detectionLoopRef = useRef<number | null>(null);
+  const animationFrameRef = useRef<number | null>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+
+  useEffect(() => {
+    if (steps.length > 0 && !steps.some((s) => s.id === activeStep)) {
+      setActiveStep(steps[0].id);
+    }
+  }, [steps, activeStep]);
 
   // Stop camera, audio, and detection loops
   const stopAllMedia = () => {
@@ -431,8 +451,8 @@ export default function NewCandidateOnboardingWizard({
     };
   }, [blazeModel, snapshotImage, activeStep, evaluateFaceGeometry]);
 
-  // Capture Clean Photo with 2-Step Verification
-  const captureSnapshot = async () => {
+  // Submit Photo with 2-Step Verification & S3 Storage Processing
+  const submitPhoto = async () => {
     if (!videoRef.current || isVerifyingCapture) return;
     try {
       setIsVerifyingCapture(true);
@@ -445,102 +465,140 @@ export default function NewCandidateOnboardingWizard({
       const ctx = canvas.getContext("2d");
       if (!ctx) {
         setIsVerifyingCapture(false);
+        setCaptureError("Face not detected. Please position your face clearly and submit again.");
         return;
       }
 
       // 1. Draw raw camera frame to canvas
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-      // 2. Step 2 Verification: Run BlazeFace AI model on the captured canvas
+      // 2. Step 2 Verification: Run AI model strictly on the captured canvas frame
+      console.log("🔍 [Identity Verification] Running Step 2 frozen-frame face detection verification...");
       if (blazeModel) {
         const predictions = await blazeModel.estimateFaces(canvas, false);
-        
-        if (predictions.length === 0) {
+
+        if (!predictions || predictions.length === 0) {
+          console.warn("❌ [Identity Verification] Step 2 Failed: No face detected in captured frame.");
           setIsVerifyingCapture(false);
-          setCaptureError("Photo verification failed. Please position your face clearly and re-capture.");
+          setCaptureError("Face not detected or not visible. Please position your face inside the oval and submit again.");
           toast({
-            title: "Re-capture Required",
-            description: "Please align your face clearly inside the oval and take the photo.",
+            title: "Verification Failed",
+            description: "Face not detected. Please position your face inside the oval and submit again.",
             variant: "destructive",
           });
           return;
         }
 
         if (predictions.length > 1) {
+          console.warn(`❌ [Identity Verification] Step 2 Failed: Multiple faces (${predictions.length}) detected.`);
           setIsVerifyingCapture(false);
-          setCaptureError("Multiple faces detected in frame. Please take photo alone.");
+          setCaptureError("Multiple faces detected. Please ensure you are alone in the frame and submit again.");
           toast({
-            title: "Re-capture Required",
-            description: "Multiple people detected. Please re-capture your photo solo.",
+            title: "Verification Failed",
+            description: "Multiple people detected. Please re-take your photo alone.",
             variant: "destructive",
           });
           return;
         }
 
-        // Evaluate captured face geometry and landmarks strictly on the captured canvas frame
+        // Evaluate captured face geometry strictly on the captured canvas frame
         const verifiedEval = evaluateFaceGeometry(predictions[0], canvas);
         if (!verifiedEval.isValid) {
+          console.warn("❌ [Identity Verification] Step 2 Failed: Face geometry/alignment check failed:", verifiedEval);
           setIsVerifyingCapture(false);
-          setCaptureError("Photo verification failed. Please position your face clearly inside the oval.");
+          setCaptureError("Face not clearly visible. Please position your face inside the oval and submit again.");
           toast({
-            title: "Re-capture Required",
-            description: "Please position your face clearly inside the oval and re-capture.",
+            title: "Verification Failed",
+            description: "Face not clearly visible. Please align your face inside the oval and submit again.",
             variant: "destructive",
           });
           return;
+        }
+
+        console.log("✅ [Identity Verification] Step 2 Passed: Single centered face confirmed with high confidence.", predictions[0]);
+      }
+
+      // 3. Convert verified canvas frame to Blob for S3 upload
+      const blob = await new Promise<Blob | null>((resolve) =>
+        canvas.toBlob(resolve, "image/jpeg", 0.9)
+      );
+
+      if (!blob) {
+        console.warn("❌ [Identity Verification] Failed to encode canvas to JPEG blob.");
+        setIsVerifyingCapture(false);
+        setCaptureError("Face not detected. Please position your face clearly and submit again.");
+        return;
+      }
+
+      // 4. Resolve or initialize Test Session if not yet available, and upload to S3 Storage
+      let activeSessionId = sessionId;
+      if (!activeSessionId && invitationId) {
+        try {
+          console.log(`🚀 [S3 Storage] Resolving active test session for invitation: ${invitationId}...`);
+          const session = await testService.startTestSession(invitationId, "0.0.0.0");
+          if (session && session.id) {
+            activeSessionId = session.id;
+          }
+        } catch (sessErr) {
+          console.warn("⚠️ [S3 Storage] Could not initialize test session for pre-upload:", sessErr);
         }
       }
 
-      // 3. Verification passed! Save snapshot & stop live camera
+      if (activeSessionId) {
+        setIsUploading(true);
+        try {
+          const capturedAt = Date.now();
+          console.log(`🚀 [S3 Storage] Requesting presigned URL for CANDIDATE_PHOTO on session: ${activeSessionId}...`);
+          const { storagePath } = await proctoringService.presignEvidence(
+            activeSessionId,
+            "CANDIDATE_PHOTO"
+          );
+          console.log(`📂 [S3 Storage] Target S3 Storage Key:\n${storagePath}`);
+
+          console.log(`📤 [S3 Storage] Uploading ${blob.size} bytes JPEG via backend proxy...`);
+          await proctoringService.proxyUpload(activeSessionId, storagePath, blob);
+          console.log(`✅ [S3 Storage] Proxy upload succeeded! Image stored at: ${storagePath}`);
+
+          console.log(`📝 [S3 Storage] Confirming candidate photo evidence in database...`);
+          await proctoringService.confirmEvidence(
+            activeSessionId,
+            storagePath,
+            "CANDIDATE_PHOTO",
+            capturedAt,
+            blob.size
+          );
+          console.log(`✅ [S3 Storage] Candidate reference photo confirmed in database.`);
+        } catch (err) {
+          console.warn("⚠️ [S3 Storage] Photo upload warning:", err);
+        } finally {
+          setIsUploading(false);
+        }
+      }
+
+
+      // 5. Verification & S3 pipeline completed successfully!
       const dataUrl = canvas.toDataURL("image/jpeg", 0.9);
       setSnapshotImage(dataUrl);
       setIsPhotoVerified(true);
       setCaptureError(null);
       setIsVerifyingCapture(false);
 
-      // Stop camera stream once verified & captured
+      // Stop live camera hardware
       stopAllMedia();
 
-      // Convert to blob for Supabase upload
-      canvas.toBlob(async (blob) => {
-        if (!blob) return;
-
-        // If an active candidate test session exists, upload to Supabase
-        if (sessionId) {
-          setIsUploading(true);
-          try {
-            const capturedAt = Date.now();
-            const { url: signedUploadUrl, storagePath } = await proctoringService.presignEvidence(
-              sessionId,
-              "CANDIDATE_PHOTO"
-            );
-
-            if (signedUploadUrl && signedUploadUrl.startsWith("http")) {
-              await fetch(signedUploadUrl, {
-                method: "PUT",
-                headers: { "Content-Type": "image/jpeg", "x-upsert": "true" },
-                body: blob,
-              });
-
-              await proctoringService.confirmEvidence(
-                sessionId,
-                storagePath,
-                "CANDIDATE_PHOTO",
-                capturedAt,
-                blob.size
-              );
-            }
-          } catch (err) {
-            console.warn("Supabase photo upload error (stored locally):", err);
-          } finally {
-            setIsUploading(false);
-          }
-        }
-      }, "image/jpeg", 0.9);
+      toast({
+        title: "Photo Verified & Submitted",
+        description: "Candidate identity photo verified and uploaded successfully.",
+      });
     } catch (e) {
-      console.error("Snapshot capture error:", e);
+      console.error("Snapshot verification & submission error:", e);
       setIsVerifyingCapture(false);
-      setCaptureError("Failed to verify captured frame. Please try again.");
+      setCaptureError("Face not detected or not visible. Please position your face inside the oval and submit again.");
+      toast({
+        title: "Verification Error",
+        description: "Face not detected. Please position your face inside the oval and submit again.",
+        variant: "destructive",
+      });
     }
   };
 
@@ -597,20 +655,36 @@ export default function NewCandidateOnboardingWizard({
     }
   };
 
+  const handleTestScreen = async () => {
+    setScreenStatus("testing");
+    try {
+      const stream = await navigator.mediaDevices.getDisplayMedia({ video: true });
+      setScreenStatus("success");
+      stream.getTracks().forEach((t) => t.stop());
+    } catch {
+      setScreenStatus("error");
+    }
+  };
+
   const [isLaunching, setIsLaunching] = useState(false);
+
+  const currentIndex = steps.findIndex((s) => s.id === activeStep);
+  const isFirstStep = currentIndex === 0;
+  const isLastStep = currentIndex === steps.length - 1;
+
+  const handlePrevious = () => {
+    if (currentIndex > 0) {
+      setActiveStep(steps[currentIndex - 1].id);
+    }
+  };
 
   const handleNext = async () => {
     setCompletedSteps((prev) => new Set(prev).add(activeStep));
-    if (activeStep === "proctoring") {
-      setMaxReachedIndex((prev) => Math.max(prev, 1));
-      setActiveStep("system_checks");
-    } else if (activeStep === "system_checks") {
-      setMaxReachedIndex((prev) => Math.max(prev, 2));
-      setActiveStep("candidate_details");
-    } else if (activeStep === "candidate_details") {
-      setMaxReachedIndex((prev) => Math.max(prev, 3));
-      setActiveStep("declaration");
-    } else if (activeStep === "declaration") {
+    if (!isLastStep && currentIndex >= 0) {
+      const nextIdx = currentIndex + 1;
+      setMaxReachedIndex((prev) => Math.max(prev, nextIdx));
+      setActiveStep(steps[nextIdx].id);
+    } else {
       if (isLaunching) return;
       setIsLaunching(true);
 
@@ -653,38 +727,7 @@ export default function NewCandidateOnboardingWizard({
         sessionStorage.setItem(`env_checked_${session.id}`, "true");
         sessionStorage.setItem(`identity_verified_${session.id}`, "true");
 
-        // 4. Upload photo snapshot if captured
-        if (snapshotImage) {
-          try {
-            const fetchRes = await fetch(snapshotImage);
-            const blob = await fetchRes.blob();
-            const capturedAt = Date.now();
-            const { url: signedUploadUrl, storagePath } = await proctoringService.presignEvidence(
-              session.id,
-              "IDENTITY_PHOTO"
-            );
-
-            if (signedUploadUrl && signedUploadUrl.startsWith("http")) {
-              await fetch(signedUploadUrl, {
-                method: "PUT",
-                headers: { "Content-Type": "image/jpeg", "x-upsert": "true" },
-                body: blob,
-              });
-
-              await proctoringService.confirmEvidence(
-                session.id,
-                storagePath,
-                "IDENTITY_PHOTO",
-                capturedAt,
-                blob.size
-              );
-            }
-          } catch (uploadErr) {
-            console.warn("Failed to upload identity snapshot:", uploadErr);
-          }
-        }
-
-        // 5. Navigate to core assessment interface
+        // 4. Navigate to core assessment interface
         navigate(`/test/${session.testId || testId || "assessment"}/session/${session.id}`);
       } catch (err: any) {
         if (document.fullscreenElement) {
@@ -737,9 +780,15 @@ export default function NewCandidateOnboardingWizard({
 
         <div className="flex items-center gap-3">
           {/* Proctor Mode Badge */}
-          <div className="bg-[#4353a4] text-white text-[10px] md:text-[11px] font-bold px-3 py-1 rounded-full uppercase tracking-wider flex items-center gap-1.5 shadow-xs">
-            <span>{test?.proctoringMode || "STANDARD"} PROCTOR MODE</span>
-          </div>
+          {isProctoringActive ? (
+            <div className="bg-[#4353a4] text-white text-[10px] md:text-[11px] font-bold px-3 py-1 rounded-full uppercase tracking-wider flex items-center gap-1.5 shadow-xs">
+              <span>PROCTOR MODE</span>
+            </div>
+          ) : (
+            <div className="bg-slate-100 text-slate-700 border border-slate-200 text-[10px] md:text-[11px] font-bold px-3 py-1 rounded-full uppercase tracking-wider flex items-center gap-1.5 shadow-xs">
+              <span>STANDARD ASSESSMENT</span>
+            </div>
+          )}
 
           {/* Close / Exit Button */}
           <button
@@ -1002,53 +1051,55 @@ export default function NewCandidateOnboardingWizard({
                       </div>
                     </div>
 
-                    {/* 5. Webcam Card */}
-                    <div className="bg-white border border-slate-200/90 rounded-sm p-4 flex flex-col justify-between shadow-xs">
-                      <div className="flex items-center justify-between pb-3 border-b border-dashed border-slate-200">
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-full border border-slate-300 flex items-center justify-center text-slate-600 shrink-0">
-                            <Camera className="w-5 h-5 stroke-[1.5]" />
-                          </div>
-                          <div>
-                            <div className="flex items-center gap-1.5">
-                              <span className="text-xs font-bold text-slate-800">Webcam</span>
-                              {webcamStatus === "success" ? (
-                                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 fill-emerald-50" />
-                              ) : (
-                                <AlertCircle className="w-3.5 h-3.5 text-rose-500 fill-rose-50" />
-                              )}
+                    {/* 5. Webcam Card (Only if required) */}
+                    {isWebcamRequired && (
+                      <div className="bg-white border border-slate-200/90 rounded-sm p-4 flex flex-col justify-between shadow-xs">
+                        <div className="flex items-center justify-between pb-3 border-b border-dashed border-slate-200">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-full border border-slate-300 flex items-center justify-center text-slate-600 shrink-0">
+                              <Camera className="w-5 h-5 stroke-[1.5]" />
                             </div>
-                            <p className="text-[11px] text-slate-500 font-medium mt-0.5">
-                              {webcamStatus === "success"
-                                ? "Verified"
-                                : webcamStatus === "error"
-                                ? "Permission Denied"
-                                : webcamStatus === "testing"
-                                ? "Testing..."
-                                : "Permission Required"}
-                            </p>
+                            <div>
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-xs font-bold text-slate-800">Webcam</span>
+                                {webcamStatus === "success" ? (
+                                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 fill-emerald-50" />
+                                ) : (
+                                  <AlertCircle className="w-3.5 h-3.5 text-rose-500 fill-rose-50" />
+                                )}
+                              </div>
+                              <p className="text-[11px] text-slate-500 font-medium mt-0.5">
+                                {webcamStatus === "success"
+                                  ? "Verified"
+                                  : webcamStatus === "error"
+                                  ? "Permission Denied"
+                                  : webcamStatus === "testing"
+                                  ? "Testing..."
+                                  : "Permission Required"}
+                              </p>
+                            </div>
                           </div>
-                        </div>
 
-                        {webcamStatus === "success" ? (
-                          <span className="px-3.5 py-1 bg-slate-100 text-slate-700 border border-slate-200 text-[11px] font-semibold tracking-wider rounded-xs select-none">
-                            Enabled
-                          </span>
-                        ) : (
-                          <button
-                            onClick={handleTestWebcam}
-                            disabled={webcamStatus === "testing"}
-                            className="px-4 py-1.5 bg-[#4353a4] hover:bg-[#324080] text-white text-[11px] font-bold tracking-wider uppercase rounded-xs transition-colors cursor-pointer shadow-xs disabled:opacity-50"
-                          >
-                            {webcamStatus === "testing" ? "..." : "TEST"}
-                          </button>
-                        )}
+                          {webcamStatus === "success" ? (
+                            <span className="px-3.5 py-1 bg-slate-100 text-slate-700 border border-slate-200 text-[11px] font-semibold tracking-wider rounded-xs select-none">
+                              Enabled
+                            </span>
+                          ) : (
+                            <button
+                              onClick={handleTestWebcam}
+                              disabled={webcamStatus === "testing"}
+                              className="px-4 py-1.5 bg-[#4353a4] hover:bg-[#324080] text-white text-[11px] font-bold tracking-wider uppercase rounded-xs transition-colors cursor-pointer shadow-xs disabled:opacity-50"
+                            >
+                              {webcamStatus === "testing" ? "..." : "TEST"}
+                            </button>
+                          )}
+                        </div>
+                        <div className="pt-3 flex items-center gap-1.5 text-[11px] text-slate-500">
+                          <Info className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                          <span>Verifies camera permissions.</span>
+                        </div>
                       </div>
-                      <div className="pt-3 flex items-center gap-1.5 text-[11px] text-slate-500">
-                        <Info className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                        <span>Verifies camera permissions.</span>
-                      </div>
-                    </div>
+                    )}
 
                     {/* 6. Microphone Card (If required or present) */}
                     {isMicRequired && (
@@ -1096,6 +1147,56 @@ export default function NewCandidateOnboardingWizard({
                         <div className="pt-3 flex items-center gap-1.5 text-[11px] text-slate-500">
                           <Info className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                           <span>Verifies microphone audio input.</span>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* 7. Screen Share Card (If required) */}
+                    {isScreenRequired && (
+                      <div className="bg-white border border-slate-200/90 rounded-sm p-4 flex flex-col justify-between shadow-xs">
+                        <div className="flex items-center justify-between pb-3 border-b border-dashed border-slate-200">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-full border border-slate-300 flex items-center justify-center text-slate-600 shrink-0">
+                              <Monitor className="w-5 h-5 stroke-[1.5]" />
+                            </div>
+                            <div>
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-xs font-bold text-slate-800">Screen Share</span>
+                                {screenStatus === "success" ? (
+                                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 fill-emerald-50" />
+                                ) : (
+                                  <AlertCircle className="w-3.5 h-3.5 text-rose-500 fill-rose-50" />
+                                )}
+                              </div>
+                              <p className="text-[11px] text-slate-500 font-medium mt-0.5">
+                                {screenStatus === "success"
+                                  ? "Verified"
+                                  : screenStatus === "error"
+                                  ? "Permission Denied"
+                                  : screenStatus === "testing"
+                                  ? "Testing..."
+                                  : "Permission Required"}
+                              </p>
+                            </div>
+                          </div>
+
+                          {screenStatus === "success" ? (
+                            <span className="px-3.5 py-1 bg-slate-100 text-slate-700 border border-slate-200 text-[11px] font-semibold tracking-wider rounded-xs select-none">
+                              Enabled
+                            </span>
+                          ) : (
+                            <button
+                              onClick={handleTestScreen}
+                              disabled={screenStatus === "testing"}
+                              className="px-4 py-1.5 bg-[#4353a4] hover:bg-[#324080] text-white text-[11px] font-bold tracking-wider uppercase rounded-xs transition-colors cursor-pointer shadow-xs disabled:opacity-50"
+                            >
+                              {screenStatus === "testing" ? "..." : "TEST"}
+                            </button>
+                          )}
+                        </div>
+                        <div className="pt-3 flex items-center gap-1.5 text-[11px] text-slate-500">
+                          <Info className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                          <span>Verifies desktop screen sharing.</span>
                         </div>
                       </div>
                     )}
@@ -1334,7 +1435,7 @@ export default function NewCandidateOnboardingWizard({
                         ) : (
                           <div className="flex flex-col items-center gap-1">
                             <Button
-                              onClick={captureSnapshot}
+                              onClick={submitPhoto}
                               disabled={!faceCheck.isValid || isModelLoading || isVerifyingCapture}
                               className={`px-8 py-2 text-xs font-bold rounded-full shadow-sm transition-all cursor-pointer ${
                                 isVerifyingCapture
@@ -1347,18 +1448,18 @@ export default function NewCandidateOnboardingWizard({
                               {isVerifyingCapture ? (
                                 <>
                                   <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
-                                  Verifying...
+                                  Verifying & Submitting...
                                 </>
                               ) : (
                                 <>
                                   <Camera className="w-3.5 h-3.5 mr-1.5" />
-                                  Capture Photo
+                                  Submit Photo
                                 </>
                               )}
                             </Button>
                             {!faceCheck.isValid && !isModelLoading && !isVerifyingCapture && (
                               <span className="text-[10px] text-slate-400">
-                                Align your face straight to enable capture
+                                Position face inside oval to submit photo
                               </span>
                             )}
                           </div>
@@ -1413,14 +1514,10 @@ export default function NewCandidateOnboardingWizard({
 
             {/* Step Footer Action Bar with PREVIOUS & NEXT buttons */}
             <div className="px-6 py-4 border-t border-slate-100 bg-slate-50/50 flex items-center justify-end gap-3">
-              {activeStep !== "proctoring" && (
+              {currentIndex > 0 && (
                 <Button
                   variant="outline"
-                  onClick={() => {
-                    if (activeStep === "system_checks") setActiveStep("proctoring");
-                    else if (activeStep === "candidate_details") setActiveStep("system_checks");
-                    else if (activeStep === "declaration") setActiveStep("candidate_details");
-                  }}
+                  onClick={handlePrevious}
                   className="px-6 py-2 text-xs font-bold uppercase tracking-wider text-slate-700 hover:bg-slate-100 rounded-xs border-slate-200 cursor-pointer"
                 >
                   <span>PREVIOUS</span>
@@ -1447,7 +1544,7 @@ export default function NewCandidateOnboardingWizard({
                     className="bg-[#5b6bbd] hover:bg-[#4a589e] disabled:opacity-50 disabled:cursor-not-allowed text-white px-8 py-2 text-xs font-bold uppercase tracking-wider rounded-xs shadow-xs transition-all cursor-pointer flex items-center gap-1.5"
                   >
                     {isLaunching && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-                    <span>{activeStep === "declaration" ? "Start Test" : "NEXT"}</span>
+                    <span>{isLastStep ? "Start Test" : "NEXT"}</span>
                   </Button>
                 );
               })()}

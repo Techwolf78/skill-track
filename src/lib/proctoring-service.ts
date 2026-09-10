@@ -116,5 +116,29 @@ export const proctoringService = {
       { storagePath, evidenceType, capturedAt, fileSizeBytes }
     );
     return unwrapResponse(response);
-  }
+  },
+
+  /**
+   * Upload raw bytes to S3 via the backend proxy endpoint.
+   * Use this instead of a direct PUT to the presigned URL to avoid browser CORS issues.
+   */
+  proxyUpload: async (sessionId: string, storagePath: string, blob: Blob): Promise<void> => {
+    const token = localStorage.getItem("token");
+    const encodedPath = encodeURIComponent(storagePath);
+    const res = await fetch(
+      `/api/test-sessions/${sessionId}/evidence/upload-proxy?path=${encodedPath}&contentType=${encodeURIComponent(blob.type || "image/jpeg")}`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/octet-stream",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: blob,
+      }
+    );
+    if (!res.ok) {
+      const text = await res.text().catch(() => res.statusText);
+      throw new Error(`Proxy upload failed (${res.status}): ${text}`);
+    }
+  },
 };

@@ -626,32 +626,26 @@ export default function NewCandidateTestWelcome({
   // Already submitted
   if (invitationStatus?.hasSubmittedSession) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-950 p-4 relative overflow-hidden">
-        <div className="absolute inset-0 bg-[linear-gradient(to_right,#1e293b18_1px,transparent_1px),linear-gradient(to_bottom,#1e293b18_1px,transparent_1px)] bg-[size:28px_28px] pointer-events-none" />
-        <div className="absolute top-1/3 left-1/2 -translate-x-1/2 w-96 h-96 bg-emerald-500/5 rounded-full blur-3xl pointer-events-none" />
-        <Card className="max-w-md w-full border border-slate-800 bg-slate-900/80 backdrop-blur-md shadow-2xl overflow-hidden animate-in fade-in duration-300">
-          <div className="h-1 bg-gradient-to-r from-emerald-500 via-teal-400 to-cyan-500 w-full" />
-          <CardHeader className="text-center pt-10">
-            <div className="mx-auto mb-4 w-16 h-16 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center">
-              <CheckCircle2 className="w-8 h-8 text-emerald-400" />
-            </div>
-            <CardTitle className="text-2xl font-bold font-mono text-slate-100">Assessment Submitted</CardTitle>
-            <CardDescription className="text-slate-400 mt-2">
+      <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4 relative overflow-hidden">
+        <Card className="max-w-md w-full border border-slate-200 bg-white shadow-xl rounded-2xl overflow-hidden animate-in fade-in duration-300">
+          <CardHeader className="text-center pt-10 pb-4">
+            <CardTitle className="text-2xl font-bold text-slate-900">Assessment Submitted</CardTitle>
+            <CardDescription className="text-slate-500 mt-2 text-sm">
               You have already completed and submitted this assessment. Your responses are securely recorded.
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-3 pb-4">
-            <div className="flex items-center gap-3 rounded-lg bg-slate-800/60 border border-slate-700/50 px-4 py-3">
-              <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
-              <span className="text-xs text-slate-300">All responses are securely stored and cannot be modified.</span>
+          <CardContent className="space-y-3 pb-6 px-8">
+            <div className="flex items-center gap-3 rounded-xl bg-slate-50 border border-slate-200/80 px-4 py-3.5">
+              <ShieldCheck className="w-5 h-5 text-emerald-600 shrink-0" />
+              <span className="text-xs text-slate-700 font-medium">All responses are securely stored and cannot be modified.</span>
             </div>
-            <div className="flex items-center gap-3 rounded-lg bg-slate-800/60 border border-slate-700/50 px-4 py-3">
-              <Clock className="w-4 h-4 text-cyan-400 shrink-0" />
-              <span className="text-xs text-slate-300">Results will be shared by your administrator once evaluation is complete.</span>
+            <div className="flex items-center gap-3 rounded-xl bg-slate-50 border border-slate-200/80 px-4 py-3.5">
+              <Clock className="w-5 h-5 text-[#4353a4] shrink-0" />
+              <span className="text-xs text-slate-700 font-medium">Results will be shared by your administrator once evaluation is complete.</span>
             </div>
           </CardContent>
-          <CardFooter className="pb-8 flex justify-center">
-            <div className="w-full text-center p-3 rounded-lg bg-slate-800/80 border border-slate-700/60 font-mono text-xs text-slate-400">
+          <CardFooter className="pb-8 px-8 flex justify-center">
+            <div className="w-full text-center p-3.5 rounded-xl bg-slate-100 border border-slate-200 text-xs font-semibold text-slate-600">
               You can close this tab now
             </div>
           </CardFooter>
@@ -663,36 +657,30 @@ export default function NewCandidateTestWelcome({
   // Schedule expired
   if (invitationStatus?.scheduleExpired && !invitationStatus?.hasSubmittedSession) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-950 p-4 relative overflow-hidden">
-        <div className="absolute inset-0 bg-[linear-gradient(to_right,#1e293b18_1px,transparent_1px),linear-gradient(to_bottom,#1e293b18_1px,transparent_1px)] bg-[size:28px_28px] pointer-events-none" />
-        <div className="absolute top-1/3 left-1/2 -translate-x-1/2 w-96 h-96 bg-red-500/5 rounded-full blur-3xl pointer-events-none" />
-        <Card className="max-w-md w-full border border-slate-800 bg-slate-900/80 backdrop-blur-md shadow-2xl overflow-hidden animate-in fade-in duration-300">
-          <div className="h-1 bg-gradient-to-r from-red-500 via-rose-400 to-orange-400 w-full" />
-          <CardHeader className="text-center pt-10">
-            <div className="mx-auto mb-4 w-16 h-16 rounded-full bg-red-500/10 border border-red-500/20 flex items-center justify-center">
-              <AlertTriangle className="w-8 h-8 text-red-400" />
-            </div>
-            <CardTitle className="text-2xl font-bold font-mono text-slate-100">Schedule Ended</CardTitle>
-            <CardDescription className="text-slate-400 mt-2">
+      <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4 relative overflow-hidden">
+        <Card className="max-w-md w-full border border-slate-200 bg-white shadow-xl rounded-2xl overflow-hidden animate-in fade-in duration-300">
+          <CardHeader className="text-center pt-10 pb-4">
+            <CardTitle className="text-2xl font-bold text-slate-900">Schedule Ended</CardTitle>
+            <CardDescription className="text-slate-500 mt-2 text-sm">
               The schedule for this assessment has ended. This test cannot be taken now.
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-3 pb-4">
+          <CardContent className="space-y-3 pb-6 px-8">
             {invitationStatus.endTime && (
-              <div className="flex items-center gap-3 rounded-lg bg-slate-800/60 border border-slate-700/50 px-4 py-3">
-                <Clock className="w-4 h-4 text-rose-400 shrink-0" />
-                <span className="text-xs text-slate-300">
-                  Ended at: <strong className="text-slate-200">{new Date(invitationStatus.endTime).toLocaleString()}</strong>
+              <div className="flex items-center gap-3 rounded-xl bg-slate-50 border border-slate-200/80 px-4 py-3.5">
+                <Clock className="w-5 h-5 text-rose-500 shrink-0" />
+                <span className="text-xs text-slate-700">
+                  Ended at: <strong className="text-slate-900 font-semibold">{new Date(invitationStatus.endTime).toLocaleString()}</strong>
                 </span>
               </div>
             )}
-            <div className="flex items-center gap-3 rounded-lg bg-slate-800/60 border border-slate-700/50 px-4 py-3">
-              <AlertCircle className="w-4 h-4 text-amber-400 shrink-0" />
-              <span className="text-xs text-slate-400">Please reach out to your administrator to request a new assessment window.</span>
+            <div className="flex items-center gap-3 rounded-xl bg-slate-50 border border-slate-200/80 px-4 py-3.5">
+              <AlertCircle className="w-5 h-5 text-amber-500 shrink-0" />
+              <span className="text-xs text-slate-600">Please reach out to your administrator to request a new assessment window.</span>
             </div>
           </CardContent>
-          <CardFooter className="pb-8 flex justify-center">
-            <div className="w-full text-center p-3 rounded-lg bg-slate-800/80 border border-slate-700/60 font-mono text-xs text-slate-400">
+          <CardFooter className="pb-8 px-8 flex justify-center">
+            <div className="w-full text-center p-3.5 rounded-xl bg-slate-100 border border-slate-200 text-xs font-semibold text-slate-600">
               You can close this tab now
             </div>
           </CardFooter>
@@ -704,20 +692,16 @@ export default function NewCandidateTestWelcome({
   // Mobile device
   if (isMobile) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-4 bg-[#edf2f7]">
-        <Card className="max-w-md w-full border-red-200 shadow-2xl overflow-hidden">
-          <div className="h-2 bg-red-500" />
-          <CardHeader className="text-center">
-            <div className="mx-auto mb-4 w-16 h-16 rounded-full bg-red-50 flex items-center justify-center">
-              <Smartphone className="w-8 h-8 text-red-500" />
-            </div>
-            <CardTitle className="text-2xl font-bold">Device Not Supported</CardTitle>
-            <CardDescription className="text-base mt-2">
+      <div className="min-h-screen flex items-center justify-center p-4 bg-slate-50">
+        <Card className="max-w-md w-full border border-slate-200 bg-white shadow-xl rounded-2xl overflow-hidden">
+          <CardHeader className="text-center pt-10 pb-4">
+            <CardTitle className="text-2xl font-bold text-slate-900">Device Not Supported</CardTitle>
+            <CardDescription className="text-sm mt-2 text-slate-500">
               This assessment requires screen sharing and proctoring features not supported on mobile or tablet browsers.
             </CardDescription>
           </CardHeader>
-          <CardContent className="text-center">
-            <p className="text-sm text-slate-500">
+          <CardContent className="text-center px-8 pb-8">
+            <p className="text-xs text-slate-600">
               Please open the invitation link on a <strong>desktop or laptop computer</strong> with a webcam, microphone, and a modern browser.
             </p>
           </CardContent>
@@ -729,28 +713,23 @@ export default function NewCandidateTestWelcome({
   // Auth screen: Not authenticated and no testData → show Send Access Link / OTP
   if ((error || !testData) && !isAuthenticated) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-4 bg-slate-950 text-slate-100 font-sans relative">
-        <div className="absolute inset-0 bg-[linear-gradient(to_right,#1e293b12_1px,transparent_1px),linear-gradient(to_bottom,#1e293b12_1px,transparent_1px)] bg-[size:24px_24px] pointer-events-none" />
-        <Card className="max-w-md w-full border border-slate-800 bg-slate-900/80 backdrop-blur-md shadow-2xl relative overflow-hidden animate-in fade-in duration-300">
-          <div className="h-1 bg-emerald-500 w-full" />
-          <CardHeader className="text-center pt-8 pb-6">
-            <div className="mx-auto mb-4 w-14 h-14 rounded-xl border border-emerald-500/20 bg-emerald-950/20 flex items-center justify-center shadow-lg shadow-emerald-950/30">
-              <Shield className="w-7 h-7 text-emerald-400" />
-            </div>
-            <CardTitle className="text-2xl font-bold tracking-tight font-mono text-emerald-400">
-              {otpRequested ? "SECURITY VERIFICATION" : "SECURE TEST ACCESS"}
+      <div className="min-h-screen flex items-center justify-center p-4 bg-slate-50 text-slate-900 font-sans relative">
+        <Card className="max-w-md w-full border border-slate-200 bg-white shadow-xl rounded-2xl relative overflow-hidden animate-in fade-in duration-300">
+          <CardHeader className="text-center pt-8 pb-6 px-8">
+            <CardTitle className="text-2xl font-bold tracking-tight text-slate-900">
+              {otpRequested ? "Security Verification" : "Secure Test Access"}
             </CardTitle>
-            <CardDescription className="text-slate-400 font-sans mt-2">
+            <CardDescription className="text-slate-500 font-sans mt-2 text-xs">
               {otpRequested
                 ? "Enter the 6-digit access code sent to your registered email."
                 : "Identity verification is required to start your secure test."}
             </CardDescription>
           </CardHeader>
 
-          <CardContent className="px-6 pb-6">
+          <CardContent className="px-8 pb-8">
             {error && (
-              <div className="mb-4 p-3 rounded-lg bg-red-950/30 border border-red-500/20 flex items-start gap-2.5 text-xs text-red-400">
-                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+              <div className="mb-4 p-3 rounded-lg bg-red-50 border border-red-200 flex items-start gap-2.5 text-xs text-red-700">
+                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-red-500" />
                 <span>{error}</span>
               </div>
             )}
@@ -758,7 +737,7 @@ export default function NewCandidateTestWelcome({
             {otpRequested ? (
               <div className="space-y-6">
                 <div className="space-y-2">
-                  <Label htmlFor="otp" className="text-xs uppercase tracking-widest font-mono text-slate-400">
+                  <Label htmlFor="otp" className="text-xs font-semibold text-slate-700">
                     Verification Code
                   </Label>
                   <Input
@@ -773,7 +752,7 @@ export default function NewCandidateTestWelcome({
                       if (val.length === 6) handleOtpSubmit(val);
                     }}
                     disabled={isVerifyingOtp}
-                    className="text-center text-2xl tracking-[0.3em] font-mono h-12 bg-slate-950 border-slate-800 text-emerald-400 focus-visible:ring-emerald-500"
+                    className="text-center text-2xl tracking-[0.3em] font-mono h-12 bg-white border-slate-200 text-slate-900 focus-visible:ring-[#4353a4]"
                     autoComplete="one-time-code"
                   />
                 </div>
@@ -781,30 +760,27 @@ export default function NewCandidateTestWelcome({
                   <Button
                     onClick={() => handleOtpSubmit(otpCode)}
                     disabled={otpCode.length !== 6 || isVerifyingOtp}
-                    className="w-full h-11 bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold tracking-wider"
+                    className="w-full h-11 bg-[#4353a4] hover:bg-[#344285] text-white font-semibold shadow-sm"
                   >
                     {isVerifyingOtp ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : null}
-                    {isVerifyingOtp ? "VERIFYING..." : "SUBMIT CODE"}
+                    {isVerifyingOtp ? "Verifying..." : "Submit Code"}
                   </Button>
                   <Button
                     onClick={handleSendAccessCode}
                     disabled={otpCooldown > 0 || isLoggingIn}
                     variant="outline"
-                    className="w-full h-11 border-slate-800 bg-slate-950 hover:bg-slate-900 text-slate-300 font-medium"
+                    className="w-full h-11 border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-medium"
                   >
-                    {otpCooldown > 0 ? `RESEND IN ${otpCooldown}S` : "RESEND EMAIL"}
+                    {otpCooldown > 0 ? `Resend in ${otpCooldown}s` : "Resend Email"}
                   </Button>
                 </div>
               </div>
             ) : (
               <div className="space-y-4">
-                <p className="text-sm text-slate-400 text-center leading-relaxed">
-                  We will send a one-click magic login link and a fallback 6-digit verification code to the email associated with your invitation.
-                </p>
                 <Button
                   onClick={handleSendAccessCode}
-                  disabled={isLoggingIn}
-                  className="w-full h-12 bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold tracking-wider"
+                  disabled={isLoggingIn || otpCooldown > 0}
+                  className="w-full h-11 bg-[#4353a4] hover:bg-[#344285] text-white font-semibold shadow-sm"
                 >
                   {isLoggingIn ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : null}
                   {isLoggingIn ? "SENDING LINK..." : "SEND ACCESS LINK"}
@@ -813,16 +789,16 @@ export default function NewCandidateTestWelcome({
             )}
           </CardContent>
 
-          <CardFooter className="border-t border-slate-800/40 bg-slate-950/20 px-6 py-4 flex justify-between">
+          <CardFooter className="border-t border-slate-100 bg-slate-50/50 px-8 py-4 flex justify-between">
             <Button
               onClick={() => { setOtpRequested(false); setError(null); setOtpCode(""); }}
               variant="ghost"
-              className="text-xs text-slate-500 hover:text-slate-300 font-mono hover:bg-transparent"
+              className="text-xs text-slate-500 hover:text-slate-800 hover:bg-transparent"
               disabled={!otpRequested}
             >
-              &larr; BACK
+              &larr; Back
             </Button>
-            <Button onClick={() => navigate("/")} variant="ghost" className="text-xs text-slate-500 hover:text-slate-300 font-mono hover:bg-transparent">
+            <Button onClick={() => navigate("/")} variant="ghost" className="text-xs text-slate-500 hover:text-slate-800 hover:bg-transparent">
               Return to Homepage
             </Button>
           </CardFooter>

@@ -192,7 +192,8 @@ const getProctoringPreset = (mode: ProctoringMode) => {
       blockCopyPaste: true,
       blockRightClick: true,
       warnOnFullscreenExit: true,
-      maxWarnings: 5,
+      detectDevTools: true,
+      maxWarnings: 3,
     };
   }
   if (mode === "MEDIUM") {
@@ -202,12 +203,11 @@ const getProctoringPreset = (mode: ProctoringMode) => {
       blockCopyPaste: true,
       blockRightClick: true,
       warnOnFullscreenExit: true,
+      detectDevTools: true,
       maxWarnings: 3,
       requireWebcam: true,
       detectFaceNotVisible: true,
       detectMultipleFaces: true,
-      detectSuspiciousAudio: true,
-      detectObjects: true,
       periodicSnapshots: true,
       evidenceCapture: true,
     };
@@ -219,17 +219,16 @@ const getProctoringPreset = (mode: ProctoringMode) => {
       blockCopyPaste: true,
       blockRightClick: true,
       warnOnFullscreenExit: true,
+      detectDevTools: true,
       maxWarnings: 3,
       requireWebcam: true,
       detectFaceNotVisible: true,
       detectMultipleFaces: true,
       detectSuspiciousAudio: true,
-      detectObjects: true,
       periodicSnapshots: true,
       evidenceCapture: true,
       requireMicrophone: true,
       requireScreenShare: true,
-      detectDevTools: true,
       detectScreenShareStop: true,
       enableLiveProctoring: true,
       autoSubmitOnCriticalViolations: true,
@@ -2872,472 +2871,60 @@ export default function NewAdminTestEdit() {
                         <SelectItem value="LOW">Low Proctoring</SelectItem>
                         <SelectItem value="MEDIUM">Medium Proctoring</SelectItem>
                         <SelectItem value="HIGH">High Proctoring</SelectItem>
-                        <SelectItem value="CUSTOM">Custom</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
 
                   {proctoringMode === "NONE" ? (
-                    <p className="text-sm text-muted-foreground italic">
-                      This assessment will run without proctoring.
-                    </p>
+                    <div className="p-4 rounded-xl bg-slate-50 border border-slate-200/80 text-sm text-slate-500">
+                      <p className="font-semibold text-slate-800 mb-1">No Proctoring Active</p>
+                      <p>This assessment runs without restrictions. Candidates will not be prompted for camera, microphone, or fullscreen permissions.</p>
+                    </div>
+                  ) : proctoringMode === "LOW" ? (
+                    <div className="space-y-3 p-4 rounded-xl bg-slate-50 border border-slate-200/80 text-xs text-slate-600">
+                      <div className="flex items-center gap-2 text-sm font-semibold text-slate-900">
+                        <span className="w-2 h-2 rounded-full bg-amber-500" />
+                        <span>Low Proctoring Rules</span>
+                      </div>
+                      <p className="text-slate-500">Browser & shell security only. No webcam or microphone required.</p>
+                      <ul className="grid grid-cols-1 md:grid-cols-2 gap-2 pt-1 font-medium text-slate-700">
+                        <li className="flex items-center gap-2">✓ Fullscreen Required (Warning on Exit)</li>
+                        <li className="flex items-center gap-2">✓ Tab Switch & Window Blur Tracking</li>
+                        <li className="flex items-center gap-2">✓ Developer Tools & Inspect Blocked</li>
+                        <li className="flex items-center gap-2">✓ Copy, Paste & Right Click Blocked</li>
+                      </ul>
+                    </div>
+                  ) : proctoringMode === "MEDIUM" ? (
+                    <div className="space-y-3 p-4 rounded-xl bg-slate-50 border border-slate-200/80 text-xs text-slate-600">
+                      <div className="flex items-center gap-2 text-sm font-semibold text-slate-900">
+                        <span className="w-2 h-2 rounded-full bg-orange-500" />
+                        <span>Medium Proctoring Rules</span>
+                      </div>
+                      <p className="text-slate-500">Includes all Low Proctoring protections plus real-time AI webcam facial monitoring.</p>
+                      <ul className="grid grid-cols-1 md:grid-cols-2 gap-2 pt-1 font-medium text-slate-700">
+                        <li className="flex items-center gap-2">✓ All Low Proctoring Restrictions</li>
+                        <li className="flex items-center gap-2">✓ Mandatory Webcam Video Stream</li>
+                        <li className="flex items-center gap-2">✓ AI Facial Look-Away & Absence</li>
+                        <li className="flex items-center gap-2">✓ Multiple Faces / Second Person Detection</li>
+                        <li className="flex items-center gap-2">✓ Periodic Audit Snapshots (every 5 mins)</li>
+                        <li className="flex items-center gap-2">✓ Instant Evidence Capture on Violations</li>
+                      </ul>
+                    </div>
                   ) : (
-                    <div className="space-y-6 pt-2">
-                      {/* Category 1: Browser Controls */}
-                      <div className="space-y-4">
-                        <h4 className="text-sm font-semibold text-slate-900 uppercase tracking-wider">
-                          Browser & Shell Control
-                        </h4>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <div className="flex items-center space-x-2">
-                            <div className="relative flex items-center justify-center">
-                              <Checkbox
-                                id="enableTabSwitchTracking"
-                                checked={enableTabSwitchTracking}
-                                onCheckedChange={(checked) =>
-                                  setEnableTabSwitchTracking(!!checked)
-                                }
-                                disabled={proctoringMode !== "CUSTOM"}
-                              />
-                              {!enableTabSwitchTracking && proctoringMode !== "CUSTOM" && (
-                                <div className="absolute inset-0 flex items-center justify-center pointer-events-none rounded-sm border border-red-500/40 bg-red-500/10 text-red-500">
-                                  <X className="h-3 w-3 stroke-[2.5]" />
-                                </div>
-                              )}
-                            </div>
-                            <Label
-                              htmlFor="enableTabSwitchTracking"
-                              className="text-sm font-normal cursor-pointer"
-                            >
-                              Enable tab switch tracking
-                            </Label>
-                          </div>
-
-                          <div className="flex items-center space-x-2">
-                            <div className="relative flex items-center justify-center">
-                              <Checkbox
-                                id="blockCopyPaste"
-                                checked={blockCopyPaste}
-                                onCheckedChange={(checked) =>
-                                  setBlockCopyPaste(!!checked)
-                                }
-                                disabled={proctoringMode !== "CUSTOM"}
-                              />
-                              {!blockCopyPaste && proctoringMode !== "CUSTOM" && (
-                                <div className="absolute inset-0 flex items-center justify-center pointer-events-none rounded-sm border border-red-500/40 bg-red-500/10 text-red-500">
-                                  <X className="h-3 w-3 stroke-[2.5]" />
-                                </div>
-                              )}
-                            </div>
-                            <Label
-                              htmlFor="blockCopyPaste"
-                              className="text-sm font-normal cursor-pointer"
-                            >
-                              Block copy/paste
-                            </Label>
-                          </div>
-
-                          <div className="flex items-center space-x-2">
-                            <div className="relative flex items-center justify-center">
-                              <Checkbox
-                                id="blockRightClick"
-                                checked={blockRightClick}
-                                onCheckedChange={(checked) =>
-                                  setBlockRightClick(!!checked)
-                                }
-                                disabled={proctoringMode !== "CUSTOM"}
-                              />
-                              {!blockRightClick && proctoringMode !== "CUSTOM" && (
-                                <div className="absolute inset-0 flex items-center justify-center pointer-events-none rounded-sm border border-red-500/40 bg-red-500/10 text-red-500">
-                                  <X className="h-3 w-3 stroke-[2.5]" />
-                                </div>
-                              )}
-                            </div>
-                            <Label
-                              htmlFor="blockRightClick"
-                              className="text-sm font-normal cursor-pointer"
-                            >
-                              Block right click
-                            </Label>
-                          </div>
-
-                          <div className="flex items-center space-x-2">
-                            <div className="relative flex items-center justify-center">
-                              <Checkbox
-                                id="warnOnFullscreenExit"
-                                checked={warnOnFullscreenExit}
-                                onCheckedChange={(checked) =>
-                                  setWarnOnFullscreenExit(!!checked)
-                                }
-                                disabled={proctoringMode !== "CUSTOM"}
-                              />
-                              {!warnOnFullscreenExit && proctoringMode !== "CUSTOM" && (
-                                <div className="absolute inset-0 flex items-center justify-center pointer-events-none rounded-sm border border-red-500/40 bg-red-500/10 text-red-500">
-                                  <X className="h-3 w-3 stroke-[2.5]" />
-                                </div>
-                              )}
-                            </div>
-                            <Label
-                              htmlFor="warnOnFullscreenExit"
-                              className="text-sm font-normal cursor-pointer"
-                            >
-                              Warn on fullscreen exit
-                            </Label>
-                          </div>
-                        </div>
-
-                        <div className="pt-2 max-w-xs space-y-2">
-                          <Label htmlFor="maxWarnings" className="text-sm font-normal">
-                            Max Warnings Allowed
-                          </Label>
-                          <Input
-                            id="maxWarnings"
-                            type="number"
-                            min="0"
-                            value={maxWarnings}
-                            onChange={(e) => setMaxWarnings(parseInt(e.target.value, 10) || 0)}
-                            disabled={proctoringMode !== "CUSTOM"}
-                            className="w-32 bg-white"
-                          />
-                        </div>
+                    <div className="space-y-3 p-4 rounded-xl bg-slate-50 border border-slate-200/80 text-xs text-slate-600">
+                      <div className="flex items-center gap-2 text-sm font-semibold text-slate-900">
+                        <span className="w-2 h-2 rounded-full bg-red-500" />
+                        <span>High Proctoring Rules</span>
                       </div>
-
-                      {/* Category 2: Webcam & Audio Monitoring */}
-                      <div className="space-y-4 pt-4 border-t">
-                        <h4 className="text-sm font-semibold text-slate-900 uppercase tracking-wider">
-                          Webcam & Audio Monitoring
-                        </h4>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <div className="flex items-center space-x-2">
-                            <div className="relative flex items-center justify-center">
-                              <Checkbox
-                                id="requireWebcam"
-                                checked={requireWebcam}
-                                onCheckedChange={(checked) =>
-                                  setRequireWebcam(!!checked)
-                                }
-                                disabled={proctoringMode !== "CUSTOM"}
-                              />
-                              {!requireWebcam && proctoringMode !== "CUSTOM" && (
-                                <div className="absolute inset-0 flex items-center justify-center pointer-events-none rounded-sm border border-red-500/40 bg-red-500/10 text-red-500">
-                                  <X className="h-3 w-3 stroke-[2.5]" />
-                                </div>
-                              )}
-                            </div>
-                            <Label
-                              htmlFor="requireWebcam"
-                              className="text-sm font-normal cursor-pointer"
-                            >
-                              Require webcam
-                            </Label>
-                          </div>
-
-                          <div className="flex items-center space-x-2">
-                            <div className="relative flex items-center justify-center">
-                              <Checkbox
-                                id="detectFaceNotVisible"
-                                checked={detectFaceNotVisible}
-                                onCheckedChange={(checked) =>
-                                  setDetectFaceNotVisible(!!checked)
-                                }
-                                disabled={proctoringMode !== "CUSTOM"}
-                              />
-                              {!detectFaceNotVisible && proctoringMode !== "CUSTOM" && (
-                                <div className="absolute inset-0 flex items-center justify-center pointer-events-none rounded-sm border border-red-500/40 bg-red-500/10 text-red-500">
-                                  <X className="h-3 w-3 stroke-[2.5]" />
-                                </div>
-                              )}
-                            </div>
-                            <Label
-                              htmlFor="detectFaceNotVisible"
-                              className="text-sm font-normal cursor-pointer"
-                            >
-                              Detect face not visible
-                            </Label>
-                          </div>
-
-                          <div className="flex items-center space-x-2">
-                            <div className="relative flex items-center justify-center">
-                              <Checkbox
-                                id="detectMultipleFaces"
-                                checked={detectMultipleFaces}
-                                onCheckedChange={(checked) =>
-                                  setDetectMultipleFaces(!!checked)
-                                }
-                                disabled={proctoringMode !== "CUSTOM"}
-                              />
-                              {!detectMultipleFaces && proctoringMode !== "CUSTOM" && (
-                                <div className="absolute inset-0 flex items-center justify-center pointer-events-none rounded-sm border border-red-500/40 bg-red-500/10 text-red-500">
-                                  <X className="h-3 w-3 stroke-[2.5]" />
-                                </div>
-                              )}
-                            </div>
-                            <Label
-                              htmlFor="detectMultipleFaces"
-                              className="text-sm font-normal cursor-pointer"
-                            >
-                              Detect multiple faces
-                            </Label>
-                          </div>
-
-                          <div className="flex items-center space-x-2">
-                            <div className="relative flex items-center justify-center">
-                              <Checkbox
-                                id="detectSuspiciousAudio"
-                                checked={detectSuspiciousAudio}
-                                onCheckedChange={(checked) =>
-                                  setDetectSuspiciousAudio(!!checked)
-                                }
-                                disabled={proctoringMode !== "CUSTOM"}
-                              />
-                              {!detectSuspiciousAudio && proctoringMode !== "CUSTOM" && (
-                                <div className="absolute inset-0 flex items-center justify-center pointer-events-none rounded-sm border border-red-500/40 bg-red-500/10 text-red-500">
-                                  <X className="h-3 w-3 stroke-[2.5]" />
-                                </div>
-                              )}
-                            </div>
-                            <Label
-                              htmlFor="detectSuspiciousAudio"
-                              className="text-sm font-normal cursor-pointer"
-                            >
-                              Detect suspicious audio
-                            </Label>
-                          </div>
-
-                          <div className="flex items-center space-x-2">
-                            <div className="relative flex items-center justify-center">
-                              <Checkbox
-                                id="detectObjects"
-                                checked={detectObjects}
-                                onCheckedChange={(checked) =>
-                                  setDetectObjects(!!checked)
-                                }
-                                disabled={proctoringMode !== "CUSTOM"}
-                              />
-                              {!detectObjects && proctoringMode !== "CUSTOM" && (
-                                <div className="absolute inset-0 flex items-center justify-center pointer-events-none rounded-sm border border-red-500/40 bg-red-500/10 text-red-500">
-                                  <X className="h-3 w-3 stroke-[2.5]" />
-                                </div>
-                              )}
-                            </div>
-                            <Label
-                              htmlFor="detectObjects"
-                              className="text-sm font-normal cursor-pointer"
-                            >
-                              Detect prohibited objects (phones/books)
-                            </Label>
-                          </div>
-
-                          <div className="flex items-center space-x-2">
-                            <div className="relative flex items-center justify-center">
-                              <Checkbox
-                                id="periodicSnapshots"
-                                checked={periodicSnapshots}
-                                onCheckedChange={(checked) =>
-                                  setPeriodicSnapshots(!!checked)
-                                }
-                                disabled={proctoringMode !== "CUSTOM"}
-                              />
-                              {!periodicSnapshots && proctoringMode !== "CUSTOM" && (
-                                <div className="absolute inset-0 flex items-center justify-center pointer-events-none rounded-sm border border-red-500/40 bg-red-500/10 text-red-500">
-                                  <X className="h-3 w-3 stroke-[2.5]" />
-                                </div>
-                              )}
-                            </div>
-                            <Label
-                              htmlFor="periodicSnapshots"
-                              className="text-sm font-normal cursor-pointer"
-                            >
-                              Periodic snapshots
-                            </Label>
-                          </div>
-
-                          <div className="flex items-center space-x-2">
-                            <div className="relative flex items-center justify-center">
-                              <Checkbox
-                                id="evidenceCapture"
-                                checked={evidenceCapture}
-                                onCheckedChange={(checked) =>
-                                  setEvidenceCapture(!!checked)
-                                }
-                                disabled={proctoringMode !== "CUSTOM"}
-                              />
-                              {!evidenceCapture && proctoringMode !== "CUSTOM" && (
-                                <div className="absolute inset-0 flex items-center justify-center pointer-events-none rounded-sm border border-red-500/40 bg-red-500/10 text-red-500">
-                                  <X className="h-3 w-3 stroke-[2.5]" />
-                                </div>
-                              )}
-                            </div>
-                            <Label
-                              htmlFor="evidenceCapture"
-                              className="text-sm font-normal cursor-pointer"
-                            >
-                              Capture snapshot evidence
-                            </Label>
-                          </div>
-
-                          <div className="flex items-center space-x-2">
-                            <div className="relative flex items-center justify-center">
-                              <Checkbox
-                                id="requireMicrophone"
-                                checked={requireMicrophone}
-                                onCheckedChange={(checked) =>
-                                  setRequireMicrophone(!!checked)
-                                }
-                                disabled={proctoringMode !== "CUSTOM"}
-                              />
-                              {!requireMicrophone && proctoringMode !== "CUSTOM" && (
-                                <div className="absolute inset-0 flex items-center justify-center pointer-events-none rounded-sm border border-red-500/40 bg-red-500/10 text-red-500">
-                                  <X className="h-3 w-3 stroke-[2.5]" />
-                                </div>
-                              )}
-                            </div>
-                            <Label
-                              htmlFor="requireMicrophone"
-                              className="text-sm font-normal cursor-pointer"
-                            >
-                              Require microphone
-                            </Label>
-                          </div>
-
-                          <div className="flex items-center space-x-2">
-                            <div className="relative flex items-center justify-center">
-                              <Checkbox
-                                id="requireScreenShare"
-                                checked={requireScreenShare}
-                                onCheckedChange={(checked) =>
-                                  setRequireScreenShare(!!checked)
-                                }
-                                disabled={proctoringMode !== "CUSTOM"}
-                              />
-                              {!requireScreenShare && proctoringMode !== "CUSTOM" && (
-                                <div className="absolute inset-0 flex items-center justify-center pointer-events-none rounded-sm border border-red-500/40 bg-red-500/10 text-red-500">
-                                  <X className="h-3 w-3 stroke-[2.5]" />
-                                </div>
-                              )}
-                            </div>
-                            <Label
-                              htmlFor="requireScreenShare"
-                              className="text-sm font-normal cursor-pointer"
-                            >
-                              Require screen share
-                            </Label>
-                          </div>
-
-                          <div className="flex items-center space-x-2">
-                            <div className="relative flex items-center justify-center">
-                              <Checkbox
-                                id="detectDevTools"
-                                checked={detectDevTools}
-                                onCheckedChange={(checked) =>
-                                  setDetectDevTools(!!checked)
-                                }
-                                disabled={proctoringMode !== "CUSTOM"}
-                              />
-                              {!detectDevTools && proctoringMode !== "CUSTOM" && (
-                                <div className="absolute inset-0 flex items-center justify-center pointer-events-none rounded-sm border border-red-500/40 bg-red-500/10 text-red-500">
-                                  <X className="h-3 w-3 stroke-[2.5]" />
-                                </div>
-                              )}
-                            </div>
-                            <Label
-                              htmlFor="detectDevTools"
-                              className="text-sm font-normal cursor-pointer"
-                            >
-                              Detect DevTools
-                            </Label>
-                          </div>
-
-                          <div className="flex items-center space-x-2">
-                            <div className="relative flex items-center justify-center">
-                              <Checkbox
-                                id="detectScreenShareStop"
-                                checked={detectScreenShareStop}
-                                onCheckedChange={(checked) =>
-                                  setDetectScreenShareStop(!!checked)
-                                }
-                                disabled={proctoringMode !== "CUSTOM"}
-                              />
-                              {!detectScreenShareStop && proctoringMode !== "CUSTOM" && (
-                                <div className="absolute inset-0 flex items-center justify-center pointer-events-none rounded-sm border border-red-500/40 bg-red-500/10 text-red-500">
-                                  <X className="h-3 w-3 stroke-[2.5]" />
-                                </div>
-                              )}
-                            </div>
-                            <Label
-                              htmlFor="detectScreenShareStop"
-                              className="text-sm font-normal cursor-pointer"
-                            >
-                              Detect screen share stop
-                            </Label>
-                          </div>
-
-                          <div className="flex items-center space-x-2">
-                            <div className="relative flex items-center justify-center">
-                              <Checkbox
-                                id="enableLiveProctoring"
-                                checked={enableLiveProctoring}
-                                onCheckedChange={(checked) =>
-                                  setEnableLiveProctoring(!!checked)
-                                }
-                                disabled={proctoringMode !== "CUSTOM"}
-                              />
-                              {!enableLiveProctoring && proctoringMode !== "CUSTOM" && (
-                                <div className="absolute inset-0 flex items-center justify-center pointer-events-none rounded-sm border border-red-500/40 bg-red-500/10 text-red-500">
-                                  <X className="h-3 w-3 stroke-[2.5]" />
-                                </div>
-                              )}
-                            </div>
-                            <Label
-                              htmlFor="enableLiveProctoring"
-                              className="text-sm font-normal cursor-pointer"
-                            >
-                              Enable live proctoring
-                            </Label>
-                          </div>
-
-                          <div className="flex items-center space-x-2">
-                            <div className="relative flex items-center justify-center">
-                              <Checkbox
-                                id="autoSubmitOnCriticalViolations"
-                                checked={autoSubmitOnCriticalViolations}
-                                onCheckedChange={(checked) =>
-                                  setAutoSubmitOnCriticalViolations(!!checked)
-                                }
-                                disabled={proctoringMode !== "CUSTOM"}
-                              />
-                              {!autoSubmitOnCriticalViolations && proctoringMode !== "CUSTOM" && (
-                                <div className="absolute inset-0 flex items-center justify-center pointer-events-none rounded-sm border border-red-500/40 bg-red-500/10 text-red-500">
-                                  <X className="h-3 w-3 stroke-[2.5]" />
-                                </div>
-                              )}
-                            </div>
-                            <Label
-                              htmlFor="autoSubmitOnCriticalViolations"
-                              className="text-sm font-normal cursor-pointer"
-                            >
-                              Auto-submit on critical violations
-                            </Label>
-                          </div>
-                        </div>
-
-                        {autoSubmitOnCriticalViolations && (
-                          <div className="pt-2 max-w-xs space-y-2">
-                            <Label htmlFor="maxCriticalViolations" className="text-sm font-normal">
-                              Max Critical Violations
-                            </Label>
-                            <Input
-                              id="maxCriticalViolations"
-                              type="number"
-                              min="1"
-                              value={maxCriticalViolations}
-                              onChange={(e) => setMaxCriticalViolations(parseInt(e.target.value, 10) || 0)}
-                              disabled={proctoringMode !== "CUSTOM"}
-                              className="w-32 bg-white"
-                            />
-                          </div>
-                        )}
-                      </div>
+                      <p className="text-slate-500">Full lockdown assessment with audio transcription, mandatory screen share, and auto-submission.</p>
+                      <ul className="grid grid-cols-1 md:grid-cols-2 gap-2 pt-1 font-medium text-slate-700">
+                        <li className="flex items-center gap-2">✓ All Low & Medium Restrictions</li>
+                        <li className="flex items-center gap-2">✓ Microphone & Audio Keyword Monitoring</li>
+                        <li className="flex items-center gap-2">✓ Mandatory Entire Screen Share</li>
+                        <li className="flex items-center gap-2">✓ Screen Share Stop Detection</li>
+                        <li className="flex items-center gap-2">✓ Live Admin Proctoring Feed Stream</li>
+                        <li className="flex items-center gap-2">✓ Auto-submit on 3 Critical Violations</li>
+                      </ul>
                     </div>
                   )}
                 </CardContent>

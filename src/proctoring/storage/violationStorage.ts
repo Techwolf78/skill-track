@@ -32,7 +32,7 @@ export class ViolationStore {
       backendType = "SUSPICIOUS_AUDIO";
     } else if (v.type === "BACKGROUND_OBJECT") {
       backendType = "OBJECT_DETECTED";
-    } else if (v.type === "EXTENDED_TAB_SWITCH" || v.type === "COPY_PASTE") {
+    } else if (v.type === "EXTENDED_TAB_SWITCH") {
       backendType = "TAB_SWITCH";
     } else if (v.type === "UNUSUAL_BEHAVIOR") {
       backendType = "LOOK_AWAY";

@@ -17,10 +17,10 @@
      --primary-foreground: 0 0% 100%;
      --primary-hover: 230 43% 36%;
      
-     /* Aqua Blue - Accent */
-     --accent: 191 100% 50%;
-     --accent-foreground: 220 30% 15%;
-     --accent-hover: 191 100% 42%;
+     /* Soft Slate / Brand Focus - Accent */
+     --accent: 230 43% 96%;
+     --accent-foreground: 230 43% 30%;
+     --accent-hover: 230 43% 92%;
      
      /* Soft White - Background */
      --background: 0 0% 99%;

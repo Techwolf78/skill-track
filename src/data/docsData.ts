@@ -88,7 +88,7 @@ export const DOCS_DATA: DocSection[] = [
               subheading: "Four-tier decoupled microservice distribution",
               body: [
                 "RxOne separates compute-intensive client proctoring analysis, candidate test evaluation, and secure code compilation into sovereign layers to ensure fault isolation.",
-                "1. Client Edge Layer: Handles Monaco Editor runtime, real-time media streams, WebGL BlazeFace neural inference, and telemetry packet signing.",
+                "1. Client Edge Layer: Handles Monaco Editor runtime, real-time media streams, WebGL neural vision inference, and telemetry packet signing.",
                 "2. Application Gateway & Auth Cluster: Handles JWT token verification, Rate-limiting token buckets, tenant routing, and biometric snapshot authorization.",
                 "3. Core Assessment State Machine: Persists assessment lifecycle transitions (SCHEDULED -> IN_PROGRESS -> SUBMITTED -> EVALUATED) in PostgreSQL with atomic Redis lock guards.",
                 "4. Isolated Execution Sandboxes: Executes untrusted candidate source code inside ephemeral, zero-network Docker / gVisor sandboxes with strict CPU, memory, and syscall constraints."
@@ -126,7 +126,7 @@ export const DOCS_DATA: DocSection[] = [
               paramsTable: [
                 { name: "sessionId", type: "string (UUIDv4)", default: "required", description: "Unique active session identifier allocated at initialization." },
                 { name: "timestamp", type: "integer (epoch ms)", default: "Date.now()", description: "UTC timestamp from high-resolution monotonic performance clock." },
-                { name: "faceConfidence", type: "float (0.0 - 1.0)", default: "1.0", description: "TensorFlow BlazeFace model bounding box inference confidence." },
+                { name: "faceConfidence", type: "float (0.0 - 1.0)", default: "1.0", description: "AI facial detection model bounding box inference confidence." },
                 { name: "faceCount", type: "integer", default: "1", description: "Total distinct facial landmark meshes identified in current camera frame." },
                 { name: "gazeYaw", type: "float (degrees)", default: "0.0", description: "Horizontal head pose rotation angle (-90° to +90°)." },
                 { name: "gazePitch", type: "float (degrees)", default: "0.0", description: "Vertical head pose elevation angle (-90° to +90°)." },
@@ -343,13 +343,13 @@ curl -X GET "https://api.rxone.io/v1/system/health" \\
         category: "AI Proctoring",
         readTime: "14 min read",
         updatedAt: "2026-06-29",
-        tags: ["TensorFlow", "BlazeFace", "CocoSSD", "Computer Vision", "Anti-Cheat"],
+        tags: ["TensorFlow", "FaceDetection", "CocoSSD", "Computer Vision", "Anti-Cheat"],
         content: {
           summary: "RxOne utilizes zero-latency edge inference via WebGL-accelerated neural networks inside the candidate browser, guaranteeing privacy compliance while detecting integrity breaches in sub-200ms cycles.",
           quickReference: {
             headers: ["Violation Rule", "Detector Engine", "Threshold / Parameter", "Default Penalty", "Resolution Action"],
             rows: [
-              ["No Face Detected", "BlazeFace Bounding Tensor", "> 2.5s missing face", "-10.0 pts", "On-screen warning chime + webcam snapshot"],
+              ["No Face Detected", "AI Facial Detection Tensor", "> 2.5s missing face", "-10.0 pts", "On-screen warning chime + webcam snapshot"],
               ["Multiple Faces", "MediaPipe 3D Mesh", "2+ meshes with conf > 0.80", "-15.0 pts / incident", "Red alert snapshot + SuperAdmin live flag"],
               ["Gaze Deviation", "Iris landmark ray-tracing", "Yaw > 28° or Pitch > 22° for > 3.0s", "-4.0 pts", "Yellow flag indicator in session audit log"],
               ["Mobile Device In Frame", "Coco-SSD Object Detection", "'cell phone' class with conf > 0.72", "-25.0 pts / frame", "Critical violation snapshot + strike + SMS alert"],

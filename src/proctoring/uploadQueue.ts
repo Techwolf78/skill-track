@@ -82,15 +82,26 @@ export class UploadQueue {
       const storagePath: string = payload.storagePath || "";
       if (!signedUrl) throw new Error("No signedUploadUrl returned from presign");
 
-      // Step 2: PUT binary JPEG directly to Supabase Storage
-      console.log(`[UploadQueue] Uploading JPEG buffer to Supabase storage...`);
-      const putRes = await fetch(signedUrl, {
-        method: "PUT",
-        headers: { "Content-Type": "image/jpeg", "x-upsert": "true" },
-        body: item.buffer,
-      });
-      if (!putRes.ok) throw new Error(`Storage PUT failed: ${putRes.status}`);
-      console.log(`[UploadQueue] Supabase PUT upload success.`);
+      console.log(`[UploadQueue] Full Presigned URL (for path only):\n${signedUrl}`);
+      console.log(`[UploadQueue] S3 Storage Target Key:\n${storagePath}`);
+      console.log(`[UploadQueue] Uploading JPEG buffer via backend proxy...`);
+
+      // Step 2: Proxy upload via backend (avoids browser→S3 CORS)
+      const encodedPath = encodeURIComponent(storagePath);
+      const proxyRes = await fetch(
+        `/api/test-sessions/${this.sessionId}/evidence/upload-proxy?path=${encodedPath}&contentType=image%2Fjpeg`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/octet-stream",
+            ...authHeaders,
+          },
+          body: item.buffer,
+        }
+      );
+      if (!proxyRes.ok) throw new Error(`Proxy upload failed: ${proxyRes.status}`);
+      console.log(`[UploadQueue] Proxy upload success! Image stored at: ${storagePath}`);
+
 
       // Step 3: Confirm evidence record in DB with deterministic key
       console.log(`[UploadQueue] Confirming evidence with backend path: ${storagePath}...`);

@@ -446,6 +446,20 @@ function TestInterfaceContent({ testId, sessionId, navigate, toast }: { testId?:
       };
       setSession(normalizedSession);
 
+      // Ensure session is ACTIVE before fetching the paper.
+      // activateSession is idempotent — safe to call even if already ACTIVE.
+      if (sessionData.status !== "ACTIVE") {
+        console.log("🔓 STEP 2b: Activating session before fetching paper...");
+        try {
+          await testService.activateTestSession(sessionId);
+          console.log("✅ STEP 2b: Session activated.");
+        } catch (activateErr) {
+          // If activation fails (e.g. photo not yet uploaded) log a warning and continue;
+          // getTestPaper will surface the real error if the session is still not ACTIVE.
+          console.warn("⚠️ Session activation warning:", activateErr);
+        }
+      }
+
       console.log("🚀 STEP 3: Fetching paper for session:", sessionId);
       if (!sessionId) throw new Error("No session ID provided");
       
@@ -1602,17 +1616,6 @@ useEffect(() => {
             </AnimatePresence>
           </div>
           
-          <div className={cn(
-            "flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-bold transition-all",
-            trustScore > 80 ? "bg-green-500/10 text-green-600 border border-green-500/20" :
-            trustScore > 50 ? "bg-yellow-500/10 text-yellow-600 border border-yellow-500/20" :
-            "bg-red-500/10 text-red-600 border border-red-500/20 animate-pulse"
-          )}>
-            {trustScore > 80 ? <ShieldCheckIcon className="w-4 h-4" /> : 
-             trustScore > 50 ? <Shield className="w-4 h-4" /> : 
-             <ShieldAlert className="w-4 h-4" />}
-            <span className="hidden sm:inline">Trust Score:</span> {trustScore}%
-          </div>
 
            <div className="text-sm text-muted-foreground">
             Q{currentIndex + 1}/{questions.length}

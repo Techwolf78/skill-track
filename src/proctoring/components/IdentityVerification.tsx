@@ -292,24 +292,11 @@ export const IdentityVerification: React.FC<IdentityVerificationProps> = ({ sess
     if (!capturedBlob || !sessionId) return;
     setIsUploading(true);
     try {
-      // 1. Presign Upload URL
-      const { url: presignedUrl, storagePath } = await proctoringService.presignEvidence(sessionId, "CANDIDATE_PHOTO");
+      // 1. Presign to get the storagePath
+      const { storagePath } = await proctoringService.presignEvidence(sessionId, "CANDIDATE_PHOTO");
 
-      // 2. Direct Upload Blob to Storage (if valid http endpoint)
-      if (presignedUrl && presignedUrl.startsWith("http")) {
-        try {
-          await fetch(presignedUrl, {
-            method: "PUT",
-            headers: { 
-              "Content-Type": "image/jpeg",
-              "x-upsert": "true"
-            },
-            body: capturedBlob,
-          });
-        } catch (putErr) {
-          console.warn("Storage PUT upload exception, proceeding to confirm evidence record:", putErr);
-        }
-      }
+      // 2. Proxy upload through backend (avoids browser→S3 CORS)
+      await proctoringService.proxyUpload(sessionId, storagePath, capturedBlob);
 
       // 3. Confirm Evidence on Backend
       await proctoringService.confirmEvidence(sessionId, storagePath, "CANDIDATE_PHOTO", Date.now(), capturedBlob.size);

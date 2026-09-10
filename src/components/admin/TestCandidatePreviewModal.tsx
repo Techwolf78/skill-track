@@ -952,36 +952,28 @@ export function TestCandidatePreviewModal({
             </div>
 
             <div className="w-full max-w-md relative">
-              <Card className="border border-slate-800 bg-slate-900/80 backdrop-blur-md shadow-2xl overflow-hidden">
-                {/* Top accent bar */}
-                <div className="h-1 bg-gradient-to-r from-emerald-500 via-teal-400 to-cyan-500 w-full" />
-
+              <Card className="border border-slate-200 bg-white shadow-xl rounded-2xl overflow-hidden">
                 <CardContent className="pt-10 pb-8 px-8 text-center space-y-6">
-                  {/* Animated checkmark */}
-                  <div className="mx-auto w-20 h-20 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center shadow-lg shadow-emerald-900/30">
-                    <CheckCircle2 className="w-10 h-10 text-emerald-400" />
-                  </div>
-
                   <div className="space-y-2">
-                    <h1 className="text-2xl font-bold tracking-tight text-slate-100 font-mono">
+                    <h1 className="text-2xl font-bold tracking-tight text-slate-900">
                       Assessment Submitted
                     </h1>
-                    <p className="text-slate-400 text-sm leading-relaxed">
+                    <p className="text-slate-500 text-sm leading-relaxed">
                       Your responses have been successfully recorded and submitted for evaluation.
                     </p>
                   </div>
 
                   {/* Summary Metric Badges */}
-                  <div className="grid grid-cols-2 gap-2 text-xs font-mono py-1">
-                    <div className="p-2.5 rounded bg-slate-800/80 border border-slate-700 text-left">
-                      <span className="text-slate-400 block text-[10px] uppercase">Answered</span>
-                      <span className="text-emerald-400 font-bold text-sm">
+                  <div className="grid grid-cols-2 gap-2 text-xs py-1">
+                    <div className="p-3 rounded-xl bg-slate-50 border border-slate-200/80 text-left">
+                      <span className="text-slate-500 block text-[11px] font-medium">Answered</span>
+                      <span className="text-[#4353a4] font-bold text-base">
                         {Object.keys(answers).length} / {totalQuestions}
                       </span>
                     </div>
-                    <div className="p-2.5 rounded bg-slate-800/80 border border-slate-700 text-left">
-                      <span className="text-slate-400 block text-[10px] uppercase">Flagged</span>
-                      <span className="text-amber-400 font-bold text-sm">
+                    <div className="p-3 rounded-xl bg-slate-50 border border-slate-200/80 text-left">
+                      <span className="text-slate-500 block text-[11px] font-medium">Flagged</span>
+                      <span className="text-amber-600 font-bold text-base">
                         {flagged.size}
                       </span>
                     </div>
@@ -989,36 +981,30 @@ export function TestCandidatePreviewModal({
 
                   {/* Info pills */}
                   <div className="flex flex-col gap-3">
-                    <div className="flex items-center gap-3 rounded-lg bg-slate-800/60 border border-slate-700/50 px-4 py-3">
-                      <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
-                      <span className="text-xs text-slate-300 text-left">
+                    <div className="flex items-center gap-3 rounded-xl bg-slate-50 border border-slate-200/80 px-4 py-3.5">
+                      <ShieldCheck className="w-5 h-5 text-emerald-600 shrink-0" />
+                      <span className="text-xs text-slate-700 text-left font-medium">
                         All responses are securely stored and cannot be modified.
                       </span>
                     </div>
-                    <div className="flex items-center gap-3 rounded-lg bg-slate-800/60 border border-slate-700/50 px-4 py-3">
-                      <Clock className="w-4 h-4 text-cyan-400 shrink-0" />
-                      <span className="text-xs text-slate-300 text-left">
+                    <div className="flex items-center gap-3 rounded-xl bg-slate-50 border border-slate-200/80 px-4 py-3.5">
+                      <Clock className="w-5 h-5 text-[#4353a4] shrink-0" />
+                      <span className="text-xs text-slate-700 text-left font-medium">
                         Results will be shared by your administrator once evaluation is complete.
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-3 rounded-lg bg-slate-800/60 border border-slate-700/50 px-4 py-3">
-                      <Calendar className="w-4 h-4 text-slate-400 shrink-0" />
-                      <span className="text-xs text-slate-400 font-mono text-left break-all">
-                        Session Mode: <span className="text-slate-300">Live Preview Simulation</span>
                       </span>
                     </div>
                   </div>
                 </CardContent>
 
-                <div className="px-8 pb-8 flex justify-center">
-                  <div className="w-full text-center p-3 rounded-lg bg-slate-800/80 border border-slate-700/60 font-mono text-xs text-slate-400">
+                <CardFooter className="px-8 pb-8 flex justify-center">
+                  <div className="w-full text-center p-3.5 rounded-xl bg-slate-100 border border-slate-200 text-xs font-semibold text-slate-600">
                     You can close this tab now
                   </div>
-                </div>
+                </CardFooter>
               </Card>
 
-              <p className="text-center text-xs text-slate-500 mt-4 font-mono">
-                Candidate assessment lifecycle complete.
+              <p className="text-center text-xs text-slate-400 mt-4">
+                You may safely close this window.
               </p>
             </div>
           </div>

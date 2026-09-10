@@ -67,7 +67,6 @@ const getProctoringPreset = (mode: ProctoringMode) => {
     detectFaceNotVisible: false,
     detectMultipleFaces: false,
     detectSuspiciousAudio: false,
-    detectObjects: false,
     periodicSnapshots: false,
     evidenceCapture: false,
     requireMicrophone: false,
@@ -86,6 +85,7 @@ const getProctoringPreset = (mode: ProctoringMode) => {
       blockCopyPaste: true,
       blockRightClick: true,
       warnOnFullscreenExit: true,
+      detectDevTools: true,
       maxWarnings: 5,
     };
   }
@@ -96,12 +96,11 @@ const getProctoringPreset = (mode: ProctoringMode) => {
       blockCopyPaste: true,
       blockRightClick: true,
       warnOnFullscreenExit: true,
+      detectDevTools: true,
       maxWarnings: 3,
       requireWebcam: true,
       detectFaceNotVisible: true,
       detectMultipleFaces: true,
-      detectSuspiciousAudio: true,
-      detectObjects: true,
       periodicSnapshots: true,
       evidenceCapture: true,
     };
@@ -118,7 +117,6 @@ const getProctoringPreset = (mode: ProctoringMode) => {
       detectFaceNotVisible: true,
       detectMultipleFaces: true,
       detectSuspiciousAudio: true,
-      detectObjects: true,
       periodicSnapshots: true,
       evidenceCapture: true,
       requireMicrophone: true,
@@ -861,7 +859,6 @@ export default function TestsEdit() {
                     <SelectItem value="LOW">Low Proctoring</SelectItem>
                     <SelectItem value="MEDIUM">Medium Proctoring</SelectItem>
                     <SelectItem value="HIGH">High Proctoring</SelectItem>
-                    <SelectItem value="CUSTOM">Custom</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

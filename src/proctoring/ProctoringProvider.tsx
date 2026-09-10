@@ -188,6 +188,20 @@ export const ProctoringProvider: React.FC<{
   useDevToolsDetector(state.isProctoringActive && config.devtools, () => addViolation("DEVTOOLS_OPEN"));
   useAudioMonitor(state.isProctoringActive && config.audio, handleViolation);
 
+  // Disable right click / context menu when proctoring and devtools restriction are active
+  useEffect(() => {
+    if (!state.isProctoringActive || !config.devtools) return;
+
+    const handleContextMenu = (e: MouseEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      return false;
+    };
+
+    window.addEventListener("contextmenu", handleContextMenu, true);
+    return () => window.removeEventListener("contextmenu", handleContextMenu, true);
+  }, [state.isProctoringActive, config.devtools]);
+
 
 
   // Periodic behavior analysis

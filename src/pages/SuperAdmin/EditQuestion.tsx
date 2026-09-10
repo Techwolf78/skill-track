@@ -2291,8 +2291,6 @@ export default function EditQuestion() {
 
           {/* Coding Question Test Cases */}
           {questionType === "CODING" && (
-          {/* Coding Question Test Cases */}
-          {questionType === "CODING" && (
             <Card className="border border-slate-200 bg-slate-50/40 shadow-sm overflow-hidden">
               <CardHeader className="bg-gradient-to-r from-blue-50/70 via-indigo-50/50 to-slate-50/30 border-b border-slate-200/80 pb-4">
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
