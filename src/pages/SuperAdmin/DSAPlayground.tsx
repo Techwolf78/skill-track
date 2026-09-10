@@ -1240,7 +1240,7 @@ export default function DSAPlayground() {
                                 </span>
                                 <Badge
                                   variant="outline"
-                                  className="text-[10px] border-orange-500/30 text-orange-300 bg-orange-500/5"
+                                  className="text-[10px] border-blue-500/30 text-blue-300 bg-blue-500/5"
                                 >
                                   {tc.weight || 0}% weight
                                 </Badge>

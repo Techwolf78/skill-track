@@ -113,8 +113,9 @@ export default function TestSchedules() {
     queryKey: ["candidate-invitations"],
     queryFn: async () => {
       try {
-        const res = await apiClient.get("/candidate-invitations");
+        const res = await apiClient.get("/candidate-invitations?size=1000");
         const data = res.data?.data;
+
         if (Array.isArray(data)) {
           return data;
         }
@@ -537,7 +538,7 @@ export default function TestSchedules() {
                           <Button
                             variant="ghost"
                             size="icon"
-                            className="text-muted-foreground hover:text-orange-600 hover:bg-orange-50/40 dark:hover:bg-orange-950/10"
+                            className="text-muted-foreground hover:text-primary hover:bg-primary/10"
                             disabled={isUpdating}
                           >
                             {isUpdating ? (

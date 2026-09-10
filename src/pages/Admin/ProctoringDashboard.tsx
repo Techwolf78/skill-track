@@ -94,7 +94,8 @@ import {
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiClient } from "@/lib/api-client";
-import { TestSession } from "@/lib/test-service";
+import { testService, TestSession } from "@/lib/test-service";
+import { candidateService } from "@/lib/candidate-service";
 import { TestPhotoUploadModal } from "@/proctoring/components/TestPhotoUploadModal";
 import { ExtendTimeModal, ExtendTimeCandidateSession } from "@/components/admin/ExtendTimeModal";
 
@@ -303,21 +304,32 @@ export default function ProctoringDashboard() {
     }
   };
 
-  // Fetch Schedules API
+  // Fetch Schedules using dedicated backend API
   const loadSchedules = useCallback(async () => {
     setLoadingSchedules(true);
     setErrorSchedules(null);
     try {
-      const response = await apiClient.get("/admin/proctoring/assessment-schedules");
-      const data = response.data?.data ?? response.data;
-      if (Array.isArray(data) && data.length > 0) {
-        setSchedules(data);
-        setSelectedScheduleId(data[0].id);
+      const standardSchedules = await testService.getAllTestSchedules({ size: 1000 });
+      const scheduleList: AssessmentSchedule[] = standardSchedules.map((s) => ({
+        id: s.id,
+        assessmentName: s.test?.title || `Schedule #${s.id.slice(0, 8)}`,
+        scheduledDate: s.startTime ? new Date(s.startTime).toLocaleDateString() : "Active",
+        startTime: s.startTime ? new Date(s.startTime).toLocaleTimeString() : "",
+        proctoringMode: (s.test?.proctoringMode || "MEDIUM") as ProctoringMode,
+        totalCandidates: s.maxCandidates || 0,
+        activeCandidates: 0,
+        submittedCandidates: 0,
+        flaggedCandidates: 0,
+      }));
+
+      setSchedules(scheduleList);
+      if (scheduleList.length > 0) {
+        setSelectedScheduleId((prev) => (prev && scheduleList.some((s) => s.id === prev) ? prev : scheduleList[0].id));
       } else {
-        setSchedules([]);
         setSelectedScheduleId("");
       }
-    } catch {
+    } catch (err) {
+      console.error("Failed to load schedules:", err);
       setErrorSchedules("Could not load assessment schedules. Check your connection or try again.");
       setSchedules([]);
       setSelectedScheduleId("");
@@ -326,32 +338,30 @@ export default function ProctoringDashboard() {
     }
   }, []);
 
-  // Fetch Candidates for Selected Schedule API
+  // Fetch Candidates for Selected Schedule using dedicated backend API
   const loadCandidates = useCallback(async (scheduleId: string) => {
     if (!scheduleId) return;
     setLoadingCandidates(true);
     setErrorCandidates(null);
     try {
-      const response = await apiClient.get(
-        `/admin/proctoring/assessment-schedules/${scheduleId}/candidates`,
-      );
-      const data = response.data?.data ?? response.data;
-      const mappedCandidates = Array.isArray(data) ? data.map((cand: { candidateId: string; sessionId?: string; candidateName: string; email: string; testStatus: string; proctoringMode: ProctoringMode; riskLevel: RiskLevel; violationCount: number; criticalViolationCount: number; lastActivityAt?: string; reviewStatus?: ReviewStatus }) => ({
-        id: cand.candidateId,
-        sessionId: cand.sessionId,
-        name: cand.candidateName,
-        email: cand.email,
-        testStatus: (cand.testStatus === "ACTIVE" ? "IN_PROGRESS" : cand.testStatus) as TestStatus,
-        proctoringMode: cand.proctoringMode,
-        riskLevel: cand.riskLevel,
-        violationsCount: cand.violationCount,
-        criticalViolationsCount: cand.criticalViolationCount,
-        lastActivity: cand.lastActivityAt ? new Date(cand.lastActivityAt).toLocaleString() : "No activity",
-        reviewStatus: cand.reviewStatus || "NOT_REVIEWED",
-      })) : [];
+      const invitations = await candidateService.getInvitationsBySchedule(scheduleId);
+      const mappedCandidates: ProctoringCandidate[] = invitations.map((inv) => ({
+        id: inv.candidateId || inv.id,
+        sessionId: undefined,
+        name: inv.candidateName || inv.candidate?.user?.name || "Candidate",
+        email: inv.candidateEmail || inv.candidate?.user?.email || "—",
+        testStatus: (inv.sessionStatus === "ACTIVE" ? "IN_PROGRESS" : (inv.sessionStatus || "NOT_STARTED")) as TestStatus,
+        proctoringMode: "MEDIUM",
+        riskLevel: "NONE",
+        violationsCount: 0,
+        criticalViolationsCount: 0,
+        lastActivity: inv.createdAt ? new Date(inv.createdAt).toLocaleString() : "No activity",
+        reviewStatus: "NOT_REVIEWED",
+      }));
 
       setCandidates(mappedCandidates);
-    } catch {
+    } catch (err) {
+      console.error("Failed to load candidates for schedule:", err);
       setErrorCandidates("Could not load candidates for this schedule.");
       setCandidates([]);
     } finally {

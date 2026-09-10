@@ -1,5 +1,6 @@
 import { apiClient } from "./api-client";
 import { BaseResponse } from "./auth-service";
+import { SpringPage, unwrapPageResponse, unwrapArrayResponse } from "./api/baseResponseUtils";
 
 export interface UserResponse {
   id: string;
@@ -33,18 +34,37 @@ export interface UpdateUserRequestPatch {
 }
 
 export const userService = {
-  getUsers: async (): Promise<UserResponse[]> => {
-    const response =
-      await apiClient.get<BaseResponse<UserResponse[]>>("/users");
-    const data = response.data?.data;
-    if (Array.isArray(data)) {
-      return data;
-    }
-    if (data && typeof data === "object" && "content" in data && Array.isArray((data as any).content)) {
-      return (data as any).content;
-    }
-    return [];
+  getUsers: async (params?: {
+    role?: string;
+    excludeRole?: string;
+    page?: number;
+    size?: number;
+  }): Promise<UserResponse[]> => {
+    const queryParams = new URLSearchParams();
+    if (params?.role && params.role !== "all") queryParams.append("role", params.role);
+    if (params?.excludeRole) queryParams.append("excludeRole", params.excludeRole);
+    queryParams.append("page", String(params?.page ?? 0));
+    queryParams.append("size", String(params?.size ?? 1000));
+
+    const response = await apiClient.get<BaseResponse<UserResponse[]>>(`/users?${queryParams.toString()}`);
+    return unwrapArrayResponse<UserResponse>(response);
   },
+
+  getUsersPage: async (
+    page = 0,
+    size = 20,
+    params?: { role?: string; excludeRole?: string }
+  ): Promise<SpringPage<UserResponse>> => {
+    const queryParams = new URLSearchParams();
+    if (params?.role && params.role !== "all") queryParams.append("role", params.role);
+    if (params?.excludeRole) queryParams.append("excludeRole", params.excludeRole);
+    queryParams.append("page", String(page));
+    queryParams.append("size", String(size));
+
+    const response = await apiClient.get<BaseResponse<SpringPage<UserResponse>>>(`/users?${queryParams.toString()}`);
+    return unwrapPageResponse<UserResponse>(response);
+  },
+
 
   getUserById: async (id: string): Promise<UserResponse> => {
     const response = await apiClient.get<BaseResponse<UserResponse>>(

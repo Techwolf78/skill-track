@@ -56,27 +56,32 @@ export default function CandidateDashboard() {
       const effectiveOrgId = candidate?.organisationId || "demo-org-1";
       setCandidateId(effectiveCandidateId);
 
-      // 2. Load all sessions, tests safely
+      // 2. Load candidate sessions (backend automatically isolates to this candidate)
       let allSessions: TestSession[] = [];
-      let allTests: Test[] = [];
       try {
-        const res = await Promise.all([
-          testService.getAllSessions(),
-          testService.getAllTests(),
-        ]);
-        allSessions = res[0];
-        allTests = res[1];
+        allSessions = await testService.getAllSessions();
       } catch {
-        // Fallback to empty to trigger demo data
+        allSessions = [];
       }
 
-      // Filter sessions belonging to this candidate
-      const mySessions = allSessions.filter((s) => s.candidateId === effectiveCandidateId);
+      // Resolve test details per unique testId via authorized getTestById
+      const distinctTestIds = Array.from(new Set(allSessions.map((s) => s.testId).filter(Boolean)));
+      const testMap = new Map<string, Test>();
+      await Promise.allSettled(
+        distinctTestIds.map(async (tId) => {
+          try {
+            const testData = await testService.getTestById(tId);
+            if (testData) testMap.set(tId, testData);
+          } catch {
+            // Ignore if individual test lookup fails
+          }
+        })
+      );
 
       // 3. Enrich: pair sessions with test info and try to load results
       const enriched: EnrichedSession[] = await Promise.all(
-        mySessions.map(async (session) => {
-          const test = allTests.find((t) => t.id === session.testId) || null;
+        allSessions.map(async (session) => {
+          const test = testMap.get(session.testId) || null;
           let result: TestResult | null = null;
           try {
             const res = await testService.pollResultBySessionId(session.id);
@@ -90,6 +95,7 @@ export default function CandidateDashboard() {
           return { session, test, result };
         })
       );
+
 
       // If backend returns no sessions for this candidate account, populate rich demo dummy data
       if (enriched.length === 0) {

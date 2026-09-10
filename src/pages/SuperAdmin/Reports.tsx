@@ -1679,7 +1679,7 @@ export default function Reports() {
                                       onClick={() =>
                                         navigate(`/superadmin/proctoring/${session.id}`)
                                       }
-                                      className="h-8 text-xs border-orange-500/20 text-orange-600 hover:bg-orange-50 dark:hover:bg-orange-950/10"
+                                      className="h-8 text-xs border-primary/20 text-primary hover:bg-primary/10"
                                     >
                                       <ShieldAlert className="h-3.5 w-3.5 mr-1" />
                                       Proctoring

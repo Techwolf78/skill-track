@@ -55,18 +55,34 @@ export default function Notifications() {
       const candidate = await candidateService.getCandidateByUserId(userId);
       if (!candidate) return;
 
-      const [allSessions, allTests] = await Promise.all([
-        testService.getAllSessions(),
-        testService.getAllTests(),
-      ]);
+      let allSessions: TestSession[] = [];
+      try {
+        allSessions = await testService.getAllSessions();
+      } catch {
+        allSessions = [];
+      }
 
-      const mySessions = allSessions.filter((s) => s.candidateId === candidate.id);
+      // Resolve test details per unique testId via authorized getTestById
+      const distinctTestIds = Array.from(new Set(allSessions.map((s) => s.testId).filter(Boolean)));
+      const testMap = new Map<string, Test>();
+      await Promise.allSettled(
+        distinctTestIds.map(async (tId) => {
+          try {
+            const testData = await testService.getTestById(tId);
+            if (testData) testMap.set(tId, testData);
+          } catch {
+            // Ignore if individual test lookup fails
+          }
+        })
+      );
+
       const notifs: Notification[] = [];
 
       await Promise.all(
-        mySessions.map(async (session) => {
-          const test = allTests.find((t) => t.id === session.testId);
+        allSessions.map(async (session) => {
+          const test = testMap.get(session.testId);
           const testTitle = test?.title || "Assessment";
+
 
           // Session started → treat as invitation/active test
           if (session.status === "STARTED") {

@@ -125,15 +125,15 @@ const mapCandidate = (c: Candidate & Record<string, unknown>): Candidate => {
 };
 
 export const candidateService = {
-  getCandidates: async (): Promise<Candidate[]> => {
+  getCandidates: async (params?: { search?: string; organisationId?: string }): Promise<Candidate[]> => {
     try {
-      const firstPage = await candidateService.getCandidatesPage(0, 100);
+      const firstPage = await candidateService.getCandidatesPage(0, 100, params?.search, params?.organisationId);
       let allContent: Candidate[] = [...firstPage.content];
 
       if (firstPage.totalPages > 1) {
         const remainingPromises: Promise<SpringPage<Candidate>>[] = [];
         for (let p = 1; p < firstPage.totalPages; p++) {
-          remainingPromises.push(candidateService.getCandidatesPage(p, 100));
+          remainingPromises.push(candidateService.getCandidatesPage(p, 100, params?.search, params?.organisationId));
         }
         const remainingPages = await Promise.all(remainingPromises);
         for (const pg of remainingPages) {
@@ -143,7 +143,11 @@ export const candidateService = {
 
       return allContent;
     } catch {
-      const response = await apiClient.get<Candidate[]>("/candidates");
+      const queryParams = new URLSearchParams();
+      if (params?.search && params.search.trim()) queryParams.append("search", params.search.trim());
+      if (params?.organisationId && params.organisationId !== "all") queryParams.append("organisationId", params.organisationId);
+      const url = queryParams.toString() ? `/candidates?${queryParams.toString()}` : "/candidates";
+      const response = await apiClient.get<Candidate[]>(url);
       const rawList = unwrapArrayResponse(response);
       return rawList.map((c) => mapCandidate(c as Candidate & Record<string, unknown>));
     }
@@ -158,7 +162,8 @@ export const candidateService = {
   getCandidatesPage: async (
     page: number,
     size: number,
-    search?: string
+    search?: string,
+    organisationId?: string
   ): Promise<SpringPage<Candidate>> => {
     const params = new URLSearchParams({
       page: String(page),
@@ -167,10 +172,14 @@ export const candidateService = {
     if (search && search.trim()) {
       params.append("search", search.trim());
     }
+    if (organisationId && organisationId !== "all") {
+      params.append("organisationId", organisationId);
+    }
 
     let response: { data: unknown };
     try {
       response = await apiClient.get<unknown>(`/candidates?${params.toString()}`);
+
     } catch (err) {
       // If backend throws 500 on search query, fall back to fetching candidates and filtering client-side
       if (search && search.trim()) {
@@ -321,37 +330,17 @@ export const candidateService = {
   // Get all invitations for a specific test schedule
   getInvitationsBySchedule: async (scheduleId: string): Promise<CandidateInvitation[]> => {
     try {
-      // 1. Fetch invitations for this schedule
+      // Fetch invitations directly from dedicated candidate-invitations endpoint
       const response = await apiClient.get<unknown>(`/candidate-invitations/schedule/${scheduleId}`);
       const invitationsRaw = unwrapArrayResponse(response as { data: BaseResponse<CandidateInvitation[]> | CandidateInvitation[] });
 
-      // 2. Fetch proctoring records for this schedule to get names, emails, and sessionStatus in one batch
-      let proctoringRecords: Array<{
-        candidateId: string;
-        candidateName?: string;
-        email?: string;
-        testStatus?: string;
-      }> = [];
-
-      try {
-        const procRes = await apiClient.get<unknown>(`/api/admin/proctoring/assessment-schedules/${scheduleId}/candidates`);
-        proctoringRecords = unwrapArrayResponse(procRes as { data: BaseResponse<typeof proctoringRecords> | typeof proctoringRecords });
-      } catch {
-        // proctoring records optional
-      }
-
-      const procMap = new Map(proctoringRecords.map((r) => [r.candidateId, r]));
-
-      return invitationsRaw.map((inv) => {
-        const proc = procMap.get(inv.candidateId);
-        return {
-          ...inv,
-          candidateName: inv.candidateName || proc?.candidateName || inv.candidate?.user?.name || "Candidate",
-          candidateEmail: inv.candidateEmail || proc?.email || inv.candidate?.user?.email || "—",
-          candidatePhone: inv.candidatePhone || inv.candidate?.user?.phoneNumber,
-          sessionStatus: (proc?.testStatus as CandidateInvitation["sessionStatus"]) || inv.sessionStatus || "NOT_STARTED",
-        };
-      });
+      return invitationsRaw.map((inv) => ({
+        ...inv,
+        candidateName: inv.candidateName || inv.candidate?.user?.name || "Candidate",
+        candidateEmail: inv.candidateEmail || inv.candidate?.user?.email || "—",
+        candidatePhone: inv.candidatePhone || inv.candidate?.user?.phoneNumber,
+        sessionStatus: inv.sessionStatus || "NOT_STARTED",
+      }));
     } catch (error) {
       console.error("Failed to fetch schedule invitations:", error);
       return [];

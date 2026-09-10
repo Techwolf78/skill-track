@@ -150,14 +150,15 @@ export function useCandidatesQuery() {
  * Query key includes page + size so React Query refetches automatically on navigation.
  * keepPreviousData keeps the current page visible while the next page loads.
  */
-export function useCandidatesPageQuery(page: number, size: number, search?: string) {
+export function useCandidatesPageQuery(page: number, size: number, search?: string, organisationId?: string) {
   return useQuery<SpringPage<Candidate>>({
-    queryKey: ["candidates-page", page, size, search ?? ""],
-    queryFn: () => candidateService.getCandidatesPage(page, size, search),
+    queryKey: ["candidates-page", page, size, search ?? "", organisationId ?? ""],
+    queryFn: () => candidateService.getCandidatesPage(page, size, search, organisationId),
     placeholderData: keepPreviousData,
     staleTime: 60_000, // 60 seconds cache per page
   });
 }
+
 
 export function useScheduleInvitationsQuery(scheduleId: string) {
   return useQuery<CandidateInvitation[]>({
@@ -215,14 +216,14 @@ export function useCreateOrganisationMutation() {
 export function useTestsQuery() {
   return useQuery<Test[]>({
     queryKey: ["tests"],
-    queryFn: testService.getAllTests,
+    queryFn: () => testService.getAllTests(),
   });
 }
 
 export function useInactiveTestsQuery() {
   return useQuery<Test[]>({
     queryKey: ["inactiveTests"],
-    queryFn: testService.getInactiveTests,
+    queryFn: () => testService.getInactiveTests(),
   });
 }
 
@@ -271,12 +272,13 @@ export function useActivateTestMutation() {
 
 // ==================== Test Schedules Hooks ====================
 
-export function useTestSchedulesQuery() {
+export function useTestSchedulesQuery(params?: { testId?: string; page?: number; size?: number }) {
   return useQuery<TestScheduleExtended[]>({
-    queryKey: ["test-schedules"],
-    queryFn: testService.getAllTestSchedules,
+    queryKey: ["test-schedules", params],
+    queryFn: () => testService.getAllTestSchedules(params),
   });
 }
+
 
 export function useCreateTestScheduleMutation() {
   const queryClient = useQueryClient();

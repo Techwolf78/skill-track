@@ -40,7 +40,7 @@ const AVATAR_PALETTE = [
   "bg-rose-500/15 text-rose-600",
   "bg-cyan-500/15 text-cyan-600",
   "bg-fuchsia-500/15 text-fuchsia-600",
-  "bg-orange-500/15 text-orange-600",
+  "bg-indigo-500/15 text-indigo-600",
 ];
 function avatarColour(name: string) {
   return AVATAR_PALETTE[(name || "U").charCodeAt(0) % AVATAR_PALETTE.length];
@@ -113,23 +113,34 @@ export default function InviteCandidates() {
     try {
       setLoading(true);
       const [schedulesData, candidatesData] = await Promise.all([
-        testService.getAllTestSchedules(),
+        testService.getAllTestSchedules({ size: 1000 }),
         candidateService.getCandidates(),
       ]);
-      const schedulesWithTests = await Promise.all(
-        schedulesData.map(async (schedule) => {
+
+      // Deduplicate distinct test IDs to eliminate N+1 request flooding
+      const distinctTestIds = Array.from(new Set(schedulesData.map((s) => s.testId).filter(Boolean)));
+      const testMap = new Map<string, Test>();
+      await Promise.allSettled(
+        distinctTestIds.map(async (testId) => {
           try {
-            const test = await testService.getTestById(schedule.testId);
-            return { ...schedule, test };
+            const test = await testService.getTestById(testId);
+            if (test) testMap.set(testId, test);
           } catch {
-            return schedule;
+            // Ignore individual test fetch failure
           }
-        }),
+        })
       );
+
+      const schedulesWithTests = schedulesData.map((schedule) => ({
+        ...schedule,
+        test: testMap.get(schedule.testId),
+      }));
+
       setSchedules(schedulesWithTests);
       setCandidates(candidatesData);
       try {
-        const response = await apiClient.get("/candidate-invitations");
+        const response = await apiClient.get("/candidate-invitations?size=1000");
+
         const invData = response.data?.data;
         if (Array.isArray(invData)) {
           setInvitations(invData);

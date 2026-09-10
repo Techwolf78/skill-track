@@ -50,24 +50,31 @@ export default function MyAssessments() {
       }
       const effectiveCandidateId = candidate?.id || userId || "demo-candidate-1";
 
+      // 2. Load candidate sessions (backend automatically isolates to this candidate)
       let allSessions: TestSession[] = [];
-      let allTests: Test[] = [];
       try {
-        const res = await Promise.all([
-          testService.getAllSessions(),
-          testService.getAllTests(),
-        ]);
-        allSessions = res[0];
-        allTests = res[1];
+        allSessions = await testService.getAllSessions();
       } catch {
-        // Fallback
+        allSessions = [];
       }
 
-      const mySessions = allSessions.filter((s) => s.candidateId === effectiveCandidateId);
+      // Resolve test details per unique testId via authorized getTestById
+      const distinctTestIds = Array.from(new Set(allSessions.map((s) => s.testId).filter(Boolean)));
+      const testMap = new Map<string, Test>();
+      await Promise.allSettled(
+        distinctTestIds.map(async (tId) => {
+          try {
+            const testData = await testService.getTestById(tId);
+            if (testData) testMap.set(tId, testData);
+          } catch {
+            // Ignore if individual test lookup fails
+          }
+        })
+      );
 
       const enriched: EnrichedSession[] = await Promise.all(
-        mySessions.map(async (session) => {
-          const test = allTests.find((t) => t.id === session.testId) || null;
+        allSessions.map(async (session) => {
+          const test = testMap.get(session.testId) || null;
           let result: TestResult | null = null;
           try {
             const res = await testService.pollResultBySessionId(session.id);
@@ -77,6 +84,7 @@ export default function MyAssessments() {
           return { session, test, result };
         })
       );
+
 
       if (enriched.length === 0) {
         const dummyDemoSessions: EnrichedSession[] = [

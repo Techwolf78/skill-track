@@ -20,7 +20,14 @@ import {
   Calendar,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
-import { useTestsQuery, useCreateTestMutation, useDeleteTestMutation } from "@/hooks/use-query-hooks";
+import {
+  useTestsQuery,
+  useCreateTestMutation,
+  useDeleteTestMutation,
+  useTestSchedulesQuery,
+} from "@/hooks/use-query-hooks";
+import { useQuery } from "@tanstack/react-query";
+import { apiClient } from "@/lib/api-client";
 import { auditLogService, AuditLog } from "@/lib/audit-log-service";
 import { stripHtml } from "@/lib/utils";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -55,8 +62,50 @@ export default function NewAdminHome() {
   const [newTestDuration, setNewTestDuration] = useState(60);
   const [isCreating, setIsCreating] = useState(false);
 
-  // 1. Fetch Real Tests from Backend
+  // 1. Fetch Real Tests, Schedules & Candidate Invitations from Backend
   const { data: tests = [], isLoading: isLoadingTests } = useTestsQuery();
+  const { data: schedules = [], isLoading: schedulesLoading } = useTestSchedulesQuery();
+  const { data: invitations = [], isLoading: invitationsLoading } = useQuery<any[]>({
+    queryKey: ["all-candidate-invitations"],
+    queryFn: async () => {
+      try {
+        const res = await apiClient.get("/candidate-invitations?size=1000");
+        const data = res.data?.data ?? res.data;
+        if (Array.isArray(data)) return data;
+        if (data && typeof data === "object" && Array.isArray(data.content)) {
+          return data.content;
+        }
+        return [];
+      } catch (err) {
+        console.warn("Failed to fetch candidate invitations:", err);
+        return [];
+      }
+    },
+  });
+
+  // Map testId to candidate invitation count
+  const testTakersCountMap = useMemo(() => {
+    const counts: Record<string, number> = {};
+    const scheduleToTestMap: Record<string, string> = {};
+    schedules.forEach((schedule) => {
+      if (schedule.id && schedule.testId) {
+        scheduleToTestMap[schedule.id] = schedule.testId;
+      }
+    });
+
+    invitations.forEach((invitation) => {
+      const scheduleId = invitation.scheduleId || invitation.schedule?.id;
+      if (scheduleId) {
+        const testId = scheduleToTestMap[scheduleId];
+        if (testId) {
+          counts[testId] = (counts[testId] || 0) + 1;
+        }
+      }
+    });
+
+    return counts;
+  }, [schedules, invitations]);
+
   const createTestMutation = useCreateTestMutation();
   const deleteTestMutation = useDeleteTestMutation();
 
@@ -257,21 +306,21 @@ export default function NewAdminHome() {
         ) : (
           <div className="divide-y divide-slate-200">
             {recentTests.map((test) => {
-              const questionCount =
-                test.questions?.length ||
-                test.testQuestions?.length ||
-                (test as any).questionCount ||
-                100;
+              const testQuestionsList = test.questions || test.testQuestions || [];
+              const questionCount = testQuestionsList.length || (test as any).questionCount || 0;
 
-              const sectionCount =
-                (test as any).sections?.length ||
-                (test as any).sectionCount ||
-                1;
+              const uniqueSections = new Set(
+                testQuestionsList
+                  .map((q: any) => q.sectionName?.trim())
+                  .filter((s: any) => Boolean(s))
+              );
+              const sectionCount = uniqueSections.size > 0 ? uniqueSections.size : 1;
 
               const candidateCount =
+                testTakersCountMap[test.id] ??
                 (test as any).candidateCount ??
-                test.testSchedules?.length ??
                 (test as any).totalCandidates ??
+                test.testSchedules?.length ??
                 0;
 
               const orgName =

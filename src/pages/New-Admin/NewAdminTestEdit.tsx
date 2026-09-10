@@ -381,9 +381,9 @@ export default function NewAdminTestEdit() {
     Promise.all([
       testService.getTestById(id),
       testService.getGroupedTestQuestions(id),
-      testService.getAllTestSchedules(),
+      testService.getAllTestSchedules({ testId: id, size: 1000 }),
     ])
-      .then(([testData, groupedData, allSchedules]) => {
+      .then(([testData, groupedData, testSchedules]) => {
         setTest(testData);
 
         // Populate General Settings Form
@@ -403,11 +403,15 @@ export default function NewAdminTestEdit() {
           setInstructions("");
         }
 
-        // Populate Schedule
-        const testSchedules = (allSchedules || []).filter((s) => s.testId === id);
+        // Populate Schedule - sort by recency (startTime / createdAt desc)
+        const sortedSchedules = [...(testSchedules || [])].sort((a, b) => {
+          const timeA = new Date(a.startTime || a.createdAt || 0).getTime();
+          const timeB = new Date(b.startTime || b.createdAt || 0).getTime();
+          return timeB - timeA;
+        });
         const activeSchedule =
-          testSchedules.find((s) => s.status === "SCHEDULED" || s.status === "LIVE") ||
-          testSchedules[0];
+          sortedSchedules.find((s) => s.status === "SCHEDULED" || s.status === "LIVE") ||
+          sortedSchedules[0];
 
         if (activeSchedule) {
           setSelectedScheduleId(activeSchedule.id);
@@ -423,6 +427,15 @@ export default function NewAdminTestEdit() {
             .getInvitationsBySchedule(activeSchedule.id)
             .then((invs) => setInvitations(invs || []))
             .catch((e) => console.warn("Failed to load invitations:", e));
+        } else {
+          setSelectedScheduleId("");
+          setSelectedScheduleData(null);
+          setScheduleStartTime("");
+          setScheduleEndTime("");
+          setInitialScheduleStart("");
+          setInitialScheduleEnd("");
+          setInvitations([]);
+          setCandidateResults({});
         }
 
         // Populate Proctoring Settings
@@ -501,12 +514,18 @@ export default function NewAdminTestEdit() {
     if (!id) return;
     try {
       setLoadingCandidatesData(true);
-      const allScheds = await testService.getAllTestSchedules();
-      const testSchedules = allScheds.filter((s) => s.testId === id);
+      const testSchedules = await testService.getAllTestSchedules({ testId: id, size: 1000 });
       
       const scheduleIds = testSchedules.length > 0 
         ? Array.from(new Set(testSchedules.map((s) => s.id)))
-        : selectedScheduleId ? [selectedScheduleId] : [];
+        : [];
+
+      if (scheduleIds.length === 0) {
+        setInvitations([]);
+        setCandidateResults({});
+        setLoadingCandidatesData(false);
+        return;
+      }
 
       if (scheduleIds.length > 0) {
         const invsLists = await Promise.all(
@@ -2020,10 +2039,6 @@ export default function NewAdminTestEdit() {
             <DropdownMenuTrigger asChild>
               <button className="flex items-center gap-2.5 px-2 py-1 hover:bg-white/5 transition-colors focus:outline-none cursor-pointer">
                 <Avatar className="w-8 h-8 border border-slate-700 bg-slate-800 text-slate-200">
-                  <AvatarImage
-                    src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=120&auto=format&fit=crop&q=80"
-                    alt={user?.name || "Admin"}
-                  />
                   <AvatarFallback className="bg-[#4353a4] text-white text-xs font-bold">
                     {user?.name ? user.name.slice(0, 2).toUpperCase() : "AD"}
                   </AvatarFallback>

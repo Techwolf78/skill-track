@@ -12,10 +12,10 @@
 
 @layer base {
    :root {
-     /* Sunset Orange - Primary */
-     --primary: 11 100% 60%;
+     /* RxOne / DoSelect Design System - Brand Blue Theme */
+     --primary: 230 43% 45%;
      --primary-foreground: 0 0% 100%;
-     --primary-hover: 11 100% 52%;
+     --primary-hover: 230 43% 36%;
      
      /* Aqua Blue - Accent */
      --accent: 191 100% 50%;
@@ -58,7 +58,7 @@
      /* Borders & Inputs */
      --border: 220 13% 91%;
      --input: 220 13% 91%;
-     --ring: 11 100% 60%;
+     --ring: 230 43% 45%;
      
      /* Radius */
      --radius: 0.75rem;
@@ -66,15 +66,15 @@
      /* Sidebar */
      --sidebar-background: 220 30% 12%;
      --sidebar-foreground: 220 10% 85%;
-     --sidebar-primary: 11 100% 60%;
+     --sidebar-primary: 230 43% 45%;
      --sidebar-primary-foreground: 0 0% 100%;
      --sidebar-accent: 220 30% 18%;
      --sidebar-accent-foreground: 220 10% 95%;
      --sidebar-border: 220 20% 20%;
-     --sidebar-ring: 11 100% 60%;
+     --sidebar-ring: 230 43% 45%;
      
      /* Gradients */
-     --gradient-primary: linear-gradient(135deg, hsl(32, 100%, 63%) 0%, hsl(11, 100%, 60%) 50%, hsl(4, 100%, 43%) 100%);
+     --gradient-primary: linear-gradient(135deg, hsl(230, 43%, 55%) 0%, hsl(230, 43%, 45%) 50%, hsl(230, 43%, 35%) 100%);
      --gradient-accent: linear-gradient(135deg, hsl(191, 100%, 50%) 0%, hsl(200, 100%, 45%) 100%);
      --gradient-hero: linear-gradient(135deg, hsl(220, 30%, 12%) 0%, hsl(220, 35%, 18%) 100%);
      --gradient-card: linear-gradient(180deg, hsl(0, 0%, 100%) 0%, hsl(220, 14%, 98%) 100%);
@@ -84,7 +84,7 @@
      --shadow-md: 0 4px 6px -1px hsl(220 30% 15% / 0.07), 0 2px 4px -2px hsl(220 30% 15% / 0.07);
      --shadow-lg: 0 10px 15px -3px hsl(220 30% 15% / 0.08), 0 4px 6px -4px hsl(220 30% 15% / 0.08);
      --shadow-xl: 0 20px 25px -5px hsl(220 30% 15% / 0.1), 0 8px 10px -6px hsl(220 30% 15% / 0.1);
-     --shadow-primary: 0 4px 14px 0 hsl(11 100% 60% / 0.35);
+     --shadow-primary: 0 4px 14px 0 hsl(230 43% 45% / 0.35);
      --shadow-accent: 0 4px 14px 0 hsl(191 100% 50% / 0.3);
    }
  }

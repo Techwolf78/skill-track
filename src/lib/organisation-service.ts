@@ -1,5 +1,6 @@
 import { apiClient } from "./api-client";
 import { BaseResponse } from "./auth-service";
+import { SpringPage, unwrapPageResponse, unwrapArrayResponse } from "./api/baseResponseUtils";
 
 export interface OrganisationResponse {
   id: string;
@@ -28,15 +29,17 @@ export interface OrganisationDashboardStats {
   averageScore: number;
   completionRate: number;
   passRate: number;
-  topicPerformance: Array<{
-    topic: string;
-    avgScore: number;
-    difficulty: "Easy" | "Medium" | "Hard";
+  recentActivity: Array<{
+    id: string;
+    type: string;
+    description: string;
+    timestamp: string;
   }>;
-  topPerformers: Array<{
-    name: string;
-    score: number;
-    batch: string;
+  leaderboard: Array<{
+    candidateId: string;
+    candidateName: string;
+    testsTaken: number;
+    averageScore: number;
     rank: number;
   }>;
 }
@@ -51,20 +54,32 @@ export const organisationService = {
     return response.data.data;
   },
 
-  getOrganisations: async (): Promise<OrganisationResponse[]> => {
-    const response =
-      await apiClient.get<BaseResponse<OrganisationResponse[]>>(
-        "/organisations",
-      );
+  getOrganisations: async (params?: {
+    search?: string;
+    page?: number;
+    size?: number;
+  }): Promise<OrganisationResponse[]> => {
+    const queryParams = new URLSearchParams();
+    if (params?.search && params.search.trim()) queryParams.append("search", params.search.trim());
+    queryParams.append("page", String(params?.page ?? 0));
+    queryParams.append("size", String(params?.size ?? 1000));
 
-    const data = response.data?.data;
-    if (Array.isArray(data)) {
-      return data;
-    }
-    if (data && typeof data === "object" && "content" in data && Array.isArray((data as unknown as Record<string, unknown>).content)) {
-      return (data as unknown as Record<string, unknown>).content as OrganisationResponse[];
-    }
-    return [];
+    const response = await apiClient.get<BaseResponse<OrganisationResponse[]>>(`/organisations?${queryParams.toString()}`);
+    return unwrapArrayResponse<OrganisationResponse>(response);
+  },
+
+  getOrganisationsPage: async (
+    page = 0,
+    size = 20,
+    search?: string
+  ): Promise<SpringPage<OrganisationResponse>> => {
+    const queryParams = new URLSearchParams();
+    if (search && search.trim()) queryParams.append("search", search.trim());
+    queryParams.append("page", String(page));
+    queryParams.append("size", String(size));
+
+    const response = await apiClient.get<BaseResponse<SpringPage<OrganisationResponse>>>(`/organisations?${queryParams.toString()}`);
+    return unwrapPageResponse<OrganisationResponse>(response);
   },
 
   getOrganisationById: async (id: string): Promise<OrganisationResponse> => {

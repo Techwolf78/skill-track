@@ -105,9 +105,15 @@ export default function Users() {
   const { data: organisations = [] } = useOrganisationsQuery();
 
   const { data: users = [], isLoading } = useQuery({
-    queryKey: ["users"],
-    queryFn: userService.getUsers,
+    queryKey: ["users", roleFilter],
+    queryFn: () =>
+      userService.getUsers({
+        excludeRole: "CANDIDATE",
+        role: roleFilter !== "all" ? roleFilter : undefined,
+        size: 1000,
+      }),
   });
+
 
   const filteredUsers = (users as UserResponse[]).filter((user) => {
     // Exclude CANDIDATE role completely

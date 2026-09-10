@@ -257,18 +257,23 @@ export default function Students() {
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(15);
 
+  const [selectedOrganisation, setSelectedOrganisation] = useState<string>("all");
+
   const {
     data: pageData,
     isLoading: candidatesLoading,
     isError: candidatesError,
     error: candidatesErrorObj,
     refetch: refetchCandidates,
-  } = useCandidatesPageQuery(page, pageSize);
+  } = useCandidatesPageQuery(
+    page,
+    pageSize,
+    debouncedSearch,
+    selectedOrganisation !== "all" ? selectedOrganisation : undefined
+  );
 
   const { data: organisations = [], isLoading: orgsLoading, refetch: refetchOrgs } = useOrganisationsQuery();
   const loading = candidatesLoading || orgsLoading;
-
-  const [selectedOrganisation, setSelectedOrganisation] = useState<string>("all");
 
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isBulkUploadOpen, setIsBulkUploadOpen] = useState(false);
@@ -328,19 +333,9 @@ export default function Students() {
     setPage(0);
   }, [selectedOrganisation]);
 
-  // All candidates on the current backend page
-  const allCandidates = pageData?.content ?? [];
+  // Server-filtered candidates on the current page
+  const candidates = pageData?.content ?? [];
 
-  // Client-side filter: search + org (applied on current page only)
-  const candidates = allCandidates.filter((candidate) => {
-    const matchesSearch =
-      !debouncedSearch ||
-      candidate.user.name?.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
-      candidate.user.email?.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
-      candidate.user.phoneNumber?.toLowerCase().includes(debouncedSearch.toLowerCase());
-    const matchesOrg = selectedOrganisation === "all" || candidate.organisation.id === selectedOrganisation;
-    return matchesSearch && matchesOrg;
-  });
 
   // Backend pagination metadata
   const totalElements = pageData?.totalElements ?? 0;

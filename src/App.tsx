@@ -30,7 +30,6 @@ const TestDetails = React.lazy(() => import("./pages/SuperAdmin/TestDetails"));
 const TestScheduleDetails = React.lazy(() => import("./pages/SuperAdmin/TestScheduleDetails"));
 const InviteCandidates = React.lazy(() => import("./pages/SuperAdmin/InviteCandidates"));
 const InvitedCandidatesHistory = React.lazy(() => import("./pages/SuperAdmin/InvitedCandidatesHistory"));
-const TestAccess = React.lazy(() => import("./pages/test/TestAccess"));
 const EditQuestion = React.lazy(() => import("./pages/SuperAdmin/EditQuestion"));
 const AddQuestion = React.lazy(() => import("./pages/SuperAdmin/AddQuestion"));
 const Settings = React.lazy(() => import("./pages/SuperAdmin/Settings"));

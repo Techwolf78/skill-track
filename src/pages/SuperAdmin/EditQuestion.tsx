@@ -2291,8 +2291,10 @@ export default function EditQuestion() {
 
           {/* Coding Question Test Cases */}
           {questionType === "CODING" && (
-            <Card className="border border-orange-200 bg-orange-50/40 shadow-sm overflow-hidden">
-              <CardHeader className="bg-gradient-to-r from-orange-100/70 via-orange-50/50 to-amber-50/30 border-b border-orange-200/80 pb-4">
+          {/* Coding Question Test Cases */}
+          {questionType === "CODING" && (
+            <Card className="border border-slate-200 bg-slate-50/40 shadow-sm overflow-hidden">
+              <CardHeader className="bg-gradient-to-r from-blue-50/70 via-indigo-50/50 to-slate-50/30 border-b border-slate-200/80 pb-4">
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                   <div>
                     <div className="flex items-center gap-2">
@@ -2307,7 +2309,7 @@ export default function EditQuestion() {
                       </Badge>
                       <Badge
                         variant="outline"
-                        className="bg-orange-100 text-orange-900 border-orange-300 font-bold text-xs"
+                        className="bg-blue-100 text-blue-900 border-blue-300 font-bold text-xs"
                       >
                         {testCases.filter((tc) => !tc.sample).length} Hidden
                       </Badge>
@@ -2317,14 +2319,14 @@ export default function EditQuestion() {
                       candidate evaluation
                     </CardDescription>
                     {totalWeight !== 100 && testCases.length > 0 && (
-                      <p className="text-xs font-bold mt-1 text-orange-600">
+                      <p className="text-xs font-bold mt-1 text-rose-600">
                         Total weight: {totalWeight}% (must equal 100%)
                       </p>
                     )}
                   </div>
 
                   <div className="flex items-center gap-2">
-                    <div className="flex items-center border border-orange-200 rounded-lg p-0.5 bg-orange-100/60">
+                    <div className="flex items-center border border-slate-200 rounded-lg p-0.5 bg-slate-100/60">
                       <Button
                         type="button"
                         variant={
@@ -2333,8 +2335,8 @@ export default function EditQuestion() {
                         size="sm"
                         className={`px-2.5 py-1 h-7 text-xs flex items-center gap-1 font-semibold ${
                           testCaseViewMode === "carousel"
-                            ? "bg-orange-500 text-white hover:bg-orange-600 shadow-sm"
-                            : "text-slate-700 hover:bg-orange-200/60"
+                            ? "bg-[#4353a4] text-white hover:bg-[#344285] shadow-sm"
+                            : "text-slate-700 hover:bg-slate-200/60"
                         }`}
                         onClick={() => setTestCaseViewMode("carousel")}
                       >
@@ -2348,8 +2350,8 @@ export default function EditQuestion() {
                         size="sm"
                         className={`px-2.5 py-1 h-7 text-xs flex items-center gap-1 font-semibold ${
                           testCaseViewMode === "grid"
-                            ? "bg-orange-500 text-white hover:bg-orange-600 shadow-sm"
-                            : "text-slate-700 hover:bg-orange-200/60"
+                            ? "bg-[#4353a4] text-white hover:bg-[#344285] shadow-sm"
+                            : "text-slate-700 hover:bg-slate-200/60"
                         }`}
                         onClick={() => setTestCaseViewMode("grid")}
                       >
@@ -2365,7 +2367,7 @@ export default function EditQuestion() {
                         addTestCase();
                         setActiveTestCaseIndex(testCases.length);
                       }}
-                      className="border-orange-500 bg-orange-500 text-white hover:bg-orange-600 font-bold shadow-sm"
+                      className="border-[#4353a4] bg-[#4353a4] text-white hover:bg-[#344285] font-bold shadow-sm"
                     >
                       <Plus className="w-4 h-4 mr-1" />
                       Add Test Case
@@ -2375,7 +2377,7 @@ export default function EditQuestion() {
 
                 {/* Carousel Dots Navigation Bar */}
                 {testCases.length > 0 && (
-                  <div className="flex items-center justify-between pt-3 mt-3 border-t border-orange-200/80">
+                  <div className="flex items-center justify-between pt-3 mt-3 border-t border-slate-200/80">
                     {/* Dot Indicators */}
                     <div className="flex items-center gap-1.5 flex-wrap max-w-full overflow-x-auto py-1">
                       {testCases.map((tc, idx) => {
@@ -2398,10 +2400,10 @@ export default function EditQuestion() {
                                 isActive
                                   ? isSample
                                     ? "bg-emerald-600 text-white border-emerald-700 shadow-md ring-2 ring-emerald-400/50"
-                                    : "bg-orange-500 text-white border-orange-600 shadow-md ring-2 ring-orange-400/50"
+                                    : "bg-[#4353a4] text-white border-[#344285] shadow-md ring-2 ring-indigo-400/50"
                                   : isSample
                                     ? "bg-emerald-100 text-emerald-900 border-emerald-300"
-                                    : "bg-orange-100 text-orange-950 border-orange-300"
+                                    : "bg-blue-100 text-blue-950 border-blue-300"
                               }`}
                             >
                               #{idx + 1}
@@ -2419,7 +2421,7 @@ export default function EditQuestion() {
                           Sample
                         </span>
                         <span className="flex items-center gap-1">
-                          <span className="w-2.5 h-2.5 rounded-full bg-orange-500 inline-block" />
+                          <span className="w-2.5 h-2.5 rounded-full bg-blue-500 inline-block" />
                           Hidden
                         </span>
                       </div>
@@ -2431,7 +2433,7 @@ export default function EditQuestion() {
                               type="button"
                               variant="outline"
                               size="icon"
-                              className="h-7 w-7 border-orange-300 bg-orange-100/80 text-slate-800 hover:bg-orange-200"
+                              className="h-7 w-7 border-slate-300 bg-slate-100/80 text-slate-800 hover:bg-slate-200"
                               onClick={() =>
                                 setActiveTestCaseIndex((prev) =>
                                   prev > 0 ? prev - 1 : testCases.length - 1,
@@ -2447,7 +2449,7 @@ export default function EditQuestion() {
                               type="button"
                               variant="outline"
                               size="icon"
-                              className="h-7 w-7 border-orange-300 bg-orange-100/80 text-slate-800 hover:bg-orange-200"
+                              className="h-7 w-7 border-slate-300 bg-slate-100/80 text-slate-800 hover:bg-slate-200"
                               onClick={() =>
                                 setActiveTestCaseIndex((prev) =>
                                   prev < testCases.length - 1 ? prev + 1 : 0,
@@ -2474,12 +2476,12 @@ export default function EditQuestion() {
                       const testCase = testCases[idx] || testCases[0];
                       if (!testCase) return null;
                       return (
-                        <div className="border border-orange-200 bg-orange-50/20 rounded-xl p-5 space-y-4 relative shadow-sm">
-                          <div className="flex items-center justify-between border-b border-orange-200/80 pb-3">
+                        <div className="border border-slate-200 bg-slate-50/20 rounded-xl p-5 space-y-4 relative shadow-sm">
+                          <div className="flex items-center justify-between border-b border-slate-200/80 pb-3">
                             <div className="flex items-center gap-3">
                               <Badge
                                 variant="outline"
-                                className="font-bold text-xs px-3 py-1 bg-orange-100 text-orange-950 border-orange-300"
+                                className="font-bold text-xs px-3 py-1 bg-blue-100 text-blue-950 border-blue-300"
                               >
                                 Test Case #{idx + 1}
                               </Badge>
@@ -2489,7 +2491,7 @@ export default function EditQuestion() {
                                   Case (Visible to Candidate)
                                 </Badge>
                               ) : (
-                                <Badge className="bg-orange-100 text-orange-950 border border-orange-300 flex items-center gap-1 font-bold text-xs">
+                                <Badge className="bg-blue-100 text-blue-950 border border-blue-300 flex items-center gap-1 font-bold text-xs">
                                   <EyeOff className="w-3.5 h-3.5" /> Hidden Test
                                   Case (Evaluation Only)
                                 </Badge>
@@ -2530,7 +2532,7 @@ export default function EditQuestion() {
                                   }
                                   placeholder="Enter input (e.g. 10)"
                                   rows={4}
-                                  className="font-mono text-sm bg-white text-slate-900 border-slate-300 focus:border-orange-500"
+                                  className="font-mono text-sm bg-white text-slate-900 border-slate-300 focus:border-[#4353a4]"
                                 />
                               </div>
 
@@ -2549,13 +2551,13 @@ export default function EditQuestion() {
                                   }
                                   placeholder="Enter expected output (e.g. 19)"
                                   rows={4}
-                                  className="font-mono text-sm bg-white text-slate-900 border-slate-300 focus:border-orange-500"
+                                  className="font-mono text-sm bg-white text-slate-900 border-slate-300 focus:border-[#4353a4]"
                                 />
                               </div>
                             </div>
 
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2 border-t border-orange-200/80">
-                              <div className="flex items-center space-x-2 bg-white p-3 rounded-lg border border-orange-200">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2 border-t border-slate-200/80">
+                              <div className="flex items-center space-x-2 bg-white p-3 rounded-lg border border-slate-200">
                                 <Checkbox
                                   id={`sample-active-${idx}`}
                                   checked={testCase.sample}
@@ -2576,7 +2578,7 @@ export default function EditQuestion() {
                                 </Label>
                               </div>
 
-                              <div className="flex items-center gap-3 bg-white p-3 rounded-lg border border-orange-200">
+                              <div className="flex items-center gap-3 bg-white p-3 rounded-lg border border-slate-200">
                                 <Label className="whitespace-nowrap text-xs font-semibold text-slate-800">
                                   Score Weight (%)
                                 </Label>
@@ -2593,7 +2595,7 @@ export default function EditQuestion() {
                                   min={0}
                                   max={100}
                                   step={5}
-                                  className="bg-white border-orange-300 font-bold text-orange-600 w-24"
+                                  className="bg-white border-slate-300 font-bold text-[#4353a4] w-24"
                                 />
                               </div>
                             </div>
@@ -2613,7 +2615,7 @@ export default function EditQuestion() {
                                 }
                                 placeholder="Explain why this output is expected..."
                                 rows={2}
-                                className="text-sm bg-white text-slate-900 border-slate-300 focus:border-orange-500"
+                                className="text-sm bg-white text-slate-900 border-slate-300 focus:border-[#4353a4]"
                               />
                             </div>
                           </div>
@@ -2626,13 +2628,13 @@ export default function EditQuestion() {
                       {testCases.map((testCase, index) => (
                         <div
                           key={index}
-                          className="border border-orange-200 bg-white rounded-xl p-4 space-y-3 relative hover:border-orange-400 transition-colors shadow-sm"
+                          className="border border-slate-200 bg-white rounded-xl p-4 space-y-3 relative hover:border-[#4353a4] transition-colors shadow-sm"
                         >
                           <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2">
                               <Badge
                                 variant="outline"
-                                className="font-bold text-xs bg-orange-100 text-orange-950 border-orange-300"
+                                className="font-bold text-xs bg-blue-100 text-blue-950 border-blue-300"
                               >
                                 #{index + 1}
                               </Badge>
@@ -2641,7 +2643,7 @@ export default function EditQuestion() {
                                   Sample
                                 </Badge>
                               ) : (
-                                <Badge className="bg-orange-100 text-orange-950 border border-orange-300 text-xs font-bold">
+                                <Badge className="bg-blue-100 text-blue-950 border border-blue-300 text-xs font-bold">
                                   Hidden
                                 </Badge>
                               )}
@@ -2693,8 +2695,8 @@ export default function EditQuestion() {
                 )}
 
                 {testCases.length === 0 && (
-                  <div className="text-center py-8 text-slate-500 border border-dashed border-orange-300 rounded-xl bg-orange-50/30">
-                    <AlertCircle className="w-12 h-12 mx-auto mb-3 text-orange-500" />
+                  <div className="text-center py-8 text-slate-500 border border-dashed border-slate-300 rounded-xl bg-slate-50/30">
+                    <AlertCircle className="w-12 h-12 mx-auto mb-3 text-slate-400" />
                     <p className="text-slate-800 font-medium">
                       No test cases added
                     </p>
@@ -2705,7 +2707,7 @@ export default function EditQuestion() {
                         addTestCase();
                         setActiveTestCaseIndex(0);
                       }}
-                      className="mt-4 border-orange-500 bg-orange-500 text-white hover:bg-orange-600 font-bold"
+                      className="mt-4 border-[#4353a4] bg-[#4353a4] text-white hover:bg-[#344285] font-bold"
                     >
                       <Plus className="w-4 h-4 mr-2" />
                       Add Your First Test Case

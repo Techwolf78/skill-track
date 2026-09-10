@@ -53,31 +53,38 @@ export default function ResultsReports() {
       }
       const effectiveCandidateId = candidate?.id || userId || "demo-candidate-1";
 
+      // 2. Load candidate sessions (backend automatically isolates to this candidate)
       let allSessions: TestSession[] = [];
-      let allTests: Test[] = [];
       try {
-        const res = await Promise.all([
-          testService.getAllSessions(),
-          testService.getAllTests(),
-        ]);
-        allSessions = res[0];
-        allTests = res[1];
+        allSessions = await testService.getAllSessions();
       } catch {
-        // Fallback
+        allSessions = [];
       }
 
-      const mySessions = allSessions.filter((s) => s.candidateId === effectiveCandidateId);
+      // Resolve test details per unique testId via authorized getTestById
+      const distinctTestIds = Array.from(new Set(allSessions.map((s) => s.testId).filter(Boolean)));
+      const testMap = new Map<string, Test>();
+      await Promise.allSettled(
+        distinctTestIds.map(async (tId) => {
+          try {
+            const testData = await testService.getTestById(tId);
+            if (testData) testMap.set(tId, testData);
+          } catch {
+            // Ignore if individual test lookup fails
+          }
+        })
+      );
 
       // Load results for each submitted/evaluated session
       const enriched: EnrichedResult[] = [];
       await Promise.all(
-        mySessions.map(async (session) => {
+        allSessions.map(async (session) => {
           if (session.status !== "SUBMITTED" && session.status !== "EVALUATED") return;
           try {
             const res = await testService.pollResultBySessionId(session.id);
             const statusCode = res.statusCode || res.status;
             if (statusCode === 200 && res.data) {
-              const test = allTests.find((t) => t.id === session.testId) || null;
+              const test = testMap.get(session.testId) || null;
               enriched.push({ session, test, result: res.data });
             }
           } catch {
@@ -85,6 +92,7 @@ export default function ResultsReports() {
           }
         })
       );
+
 
       if (enriched.length === 0) {
         const dummyResults: EnrichedResult[] = [

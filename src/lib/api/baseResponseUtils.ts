@@ -58,6 +58,18 @@ export const extractWarnings = (response: { data: unknown }): string[] => {
   return [];
 };
 
+/** Spring Data Page response shape */
+export interface SpringPage<T> {
+  content: T[];
+  totalElements: number;
+  totalPages: number;
+  size: number;
+  number: number; // 0-indexed current page
+  first: boolean;
+  last: boolean;
+  empty: boolean;
+}
+
 /** Unwraps an array BaseResponse, Spring Page, or raw array, always returning a valid array. */
 export const unwrapArrayResponse = <T = any>(
   response: { data: BaseResponse<T[] | { content?: T[] }> | T[] | { content?: T[] } | unknown } | any
@@ -85,7 +97,30 @@ export const unwrapArrayResponse = <T = any>(
   return [];
 };
 
+/** Unwraps a Spring Data Page wrapped in BaseResponse<Page<T>> or returns a safe fallback Page object. */
+export const unwrapPageResponse = <T>(
+  response: { data: BaseResponse<SpringPage<T>> | SpringPage<T> | unknown } | any
+): SpringPage<T> => {
+  const payload = response?.data;
+  let pageObj: any = payload;
+  if (payload && typeof payload === "object" && "data" in payload && (payload as any).data !== undefined && (payload as any).data !== null) {
+    pageObj = (payload as any).data;
+  }
+  const content = Array.isArray(pageObj?.content) ? pageObj.content : Array.isArray(pageObj) ? pageObj : [];
+  return {
+    content,
+    totalElements: typeof pageObj?.totalElements === "number" ? pageObj.totalElements : content.length,
+    totalPages: typeof pageObj?.totalPages === "number" ? pageObj.totalPages : 1,
+    size: typeof pageObj?.size === "number" ? pageObj.size : 20,
+    number: typeof pageObj?.number === "number" ? pageObj.number : 0,
+    first: typeof pageObj?.first === "boolean" ? pageObj.first : true,
+    last: typeof pageObj?.last === "boolean" ? pageObj.last : true,
+    empty: typeof pageObj?.empty === "boolean" ? pageObj.empty : content.length === 0,
+  };
+};
+
 /** Returns true when the response envelope indicates a successful operation. */
 export const isSuccessResponse = (
   response: { data: BaseResponse<unknown> }
 ): boolean => response.data?.success === true;
+

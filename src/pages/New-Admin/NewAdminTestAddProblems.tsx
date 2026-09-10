@@ -332,10 +332,6 @@ export default function NewAdminTestAddProblems() {
             <DropdownMenuTrigger asChild>
               <button className="flex items-center gap-2.5 px-2 py-1 hover:bg-white/5 transition-colors focus:outline-none cursor-pointer">
                 <Avatar className="w-8 h-8 border border-slate-700 bg-slate-800 text-slate-200">
-                  <AvatarImage
-                    src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=120&auto=format&fit=crop&q=80"
-                    alt={user?.name || "Admin"}
-                  />
                   <AvatarFallback className="bg-[#4353a4] text-white text-xs font-bold">
                     {user?.name ? user.name.slice(0, 2).toUpperCase() : "AD"}
                   </AvatarFallback>

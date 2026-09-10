@@ -66,22 +66,30 @@ export default function InvitedCandidatesHistory() {
     try {
       setLoading(true);
       const [schedulesData, candidatesData, invitationsResponse] = await Promise.all([
-        testService.getAllTestSchedules(),
+        testService.getAllTestSchedules({ size: 1000 }),
         candidateService.getCandidates(),
-        apiClient.get("/candidate-invitations").catch(() => ({ data: { data: [] } })),
+        apiClient.get("/candidate-invitations?size=1000").catch(() => ({ data: { data: [] } })),
       ]);
       
-      // Fetch test details for each schedule
-      const schedulesWithTests = await Promise.all(
-        schedulesData.map(async (schedule) => {
+      // Deduplicate distinct test IDs to eliminate N+1 request flooding
+      const distinctTestIds = Array.from(new Set(schedulesData.map((s) => s.testId).filter(Boolean)));
+      const testMap = new Map<string, Test>();
+      await Promise.allSettled(
+        distinctTestIds.map(async (testId) => {
           try {
-            const test = await testService.getTestById(schedule.testId);
-            return { ...schedule, test };
+            const test = await testService.getTestById(testId);
+            if (test) testMap.set(testId, test);
           } catch {
-            return schedule;
+            // Ignore individual test fetch failure
           }
         })
       );
+
+      const schedulesWithTests = schedulesData.map((schedule) => ({
+        ...schedule,
+        test: testMap.get(schedule.testId),
+      }));
+
       
       setSchedules(schedulesWithTests);
       setCandidates(candidatesData);

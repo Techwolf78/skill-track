@@ -220,10 +220,197 @@ export default function NewCandidateTestWelcome({
     }
   };
 
+  /* ────── Token Validation + Data Resolution (ported from TestAccess.tsx) ────── */
+
+  const validateToken = useCallback(
+    async (tokenOverride?: string) => {
+      try {
+        setLoading(true);
+        if (!routeId) {
+          throw new Error("Invalid link parameters.");
+        }
+
+        let decoded: Record<string, unknown> | null = null;
+        const effectiveToken = tokenOverride || (typeof routeToken === "string" ? routeToken : null);
+
+        if (tokenOverride) {
+          decoded = parseJwt(tokenOverride);
+          if (!decoded) throw new Error("Failed to parse authentication token.");
+        } else if (routeToken) {
+          const authResponse = await apiClient.post("/candidate-invitations/validate", {
+            id: routeId,
+            token: routeToken,
+          });
+          const authData = authResponse.data?.data || authResponse.data;
+          if (!authData || !authData.accessToken) throw new Error("Authentication failed.");
+          decoded = parseJwt(authData.accessToken);
+          if (decoded) {
+            loginToContext(authData.accessToken, {
+              id: decoded.id as string,
+              name: decoded.name as string,
+              email: decoded.sub as string,
+              role: decoded.role as string,
+            });
+          } else {
+            throw new Error("Failed to parse authentication token.");
+          }
+        } else {
+          const storedToken = localStorage.getItem("token");
+          if (storedToken) decoded = parseJwt(storedToken);
+          if (!isAuthenticated || !decoded) {
+            setLoading(false);
+            return;
+          }
+        }
+
+        // ── Fetch invitation (with fallback chain from TestAccess) ──
+        let invitation: CandidateInvitation | null = null;
+        try {
+          const invitationResponse = await apiClient.get(`/candidate-invitations/${routeId}`);
+          invitation = invitationResponse.data?.data || invitationResponse.data;
+        } catch (err: unknown) {
+          const axiosError = err as { response?: { status?: number } };
+          console.warn("Direct invitation fetch failed:", axiosError.response?.status);
+          try {
+            const listResponse = await apiClient.get("/candidate-invitations");
+            const listData = listResponse.data?.data || listResponse.data;
+            const items = Array.isArray(listData)
+              ? listData
+              : listData?.content && Array.isArray(listData.content)
+              ? listData.content
+              : [];
+            invitation = items.find((item: CandidateInvitation) => item.id === routeId) || null;
+          } catch (listErr) {
+            console.warn("List invitation fetch failed:", listErr);
+          }
+
+          if (!invitation && decoded) {
+            const scheduleId = (decoded.scheduleId || decoded.schedule_id || decoded.schedId) as string | undefined;
+            const candidateId = (decoded.candidateId || decoded.candidate_id || decoded.candId || decoded.id) as string | undefined;
+            const testId = (decoded.testId || decoded.test_id) as string | undefined;
+            if (scheduleId) {
+              invitation = { id: routeId, scheduleId, candidateId, testId };
+            }
+          }
+          if (!invitation) {
+            invitation = {
+              id: routeId,
+              scheduleId: (decoded?.scheduleId || decoded?.schedule_id || decoded?.schedId) as string | undefined,
+              candidateId: (decoded?.candidateId || decoded?.candidate_id || decoded?.id) as string | undefined,
+              testId: (decoded?.testId || decoded?.test_id) as string | undefined,
+            };
+          }
+        }
+
+        // ── Fetch schedule ──
+        let schedule: TestSchedule | null = null;
+        if (invitation?.scheduleId) {
+          try {
+            const scheduleResponse = await apiClient.get(`/test-schedules/${invitation.scheduleId}`);
+            schedule = scheduleResponse.data?.data || scheduleResponse.data;
+          } catch (schedErr) {
+            console.warn("Failed to fetch schedule:", schedErr);
+          }
+        }
+
+        // ── Fetch test ──
+        let testObj: TestAssessment | null = null;
+        const testId = invitation?.testId || schedule?.testId || (decoded?.testId as string) || (decoded?.test_id as string);
+        if (testId) {
+          try {
+            testObj = await testService.getTestById(testId);
+          } catch (testErr) {
+            console.warn("Failed to fetch test:", testErr);
+          }
+        }
+
+        if (testObj && testObj.status && testObj.status !== "PUBLISHED") {
+          throw new Error("This test is currently in Draft or Archived state and cannot be accessed.");
+        }
+
+        // ── Resolve questions ──
+        let resolvedQuestions: TestQuestion[] = [];
+        if (testObj?.testQuestions?.length) resolvedQuestions = testObj.testQuestions;
+        else if (testObj?.questions?.length) resolvedQuestions = testObj.questions;
+        else if (testId) {
+          try {
+            resolvedQuestions = await testService.getTestQuestions(testId);
+          } catch { /* restricted */ }
+        }
+        setQuestions(resolvedQuestions);
+
+        // ── Build proctoring flags (same logic as TestAccess lines 495-533) ──
+        const mode: ProctoringMode = testObj?.proctoringMode ?? "NONE";
+        const isLow = mode === "LOW" || mode === "MEDIUM" || mode === "HIGH";
+        const isMedHigh = mode === "MEDIUM" || mode === "HIGH";
+        const isHigh = mode === "HIGH";
+
+        const testTitle = testObj?.title || (decoded?.testTitle as string) || (decoded?.test_title as string) || "Technical Assessment";
+        const durationMins = testObj?.durationMins || (decoded?.durationMins as number) || (decoded?.duration_mins as number) || 45;
+        const endTime = schedule?.endTime || (decoded?.endTime as string) || (decoded?.end_time as string) || "";
+        const startTime = schedule?.startTime || "";
+        const finalCandidateId = invitation?.candidateId || (decoded?.candidateId as string) || (decoded?.id as string);
+        const finalScheduleId = invitation?.scheduleId || schedule?.id || (decoded?.scheduleId as string);
+
+        // Store the full test object for the onboarding wizard
+        if (testObj) {
+          setTest(testObj as unknown as Test);
+        }
+
+        setTestData({
+          valid: true,
+          invitationId: invitation?.id || routeId,
+          candidateId: finalCandidateId || "",
+          testId: testId || "default-test-id",
+          testTitle,
+          durationMins: Number(durationMins),
+          scheduleId: finalScheduleId || "",
+          endTime,
+          startTime,
+          token: effectiveToken || undefined,
+          questionCount: resolvedQuestions.length,
+          organisationName: testObj?.organisation?.name || "",
+          proctoring: {
+            proctoringMode: mode,
+            tabSwitchTrackingEnabled: testObj?.tabSwitchTrackingEnabled ?? isLow,
+            copyPasteBlocked: testObj?.copyPasteBlocked ?? isLow,
+            rightClickBlocked: testObj?.rightClickBlocked ?? false,
+            fullscreenExitTrackingEnabled: testObj?.fullscreenExitTrackingEnabled ?? isLow,
+            webcamRequired: testObj?.webcamRequired ?? isMedHigh,
+            microphoneRequired: testObj?.microphoneRequired ?? isHigh,
+            screenShareRequired: testObj?.screenShareRequired ?? isHigh,
+            faceNotVisibleDetectionEnabled: testObj?.faceNotVisibleDetectionEnabled ?? isMedHigh,
+            multipleFaceDetectionEnabled: testObj?.multipleFaceDetectionEnabled ?? isMedHigh,
+            suspiciousAudioDetectionEnabled: testObj?.suspiciousAudioDetectionEnabled ?? isHigh,
+            objectDetectionEnabled: false,
+            devtoolsDetectionEnabled: testObj?.devtoolsDetectionEnabled ?? isHigh,
+            periodicSnapshotsEnabled: testObj?.periodicSnapshotsEnabled ?? isMedHigh,
+            evidenceCaptureEnabled: testObj?.evidenceCaptureEnabled ?? isMedHigh,
+            liveProctoringEnabled: testObj?.liveProctoringEnabled ?? isMedHigh,
+            autoSubmitOnCriticalViolation: false,
+            maxWarningsAllowed: testObj?.maxWarningsAllowed ?? (mode === "NONE" ? 0 : 3),
+            maxCriticalViolationsAllowed: testObj?.maxCriticalViolationsAllowed ?? (isHigh ? 1 : 2),
+          },
+          instructions: testObj?.instructions,
+        });
+
+        setError(null);
+      } catch (error: unknown) {
+        const validationErr = error as { response?: { data?: { message?: string } }; message?: string };
+        console.error("Token validation error:", error);
+        setError(validationErr.response?.data?.message || validationErr.message || "Invalid or expired invitation link");
+      } finally {
+        setLoading(false);
+      }
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [routeId, routeToken, isAuthenticated, loginToContext]
+  );
+
   /* ────── Auth Handlers (ported from TestAccess.tsx) ────── */
 
   const handleAuthResponse = useCallback(
-    (authData: { accessToken: string; sessionId?: string; sessionStatus?: string; testId?: string }) => {
+    async (authData: { accessToken: string; sessionId?: string; sessionStatus?: string; testId?: string }) => {
       const decoded = parseJwt(authData.accessToken);
       if (!decoded) throw new Error("Failed to parse authentication token.");
       loginToContext(authData.accessToken, {
@@ -240,10 +427,10 @@ export default function NewCandidateTestWelcome({
         navigate(`/test/${authData.testId || effectiveTestId}/results?session=${authData.sessionId}&submitted=true`);
         return;
       }
-      // Auth succeeded — the useEffect will re-run because isAuthenticated changed
+      await validateToken(authData.accessToken);
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [loginToContext, navigate, effectiveTestId]
+    [loginToContext, navigate, effectiveTestId, validateToken]
   );
 
   const verifyMagicToken = useCallback(
@@ -258,13 +445,12 @@ export default function NewCandidateTestWelcome({
         if (!authData || !authData.accessToken) throw new Error("Authentication failed.");
         window.history.replaceState({}, "", `/test/access/${routeId}`);
         toast({ title: "Verification Successful", description: "Magic link authenticated successfully." });
-        handleAuthResponse(authData);
+        await handleAuthResponse(authData);
       } catch (err: unknown) {
         const errorVal = err as { response?: { data?: { message?: string } }; message?: string };
         console.error("Magic token verification failed:", err);
         window.history.replaceState({}, "", `/test/access/${routeId}`);
         setError(errorVal.response?.data?.message || errorVal.message || "Failed to verify magic access link");
-      } finally {
         setLoading(false);
       }
     },
@@ -297,7 +483,7 @@ export default function NewCandidateTestWelcome({
       const authData = response.data?.data || response.data;
       if (!authData || !authData.accessToken) throw new Error("Authentication failed.");
       toast({ title: "Verification Successful", description: "Access code verified successfully." });
-      handleAuthResponse(authData);
+      await handleAuthResponse(authData);
     } catch (err: unknown) {
       const errorVal = err as { response?: { data?: { message?: string } }; message?: string };
       setError(errorVal.response?.data?.message || errorVal.message || "Invalid or expired access code.");
@@ -306,186 +492,6 @@ export default function NewCandidateTestWelcome({
       setIsVerifyingOtp(false);
     }
   };
-
-  /* ────── Token Validation + Data Resolution (ported from TestAccess.tsx) ────── */
-
-  const validateToken = useCallback(async () => {
-    try {
-      setLoading(true);
-      if (!routeId) {
-        throw new Error("Invalid link parameters.");
-      }
-
-      let decoded: Record<string, unknown> | null = null;
-
-      if (routeToken) {
-        const authResponse = await apiClient.post("/candidate-invitations/validate", {
-          id: routeId,
-          token: routeToken,
-        });
-        const authData = authResponse.data?.data || authResponse.data;
-        if (!authData || !authData.accessToken) throw new Error("Authentication failed.");
-        decoded = parseJwt(authData.accessToken);
-        if (decoded) {
-          loginToContext(authData.accessToken, {
-            id: decoded.id as string,
-            name: decoded.name as string,
-            email: decoded.sub as string,
-            role: decoded.role as string,
-          });
-        } else {
-          throw new Error("Failed to parse authentication token.");
-        }
-      } else {
-        const storedToken = localStorage.getItem("token");
-        if (storedToken) decoded = parseJwt(storedToken);
-        if (!isAuthenticated || !decoded) {
-          setLoading(false);
-          return;
-        }
-      }
-
-      // ── Fetch invitation (with fallback chain from TestAccess) ──
-      let invitation: CandidateInvitation | null = null;
-      try {
-        const invitationResponse = await apiClient.get(`/candidate-invitations/${routeId}`);
-        invitation = invitationResponse.data?.data || invitationResponse.data;
-      } catch (err: unknown) {
-        const axiosError = err as { response?: { status?: number } };
-        console.warn("Direct invitation fetch failed:", axiosError.response?.status);
-        try {
-          const listResponse = await apiClient.get("/candidate-invitations");
-          const listData = listResponse.data?.data || listResponse.data;
-          const items = Array.isArray(listData)
-            ? listData
-            : listData?.content && Array.isArray(listData.content)
-            ? listData.content
-            : [];
-          invitation = items.find((item: CandidateInvitation) => item.id === routeId) || null;
-        } catch (listErr) {
-          console.warn("List invitation fetch failed:", listErr);
-        }
-
-        if (!invitation && decoded) {
-          const scheduleId = (decoded.scheduleId || decoded.schedule_id || decoded.schedId) as string | undefined;
-          const candidateId = (decoded.candidateId || decoded.candidate_id || decoded.candId || decoded.id) as string | undefined;
-          const testId = (decoded.testId || decoded.test_id) as string | undefined;
-          if (scheduleId) {
-            invitation = { id: routeId, scheduleId, candidateId, testId };
-          }
-        }
-        if (!invitation) {
-          invitation = {
-            id: routeId,
-            scheduleId: (decoded?.scheduleId || decoded?.schedule_id || decoded?.schedId) as string | undefined,
-            candidateId: (decoded?.candidateId || decoded?.candidate_id || decoded?.id) as string | undefined,
-            testId: (decoded?.testId || decoded?.test_id) as string | undefined,
-          };
-        }
-      }
-
-      // ── Fetch schedule ──
-      let schedule: TestSchedule | null = null;
-      if (invitation?.scheduleId) {
-        try {
-          const scheduleResponse = await apiClient.get(`/test-schedules/${invitation.scheduleId}`);
-          schedule = scheduleResponse.data?.data || scheduleResponse.data;
-        } catch (schedErr) {
-          console.warn("Failed to fetch schedule:", schedErr);
-        }
-      }
-
-      // ── Fetch test ──
-      let testObj: TestAssessment | null = null;
-      const testId = invitation?.testId || schedule?.testId || (decoded?.testId as string) || (decoded?.test_id as string);
-      if (testId) {
-        try {
-          testObj = await testService.getTestById(testId);
-        } catch (testErr) {
-          console.warn("Failed to fetch test:", testErr);
-        }
-      }
-
-      if (testObj && testObj.status && testObj.status !== "PUBLISHED") {
-        throw new Error("This test is currently in Draft or Archived state and cannot be accessed.");
-      }
-
-      // ── Resolve questions ──
-      let resolvedQuestions: TestQuestion[] = [];
-      if (testObj?.testQuestions?.length) resolvedQuestions = testObj.testQuestions;
-      else if (testObj?.questions?.length) resolvedQuestions = testObj.questions;
-      else if (testId) {
-        try {
-          resolvedQuestions = await testService.getTestQuestions(testId);
-        } catch { /* restricted */ }
-      }
-      setQuestions(resolvedQuestions);
-
-      // ── Build proctoring flags (same logic as TestAccess lines 495-533) ──
-      const mode: ProctoringMode = testObj?.proctoringMode ?? "NONE";
-      const isLow = mode === "LOW" || mode === "MEDIUM" || mode === "HIGH";
-      const isMedHigh = mode === "MEDIUM" || mode === "HIGH";
-      const isHigh = mode === "HIGH";
-
-      const testTitle = testObj?.title || (decoded?.testTitle as string) || (decoded?.test_title as string) || "Technical Assessment";
-      const durationMins = testObj?.durationMins || (decoded?.durationMins as number) || (decoded?.duration_mins as number) || 45;
-      const endTime = schedule?.endTime || (decoded?.endTime as string) || (decoded?.end_time as string) || "";
-      const startTime = schedule?.startTime || "";
-      const finalCandidateId = invitation?.candidateId || (decoded?.candidateId as string) || (decoded?.id as string);
-      const finalScheduleId = invitation?.scheduleId || schedule?.id || (decoded?.scheduleId as string);
-
-      // Store the full test object for the onboarding wizard
-      if (testObj) {
-        setTest(testObj as unknown as Test);
-      }
-
-      setTestData({
-        valid: true,
-        invitationId: invitation?.id || routeId,
-        candidateId: finalCandidateId || "",
-        testId: testId || "default-test-id",
-        testTitle,
-        durationMins: Number(durationMins),
-        scheduleId: finalScheduleId || "",
-        endTime,
-        startTime,
-        token: routeToken,
-        questionCount: resolvedQuestions.length,
-        organisationName: testObj?.organisation?.name || "",
-        proctoring: {
-          proctoringMode: mode,
-          tabSwitchTrackingEnabled: testObj?.tabSwitchTrackingEnabled ?? isLow,
-          copyPasteBlocked: testObj?.copyPasteBlocked ?? isLow,
-          rightClickBlocked: testObj?.rightClickBlocked ?? false,
-          fullscreenExitTrackingEnabled: testObj?.fullscreenExitTrackingEnabled ?? isLow,
-          webcamRequired: testObj?.webcamRequired ?? isMedHigh,
-          microphoneRequired: testObj?.microphoneRequired ?? isHigh,
-          screenShareRequired: testObj?.screenShareRequired ?? isHigh,
-          faceNotVisibleDetectionEnabled: testObj?.faceNotVisibleDetectionEnabled ?? isMedHigh,
-          multipleFaceDetectionEnabled: testObj?.multipleFaceDetectionEnabled ?? isMedHigh,
-          suspiciousAudioDetectionEnabled: testObj?.suspiciousAudioDetectionEnabled ?? isHigh,
-          objectDetectionEnabled: false,
-          devtoolsDetectionEnabled: testObj?.devtoolsDetectionEnabled ?? isHigh,
-          periodicSnapshotsEnabled: testObj?.periodicSnapshotsEnabled ?? isMedHigh,
-          evidenceCaptureEnabled: testObj?.evidenceCaptureEnabled ?? isMedHigh,
-          liveProctoringEnabled: testObj?.liveProctoringEnabled ?? isMedHigh,
-          autoSubmitOnCriticalViolation: false,
-          maxWarningsAllowed: testObj?.maxWarningsAllowed ?? (mode === "NONE" ? 0 : 3),
-          maxCriticalViolationsAllowed: testObj?.maxCriticalViolationsAllowed ?? (isHigh ? 1 : 2),
-        },
-        instructions: testObj?.instructions,
-      });
-
-      setError(null);
-    } catch (error: unknown) {
-      const validationErr = error as { response?: { data?: { message?: string } }; message?: string };
-      console.error("Token validation error:", error);
-      setError(validationErr.response?.data?.message || validationErr.message || "Invalid or expired invitation link");
-    } finally {
-      setLoading(false);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [routeId, routeToken, isAuthenticated, loginToContext]);
 
   /* ────── Mount Effect (ported from TestAccess lines 197-262) ────── */
 

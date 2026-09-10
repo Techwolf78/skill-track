@@ -52,25 +52,14 @@ export default function TestScheduleDetails() {
   const [invitationsLoading, setInvitationsLoading] = useState(false);
 
   const fetchInvitations = useCallback(async () => {
+    if (!id) return;
     try {
       setInvitationsLoading(true);
-      // Fetch all invitations and candidates for map resolution
-      const [invRes, candData] = await Promise.all([
-        apiClient.get("/candidate-invitations").catch(() => null),
+      // Fetch invitations specifically for this schedule, and candidates for name/email resolution
+      const [scheduleInvs, candData] = await Promise.all([
+        candidateService.getInvitationsBySchedule(id).catch(() => []),
         candidateService.getCandidates().catch(() => []),
       ]);
-
-      const rawInvList = invRes?.data?.data || invRes?.data || [];
-      const list: Array<Record<string, unknown>> = Array.isArray(rawInvList)
-        ? rawInvList
-        : rawInvList && typeof rawInvList === "object" && "content" in rawInvList && Array.isArray((rawInvList as Record<string, unknown>).content)
-        ? ((rawInvList as Record<string, unknown>).content as Array<Record<string, unknown>>)
-        : [];
-
-      // Filter invitations matching this schedule ID
-      const scheduleInvs = list.filter(
-        (inv) => inv.testScheduleId === id || inv.scheduleId === id
-      );
 
       const candMap = new Map<string, { name: string; email: string }>();
       (candData || []).forEach((c: Candidate) => {
@@ -82,6 +71,7 @@ export default function TestScheduleDetails() {
           candMap.set(userObj.id, { name, email });
         }
       });
+
 
       const resolvedInvs: Invitation[] = scheduleInvs.map((inv) => {
         const invObj = inv as Record<string, unknown>;

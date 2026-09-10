@@ -16,6 +16,15 @@
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="Gryphon 360" />
     <meta name="twitter:image" content="/Gryphon360logo.png" />
+    <script>
+      // Suppress unhandled errors originating from external browser extensions (e.g. PerformanceObserver / reportAllChanges)
+      window.addEventListener('error', function (e) {
+        if (e.message && e.message.includes("reading 'startTime'") && e.filename === '') {
+          e.stopImmediatePropagation();
+          e.preventDefault();
+        }
+      });
+    </script>
   </head>
 
   <body>

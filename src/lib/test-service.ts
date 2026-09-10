@@ -1,5 +1,5 @@
 import { apiClient } from "./api-client";
-import { BaseResponse, unwrapResponse, unwrapArrayResponse, extractWarnings } from "./api/baseResponseUtils";
+import { BaseResponse, unwrapResponse, unwrapArrayResponse, unwrapPageResponse, extractWarnings, SpringPage } from "./api/baseResponseUtils";
 import {
   SignatureMetadata,
   LanguageTemplates,
@@ -375,7 +375,17 @@ export interface Question {
   comparisonMode?: "exact" | "unordered_array" | "float_tolerance";
   verifiedLanguages?: string[];
   pendingLanguages?: string[];
-  starterCode?: Record<string, string>;
+  testCases?: Array<{
+    id?: string;
+    input: string;
+    expectedOutput?: string;
+    expected?: string;
+    sample?: boolean;
+    isHidden?: boolean;
+    weight?: number;
+    explanation?: string;
+    [key: string]: unknown;
+  }>;
   coding?: {
     starterCode?: Record<string, string>;
     [key: string]: unknown;
@@ -675,39 +685,53 @@ export const testService = {
   },
 
   // ==================== Question APIs ====================
+  getQuestionsPage: async (params?: {
+    search?: string;
+    difficulty?: string;
+    type?: string;
+    tag?: string;
+    subjectId?: string;
+    topicId?: string;
+    subtopicId?: string;
+    page?: number;
+    size?: number;
+  }): Promise<SpringPage<Question>> => {
+    const queryParams = new URLSearchParams();
+    if (params?.search && params.search.trim()) queryParams.append("search", params.search.trim());
+    if (params?.difficulty && params.difficulty !== "ALL") queryParams.append("difficulty", params.difficulty);
+    if (params?.type && params.type !== "ALL") queryParams.append("type", params.type);
+    if (params?.tag && params.tag.trim()) queryParams.append("tag", params.tag.trim());
+    if (params?.subjectId && params.subjectId !== "all") queryParams.append("subjectId", params.subjectId);
+    if (params?.topicId && params.topicId !== "all") queryParams.append("topicId", params.topicId);
+    if (params?.subtopicId && params.subtopicId !== "all") queryParams.append("subtopicId", params.subtopicId);
+    queryParams.append("page", String(params?.page ?? 0));
+    queryParams.append("size", String(params?.size ?? 20));
+
+    const response = await apiClient.get<BaseResponse<SpringPage<Question>>>(`/questions?${queryParams.toString()}`);
+    return unwrapPageResponse<Question>(response);
+  },
+
   getAllQuestions: async (
     subjectId?: string,
     topicId?: string,
     subtopicId?: string,
     tag?: string,
+    options?: { search?: string; difficulty?: string; type?: string }
   ): Promise<Question[]> => {
-    let allQuestions: Question[] = [];
-    let page = 0;
-    const size = 50;
-    let hasMore = true;
-    const maxPages = 100;
+    const params = new URLSearchParams();
+    if (subjectId && subjectId !== "all") params.append("subjectId", subjectId);
+    if (topicId && topicId !== "all") params.append("topicId", topicId);
+    if (subtopicId && subtopicId !== "all") params.append("subtopicId", subtopicId);
+    if (tag && tag.trim()) params.append("tag", tag.trim());
+    if (options?.search && options.search.trim()) params.append("search", options.search.trim());
+    if (options?.difficulty && options.difficulty !== "ALL") params.append("difficulty", options.difficulty);
+    if (options?.type && options.type !== "ALL") params.append("type", options.type);
+    params.append("page", "0");
+    params.append("size", "1000");
 
-    while (hasMore && page < maxPages) {
-      const params = new URLSearchParams();
-      if (subjectId) params.append("subjectId", subjectId);
-      if (topicId) params.append("topicId", topicId);
-      if (subtopicId) params.append("subtopicId", subtopicId);
-      if (tag) params.append("tag", tag);
-      params.append("page", page.toString());
-      params.append("size", size.toString());
-
-      const url = `/questions?${params.toString()}`;
-      const response = await apiClient.get<Question[]>(url);
-      const content = unwrapArrayResponse<Question>(response);
-      allQuestions = [...allQuestions, ...content];
-
-      if (content.length < size) {
-        hasMore = false;
-      } else {
-        page++;
-      }
-    }
-    return allQuestions;
+    const url = `/questions?${params.toString()}`;
+    const response = await apiClient.get<Question[]>(url);
+    return unwrapArrayResponse<Question>(response);
   },
 
   getQuestionById: async (id: string): Promise<Question> => {
@@ -895,15 +919,39 @@ export const testService = {
   },
 
   // ==================== Test APIs ====================
-  // ==================== Test APIs ====================
-  getAllTests: async (): Promise<Test[]> => {
-    const response = await apiClient.get<Test[]>("/tests");
+  getAllTests: async (params?: { page?: number; size?: number; search?: string; sort?: string }): Promise<Test[]> => {
+    const queryParams = new URLSearchParams();
+    queryParams.append("page", String(params?.page ?? 0));
+    queryParams.append("size", String(params?.size ?? 1000));
+    if (params?.search?.trim()) queryParams.append("search", params.search.trim());
+    if (params?.sort?.trim()) queryParams.append("sort", params.sort.trim());
+
+    const response = await apiClient.get<Test[]>(`/tests?${queryParams.toString()}`);
     const list = unwrapArrayResponse(response);
     return list.map((t) => testService.mapTestFromBackend(t));
   },
 
-  getInactiveTests: async (): Promise<Test[]> => {
-    const response = await apiClient.get<Test[]>("/tests/inactive");
+  getTestsPage: async (page = 0, size = 10, search?: string, sort?: string): Promise<SpringPage<Test>> => {
+    const queryParams = new URLSearchParams();
+    queryParams.append("page", String(page));
+    queryParams.append("size", String(size));
+    if (search?.trim()) queryParams.append("search", search.trim());
+    if (sort?.trim()) queryParams.append("sort", sort.trim());
+
+    const response = await apiClient.get<BaseResponse<SpringPage<Test>>>(`/tests?${queryParams.toString()}`);
+    const pageData = unwrapPageResponse<Test>(response);
+    return {
+      ...pageData,
+      content: pageData.content.map((t) => testService.mapTestFromBackend(t)),
+    };
+  },
+
+  getInactiveTests: async (params?: { page?: number; size?: number }): Promise<Test[]> => {
+    const queryParams = new URLSearchParams();
+    queryParams.append("page", String(params?.page ?? 0));
+    queryParams.append("size", String(params?.size ?? 1000));
+
+    const response = await apiClient.get<Test[]>(`/tests/inactive?${queryParams.toString()}`);
     const list = unwrapArrayResponse(response);
     return list.map((t) => testService.mapTestFromBackend(t));
   },
@@ -1201,9 +1249,24 @@ export const testService = {
     return response.data;
   },
 
-  getAllTestSchedules: async (): Promise<TestScheduleExtended[]> => {
-    const response = await apiClient.get<TestScheduleExtended[]>("/test-schedules");
+  getAllTestSchedules: async (params?: { testId?: string; page?: number; size?: number }): Promise<TestScheduleExtended[]> => {
+    const queryParams = new URLSearchParams();
+    if (params?.testId) queryParams.append("testId", params.testId);
+    queryParams.append("page", String(params?.page ?? 0));
+    queryParams.append("size", String(params?.size ?? 1000));
+
+    const response = await apiClient.get<TestScheduleExtended[]>(`/test-schedules?${queryParams.toString()}`);
     return unwrapArrayResponse<TestScheduleExtended>(response);
+  },
+
+  getTestSchedulesPage: async (page = 0, size = 20, testId?: string): Promise<SpringPage<TestScheduleExtended>> => {
+    const queryParams = new URLSearchParams();
+    if (testId) queryParams.append("testId", testId);
+    queryParams.append("page", String(page));
+    queryParams.append("size", String(size));
+
+    const response = await apiClient.get<BaseResponse<SpringPage<TestScheduleExtended>>>(`/test-schedules?${queryParams.toString()}`);
+    return unwrapPageResponse<TestScheduleExtended>(response);
   },
 
   getTestScheduleById: async (id: string): Promise<TestScheduleExtended> => {
@@ -1253,14 +1316,34 @@ export const testService = {
     return unwrapResponse(response);
   },
 
-  getAllSessions: async (): Promise<TestSession[]> => {
-    const response = await apiClient.get<TestSession[]>("/test-sessions");
+  getAllSessions: async (params?: { testId?: string; scheduleId?: string; page?: number; size?: number }): Promise<TestSession[]> => {
+    const queryParams = new URLSearchParams();
+    if (params?.testId) queryParams.append("testId", params.testId);
+    if (params?.scheduleId) queryParams.append("scheduleId", params.scheduleId);
+    queryParams.append("page", String(params?.page ?? 0));
+    queryParams.append("size", String(params?.size ?? 1000));
+
+    const response = await apiClient.get<TestSession[]>(`/test-sessions?${queryParams.toString()}`);
     return unwrapArrayResponse<TestSession>(response);
   },
 
+  getTestSessionsPage: async (page = 0, size = 20, filters?: { testId?: string; scheduleId?: string }): Promise<SpringPage<TestSession>> => {
+    const queryParams = new URLSearchParams();
+    if (filters?.testId) queryParams.append("testId", filters.testId);
+    if (filters?.scheduleId) queryParams.append("scheduleId", filters.scheduleId);
+    queryParams.append("page", String(page));
+    queryParams.append("size", String(size));
+
+    const response = await apiClient.get<BaseResponse<SpringPage<TestSession>>>(`/test-sessions?${queryParams.toString()}`);
+    return unwrapPageResponse<TestSession>(response);
+  },
+
   getSessionsByTestId: async (testId: string): Promise<TestSession[]> => {
-    const allSessions = await testService.getAllSessions();
-    return allSessions.filter((s) => s.testId === testId);
+    return testService.getAllSessions({ testId, size: 1000 });
+  },
+
+  getSessionsByScheduleId: async (scheduleId: string): Promise<TestSession[]> => {
+    return testService.getAllSessions({ scheduleId, size: 1000 });
   },
 
   submitSession: async (id: string, _answers?: Record<string, unknown>): Promise<string> => {
