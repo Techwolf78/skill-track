@@ -548,6 +548,20 @@ export default function NewAdminTestEdit() {
                 `/api/admin/proctoring/candidates/${inv.candidateId}/details?scheduleId=${inv.scheduleId}`
               );
               const detail = detailRes.data?.data || detailRes.data;
+              if (detail?.candidate) {
+                inv.candidateName = detail.candidate.candidateName || detail.candidate.name || inv.candidateName;
+                inv.candidateEmail = detail.candidate.email || inv.candidateEmail;
+                if (!inv.candidate) {
+                  inv.candidate = {
+                    id: detail.candidate.candidateId || inv.candidateId,
+                    user: {
+                      id: "",
+                      name: detail.candidate.candidateName || detail.candidate.name || "",
+                      email: detail.candidate.email || "",
+                    },
+                  } as any;
+                }
+              }
               const sessionId = detail?.systemInfo?.sessionId || detail?.sessionId || (inv as any).sessionId || (inv as any).testSessionId;
               if (sessionId) {
                 const [res, sessionRes] = await Promise.allSettled([
@@ -994,15 +1008,29 @@ export default function NewAdminTestEdit() {
   // ── Filtered Candidates for the CANDIDATES Tab ──
   const filteredCandidates = useMemo(() => {
     return invitations.filter((inv) => {
-      const name = (inv.candidateName || inv.candidate?.user?.name || "").toLowerCase();
-      const email = (inv.candidateEmail || inv.candidate?.user?.email || "").toLowerCase();
+      const scoreEntry = candidateResults[inv.id];
+      const detailCand = scoreEntry?.detail?.candidate;
+      const name = (
+        detailCand?.candidateName ||
+        detailCand?.name ||
+        inv.candidateName ||
+        inv.candidate?.user?.name ||
+        inv.candidate?.name ||
+        ""
+      ).toLowerCase();
+      const email = (
+        detailCand?.email ||
+        inv.candidateEmail ||
+        inv.candidate?.user?.email ||
+        inv.candidate?.email ||
+        ""
+      ).toLowerCase();
       const q = candidateSearchQuery.toLowerCase().trim();
 
       if (q && !name.includes(q) && !email.includes(q)) {
         return false;
       }
 
-      const scoreEntry = candidateResults[inv.id];
       const result = scoreEntry?.result;
       const pass = result?.passed;
       const status = inv.status;
@@ -1015,8 +1043,6 @@ export default function NewAdminTestEdit() {
 
       return true;
     });
-
-
   }, [invitations, candidateSearchQuery, candidateStatusFilter, candidateResults]);
 
   const totalCandidatePages = Math.max(
@@ -1117,10 +1143,97 @@ export default function NewAdminTestEdit() {
     }
   };
 
+  const loadImageAsBase64 = async (urlOrData?: string | null): Promise<string | null> => {
+    if (!urlOrData || typeof urlOrData !== "string") return null;
+    const trimmed = urlOrData.trim();
+    if (!trimmed) return null;
+
+    if (trimmed.startsWith("data:image")) return trimmed;
+    if (trimmed.startsWith("data:")) return trimmed;
+    if (!trimmed.startsWith("http") && !trimmed.startsWith("/") && trimmed.length > 100 && !trimmed.includes(" ")) {
+      return `data:image/jpeg;base64,${trimmed}`;
+    }
+
+    let fetchUrl = trimmed;
+    if (trimmed.startsWith("http")) {
+      // Route external URLs (e.g. S3 presigned URLs) through backend proxy to bypass S3 CORS
+      fetchUrl = `/api/admin/proctoring/snapshots/proxy?url=${encodeURIComponent(trimmed)}`;
+    }
+
+    try {
+      const res = await apiClient.get(fetchUrl, { responseType: "blob" });
+      if (res.data) {
+        const blob: Blob = res.data;
+        if (blob.size > 0) {
+          return await new Promise<string | null>((resolve) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(typeof reader.result === "string" ? reader.result : null);
+            reader.onerror = () => resolve(null);
+            reader.readAsDataURL(blob);
+          });
+        }
+      }
+    } catch {
+      // proxy/apiClient fetch failed, attempt direct native fetch or canvas fallback
+    }
+
+    try {
+      const token = localStorage.getItem("token");
+      const headers: Record<string, string> = {};
+      if (token) headers["Authorization"] = `Bearer ${token}`;
+
+      let directFetchUrl = fetchUrl;
+      if (directFetchUrl.startsWith("/")) {
+        const base = apiClient.defaults.baseURL || "";
+        if (base.endsWith("/") && directFetchUrl.startsWith("/")) {
+          directFetchUrl = base + directFetchUrl.slice(1);
+        } else {
+          directFetchUrl = base + directFetchUrl;
+        }
+      }
+
+      const res = await fetch(directFetchUrl, { headers });
+      if (res.ok) {
+        const blob = await res.blob();
+        return await new Promise<string | null>((resolve) => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(typeof reader.result === "string" ? reader.result : null);
+          reader.onerror = () => resolve(null);
+          reader.readAsDataURL(blob);
+        });
+      }
+    } catch {
+      // fetch failed, fallback to Image canvas
+    }
+
+    try {
+      return await new Promise<string | null>((resolve) => {
+        const img = new Image();
+        img.crossOrigin = "anonymous";
+        img.onload = () => {
+          try {
+            const canvas = document.createElement("canvas");
+            canvas.width = img.naturalWidth || img.width || 320;
+            canvas.height = img.naturalHeight || img.height || 240;
+            const ctx = canvas.getContext("2d");
+            if (!ctx) return resolve(null);
+            ctx.drawImage(img, 0, 0);
+            resolve(canvas.toDataURL("image/jpeg", 0.85));
+          } catch {
+            resolve(null);
+          }
+        };
+        img.onerror = () => resolve(null);
+        img.src = fetchUrl;
+      });
+    } catch {
+      return null;
+    }
+  };
+
+
   const downloadAdvancedReport = async (inv: CandidateInvitation) => {
     try {
-      const name = inv.candidateName || inv.candidate?.user?.name || "Candidate";
-      const email = inv.candidateEmail || inv.candidate?.user?.email || "";
       const scoreData = candidateResults[inv.id];
 
       if (!scoreData?.sessionId) {
@@ -1135,6 +1248,22 @@ export default function NewAdminTestEdit() {
       ).catch(() => ({ data: null }));
       const detailData = detailRes.data?.data ?? detailRes.data ?? scoreData?.detail;
 
+      const name =
+        inv.candidateName ||
+        inv.candidate?.user?.name ||
+        inv.candidate?.name ||
+        detailData?.candidate?.candidateName ||
+        detailData?.candidate?.name ||
+        detailData?.candidateName ||
+        "Candidate";
+      const email =
+        inv.candidateEmail ||
+        inv.candidate?.user?.email ||
+        inv.candidate?.email ||
+        detailData?.candidate?.email ||
+        detailData?.candidateEmail ||
+        "—";
+
       const [paperRes, resumeRes, timingsRes] = await Promise.all([
         apiClient.get(`/test-sessions/${scoreData.sessionId}/paper`).catch(() => ({ data: null })),
         apiClient.get(`/test-sessions/${scoreData.sessionId}/resume`).catch(() => ({ data: null })),
@@ -1145,8 +1274,34 @@ export default function NewAdminTestEdit() {
       const resumeData = resumeRes.data?.data || resumeRes.data;
       const timingsList = timingsRes.data?.data || timingsRes.data || [];
 
-      const questionsList = paperData?.paper?.questions || [];
-      const submissionsList = resumeData?.submissions || [];
+      let rawQuestionsList = paperData?.paper?.questions || [];
+      if (!rawQuestionsList || rawQuestionsList.length === 0) {
+        let fallbackQuestions = questions;
+        if (!fallbackQuestions || fallbackQuestions.length === 0) {
+          try {
+            const groupedRes = await testService.getGroupedTestQuestions(id!);
+            const orderedKeys = Object.keys(groupedRes || {}).sort((a, b) => {
+              if (a === "Ungrouped") return 1;
+              if (b === "Ungrouped") return -1;
+              return 0;
+            });
+            fallbackQuestions = orderedKeys.flatMap((key) => groupedRes[key] || []);
+          } catch {
+            fallbackQuestions = [];
+          }
+        }
+        rawQuestionsList = fallbackQuestions.map((tq) => ({
+          id: tq.question?.id || tq.questionId || tq.id,
+          sourceQuestionId: tq.question?.id || tq.questionId,
+          prompt: tq.question?.prompt || tq.prompt,
+          type: tq.question?.type || tq.type,
+          coding: tq.question?.coding || tq.coding,
+          options: tq.question?.mcqOptions || tq.question?.options || tq.mcqOptions || (tq as any).options || [],
+          mcqOptions: tq.question?.mcqOptions || tq.question?.options || tq.mcqOptions || (tq as any).options || [],
+        }));
+      }
+      const questionsList = rawQuestionsList;
+      const submissionsList = resumeData?.submissions || resumeData?.data?.submissions || [];
 
       const scoreText =
         scoreData?.result?.totalScore !== undefined
@@ -1344,18 +1499,34 @@ export default function NewAdminTestEdit() {
       });
 
       // Render Identity Verification Photo & Snapshots Evidence if present
-      const candidatePhotoUrl = detailData?.candidatePhoto?.imageUrl || detailData?.candidatePhoto?.imageData;
-      const allEvidence: Array<{ imageUrl?: string; imageData?: string; snapshotType?: string; capturedAt?: string }> = [
+      const candidatePhotoUrl = detailData?.candidatePhoto?.imageUrl || detailData?.candidatePhoto?.imageData || detailData?.candidatePhoto?.storagePath;
+      const allEvidence: Array<{ imageUrl?: string; imageData?: string; storagePath?: string; s3Key?: string; snapshotType?: string; capturedAt?: string }> = [
         ...(detailData?.candidatePhoto ? [detailData.candidatePhoto] : []),
         ...(detailData?.evidence || []),
         ...(detailData?.snapshots || []),
-      ].filter((item) => Boolean(item?.imageUrl || item?.imageData));
+      ].filter((item) => Boolean(item?.imageUrl || item?.imageData || item?.storagePath || item?.s3Key));
 
-      if (candidatePhotoUrl || allEvidence.length > 0) {
+      // Asynchronously pre-load and convert snapshot images into Base64 for jsPDF
+      const loadedImages = await Promise.all(
+        allEvidence.slice(0, 8).map(async (snap, idx) => {
+          const rawSrc = snap.imageUrl || snap.imageData || snap.storagePath || snap.s3Key;
+          const base64 = await loadImageAsBase64(rawSrc);
+          return {
+            snap,
+            base64,
+            label: snap.snapshotType ? snap.snapshotType.replace(/_/g, " ") : `Snapshot #${idx + 1}`,
+          };
+        }),
+      );
+
+      // Filter for strictly valid base64 images
+      const validImages = loadedImages.filter((img) => Boolean(img.base64));
+
+      if (validImages.length > 0) {
         let currentY = (doc as JsPDFWithAutoTable).lastAutoTable.finalY + 10;
         
         // Page overflow check
-        if (currentY + 45 > 280) {
+        if (currentY + 50 > 280) {
           doc.addPage();
           currentY = 20;
         }
@@ -1370,36 +1541,47 @@ export default function NewAdminTestEdit() {
         const imgW = 42;
         const imgH = 32;
 
-        for (let sIdx = 0; sIdx < Math.min(allEvidence.length, 8); sIdx++) {
-          const snap = allEvidence[sIdx];
-          const src = snap.imageUrl || snap.imageData;
-          if (!src) continue;
+        for (let sIdx = 0; sIdx < validImages.length; sIdx++) {
+          const { base64, label } = validImages[sIdx];
 
           if (imgX + imgW > 196) {
             imgX = 14;
             imgY += imgH + 12;
-            if (imgY + imgH > 280) {
+            if (imgY + imgH > 275) {
               doc.addPage();
               imgY = 20;
             }
           }
 
-          try {
-            doc.setFillColor(241, 245, 249);
-            doc.roundedRect(imgX, imgY, imgW, imgH, 2, 2, "F");
-            doc.addImage(src, "JPEG", imgX, imgY, imgW, imgH);
-            doc.setFontSize(7);
-            doc.setTextColor(71, 85, 105);
-            const label = snap.snapshotType ? snap.snapshotType.replace(/_/g, " ") : `Snapshot #${sIdx + 1}`;
-            doc.text(label, imgX, imgY + imgH + 4);
-          } catch {
-            // fallback if canvas cross-origin or format error
+          doc.setFillColor(241, 245, 249);
+          doc.roundedRect(imgX, imgY, imgW, imgH, 2, 2, "F");
+
+          if (base64) {
+            try {
+              const format = base64.includes("image/png") ? "PNG" : "JPEG";
+              doc.addImage(base64, format, imgX, imgY, imgW, imgH);
+            } catch (err) {
+              console.warn("Failed to embed snapshot image in PDF:", err);
+            }
           }
+
+          doc.setFontSize(7);
+          doc.setTextColor(71, 85, 105);
+          doc.text(label, imgX, imgY + imgH + 4);
+
           imgX += imgW + 6;
         }
 
         // Advance finalY after images grid
         (doc as JsPDFWithAutoTable).lastAutoTable.finalY = imgY + imgH + 8;
+      }
+
+      // Page overflow check for Questions Header
+      let questionsHeaderY = (doc as JsPDFWithAutoTable).lastAutoTable.finalY + 10;
+      if (questionsHeaderY + 25 > 280) {
+        doc.addPage();
+        questionsHeaderY = 20;
+        (doc as JsPDFWithAutoTable).lastAutoTable.finalY = 10;
       }
 
       // Section Separator Label
@@ -1409,7 +1591,7 @@ export default function NewAdminTestEdit() {
       doc.text(
         "QUESTIONS & SUBMISSIONS DETAILS",
         14,
-        (doc as JsPDFWithAutoTable).lastAutoTable.finalY + 10,
+        questionsHeaderY,
       );
 
       // Question Cards using autoTables
@@ -1430,13 +1612,27 @@ export default function NewAdminTestEdit() {
           },
           idx: number,
         ) => {
-          const questionId = q.sourceQuestionId || q.id;
+          const questionId = q.sourceQuestionId || (q as any).questionId || q.id;
+          const targetQIds = [
+            q.sourceQuestionId,
+            (q as any).questionId,
+            q.id,
+            (q as any).question?.id,
+          ]
+            .filter(Boolean)
+            .map((id) => String(id).trim().toLowerCase());
+
           const sub = submissionsList.find(
             (s: {
-              questionId: string;
+              questionId?: string;
+              question?: { id?: string };
+              id?: string;
               answerText?: string;
               selectedOptionIds?: string[];
-            }) => s.questionId === questionId,
+            }) => {
+              const sQId = String(s.questionId || s.question?.id || "").trim().toLowerCase();
+              return sQId !== "" && targetQIds.includes(sQId);
+            },
           );
           const isCoding = q.type === "CODING";
 
@@ -1724,9 +1920,34 @@ export default function NewAdminTestEdit() {
 
       // 1. Sheet: Candidate Performance Summary
       const summaryRows = candidatesToExport.map((inv) => {
-        const name = inv.candidateName || inv.candidate?.user?.name || "Candidate";
-        const email = inv.candidateEmail || inv.candidate?.user?.email || "—";
-        const phone = inv.candidatePhone || inv.candidate?.user?.phoneNumber || "—";
+        const scoreEntry = candidateResults[inv.id];
+        const result = scoreEntry?.result;
+        const detail = scoreEntry?.detail;
+        const session = scoreEntry?.session;
+
+        const name =
+          inv.candidateName ||
+          inv.candidate?.user?.name ||
+          inv.candidate?.name ||
+          inv.candidate?.candidateName ||
+          detail?.candidate?.candidateName ||
+          detail?.candidate?.name ||
+          detail?.candidateName ||
+          "Candidate";
+        const email =
+          inv.candidateEmail ||
+          inv.candidate?.user?.email ||
+          inv.candidate?.email ||
+          detail?.candidate?.email ||
+          detail?.candidateEmail ||
+          "—";
+        const phone =
+          inv.candidatePhone ||
+          inv.candidate?.user?.phoneNumber ||
+          inv.candidate?.phoneNumber ||
+          inv.candidate?.phone ||
+          detail?.candidate?.phoneNumber ||
+          "—";
         const college =
           inv.candidate?.organisation?.name ||
           (inv.candidate?.extraFields?.collegeName as string) ||
@@ -1737,11 +1958,6 @@ export default function NewAdminTestEdit() {
           (inv.candidate?.extraFields?.department as string) ||
           (inv.candidate?.extraFields?.branch as string) ||
           "—";
-
-        const scoreEntry = candidateResults[inv.id];
-        const result = scoreEntry?.result;
-        const detail = scoreEntry?.detail;
-        const session = scoreEntry?.session;
 
         const status =
           result?.passed === true
@@ -1811,7 +2027,7 @@ export default function NewAdminTestEdit() {
         const multipleFacesCount = violations.filter((v: any) => v.eventType === "MULTIPLE_FACES").length;
         const suspiciousAudioCount = violations.filter((v: any) => v.eventType === "SUSPICIOUS_AUDIO" || v.eventType === "AUDIO_VIOLATION").length;
         const objectDetectedCount = violations.filter((v: any) => v.eventType === "OBJECT_DETECTED" || v.eventType === "CELL_PHONE").length;
-        const framesCaptured = (detail?.snapshots?.length || 0) + (detail?.evidence?.length || 0);
+        const framesCaptured = (detail?.snapshots?.length || 0) + (detail?.evidence?.length || 0) + (detail?.candidatePhoto ? 1 : 0);
 
         const riskLevel =
           detail?.riskLevel ||
@@ -1893,9 +2109,24 @@ export default function NewAdminTestEdit() {
       // 2. Sheet: Question-by-Question Submissions
       const submissionRows: Array<Record<string, any>> = [];
       candidatesToExport.forEach((inv) => {
-        const name = inv.candidateName || inv.candidate?.user?.name || "Candidate";
-        const email = inv.candidateEmail || inv.candidate?.user?.email || "—";
         const scoreEntry = candidateResults[inv.id];
+        const detail = scoreEntry?.detail;
+        const name =
+          inv.candidateName ||
+          inv.candidate?.user?.name ||
+          inv.candidate?.name ||
+          inv.candidate?.candidateName ||
+          detail?.candidate?.candidateName ||
+          detail?.candidate?.name ||
+          detail?.candidateName ||
+          "Candidate";
+        const email =
+          inv.candidateEmail ||
+          inv.candidate?.user?.email ||
+          inv.candidate?.email ||
+          detail?.candidate?.email ||
+          detail?.candidateEmail ||
+          "—";
         const submissions: any[] = scoreEntry?.detail?.submissions || [];
 
         questions.forEach((tq, idx) => {
@@ -1920,10 +2151,26 @@ export default function NewAdminTestEdit() {
       // 3. Sheet: Proctoring Violations Log
       const violationRows: Array<Record<string, any>> = [];
       candidatesToExport.forEach((inv) => {
-        const name = inv.candidateName || inv.candidate?.user?.name || "Candidate";
-        const email = inv.candidateEmail || inv.candidate?.user?.email || "—";
         const scoreEntry = candidateResults[inv.id];
+        const detail = scoreEntry?.detail;
+        const name =
+          inv.candidateName ||
+          inv.candidate?.user?.name ||
+          inv.candidate?.name ||
+          inv.candidate?.candidateName ||
+          detail?.candidate?.candidateName ||
+          detail?.candidate?.name ||
+          detail?.candidateName ||
+          "Candidate";
+        const email =
+          inv.candidateEmail ||
+          inv.candidate?.user?.email ||
+          inv.candidate?.email ||
+          detail?.candidate?.email ||
+          detail?.candidateEmail ||
+          "—";
         const violations: any[] = scoreEntry?.detail?.violations || [];
+
 
         if (violations.length === 0) {
           violationRows.push({
@@ -2640,7 +2887,7 @@ export default function NewAdminTestEdit() {
                 <button
                   onClick={handleSaveGeneralSettings}
                   disabled={savingGeneralSettings}
-                  className="px-6 py-2.5 bg-[#10B981] hover:bg-[#059669] disabled:opacity-50 text-white text-xs font-bold tracking-wider uppercase shadow-xs transition-colors rounded-none cursor-pointer inline-flex items-center gap-2"
+                  className="px-6 py-2.5 bg-[#4353a4] hover:bg-[#344285] disabled:opacity-50 text-white text-xs font-bold tracking-wider uppercase shadow-xs transition-colors rounded-none cursor-pointer inline-flex items-center gap-2"
                 >
                   {savingGeneralSettings ? (
                     <>
@@ -2827,7 +3074,7 @@ export default function NewAdminTestEdit() {
                     onClick={handleSaveSchedule}
                     disabled={savingSchedule || !isScheduleDirty}
                     size="sm"
-                    className="bg-[#10B981] hover:bg-[#059669] text-white"
+                    className="bg-[#4353a4] hover:bg-[#344285] text-white"
                   >
                     {savingSchedule ? (
                       <>
@@ -2939,7 +3186,7 @@ export default function NewAdminTestEdit() {
                     onClick={handleSaveProctoring}
                     disabled={savingProctoring || !isProctoringDirty}
                     size="sm"
-                    className="bg-[#10B981] hover:bg-[#059669] text-white"
+                    className="bg-[#4353a4] hover:bg-[#344285] text-white"
                   >
                     {savingProctoring ? (
                       <>
@@ -3091,7 +3338,7 @@ export default function NewAdminTestEdit() {
                           }
                           setIsAddCandidatesOpen(true);
                         }}
-                        className="px-4 py-2 bg-[#10B981] hover:bg-[#059669] text-white text-xs font-bold tracking-wider uppercase inline-flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs"
+                        className="px-4 py-2 bg-[#4353a4] hover:bg-[#344285] text-white text-xs font-bold tracking-wider uppercase inline-flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs"
                       >
                         <Plus className="w-3.5 h-3.5" />
                         <span>Add Candidates</span>
@@ -3099,9 +3346,9 @@ export default function NewAdminTestEdit() {
 
                       <button
                         onClick={handleDownloadReport}
-                        className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold tracking-wider uppercase inline-flex items-center gap-2 transition-colors cursor-pointer shadow-xs"
+                        className="px-4 py-2 border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 hover:text-slate-900 text-xs font-bold tracking-wider uppercase inline-flex items-center gap-2 transition-colors cursor-pointer shadow-xs"
                       >
-                        <CloudDownload className="w-4 h-4" />
+                        <CloudDownload className="w-4 h-4 text-[#4353a4]" />
                         <span>Download Report</span>
                       </button>
                     </div>
@@ -3187,22 +3434,33 @@ export default function NewAdminTestEdit() {
                           </tr>
                         ) : paginatedCandidates.length === 0 ? (
                           <tr>
-                            <td colSpan={7} className="py-12 text-center text-slate-400 space-y-2">
-                              <p>No candidates invited yet or none match filters.</p>
-                              <button
-                                onClick={() => setIsAddCandidatesOpen(true)}
-                                className="px-3 py-1.5 bg-[#10B981] hover:bg-[#059669] text-white font-semibold text-xs inline-flex items-center gap-1.5 cursor-pointer shadow-xs"
-                              >
-                                <Plus className="w-3.5 h-3.5" />
-                                <span>Add Candidates</span>
-                              </button>
+                            <td colSpan={7} className="py-12 text-center text-slate-400 text-xs">
+                              <p>
+                                {candidateSearchQuery.trim() || candidateStatusFilter !== "ALL"
+                                  ? "No candidates match your search or filter criteria."
+                                  : "No candidates found."}
+                              </p>
                             </td>
                           </tr>
                         ) : (
                           paginatedCandidates.map((inv) => {
-                            const name = inv.candidateName || inv.candidate?.user?.name || "Candidate";
-                            const email = inv.candidateEmail || inv.candidate?.user?.email || "—";
                             const scoreEntry = candidateResults[inv.id];
+                            const detailCand = scoreEntry?.detail?.candidate;
+                            const name =
+                              detailCand?.candidateName ||
+                              detailCand?.name ||
+                              scoreEntry?.detail?.candidateName ||
+                              inv.candidateName ||
+                              inv.candidate?.user?.name ||
+                              inv.candidate?.name ||
+                              "Candidate";
+                            const email =
+                              detailCand?.email ||
+                              scoreEntry?.detail?.candidateEmail ||
+                              inv.candidateEmail ||
+                              inv.candidate?.user?.email ||
+                              inv.candidate?.email ||
+                              "—";
                             const result = scoreEntry?.result;
                             const isPassed = result?.passed === true;
                             const isFailed = result && result.passed === false;
@@ -3363,7 +3621,7 @@ export default function NewAdminTestEdit() {
                                         }}
                                         className="cursor-pointer py-2 px-2.5 flex items-center gap-2 text-slate-700 hover:bg-slate-50"
                                       >
-                                        <Send className="w-3.5 h-3.5 text-emerald-600" />
+                                        <Send className="w-3.5 h-3.5 text-[#4353a4]" />
                                         <span>Resend Invitation</span>
                                       </DropdownMenuItem>
 
@@ -3557,7 +3815,7 @@ export default function NewAdminTestEdit() {
             <Button
               disabled={resending}
               onClick={handleConfirmSingleResend}
-              className="bg-[#10B981] hover:bg-[#059669] text-white text-xs font-semibold"
+              className="bg-[#4353a4] hover:bg-[#344285] text-white text-xs font-semibold"
             >
               {resending ? (
                 <>

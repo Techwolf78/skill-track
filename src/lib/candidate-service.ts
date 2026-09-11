@@ -336,8 +336,8 @@ export const candidateService = {
 
       return invitationsRaw.map((inv) => ({
         ...inv,
-        candidateName: inv.candidateName || inv.candidate?.user?.name || "Candidate",
-        candidateEmail: inv.candidateEmail || inv.candidate?.user?.email || "—",
+        candidateName: inv.candidateName || inv.candidate?.user?.name || inv.candidate?.name || undefined,
+        candidateEmail: inv.candidateEmail || inv.candidate?.user?.email || inv.candidate?.email || undefined,
         candidatePhone: inv.candidatePhone || inv.candidate?.user?.phoneNumber,
         sessionStatus: inv.sessionStatus || "NOT_STARTED",
       }));

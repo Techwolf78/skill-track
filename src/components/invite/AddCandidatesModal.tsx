@@ -791,7 +791,7 @@ export function AddCandidatesModal({
                       "text-xs font-semibold rounded-lg px-5 py-2 shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed",
                       lastFailedCount > 0
                         ? "bg-red-600 hover:bg-red-700 text-white"
-                        : "bg-[#10B981] hover:bg-[#059669] text-white"
+                        : "bg-[#4353a4] hover:bg-[#344285] text-white"
                     )}
                   >
                     {inviting ? (
@@ -958,7 +958,7 @@ export function AddCandidatesModal({
                     <Button
                       type="submit"
                       disabled={creating}
-                      className="text-xs font-semibold bg-[#10B981] hover:bg-[#059669] text-white rounded-lg px-5 py-2 shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                      className="text-xs font-semibold bg-[#4353a4] hover:bg-[#344285] text-white rounded-lg px-5 py-2 shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
                     >
                       {creating ? (
                         <>
@@ -1246,7 +1246,7 @@ export function AddCandidatesModal({
                       type="button"
                       onClick={handleSendBulkInvitations}
                       disabled={inviting || parsedBulkCandidates.length === 0}
-                      className="text-xs font-semibold bg-[#10B981] hover:bg-[#059669] text-white rounded-lg px-5 py-2 shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                      className="text-xs font-semibold bg-[#4353a4] hover:bg-[#344285] text-white rounded-lg px-5 py-2 shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
                     >
                       {inviting ? (
                         <>
@@ -1268,48 +1268,51 @@ export function AddCandidatesModal({
 
           {/* ──── RIGHT COLUMN: Actual Email Template Preview (5 cols) ──── */}
           <div className="lg:col-span-5 bg-slate-50/70 p-6 flex flex-col h-full overflow-y-auto">
-            {/* Exact Actual Email Template Card (Dark theme: SECURE ASSESSMENT GATEWAY) */}
-            <div className="flex-1 bg-[#0b101b] border border-slate-800 text-slate-200 rounded-2xl p-7 shadow-lg flex flex-col space-y-6 font-sans">
-              {/* Header: SECURE ASSESSMENT GATEWAY */}
-              <div className="border-b border-slate-800/80 pb-4">
-                <h3 className="text-sm font-extrabold tracking-wider text-[#10B981] uppercase font-mono">
-                  SECURE ASSESSMENT GATEWAY
+            {/* Exact Actual Email Template Card (White & Blue Theme: Assessment Invitation) */}
+            <div className="flex-1 bg-white border border-slate-200 text-slate-800 rounded-2xl shadow-sm flex flex-col overflow-hidden font-sans">
+              {/* Header: Assessment Invitation Banner */}
+              <div className="bg-[#4353a4] px-6 py-4">
+                <h3 className="text-xs font-bold tracking-wider text-white uppercase font-sans">
+                  Assessment Invitation
                 </h3>
               </div>
 
-              {/* Salutation and Intro */}
-              <div className="space-y-3.5 text-xs leading-relaxed text-slate-300">
-                <p className="text-xs font-medium text-slate-200">Hello,</p>
-                <p className="text-slate-400 text-xs leading-normal">
-                  You have been invited to take an assessment on <span className="text-white font-semibold">Gryphon 360</span>. Click the button below to start your test directly. The link will automatically perform secure identity checks in the background.
-                </p>
-              </div>
+              {/* Email Card Body */}
+              <div className="p-6 flex-1 flex flex-col space-y-5">
+                {/* Salutation and Intro */}
+                <div className="space-y-2.5 text-xs leading-relaxed text-slate-600">
+                  <p className="text-xs font-semibold text-slate-800">Hello,</p>
+                  <p className="text-slate-600 text-xs leading-normal">
+                    You have been invited to complete a proctored assessment on <span className="text-slate-900 font-semibold">Gryphon 360</span>. Click the button below to start or resume your assessment session securely.
+                  </p>
+                </div>
 
-              {/* Action Button: Start Test */}
-              <div className="py-2 flex justify-center">
-                <div className="px-7 py-2.5 bg-[#10B981] hover:bg-[#059669] text-white font-bold text-xs rounded-lg shadow-md tracking-wide cursor-default transition-all">
-                  Start Test
+                {/* Action Button: Start Assessment */}
+                <div className="py-2 flex justify-center">
+                  <div className="px-8 py-2.5 bg-[#4353a4] hover:bg-[#344285] text-white font-semibold text-xs rounded-md shadow-xs tracking-wide cursor-default transition-all">
+                    Start Assessment
+                  </div>
+                </div>
+
+                {/* Fallback Access Code Card */}
+                <div className="bg-slate-50 border border-slate-200 rounded-lg p-4 space-y-1.5 mt-auto text-center">
+                  <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                    Fallback Access Code
+                  </p>
+                  <p className="text-2xl font-mono font-bold tracking-widest text-[#4353a4]">
+                    660822
+                  </p>
+                  <p className="text-[11px] text-slate-400 pt-0.5">
+                    If the button does not work, enter this 6-digit access code manually on the assessment portal.
+                  </p>
                 </div>
               </div>
 
-              {/* Expiration Note */}
-              <p className="text-[11px] text-slate-400 text-center leading-normal">
-                The access link is valid for 15 minutes and can only be used to initiate/resume your session.
-              </p>
-
-              {/* Fallback Access Code Card */}
-              <div className="bg-[#172033] border border-slate-700/60 rounded-xl p-4 space-y-2 mt-auto">
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider font-mono">
-                  FALLBACK ACCESS CODE
+              {/* Email Footer */}
+              <div className="bg-slate-50/80 border-t border-slate-100 px-6 py-3 text-center">
+                <p className="text-[11px] text-slate-400">
+                  This is an automated system email. Please do not reply directly.
                 </p>
-                <p className="text-xl font-mono font-extrabold tracking-widest text-[#10B981]">
-                  660822
-                </p>
-                <div className="flex items-center gap-1 text-slate-500 pt-0.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-slate-500" />
-                  <span className="w-1.5 h-1.5 rounded-full bg-slate-500" />
-                  <span className="w-1.5 h-1.5 rounded-full bg-slate-500" />
-                </div>
               </div>
             </div>
           </div>

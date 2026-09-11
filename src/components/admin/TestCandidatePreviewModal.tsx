@@ -829,7 +829,7 @@ export function TestCandidatePreviewModal({
               </div>
               <Button
                 onClick={() => setShowSubmitDialog(true)}
-                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs gap-1.5 shadow-sm"
+                className="w-full bg-[#4353a4] hover:bg-[#344285] text-white font-semibold text-xs gap-1.5 shadow-sm"
               >
                 <Send className="w-3.5 h-3.5" />
                 Submit Test
@@ -920,7 +920,7 @@ export function TestCandidatePreviewModal({
                   setShowSubmitDialog(false);
                   setIsSubmitted(true);
                 }}
-                className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                className="bg-[#4353a4] hover:bg-[#344285] text-white"
               >
                 Submit Test
               </AlertDialogAction>
@@ -945,7 +945,7 @@ export function TestCandidatePreviewModal({
                 variant="default"
                 size="sm"
                 onClick={onClose}
-                className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs"
+                className="bg-[#4353a4] hover:bg-[#344285] text-white text-xs"
               >
                 Exit Preview
               </Button>

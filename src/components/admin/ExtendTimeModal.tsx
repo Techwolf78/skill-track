@@ -160,7 +160,7 @@ export const ExtendTimeModal: React.FC<ExtendTimeModalProps> = ({
             <button
               type="submit"
               disabled={loading || !minutes || minutes < 1 || minutes > 180}
-              className="px-4 py-2 text-xs font-semibold bg-[#10B981] hover:bg-[#059669] text-white rounded-lg shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-4 py-2 text-xs font-semibold bg-[#4353a4] hover:bg-[#344285] text-white rounded-lg shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading ? (
                 <>

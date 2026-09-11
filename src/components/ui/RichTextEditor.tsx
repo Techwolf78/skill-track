@@ -685,7 +685,7 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 bg-[#10B981] hover:bg-[#059669] text-white text-xs font-bold uppercase tracking-wider rounded-xs shadow-xs transition-colors cursor-pointer"
+                  className="px-5 py-2 bg-[#4353a4] hover:bg-[#344285] text-white text-xs font-bold uppercase tracking-wider rounded-xs shadow-xs transition-colors cursor-pointer"
                 >
                   {hasExistingLink ? "Update Link" : "Insert Link"}
                 </button>

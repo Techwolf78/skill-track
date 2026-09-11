@@ -212,7 +212,7 @@ export default function NewAdminHome() {
       .slice(0, 5);
   }, [tests]);
 
-  // 2. Fetch Real Activity Feed (Audit Logs) from Backend
+  // 2. Fetch Real Activity Feed (Audit Logs) from Backend (Scoped to Current Admin)
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [isLoadingLogs, setIsLoadingLogs] = useState(true);
   const [logsError, setLogsError] = useState<string | null>(null);
@@ -221,14 +221,28 @@ export default function NewAdminHome() {
     setIsLoadingLogs(true);
     setLogsError(null);
     try {
-      const response = await auditLogService.getAuditLogs({ size: 50 });
+      const userActor = user?.email || user?.id;
+      const response = await auditLogService.getAuditLogs({
+        actor: userActor || undefined,
+        size: 50,
+      });
       const rawContent = response.content || [];
 
-      // Filter out raw submission/calculation events, keep admin operational activities
+      // Filter out raw candidate submission/calculation events and ensure only this admin's activities are displayed
       const adminLogs = rawContent
         .filter((log) => {
           const details = (log.details || "").toLowerCase();
           const action = (log.action || "").toLowerCase();
+          const logActor = (log.actor || "").toLowerCase();
+
+          // If current admin email/id exists, ensure log belongs to them
+          if (userActor) {
+            const userIdentifier = userActor.toLowerCase();
+            if (logActor && !logActor.includes(userIdentifier) && !userIdentifier.includes(logActor)) {
+              return false;
+            }
+          }
+
           if (
             details.includes("testsession") ||
             details.includes("submission") ||
@@ -253,7 +267,7 @@ export default function NewAdminHome() {
 
   useEffect(() => {
     fetchLogs();
-  }, []);
+  }, [user?.email, user?.id]);
 
   // Format Duration string
   const formatDuration = (mins?: number) => {
@@ -475,11 +489,15 @@ export default function NewAdminHome() {
             </div>
           ) : logsError || logs.length === 0 ? (
             <div className="py-14 text-center text-slate-400 text-sm">
-              No recent admin activity recorded yet.
+              No recent activity recorded for your account.
             </div>
           ) : (
             logs.map((log) => (
-              <ActivityFeedItem key={log.id} log={log} />
+              <ActivityFeedItem
+                key={log.id}
+                log={log}
+                currentAdminName={user?.name || user?.email}
+              />
             ))
           )}
         </div>
@@ -548,7 +566,13 @@ export default function NewAdminHome() {
 /**
  * Real Activity Feed Item Component
  */
-function ActivityFeedItem({ log }: { log: AuditLog }) {
+function ActivityFeedItem({
+  log,
+  currentAdminName,
+}: {
+  log: AuditLog;
+  currentAdminName?: string;
+}) {
   const actorName = "You";
 
   let timeAgo = "recently";
@@ -563,11 +587,21 @@ function ActivityFeedItem({ log }: { log: AuditLog }) {
     actorName
   );
 
+  // Derive initial(s) from current admin's name, email, or log actor
+  const displayName = currentAdminName || log.actor || "You";
+  const initials = displayName
+    .trim()
+    .split(/\s+|[@.]/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase())
+    .join("") || "A";
+
   return (
     <div className="px-6 py-4 flex items-start gap-3.5 hover:bg-slate-50/60 transition-colors">
       <Avatar className="w-8 h-8 mt-0.5 border border-amber-300 bg-amber-500 text-white font-bold text-xs shrink-0 rounded-none">
         <AvatarFallback className="bg-amber-500 text-white font-semibold rounded-none">
-          Y
+          {initials}
         </AvatarFallback>
       </Avatar>
 

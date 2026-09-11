@@ -283,7 +283,7 @@ export const PreFlightVerificationPanel: React.FC<PreFlightVerificationPanelProp
           type="button"
           onClick={handleRunVerification}
           disabled={isValidating}
-          className="inline-flex items-center gap-2 bg-[#10B981] hover:bg-[#059669] px-4.5 py-2 text-xs font-bold text-white shadow-xs transition-colors cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
+          className="inline-flex items-center gap-2 bg-[#4353a4] hover:bg-[#344285] px-4.5 py-2 text-xs font-bold text-white shadow-xs transition-colors cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
         >
           {isValidating ? (
             <>

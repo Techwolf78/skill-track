@@ -744,7 +744,7 @@ export function BulkInviteModal({
                 <Button
                   onClick={handleSendInvitations}
                   disabled={sendingInvites || importStats.success === 0}
-                  className="gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs"
+                  className="gap-1.5 bg-[#4353a4] hover:bg-[#344285] text-white text-xs"
                 >
                   <Send className="w-3.5 h-3.5" />
                   Send Invitations ({importStats.success})

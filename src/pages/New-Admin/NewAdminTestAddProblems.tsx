@@ -394,7 +394,7 @@ export default function NewAdminTestAddProblems() {
 
           <button
             onClick={() => navigate(`/admin/tests/edit/${id}`)}
-            className="px-5 py-2.5 bg-[#10B981] hover:bg-[#059669] text-white text-sm font-semibold rounded-none shadow-xs transition-colors inline-flex items-center gap-2 self-start sm:self-auto cursor-pointer"
+            className="px-5 py-2.5 bg-[#4353a4] hover:bg-[#344285] text-white text-sm font-semibold rounded-none shadow-xs transition-colors inline-flex items-center gap-2 self-start sm:self-auto cursor-pointer"
           >
             <Check className="w-4 h-4 stroke-[3]" />
             <span>Done</span>
