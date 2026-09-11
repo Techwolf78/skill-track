@@ -1,7 +1,17 @@
 // src/lib/image-utils.ts
 // Utility functions for resolving, validating, and proxying question and evidence image assets.
 
+import { apiClient } from "./api-client";
+
 const DUMMY_PLACEHOLDER_REGEX = /^(question\s*image|option\s*\d+|none|null|undefined|image|asset|placeholder)$/i;
+
+function getProxyPrefix(): string {
+  const base = (apiClient.defaults.baseURL || "").replace(/\/+$/, "");
+  if (base.startsWith("http")) {
+    return `${base}/questions/assets/proxy`;
+  }
+  return `/api/questions/assets/proxy`;
+}
 
 /**
  * Resolves a raw image URL / storage path / base64 string to a reliable browser URL.
@@ -39,6 +49,8 @@ export function resolveImageUrl(rawUrl?: string | null): string | null {
     return trimmed;
   }
 
+  const proxyPrefix = getProxyPrefix();
+
   // 4. Absolute HTTP / HTTPS URLs (e.g. Airtel S3 cloud, MinIO, AWS S3)
   if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
     // If it's a known external storage URL (e.g. Airtel S3 on port 10445, MinIO, or rxone-store)
@@ -50,7 +62,7 @@ export function resolveImageUrl(rawUrl?: string | null): string | null {
       trimmed.includes("s3.") ||
       trimmed.includes("minio")
     ) {
-      return `/api/questions/assets/proxy?url=${encodeURIComponent(trimmed)}`;
+      return `${proxyPrefix}?url=${encodeURIComponent(trimmed)}`;
     }
     return trimmed;
   }
@@ -58,13 +70,15 @@ export function resolveImageUrl(rawUrl?: string | null): string | null {
   // 5. Relative paths (e.g. /public/question-assets/... or public/question-assets/...)
   if (trimmed.startsWith("/")) {
     if (trimmed.startsWith("/api/")) {
-      return trimmed;
+      const base = (apiClient.defaults.baseURL || "").replace(/\/+$/, "");
+      return base.startsWith("http") ? `${base}${trimmed.replace(/^\/api/, "")}` : trimmed;
     }
-    return `/api${trimmed}`;
+    const base = (apiClient.defaults.baseURL || "").replace(/\/+$/, "");
+    return base.startsWith("http") ? `${base}${trimmed}` : `/api${trimmed}`;
   }
 
   if (trimmed.startsWith("public/") || trimmed.startsWith("tests/")) {
-    return `/api/questions/assets/proxy?url=${encodeURIComponent(trimmed)}`;
+    return `${proxyPrefix}?url=${encodeURIComponent(trimmed)}`;
   }
 
   return trimmed;

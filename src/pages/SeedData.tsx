@@ -56,7 +56,7 @@ export default function SeedData() {
   const [seededCandidates, setSeededCandidates] = useState<SeededCandidate[]>([]);
   const [copiedEmail, setCopiedEmail] = useState<string | null>(null);
   const [isSeedingCompleted, setIsSeedingCompleted] = useState(false);
-  const [seedEmail, setSeedEmail] = useState("superadmin@gryphonacademy.co.in");
+  const [seedEmail, setSeedEmail] = useState("superadmin@gryphon360.com");
   const [seedPassword, setSeedPassword] = useState("password123");
   const [dataSet, setDataSet] = useState<"A" | "B" | "C" | "D">("A");
 
@@ -65,7 +65,7 @@ export default function SeedData() {
   // List of seed steps
   const [steps, setSteps] = useState<SeedStep[]>([
     { id: "org", name: "Create Organisation", description: "Creating Gryphon Academy", status: "idle" },
-    { id: "superadmin", name: "Register Super Admin", description: "Registering superadmin@gryphonacademy.co.in", status: "idle" },
+    { id: "superadmin", name: "Register Super Admin", description: "Registering superadmin@gryphon360.com", status: "idle" },
     { id: "login", name: "Authenticate", description: "Logging in as Super Admin", status: "idle" },
     { id: "taxonomy", name: "Onboard Taxonomy (Subjects & Topics)", description: "Creating Computer Science & Engineering (DSA & System Design)", status: "idle" },
     { id: "candidate", name: "Create Sample Candidate", description: "Registering candidate@example.com", status: "idle" },
@@ -127,11 +127,11 @@ export default function SeedData() {
     }
 
     // B: Fallback to the platform's default master bootstrap superadmin
-    if (!superadminToken && seedEmail !== "superadmin@gryphonacademy.co.in") {
-      addLog("🔐 Attempting master bootstrap login with default platform credentials (superadmin@gryphonacademy.co.in)...", "info");
+    if (!superadminToken && seedEmail !== "superadmin@gryphon360.com") {
+      addLog("🔐 Attempting master bootstrap login with default platform credentials (superadmin@gryphon360.com)...", "info");
       try {
         const authData = await authService.login({
-          email: "superadmin@gryphonacademy.co.in",
+          email: "superadmin@gryphon360.com",
           password: "password123",
         });
         superadminToken = authData.accessToken;
@@ -214,7 +214,7 @@ export default function SeedData() {
       setProgress(15);
       addLog("Registering Super Admin account...", "info");
 
-      const targetEmail = "superadmin@gryphonacademy.co.in";
+      const targetEmail = "superadmin@gryphon360.com";
       const targetPassword = "password123";
 
       try {
@@ -821,14 +821,14 @@ export default function SeedData() {
       setIsSeedingCompleted(true);
       addLog("🏁 DATABASE SEEDING COMPLETED SUCCESSFULLY!", "success");
       addLog("🔑 SUPER ADMIN LOGIN:", "success");
-      addLog(`   Email: ${seedEmail || "superadmin@gryphonacademy.co.in"}`, "info");
+      addLog(`   Email: ${seedEmail || "superadmin@gryphon360.com"}`, "info");
       addLog(`   Password: ${seedPassword || "password123"}`, "info");
 
       if (superadminToken) {
         const adminUserData = {
           id: "00000000-0000-0000-0000-000000000001",
           name: "Super Admin",
-          email: seedEmail || "superadmin@gryphonacademy.co.in",
+          email: seedEmail || "superadmin@gryphon360.com",
           role: "SUPERADMIN",
           organisationId: gryphonOrgId
         };
@@ -927,11 +927,11 @@ export default function SeedData() {
                   <div className="space-y-2 text-sm">
                     <div className="flex justify-between items-center py-1 border-b border-slate-900">
                       <span className="text-slate-500 font-medium">Super Admin:</span>
-                      <code className="text-slate-300 font-mono text-xs">superadmin@gryphonacademy.co.in</code>
+                      <code className="text-slate-300 font-mono text-xs">superadmin@gryphon360.com</code>
                     </div>
                     <div className="flex justify-between items-center py-1 border-b border-slate-900">
                       <span className="text-slate-500 font-medium">Admin:</span>
-                      <code className="text-slate-300 font-mono text-xs">admin@gryphonacademy.co.in</code>
+                      <code className="text-slate-300 font-mono text-xs">admin@gryphon360.com</code>
                     </div>
                     <div className="flex justify-between items-center py-1">
                       <span className="text-slate-500 font-medium">Password:</span>

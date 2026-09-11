@@ -12,7 +12,16 @@
  *   - Retry failed uploads up to 3 times with exponential backoff
  *   - In-memory queue (flushed on submit)
  */
+import { apiClient } from "@/lib/api-client";
 
+function getEndpointUrl(path: string): string {
+  const base = (apiClient.defaults.baseURL || "").replace(/\/+$/, "");
+  const cleanPath = path.startsWith("/api/") ? path.replace(/^\/api/, "") : path;
+  if (base.startsWith("http")) {
+    return `${base}${cleanPath.startsWith("/") ? cleanPath : `/${cleanPath}`}`;
+  }
+  return path.startsWith("/") ? path : `/${path}`;
+}
 
 export interface QueueItem {
   buffer: ArrayBuffer;
@@ -24,29 +33,55 @@ export interface QueueItem {
 
 const MAX_PARALLEL = 3;
 const MAX_RETRIES = 3;
+const BASE_RETRY_DELAY_MS = 1000;
 
 export class UploadQueue {
   private queue: QueueItem[] = [];
-  private active = 0;
+  private inFlight = 0;
   private sessionId: string;
+  private onStatusChange?: (pending: number, inFlight: number) => void;
 
-  constructor(sessionId: string) {
+  constructor(
+    sessionId: string,
+    onStatusChange?: (pending: number, inFlight: number) => void
+  ) {
     this.sessionId = sessionId;
+    this.onStatusChange = onStatusChange;
   }
 
-  enqueue(item: QueueItem) {
+  enqueue(item: Omit<QueueItem, "retries">): void {
     this.queue.push({ ...item, retries: 0 });
+    this.notify();
     this.drain();
   }
 
-  private drain() {
-    while (this.active < MAX_PARALLEL && this.queue.length > 0) {
+  private notify(): void {
+    this.onStatusChange?.(this.queue.length, this.inFlight);
+  }
+
+  private async drain(): Promise<void> {
+    while (this.inFlight < MAX_PARALLEL && this.queue.length > 0) {
       const item = this.queue.shift()!;
-      this.active++;
-      this.upload(item).finally(() => {
-        this.active--;
-        this.drain();
-      });
+      this.inFlight++;
+      this.notify();
+
+      this.upload(item)
+        .catch((err) => {
+          console.warn("[UploadQueue] Evidence upload failed:", err);
+          if ((item.retries ?? 0) < MAX_RETRIES) {
+            const nextRetries = (item.retries ?? 0) + 1;
+            const delay = BASE_RETRY_DELAY_MS * Math.pow(2, nextRetries - 1);
+            setTimeout(() => {
+              this.queue.push({ ...item, retries: nextRetries });
+              this.drain();
+            }, delay);
+          }
+        })
+        .finally(() => {
+          this.inFlight--;
+          this.notify();
+          this.drain();
+        });
     }
   }
 
@@ -59,7 +94,7 @@ export class UploadQueue {
       console.log(`[UploadQueue] Presigning evidence upload for type: ${item.evidenceType}...`);
       const presignKey = `ev_presign_${this.sessionId}_${item.capturedAt}_${item.evidenceType}`;
       const res = await fetch(
-        `/api/test-sessions/${this.sessionId}/evidence/presign`,
+        getEndpointUrl(`/test-sessions/${this.sessionId}/evidence/presign`),
         {
           method: "POST",
           headers: {
@@ -89,7 +124,7 @@ export class UploadQueue {
       // Step 2: Proxy upload via backend (avoids browser→S3 CORS)
       const encodedPath = encodeURIComponent(storagePath);
       const proxyRes = await fetch(
-        `/api/test-sessions/${this.sessionId}/evidence/upload-proxy?path=${encodedPath}&contentType=image%2Fjpeg`,
+        getEndpointUrl(`/test-sessions/${this.sessionId}/evidence/upload-proxy?path=${encodedPath}&contentType=image%2Fjpeg`),
         {
           method: "POST",
           headers: {
@@ -107,7 +142,7 @@ export class UploadQueue {
       console.log(`[UploadQueue] Confirming evidence with backend path: ${storagePath}...`);
       const confirmKey = `ev_confirm_${this.sessionId}_${item.capturedAt}_${item.evidenceType}`;
       const confirmRes = await fetch(
-        `/api/test-sessions/${this.sessionId}/evidence/confirm`,
+        getEndpointUrl(`/test-sessions/${this.sessionId}/evidence/confirm`),
         {
           method: "POST",
           headers: {
@@ -129,7 +164,6 @@ export class UploadQueue {
       console.log(`[UploadQueue] Confirm response from backend:`, confirmData);
     };
 
-    // Exponential backoff retry (1s, 2s, 4s)
     let lastErr: unknown;
     for (let attempt_n = 0; attempt_n <= MAX_RETRIES; attempt_n++) {
       try {

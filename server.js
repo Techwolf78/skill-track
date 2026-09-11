@@ -1,15 +1,21 @@
 import http from 'http';
+import https from 'https';
 import fs from 'fs';
 import path from 'path';
-import { fileURLToPath } from 'url';
+import { fileURLToPath, URL } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const DIST_DIR = path.join(__dirname, 'dist');
 
-// GoDaddy Node.js Hosting automatically injects PORT (fallback to 8080)
+// GoDaddy / Node.js Hosting automatically injects PORT (fallback to 8080)
 const PORT = parseInt(process.env.PORT || '8080', 10);
 const HOST = '0.0.0.0';
+
+// Backend Proxy Target (defaults to production Airtel Cloud VM gateway)
+const BACKEND_URL = process.env.BACKEND_URL || 'https://api.gryphon360.com';
+const backendParsed = new URL(BACKEND_URL);
+const backendClient = backendParsed.protocol === 'https:' ? https : http;
 
 const MIME_TYPES = {
   '.html': 'text/html; charset=UTF-8',
@@ -37,6 +43,59 @@ const MIME_TYPES = {
 };
 
 const server = http.createServer((req, res) => {
+  const reqUrl = req.url || '/';
+
+  // =========================================================================
+  // 1. /api/* REVERSE PROXY ROUTING
+  // =========================================================================
+  if (reqUrl.startsWith('/api/') || reqUrl === '/api') {
+    // Strip /api prefix: /api/auth/login -> /auth/login
+    const targetPath = reqUrl.replace(/^\/api/, '') || '/';
+    const proxyHeaders = { ...req.headers };
+    proxyHeaders.host = backendParsed.host;
+
+    // Remove connection-specific headers
+    delete proxyHeaders['connection'];
+    delete proxyHeaders['keep-alive'];
+
+    const proxyReqOptions = {
+      protocol: backendParsed.protocol,
+      hostname: backendParsed.hostname,
+      port: backendParsed.port || (backendParsed.protocol === 'https:' ? 443 : 80),
+      method: req.method,
+      path: targetPath,
+      headers: proxyHeaders,
+      timeout: 30000,
+    };
+
+    const proxyReq = backendClient.request(proxyReqOptions, (proxyRes) => {
+      res.writeHead(proxyRes.statusCode || 500, proxyRes.headers);
+      proxyRes.pipe(res);
+    });
+
+    proxyReq.on('error', (err) => {
+      console.error(`[API Proxy Error] ${req.method} ${targetPath} ->`, err.message);
+      if (!res.headersSent) {
+        res.writeHead(502, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: false, status: 502, message: 'Bad Gateway: backend unreachable' }));
+      }
+    });
+
+    proxyReq.on('timeout', () => {
+      proxyReq.destroy();
+      if (!res.headersSent) {
+        res.writeHead(504, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: false, status: 504, message: 'Gateway Timeout: backend timed out' }));
+      }
+    });
+
+    req.pipe(proxyReq);
+    return;
+  }
+
+  // =========================================================================
+  // 2. STATIC ASSETS & SPA ROUTING
+  // =========================================================================
   if (req.method !== 'GET' && req.method !== 'HEAD') {
     res.writeHead(405, { 'Content-Type': 'text/plain' });
     res.end('Method Not Allowed');
@@ -44,7 +103,7 @@ const server = http.createServer((req, res) => {
   }
 
   // Extract clean pathname without query params
-  let reqPath = decodeURI((req.url || '/').split('?')[0]);
+  let reqPath = decodeURI(reqUrl.split('?')[0]);
   if (reqPath === '/') {
     reqPath = '/index.html';
   }
@@ -103,5 +162,6 @@ const server = http.createServer((req, res) => {
 });
 
 server.listen(PORT, HOST, () => {
-  console.log(`Server listening on http://${HOST}:${PORT}`);
+  console.log(`Frontend server running on http://${HOST}:${PORT}`);
+  console.log(`API proxy routing /api/* -> ${BACKEND_URL}/*`);
 });

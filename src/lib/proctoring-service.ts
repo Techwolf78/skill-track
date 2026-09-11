@@ -125,8 +125,12 @@ export const proctoringService = {
   proxyUpload: async (sessionId: string, storagePath: string, blob: Blob): Promise<void> => {
     const token = localStorage.getItem("token");
     const encodedPath = encodeURIComponent(storagePath);
+    const base = (apiClient.defaults.baseURL || "").replace(/\/+$/, "");
+    const cleanPath = `/test-sessions/${sessionId}/evidence/upload-proxy?path=${encodedPath}&contentType=${encodeURIComponent(blob.type || "image/jpeg")}`;
+    const uploadUrl = base.startsWith("http") ? `${base}${cleanPath}` : `/api${cleanPath}`;
+
     const res = await fetch(
-      `/api/test-sessions/${sessionId}/evidence/upload-proxy?path=${encodedPath}&contentType=${encodeURIComponent(blob.type || "image/jpeg")}`,
+      uploadUrl,
       {
         method: "POST",
         headers: {

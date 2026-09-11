@@ -161,7 +161,7 @@ export default function NewAdminSettings() {
   }
 
   const userOrg = profile?.organisation?.name || authUser?.organisationData?.name || "Gryphon Academy";
-  const userEmail = profile?.email || authUser?.email || "admin@gryphonacademy.co.in";
+  const userEmail = profile?.email || authUser?.email || "admin@gryphon360.com";
 
   return (
     <div className="w-full max-w-5xl mx-auto py-4 px-2 md:px-6 space-y-4">

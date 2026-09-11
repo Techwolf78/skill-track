@@ -18,7 +18,6 @@ if (sentryDsn) {
     tracePropagationTargets: [
       "localhost",
       /^https:\/\/api\.gryphon360\.com/,
-      /^https:\/\/api\.gryphonacademy\.co\.in/,
     ],
     // Session Replay
     replaysSessionSampleRate: 0.1,
