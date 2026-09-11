@@ -20,6 +20,7 @@ import { getRedirectPathForRole } from "@/lib/auth-utils";
 import { useAuth } from "@/lib/auth-context";
 import { validateLoginForm } from "@/lib/auth/formValidation";
 import { cn } from "@/lib/utils";
+import { GryphonLogo } from "@/components/ui/GryphonLogo";
 
 const features = [
   "MCQ & Coding Assessments",
@@ -114,11 +115,7 @@ export default function Login() {
 
         <div className="relative z-10">
           <div className="flex items-center gap-3 mb-2">
-            <img
-              src="/Gryphon360logo.png"
-              alt="Gryphon 360"
-              className="h-12 w-auto object-contain shrink-0"
-            />
+            <GryphonLogo variant="dark" size="xl" />
           </div>
           <p className="text-white/60 text-sm">Skill Assessment Platform</p>
         </div>

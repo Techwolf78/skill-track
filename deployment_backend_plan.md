@@ -12,7 +12,7 @@
 |---|---|---|---|
 | **VM 1 (App Server)** | Spring Boot 4 + Redis + Nginx | 4 vCPU, 16 GB RAM, 100 GB SSD | `ccs.xlarge` |
 | **VM 2 (Database Server)** | PostgreSQL 16 Database | 2 vCPU, 8 GB RAM, 100 GB SSD | `ccs.Large_2vCPU_8Gb` |
-| **Public IP** | Point your domain (`api.yourdomain.com`) | 1 Static IP | `internet.publicip` |
+| **Public IP** | Point your domain (`api.gryphon360.com`) | 1 Static IP | `internet.publicip` |
 | **Object Storage** | Candidate photos / audio recordings | 250 GB Storage | `objsto.stalow` |
 | **Backup Storage** | Automated DB backups | 300 GB Storage | `bac.activate` |
 
@@ -130,7 +130,7 @@ sudo systemctl start rxone
 1. Create `/etc/nginx/sites-available/rxone`:
 ```nginx
 server {
-    server_name api.yourdomain.com;
+    server_name api.gryphon360.com;
 
     location / {
         proxy_pass http://127.0.0.1:8081;
@@ -152,7 +152,7 @@ server {
 ```bash
 sudo ln -s /etc/nginx/sites-available/rxone /etc/nginx/sites-enabled/
 sudo nginx -t && sudo systemctl reload nginx
-sudo certbot --nginx -d api.yourdomain.com
+sudo certbot --nginx -d api.gryphon360.com
 ```
 
 ---

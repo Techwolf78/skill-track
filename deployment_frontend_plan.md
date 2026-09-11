@@ -2,7 +2,7 @@
 
 **Application**: RxOne SkillTrack Client (`skill-track`)  
 **Target Host**: Vercel / Cloudflare Pages / Static CDN  
-**Backend API Gateway**: `https://api.yourdomain.com` (Airtel Cloud VM 1)
+**Backend API Gateway**: `https://api.gryphon360.com` (Airtel Cloud VM 1)
 
 ---
 
@@ -18,10 +18,10 @@ Create `.env.production` in the root of the frontend project:
 
 ```env
 # Point directly to your Airtel Cloud backend public domain / IP
-VITE_API_BASE_URL=https://api.yourdomain.com
+VITE_API_BASE_URL=https://api.gryphon360.com
 
 # WebSocket feed endpoint for real-time live proctoring
-VITE_WS_BASE_URL=wss://api.yourdomain.com
+VITE_WS_BASE_URL=wss://api.gryphon360.com
 
 # Production Mode
 VITE_APP_ENV=production
@@ -51,8 +51,8 @@ export const apiClient = axios.create({
    vercel
    ```
 2. Set Environment Variables in Vercel Project Settings:
-   * `VITE_API_BASE_URL` = `https://api.yourdomain.com`
-   * `VITE_WS_BASE_URL` = `wss://api.yourdomain.com`
+   * `VITE_API_BASE_URL` = `https://api.gryphon360.com`
+   * `VITE_WS_BASE_URL` = `wss://api.gryphon360.com`
 3. Configure `vercel.json` for React Single Page Application (SPA) routing:
    ```json
    {
@@ -92,8 +92,8 @@ This produces the optimized production bundle inside the `dist/` directory.
 
 ## 5. Deployment Verification Checklist
 
-- [ ] `.env.production` contains valid `VITE_API_BASE_URL=https://api.yourdomain.com`.
+- [ ] `.env.production` contains valid `VITE_API_BASE_URL=https://api.gryphon360.com`.
 - [ ] Backend CORS on Airtel VM 1 allows `https://your-frontend-app.vercel.app` and custom domain.
 - [ ] SPA rewrite rules configured (`/index.html` fallback on all 404s).
 - [ ] Preflight hardware checks (Webcam, Mic, Fullscreen) pass in candidate flow.
-- [ ] Real-time Proctoring feeds connect over `wss://api.yourdomain.com`.
+- [ ] Real-time Proctoring feeds connect over `wss://api.gryphon360.com`.

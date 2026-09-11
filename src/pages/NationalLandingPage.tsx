@@ -39,6 +39,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { GryphonLogo } from "@/components/ui/GryphonLogo";
 
 const features = [
   {
@@ -572,15 +573,13 @@ export default function NationalLandingPage() {
           >
             {/* Brand Logo / Icon */}
             <div
-              className={`flex items-center cursor-pointer ${
-                activeLayout === "vertical" ? "flex-col gap-1.5" : "gap-2.5"
-              }`}
+              className="flex items-center cursor-pointer hover:opacity-90 transition-opacity"
               onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
             >
-              <img
-                src="/Gryphon360logo.png"
-                alt="Gryphon 360"
-                className="h-8 w-auto object-contain shrink-0"
+              <GryphonLogo
+                variant="dark"
+                size={activeLayout === "vertical" ? "sm" : "md"}
+                iconOnly={activeLayout === "vertical"}
               />
             </div>
 
@@ -1938,11 +1937,7 @@ export default function NationalLandingPage() {
             {/* Brand column */}
             <div className="lg:col-span-2 space-y-5">
               <div className="flex items-center gap-3">
-                <img
-                  src="/Gryphon360logo.png"
-                  alt="Gryphon 360"
-                  className="h-9 w-auto object-contain shrink-0"
-                />
+                <GryphonLogo variant="dark" size="lg" />
               </div>
               <p className="text-sm text-slate-400 leading-relaxed max-w-sm">
                 India's premier skill assessment platform, trusted by colleges,

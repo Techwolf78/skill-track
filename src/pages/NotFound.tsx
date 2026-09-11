@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useAuth } from "@/lib/auth-context";
 import { ROLES } from "@/lib/roles";
+import { GryphonLogo } from "@/components/ui/GryphonLogo";
 
 const NotFound = () => {
   const location = useLocation();
@@ -88,11 +89,7 @@ const NotFound = () => {
       <div className="relative z-10 flex min-h-screen flex-col items-center justify-center px-4 py-16">
         {/* Logo */}
         <div className="mb-8 flex items-center gap-3">
-          <img
-            src="/Gryphon360logo.png"
-            alt="Gryphon 360"
-            className="h-10 w-auto object-contain shrink-0"
-          />
+          <GryphonLogo variant="auto" size="lg" />
         </div>
 
 {/* Animated 404 text with gradient */}
