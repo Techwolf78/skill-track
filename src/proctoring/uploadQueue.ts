@@ -119,23 +119,47 @@ export class UploadQueue {
 
       console.log(`[UploadQueue] Full Presigned URL (for path only):\n${signedUrl}`);
       console.log(`[UploadQueue] S3 Storage Target Key:\n${storagePath}`);
-      console.log(`[UploadQueue] Uploading JPEG buffer via backend proxy...`);
-
-      // Step 2: Proxy upload via backend (avoids browser→S3 CORS)
-      const encodedPath = encodeURIComponent(storagePath);
-      const proxyRes = await fetch(
-        getEndpointUrl(`/test-sessions/${this.sessionId}/evidence/upload-proxy?path=${encodedPath}&contentType=image%2Fjpeg`),
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/octet-stream",
-            ...authHeaders,
-          },
-          body: item.buffer,
+      // Step 2: Upload directly to S3 via presigned PUT URL, with fallback to backend proxy if S3 CORS fails
+      let uploadSuccess = false;
+      if (signedUrl && (signedUrl.startsWith("http://") || signedUrl.startsWith("https://"))) {
+        try {
+          console.log(`[UploadQueue] Attempting direct S3 PUT upload...`);
+          const s3Res = await fetch(signedUrl, {
+            method: "PUT",
+            headers: {
+              "Content-Type": "image/jpeg",
+            },
+            body: item.buffer,
+          });
+          if (s3Res.ok) {
+            uploadSuccess = true;
+            console.log(`[UploadQueue] Direct S3 upload success! Image stored at: ${storagePath}`);
+          } else {
+            console.warn(`[UploadQueue] Direct S3 upload returned status ${s3Res.status}, falling back to proxy`);
+          }
+        } catch (err) {
+          console.warn("[UploadQueue] Direct S3 upload network/CORS issue, falling back to proxy:", err);
         }
-      );
-      if (!proxyRes.ok) throw new Error(`Proxy upload failed: ${proxyRes.status}`);
-      console.log(`[UploadQueue] Proxy upload success! Image stored at: ${storagePath}`);
+      }
+      // Fallback: Proxy upload via backend if direct S3 upload did not succeed
+      if (!uploadSuccess) {
+        console.log(`[UploadQueue] Uploading JP
+          EG buffer via backend proxy fallback...`);
+        const encodedPath = encodeURIComponent(storagePath);
+        const proxyRes = await fetch(
+          getEndpointUrl(`/test-sessions/${this.sessionId}/evidence/upload-proxy?path=${encodedPath}&contentType=image%2Fjpeg`),
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/octet-stream",
+              ...authHeaders,
+            },
+            body: item.buffer,
+          }
+        );
+        if (!proxyRes.ok) throw new Error(`Proxy upload failed: ${proxyRes.status}`);
+        console.log(`[UploadQueue] Proxy upload success! Image stored at: ${storagePath}`);
+      }
 
 
       // Step 3: Confirm evidence record in DB with deterministic key
@@ -187,6 +211,6 @@ export class UploadQueue {
   }
 
   get pendingCount() {
-    return this.queue.length + this.active;
+    return this.queue.length + this.inFlight;
   }
 }
