@@ -11,8 +11,9 @@ import {
 
 
 const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL ||
-  (import.meta.env.PROD ? "https://api.gryphon360.com" : "http://localhost:8080");
+  import.meta.env.VITE_API_BASE_URL !== undefined && import.meta.env.VITE_API_BASE_URL !== ""
+    ? import.meta.env.VITE_API_BASE_URL
+    : (import.meta.env.PROD ? "https://api.gryphon360.com" : "");
 
 export const apiClient = axios.create({
   baseURL: API_BASE_URL,
