@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
+import { QuestionImage } from "@/components/ui/QuestionImage";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -69,6 +70,7 @@ interface Question {
   hints?: string[];
   tags?: string[];
   title?: string;
+  imageUrl?: string;
 }
 
 interface RawPaperQuestion {
@@ -79,6 +81,7 @@ interface RawPaperQuestion {
   type: "MCQ" | "CODING";
   prompt: string;
   sectionName?: string;
+  imageUrl?: string;
   options?: unknown[];
   coding?: {
     timeLimitSecs?: number;
@@ -488,6 +491,7 @@ function TestInterfaceContent({ testId, sessionId, navigate, toast }: { testId?:
               questionType: q.type,
               prompt: q.prompt,
               marks: q.marks,
+              imageUrl: q.imageUrl,
               mcqOptions: q.options as { text: string; isCorrect: boolean }[] || [],
               sampleInput: q.coding?.examples?.[0]?.input || "",
               sampleOutput: q.coding?.examples?.[0]?.expectedOutput || "",
@@ -616,6 +620,7 @@ useEffect(() => {
           hints: tq.question?.hints,
           tags: tq.question?.tags,
           title: tq.question?.title,
+          imageUrl: (tq.question as { imageUrl?: string })?.imageUrl,
         };
       });
     
@@ -1710,6 +1715,17 @@ useEffect(() => {
                     </Button>
                   </div>
 
+                  {currentQuestion.imageUrl && (
+                    <div className="mt-2">
+                      <QuestionImage
+                        src={currentQuestion.imageUrl}
+                        alt="Question diagram"
+                        enableZoom={true}
+                        className="max-w-full max-h-96 rounded-lg object-contain"
+                      />
+                    </div>
+                  )}
+
                   {currentQuestion.type === "MCQ" && currentQuestion.options && (
                     <div className="space-y-4">
                       <RadioGroup
@@ -1718,28 +1734,41 @@ useEffect(() => {
                         className="space-y-2 pt-2"
                       >
                         {currentQuestion.options.map((optionItem: unknown, idx: number) => {
-                          const option = optionItem as { id?: string; text?: string } | string;
+                          const option = optionItem as { id?: string; text?: string; imageUrl?: string } | string;
                           const optionId = (typeof option === "object" && option !== null ? (option.id || option.text || "") : option) as string;
                           const optionText = (typeof option === "object" && option !== null ? (option.text || "") : option) as string;
+                          const optionImageUrl = typeof option === "object" && option !== null ? option.imageUrl : undefined;
                           return (
                             <Label 
                               key={idx} 
                               className={cn(
-                                "flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-all",
+                                "flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-all",
                                 answers[currentQuestion.id] === optionId 
                                    ? "border-primary bg-primary/5 ring-1 ring-primary" 
                                    : "border-border hover:bg-muted/50 hover:border-primary/30"
                               )}
                             >
-                              <RadioGroupItem value={optionId} id={`option-${idx}`} />
-                              {/<[a-z][\s\S]*>/i.test(optionText) ? (
-                                <span
-                                  className="text-sm prose prose-sm max-w-none [&_p]:inline [&_p]:my-0"
-                                  dangerouslySetInnerHTML={{ __html: optionText }}
-                                />
-                              ) : (
-                                <span className="text-sm">{optionText}</span>
-                              )}
+                              <RadioGroupItem value={optionId} id={`option-${idx}`} className="mt-0.5" />
+                              <div className="flex-1 min-w-0">
+                                {/<[a-z][\s\S]*>/i.test(optionText) ? (
+                                  <span
+                                    className="text-sm prose prose-sm max-w-none [&_p]:inline [&_p]:my-0"
+                                    dangerouslySetInnerHTML={{ __html: optionText }}
+                                  />
+                                ) : (
+                                  <span className="text-sm">{optionText}</span>
+                                )}
+                                {optionImageUrl && (
+                                  <div className="mt-2">
+                                    <QuestionImage
+                                      src={optionImageUrl}
+                                      alt={`Option ${idx + 1}`}
+                                      enableZoom={true}
+                                      className="max-h-40 rounded object-contain bg-muted/20"
+                                    />
+                                  </div>
+                                )}
+                              </div>
                             </Label>
                           );
                         })}

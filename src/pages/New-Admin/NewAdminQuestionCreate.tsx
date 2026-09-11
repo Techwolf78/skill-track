@@ -42,6 +42,7 @@ import { PreFlightVerificationPanel } from "@/components/admin/PreFlightVerifica
 import { ValidateDriverResponse, QuestionBankStatus, mapFrontendToBackendLang } from "@/types/question";
 import { toast } from "sonner";
 import { RichTextEditor } from "@/components/ui/RichTextEditor";
+import { ImageUploadButton } from "@/components/ui/ImageUploadButton";
 import Editor from "@monaco-editor/react";
 
 const mapLanguageToMonaco = (lang: string): string => {
@@ -218,6 +219,7 @@ export default function NewAdminQuestionCreate() {
   const [title, setTitle] = useState(initialData.title || (isEditMode ? "Loading Problem..." : "Untitled Problem"));
   const [difficulty, setDifficulty] = useState<"EASY" | "MEDIUM" | "HARD">(initialData.difficulty || "MEDIUM");
   const [prompt, setPrompt] = useState("");
+  const [questionImageUrl, setQuestionImageUrl] = useState("");
   const [solvingTimeMins, setSolvingTimeMins] = useState(initialData.questionType === "CODING" ? "15" : "2");
   const [marks, setMarks] = useState(initialData.questionType === "CODING" ? 100 : 10);
   const [subjectId, setSubjectId] = useState("");
@@ -301,6 +303,7 @@ export default function NewAdminQuestionCreate() {
         if (!q) return;
         setTitle(q.title || "");
         setPrompt(q.prompt || "");
+        setQuestionImageUrl(q.imageUrl || (q as any).image_url || "");
         if (q.difficulty) setDifficulty(q.difficulty);
         if (q.marks !== undefined) setMarks(q.marks);
         if (q.avg_time_seconds) setSolvingTimeMins(String(Math.round(q.avg_time_seconds / 60)));
@@ -645,6 +648,7 @@ export default function NewAdminQuestionCreate() {
         isLanguageSpecific,
         testCases: validTestCases,
         tags: tags.length ? tags : undefined,
+        imageUrl: questionImageUrl || undefined,
         languageTemplates: langPayload,
         signatureMetadata: {
           method_name: signature.method_name || "solve",
@@ -684,6 +688,7 @@ export default function NewAdminQuestionCreate() {
         shuffleOptions,
         mcqOptions: filledOptions,
         tags: tags.length ? tags : undefined,
+        imageUrl: questionImageUrl || undefined,
       };
     }
 
@@ -971,6 +976,16 @@ export default function NewAdminQuestionCreate() {
               <p className="text-[11px] text-slate-400">Be as descriptive as possible, but no more.</p>
             </div>
 
+            {/* Question Image (optional) */}
+            <div className="space-y-1 pt-1">
+              <label className="block text-xs font-semibold text-slate-700">Question Image (optional)</label>
+              <ImageUploadButton
+                value={questionImageUrl}
+                onUploaded={setQuestionImageUrl}
+                label="Upload Image"
+              />
+            </div>
+
             {/* ── Coding Limits, Constraints & Explanation inside Problem Details ── */}
             {isCoding && (
               <div className="space-y-6 pt-2 border-t border-slate-100">
@@ -1165,6 +1180,16 @@ export default function NewAdminQuestionCreate() {
                             onChange={(html) => setOptionText(i, html)}
                             placeholder={`Option ${i + 1}`}
                             minHeight="36px"
+                          />
+                          <ImageUploadButton
+                            value={opt.imageUrl || ""}
+                            onUploaded={(url) =>
+                              setMcqOptions((opts) =>
+                                opts.map((o, idx) => (idx === i ? { ...o, imageUrl: url } : o))
+                              )
+                            }
+                            label="Add Image"
+                            className="mt-1"
                           />
                         </div>
                       </div>

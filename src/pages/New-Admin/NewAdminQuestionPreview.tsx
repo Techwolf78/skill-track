@@ -38,6 +38,7 @@ import { useAuth } from "@/lib/auth-context";
 import { testService, Question, McqOption, McqType } from "@/lib/test-service";
 import { apiClient } from "@/lib/api-client";
 import { mapFrontendToBackendLang } from "@/types/question";
+import { QuestionImage } from "@/components/ui/QuestionImage";
 import { toast } from "sonner";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -196,31 +197,38 @@ export default function NewAdminQuestionPreview() {
   const [overallStatus, setOverallStatus] = useState<string | null>(null);
   const [consoleOutput, setConsoleOutput] = useState<string>("");
 
+  const loadQuestion = (questionId: string) => {
+    if (!question) setLoading(true);
+    setError(null);
+    testService
+      .getQuestionById(questionId)
+      .then((data) => {
+        if (data) {
+          setQuestion(data);
+        } else {
+          setError("Question not found.");
+        }
+      })
+      .catch((err) => {
+        console.error("Failed to load question preview", err);
+        if (!question) {
+          setError("Failed to load question details: " + (err.response?.data?.message || err.message || "Unknown error"));
+        }
+      })
+      .finally(() => {
+        setLoading(false);
+      });
+  };
+
   useEffect(() => {
-    if (id && (!question || question.id !== id)) {
-      setLoading(true);
-      testService
-        .getQuestionById(id)
-        .then((data) => {
-          if (data) {
-            setQuestion(data);
-          } else {
-            setError("Question not found.");
-          }
-        })
-        .catch((err) => {
-          console.error("Failed to load question preview", err);
-          setError("Failed to load question details.");
-        })
-        .finally(() => {
-          setLoading(false);
-        });
+    if (id) {
+      loadQuestion(id);
     }
   }, [id]);
 
   // Load initial template when question or language changes
   useEffect(() => {
-    if (question && (question.questionType ?? "").toUpperCase() === "CODING") {
+    if (question && ((question.questionType || (question as any).type || "").toUpperCase() === "CODING")) {
       const templates = question.languageTemplates || {};
       const langKey = selectedLanguage === "python3" ? "python" : selectedLanguage;
       const tpl =
@@ -250,19 +258,30 @@ export default function NewAdminQuestionPreview() {
       <div className="min-h-screen bg-[#081225] flex flex-col items-center justify-center text-white p-4">
         <AlertCircle className="w-10 h-10 text-rose-400 mb-3" />
         <h2 className="text-lg font-bold text-slate-100 mb-1">Preview Unavailable</h2>
-        <p className="text-xs text-slate-400 mb-6">{error || "Could not retrieve question."}</p>
-        <button
-          onClick={() => navigate("/admin/library")}
-          className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded shadow transition-colors"
-        >
-          Return to Library
-        </button>
+        <p className="text-xs text-slate-400 mb-6 max-w-md text-center">{error || "Could not retrieve question."}</p>
+        <div className="flex items-center gap-3">
+          {id && (
+            <button
+              onClick={() => loadQuestion(id)}
+              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded shadow transition-colors cursor-pointer"
+            >
+              Retry
+            </button>
+          )}
+          <button
+            onClick={() => navigate("/admin/library")}
+            className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white text-xs font-semibold rounded shadow transition-colors cursor-pointer"
+          >
+            Return to Library
+          </button>
+        </div>
       </div>
     );
   }
 
-  const isCoding = (question.questionType ?? "").toUpperCase() === "CODING";
-  const mcqType = (question.mcqType ?? "SINGLE_CORRECT") as McqType;
+  const qType = ((question.questionType || (question as any).type || "") as string).toUpperCase();
+  const isCoding = qType === "CODING";
+  const mcqType = (question.mcqType || (question as any).type || "SINGLE_CORRECT") as McqType;
   const isMultipleCorrect =
     question.multipleCorrect ||
     mcqType === "MULTIPLE_CORRECT" ||
@@ -270,8 +289,8 @@ export default function NewAdminQuestionPreview() {
   const isAssertionReason = mcqType === "ASSERTION_REASON";
 
   // Parse assertion and reason if applicable
-  let assertion = question.assertion;
-  let reason = question.reason;
+  let assertion = (question as any).assertion;
+  let reason = (question as any).reason;
   if (isAssertionReason && (!assertion || !reason)) {
     const match = question.prompt?.match(/Assertion \(A\): (.*?)\.? Reason \(R\): (.*?)\.?$/);
     if (match) {
@@ -280,7 +299,20 @@ export default function NewAdminQuestionPreview() {
     }
   }
 
-  const options: McqOption[] = question.mcqOptions || (question as any).options || [];
+  const rawOptions = (question.mcqOptions || (question as any).options || []) as unknown[];
+  const options: McqOption[] = rawOptions.map((opt: unknown, idx: number) => {
+    if (typeof opt === "string") {
+      return { text: opt, isCorrect: false, displayOrder: idx };
+    }
+    const o = (typeof opt === "object" && opt !== null ? opt : {}) as Record<string, unknown>;
+    return {
+      id: (o.id as string) || undefined,
+      text: (o.text as string) || (o.optionText as string) || (o.value as string) || `Option ${String.fromCharCode(65 + idx)}`,
+      imageUrl: (o.imageUrl as string) || (o.image_url as string) || undefined,
+      isCorrect: Boolean(o.isCorrect ?? o.is_correct ?? o.correct),
+      displayOrder: (o.displayOrder as number) ?? (o.display_order as number) ?? idx,
+    };
+  });
 
   const handleToggleOption = (index: number) => {
     if (isMultipleCorrect) {
@@ -757,6 +789,18 @@ export default function NewAdminQuestionPreview() {
                   </div>
                 )}
 
+                {/* Question Image */}
+                {question.imageUrl && (
+                  <div className="pt-2">
+                    <QuestionImage
+                      src={question.imageUrl}
+                      alt="Question asset"
+                      enableZoom={true}
+                      className="max-w-full max-h-96 rounded-lg object-contain shadow-xs"
+                    />
+                  </div>
+                )}
+
                 {/* Constraints Section */}
                 {question.constraints && (
                   <div className="pt-2">
@@ -1140,16 +1184,28 @@ export default function NewAdminQuestionPreview() {
                                   : "border-[#232936]"
                               }`}
                             >
-                              {/<[a-z][\s\S]*>/i.test(opt.text || "") ? (
-                                <div
-                                  className="leading-relaxed select-none prose prose-invert prose-xs max-w-none text-xs font-mono [&_p]:my-0.5 [&_ol]:list-decimal [&_ol]:pl-4 [&_ul]:list-disc [&_ul]:pl-4 [&_code]:bg-slate-800 [&_code]:text-pink-400 [&_code]:px-1 [&_code]:py-0.5 [&_code]:rounded-xs"
-                                  dangerouslySetInnerHTML={{ __html: opt.text || "" }}
-                                />
-                              ) : (
-                                <span className="leading-relaxed select-none">
-                                  {opt.text || `Option ${String.fromCharCode(65 + idx)}`}
-                                </span>
-                              )}
+                              <div className="flex-1 min-w-0">
+                                {/<[a-z][\s\S]*>/i.test(opt.text || "") ? (
+                                  <div
+                                    className="leading-relaxed select-none prose prose-invert prose-xs max-w-none text-xs font-mono [&_p]:my-0.5 [&_ol]:list-decimal [&_ol]:pl-4 [&_ul]:list-disc [&_ul]:pl-4 [&_code]:bg-slate-800 [&_code]:text-pink-400 [&_code]:px-1 [&_code]:py-0.5 [&_code]:rounded-xs"
+                                    dangerouslySetInnerHTML={{ __html: opt.text || "" }}
+                                  />
+                                ) : (
+                                  <span className="leading-relaxed select-none">
+                                    {opt.text || `Option ${String.fromCharCode(65 + idx)}`}
+                                  </span>
+                                )}
+                                {opt.imageUrl && (
+                                  <div className="mt-2">
+                                    <QuestionImage
+                                      src={opt.imageUrl}
+                                      alt={`Option ${String.fromCharCode(65 + idx)} image`}
+                                      enableZoom={true}
+                                      className="max-h-36 rounded object-contain bg-black/40 p-1"
+                                    />
+                                  </div>
+                                )}
+                              </div>
 
                               {showAnswerKey && isCorrectOption && (
                                 <span className="ml-3 shrink-0 px-2 py-0.5 bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 text-[10px] font-sans font-bold uppercase rounded">

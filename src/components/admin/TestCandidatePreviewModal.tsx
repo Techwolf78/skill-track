@@ -11,6 +11,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { QuestionImage } from "@/components/ui/QuestionImage";
 import {
   Clock,
   Code2,
@@ -480,6 +481,18 @@ export function TestCandidatePreviewModal({
                           {currentQ.prompt}
                         </p>
                       )}
+
+                      {/* Question Image */}
+                      {currentQ?.imageUrl && (
+                        <div className="mt-3">
+                          <QuestionImage
+                            src={currentQ.imageUrl}
+                            alt="Question asset"
+                            enableZoom={true}
+                            className="max-w-full max-h-96 rounded-lg object-contain"
+                          />
+                        </div>
+                      )}
                     </div>
 
                     <Button
@@ -546,10 +559,11 @@ export function TestCandidatePreviewModal({
                                 {String.fromCharCode(65 + idx)}.
                               </span>
                               {opt.imageUrl && (
-                                <img
+                                <QuestionImage
                                   src={opt.imageUrl}
                                   alt={opt.text}
-                                  className="w-10 h-10 object-cover rounded border"
+                                  enableZoom={true}
+                                  className="w-10 h-10 object-cover rounded"
                                 />
                               )}
                               <span className="text-sm flex-1">{opt.text}</span>
@@ -636,10 +650,11 @@ export function TestCandidatePreviewModal({
                                   {String.fromCharCode(65 + idx)}.
                                 </span>
                                 {opt.imageUrl && (
-                                  <img
+                                  <QuestionImage
                                     src={opt.imageUrl}
                                     alt={opt.text}
-                                    className="w-10 h-10 object-cover rounded border"
+                                    enableZoom={true}
+                                    className="w-10 h-10 object-cover rounded"
                                   />
                                 )}
                                 <span className="text-sm flex-1">{opt.text}</span>

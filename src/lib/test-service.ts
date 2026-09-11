@@ -750,6 +750,20 @@ export const testService = {
     return unwrapArrayResponse<Question>(response);
   },
 
+  /**
+   * Upload an image (question prompt image or MCQ option image) to S3.
+   * Returns the public URL to store as imageUrl.
+   */
+  uploadQuestionAsset: async (file: File): Promise<string> => {
+    const formData = new FormData();
+    formData.append("file", file);
+    const response = await apiClient.post<{ url: string }>("/questions/assets/upload", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+    const data = unwrapResponse(response);
+    return (data as { url: string }).url;
+  },
+
   updateQuestion: async (
     id: string,
     dto: UpdateQuestionRequest,

@@ -36,6 +36,7 @@ import {
   AlertCircle,
 } from "lucide-react";
 import { Question, McqType } from "@/lib/test-service";
+import { QuestionImage } from "@/components/ui/QuestionImage";
 
 interface QuestionPreviewProps {
   question: Question | null;
@@ -223,13 +224,11 @@ export function QuestionPreview({ question, open, onOpenChange }: QuestionPrevie
                 <div className="flex-1">
                   {isImageBased && option.imageUrl && (
                     <div className="flex items-center gap-3">
-                      <img 
+                      <QuestionImage 
                         src={option.imageUrl} 
                         alt={option.text}
+                        enableZoom={true}
                         className="w-12 h-12 object-cover rounded"
-                        onError={(e) => {
-                          (e.target as HTMLImageElement).src = "/api/placeholder/48/48";
-                        }}
                       />
                       <span>{option.text}</span>
                     </div>
@@ -577,6 +576,16 @@ export function QuestionPreview({ question, open, onOpenChange }: QuestionPrevie
                   />
                 ) : (
                   <p className="text-base whitespace-pre-wrap">{question.prompt}</p>
+                )}
+                {question.imageUrl && (
+                  <div className="mt-4 pt-3 border-t border-border">
+                    <QuestionImage
+                      src={question.imageUrl}
+                      alt="Question asset"
+                      enableZoom={true}
+                      className="max-w-full max-h-96 rounded-lg object-contain"
+                    />
+                  </div>
                 )}
               </div>
             </div>

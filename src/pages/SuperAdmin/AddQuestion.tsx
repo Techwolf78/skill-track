@@ -66,6 +66,7 @@ import {
 } from "../../types/question";
 import { PreFlightVerificationPanel } from "@/components/admin/PreFlightVerificationPanel";
 import { useToast } from "@/hooks/use-toast";
+import { ImageUploadButton } from "@/components/ui/ImageUploadButton";
 import QuickManageSubjects from "@/components/QuickManageSubjects";
 import {
   Tooltip,
@@ -219,6 +220,7 @@ export default function AddQuestion() {
   const [selectedTopic, setSelectedTopic] = useState("");
   const [selectedSubtopic, setSelectedSubtopic] = useState("");
   const [prompt, setPrompt] = useState("");
+  const [questionImageUrl, setQuestionImageUrl] = useState("");
   const [marks, setMarks] = useState<number>(5);
   const [title, setTitle] = useState("");
   const [difficulty, setDifficulty] = useState<"EASY" | "MEDIUM" | "HARD">(
@@ -871,6 +873,7 @@ public:
         marks: marks,
         difficulty: difficulty,
         visibility: visibility,
+        imageUrl: questionImageUrl || undefined,
         // Extended Enterprise Metadata
         domain: undefined,
         cognitiveLevel: undefined,
@@ -1151,31 +1154,13 @@ public:
                 </div>
 
                 {isImageBasedMcq() && (
-                  <div className="space-y-2">
-                    <Label className="text-xs">Option Image URL</Label>
-                    <div className="flex gap-2">
-                      <Input
-                        value={option.imageUrl || ""}
-                        onChange={(e) =>
-                          handleMcqOptionImageChange(index, e.target.value)
-                        }
-                        placeholder="https://example.com/image.jpg"
-                        className="flex-1 text-sm"
-                      />
-                      {option.imageUrl && (
-                        <div className="w-16 h-16 border rounded overflow-hidden">
-                          <img
-                            src={option.imageUrl}
-                            alt={`Option ${index + 1}`}
-                            className="w-full h-full object-cover"
-                            onError={(e) => {
-                              (e.target as HTMLImageElement).src =
-                                "/api/placeholder/64/64";
-                            }}
-                          />
-                        </div>
-                      )}
-                    </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Option Image</Label>
+                    <ImageUploadButton
+                      value={option.imageUrl || ""}
+                      onUploaded={(url) => handleMcqOptionImageChange(index, url)}
+                      label="Upload Option Image"
+                    />
                   </div>
                 )}
               </div>
@@ -1483,6 +1468,17 @@ public:
                   />
                 </div>
               )}
+
+              {/* Question Image URL */}
+              {/* Question Image */}
+              <div className="space-y-2">
+                <Label>Question Image (optional)</Label>
+                <ImageUploadButton
+                  value={questionImageUrl}
+                  onUploaded={setQuestionImageUrl}
+                  label="Upload Question Image"
+                />
+              </div>
               {/* Assertion & Reason Inputs */}
               {/* Assertion & Reason Inputs */}
               {questionType === "MCQ" && mcqSubType === "ASSERTION_REASON" && (
