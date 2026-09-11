@@ -14,6 +14,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { authService } from "@/lib/auth-service";
 import { getDedicatedSkeleton } from "@/components/ui/DedicatedSkeletons";
+import { GryphonLogo } from "@/components/ui/GryphonLogo";
 
 const navItems = [
   { icon: LayoutDashboard, label: "Dashboard", path: "/candidate", end: true },
@@ -48,19 +49,11 @@ export function CandidateLayout() {
           "flex px-6 py-6 border-b border-sidebar-border",
           collapsed ? "flex-col items-center gap-4" : "items-center justify-between"
         )}>
-          {collapsed ? (
-            <img
-              src="/Gryphon360logoFavicon1.png"
-              alt="Gryphon 360"
-              className="h-8 w-8 object-contain shrink-0"
-            />
-          ) : (
-            <img
-              src="/Gryphon360logo.png"
-              alt="Gryphon 360"
-              className="h-8 w-auto object-contain shrink-0"
-            />
-          )}
+          <GryphonLogo
+            variant="dark"
+            size={collapsed ? "sm" : "md"}
+            iconOnly={collapsed}
+          />
           
           {/* Toggle Button */}
           <button

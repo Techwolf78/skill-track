@@ -23,6 +23,7 @@ import { useAuth } from "@/lib/auth-context";
 import { testService, Test, TestQuestion, TestScheduleExtended } from "@/lib/test-service";
 import NewCandidateOnboardingWizard from "./NewCandidateOnboardingWizard";
 import { apiClient } from "@/lib/api-client";
+import { GryphonLogo } from "@/components/ui/GryphonLogo";
 import { useToast } from "@/hooks/use-toast";
 import {
   Card,
@@ -832,7 +833,7 @@ export default function NewCandidateTestWelcome({
       <header className="h-16 bg-[#081225] text-white px-4 md:px-8 flex items-center justify-between border-b border-[#142340] shrink-0 sticky top-0 z-30 shadow-md">
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2 cursor-pointer" onClick={() => navigate("/")}>
-            <img src="/Gryphon360logo.png" alt="Gryphon 360" className="h-10 md:h-11 w-auto object-contain shrink-0" />
+            <GryphonLogo variant="dark" size="sm" />
           </div>
           <div className="h-4 w-px bg-slate-700 hidden sm:block" />
           <span className="text-xs md:text-sm text-slate-300 font-medium truncate max-w-[200px] sm:max-w-md">

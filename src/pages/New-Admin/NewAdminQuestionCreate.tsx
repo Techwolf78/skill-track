@@ -43,6 +43,7 @@ import { ValidateDriverResponse, QuestionBankStatus, mapFrontendToBackendLang } 
 import { toast } from "sonner";
 import { RichTextEditor } from "@/components/ui/RichTextEditor";
 import { ImageUploadButton } from "@/components/ui/ImageUploadButton";
+import { GryphonLogo } from "@/components/ui/GryphonLogo";
 import Editor from "@monaco-editor/react";
 
 const mapLanguageToMonaco = (lang: string): string => {
@@ -735,11 +736,7 @@ export default function NewAdminQuestionCreate() {
             onClick={() => navigate("/admin/library")}
             className="flex items-center gap-2 cursor-pointer group"
           >
-            <img
-              src="/Gryphon360logo.png"
-              alt="Gryphon 360"
-              className="h-12 md:h-14 w-auto object-contain shrink-0 hover:opacity-95 transition-opacity"
-            />
+            <GryphonLogo variant="dark" size="md" />
           </div>
 
           <div className="h-5 w-[1px] bg-slate-700 mx-1" />

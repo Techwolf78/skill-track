@@ -19,6 +19,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useAuth } from "@/lib/auth-context";
+import { GryphonLogo } from "@/components/ui/GryphonLogo";
 
 export default function NewAdminLayout() {
   const location = useLocation();
@@ -66,11 +67,7 @@ export default function NewAdminLayout() {
               className="flex items-center gap-2 cursor-pointer group"
             >
               {/* Gryphon360 Brand Logo */}
-              <img
-                src="/Gryphon360logo.png"
-                alt="Gryphon 360"
-                className="h-12 md:h-14 w-auto object-contain shrink-0 hover:opacity-95 transition-opacity"
-              />
+              <GryphonLogo variant="dark" size="md" />
             </div>
 
             {/* Vertical Divider Line */}

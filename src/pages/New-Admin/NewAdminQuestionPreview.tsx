@@ -40,6 +40,7 @@ import { apiClient } from "@/lib/api-client";
 import { mapFrontendToBackendLang } from "@/types/question";
 import { QuestionImage } from "@/components/ui/QuestionImage";
 import { toast } from "sonner";
+import { GryphonLogo } from "@/components/ui/GryphonLogo";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -601,11 +602,7 @@ export default function NewAdminQuestionPreview() {
             onClick={() => navigate("/admin/library")}
             className="flex items-center gap-2 cursor-pointer group shrink-0"
           >
-            <img
-              src="/Gryphon360logo.png"
-              alt="Gryphon 360"
-              className="h-12 md:h-14 w-auto object-contain shrink-0 hover:opacity-95 transition-opacity"
-            />
+            <GryphonLogo variant="dark" size="md" />
           </div>
 
           <div className="h-5 w-[1px] bg-slate-700 mx-1 shrink-0" />

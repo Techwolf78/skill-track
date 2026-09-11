@@ -28,6 +28,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useAuth } from "@/lib/auth-context";
+import { GryphonLogo } from "@/components/ui/GryphonLogo";
 import { useQuestionsQuery } from "@/hooks/use-query-hooks";
 import { testService, Question, Test } from "@/lib/test-service";
 import { toast } from "sonner";
@@ -296,11 +297,7 @@ export default function NewAdminTestAddProblems() {
             onClick={() => navigate(`/admin/tests/edit/${id}`)}
             className="flex items-center gap-2 cursor-pointer group shrink-0"
           >
-            <img
-              src="/Gryphon360logo.png"
-              alt="Gryphon 360"
-              className="h-12 md:h-14 w-auto object-contain shrink-0 hover:opacity-95 transition-opacity"
-            />
+            <GryphonLogo variant="dark" size="md" />
           </div>
 
           <div className="h-5 w-[1px] bg-slate-700 mx-1 shrink-0" />
