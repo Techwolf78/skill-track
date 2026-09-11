@@ -17,7 +17,7 @@ export default defineConfig(({ mode }) => {
       },
       proxy: {
         "/api": {
-          target: env.BACKEND_URL || "https://api.gryphon360.com",
+          target: env.BACKEND_URL || (mode === "production" ? "https://api.gryphon360.com" : "http://localhost:8080"),
           changeOrigin: true,
           secure: false,
           rewrite: (path) => path.replace(/^\/api/, ""),
