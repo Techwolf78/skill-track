@@ -76,6 +76,21 @@ const DifficultyIcon = ({ level }: { level?: string }) => {
   );
 };
 
+const decodeHtmlIfNeeded = (html: string): string => {
+  if (!html) return "";
+  if (/&lt;\s*\/?\s*(?:p|h[1-6]|ul|ol|li|code|pre|div|span|strong|em|table|tr|td|th|b|i)\b/i.test(html)) {
+    const txt = document.createElement("textarea");
+    txt.innerHTML = html;
+    let decoded = txt.value;
+    if (/&lt;\s*\/?\s*(?:p|h[1-6]|ul|ol|li|code|pre|div|span|strong|em|table|tr|td|th|b|i)\b/i.test(decoded)) {
+      txt.innerHTML = decoded;
+      decoded = txt.value;
+    }
+    return decoded;
+  }
+  return html;
+};
+
 const getDefaultCode = (language: string, questionTitle?: string): string => {
   const defaultCodes: Record<string, string> = {
     python3: `# ${questionTitle || "Write your solution here"}
@@ -359,7 +374,7 @@ export default function NewAdminQuestionPreview() {
 
       const sampleCases = isVerify
         ? (question.testCases || [])
-        : (question.testCases?.filter((tc) => !tc.isHidden) || []);
+        : (question.testCases?.filter((tc: any) => (tc.sample === true || tc.isSample === true) && !tc.isHidden) || []);
 
       const mappedResults = resultsArray.map((res: any, idx: number) => ({
         status: res.status || "ACCEPTED",
@@ -418,60 +433,60 @@ export default function NewAdminQuestionPreview() {
     toast.info("Reset code to default template.");
   };
 
-  // Robust sample testcases resolver supporting multiple schema variants, prompt extraction, and topic fallbacks
+  // Robust sample testcases resolver prioritizing actual question test cases and prompt examples
   const getSampleTestcases = (q: any) => {
     const list: Array<{ input: string; output: string; explanation?: string }> = [];
 
-    // 1. Check direct examples array (handles various key aliases)
-    const rawExamples =
-      q?.examples ||
-      q?.coding?.examples ||
-      (Array.isArray(q?.coding?.examples?.data) ? q.coding.examples.data : null);
+    // 1. Check testCases / testcases array
+    const rawCases =
+      q?.testCases ||
+      q?.testcases ||
+      q?.test_cases ||
+      q?.coding?.testCases ||
+      q?.coding?.test_cases;
 
-    if (Array.isArray(rawExamples) && rawExamples.length > 0) {
-      for (const ex of rawExamples) {
-        if (ex) {
-          list.push({
-            input: ex.input != null ? String(ex.input) : "",
-            output:
-              ex.output != null
-                ? String(ex.output)
-                : ex.expectedOutput != null
-                ? String(ex.expectedOutput)
-                : ex.expected != null
-                ? String(ex.expected)
-                : ex.expected_output != null
-                ? String(ex.expected_output)
-                : "",
-            explanation: ex.explanation,
-          });
-        }
+    if (Array.isArray(rawCases) && rawCases.length > 0) {
+      const sampleCases = rawCases.filter((tc: any) => (tc.sample === true || tc.isSample === true) && !tc.isHidden);
+      const targetCases = sampleCases.length > 0 ? sampleCases : rawCases.filter((tc: any) => !tc.isHidden).slice(0, 2);
+      for (const tc of targetCases) {
+        list.push({
+          input: tc.input != null ? String(tc.input) : "",
+          output:
+            tc.expectedOutput != null
+              ? String(tc.expectedOutput)
+              : tc.output != null
+              ? String(tc.output)
+              : tc.expected != null
+              ? String(tc.expected)
+              : "",
+          explanation: tc.explanation || q?.sampleExplanation,
+        });
       }
     }
 
-    // 2. Check testCases / testcases array
+    // 2. Check direct examples array
     if (list.length === 0) {
-      const rawCases =
-        q?.testCases ||
-        q?.testcases ||
-        q?.test_cases ||
-        q?.coding?.testCases ||
-        q?.coding?.test_cases;
+      const rawExamples =
+        q?.examples ||
+        q?.coding?.examples ||
+        (Array.isArray(q?.coding?.examples?.data) ? q.coding.examples.data : null);
 
-      if (Array.isArray(rawCases) && rawCases.length > 0) {
-        for (const tc of rawCases) {
-          if (!tc.isHidden || tc.sample) {
+      if (Array.isArray(rawExamples) && rawExamples.length > 0) {
+        for (const ex of rawExamples) {
+          if (ex) {
             list.push({
-              input: tc.input != null ? String(tc.input) : "",
+              input: ex.input != null ? String(ex.input) : "",
               output:
-                tc.expectedOutput != null
-                  ? String(tc.expectedOutput)
-                  : tc.output != null
-                  ? String(tc.output)
-                  : tc.expected != null
-                  ? String(tc.expected)
+                ex.output != null
+                  ? String(ex.output)
+                  : ex.expectedOutput != null
+                  ? String(ex.expectedOutput)
+                  : ex.expected != null
+                  ? String(ex.expected)
+                  : ex.expected_output != null
+                  ? String(ex.expected_output)
                   : "",
-              explanation: tc.explanation || q?.sampleExplanation,
+              explanation: ex.explanation,
             });
           }
         }
@@ -487,8 +502,8 @@ export default function NewAdminQuestionPreview() {
       });
     }
 
-    // 4. Try regex extraction of Examples from prompt text (matching DSAPlayground)
-    if (list.length === 0) {
+    // 4. Try regex extraction of Examples from prompt text
+    if (list.length === 0 && q?.prompt) {
       const pText = `${q?.prompt || ""}\n${q?.sampleExplanation || ""}\n${q?.constraints || ""}`;
       const exampleRegex =
         /(?:Example\s*(\d+)|\*\*Example\s*(\d+)\*\*|###\s*Example\s*(\d+))[\s\S]*?(?:Input|\*\*Input:\*\*)\s*[:\.]?\s*`?([^`\n\r]+)`?[\s\S]*?(?:Output|\*\*Output:\*\*)\s*[:\.]?\s*`?([^`\n\r]+)`?(?:[\s\S]*?(?:Explanation|\*\*Explanation:\*\*)\s*[:\.]?\s*([^\n\r]+))?/gi;
@@ -504,84 +519,6 @@ export default function NewAdminQuestionPreview() {
             explanation: rawExp || undefined,
           });
         }
-      }
-    }
-
-    // 5. Intelligent topic/problem fallback matching DSAPlayground & reference DSA sets
-    if (list.length === 0) {
-      const pLower = (q?.title || q?.prompt || "").toLowerCase();
-      if (pLower.includes("robber") || pLower.includes("house robber")) {
-        list.push(
-          {
-            input: "[1, 2, 3, 1]",
-            output: "4",
-            explanation:
-              "Rob house 1 (money = 1) and then rob house 3 (money = 3). Total amount = 1 + 3 = 4.",
-          },
-          {
-            input: "[2, 7, 9, 3, 1]",
-            output: "12",
-            explanation:
-              "Rob house 1 (money = 2), rob house 3 (money = 9) and rob house 5 (money = 1). Total amount = 2 + 9 + 1 = 12.",
-          }
-        );
-      } else if (pLower.includes("coin") || pLower.includes("change")) {
-        list.push(
-          {
-            input: "[1, 2, 5]\n11",
-            output: "3",
-            explanation: "11 = 5 + 5 + 1 (3 coins)",
-          },
-          {
-            input: "[2]\n3",
-            output: "-1",
-            explanation: "Cannot make amount 3 with denomination 2",
-          },
-          { input: "[1]\n0", output: "0", explanation: "0 amount requires 0 coins" }
-        );
-      } else if (
-        pLower.includes("subarray") ||
-        pLower.includes("sliding") ||
-        pLower.includes("k elements")
-      ) {
-        list.push(
-          {
-            input: "[2, 1, 5, 1, 3, 2]\n3",
-            output: "9",
-            explanation: "Subarray [5, 1, 3] gives max sum 9",
-          },
-          {
-            input: "[2, 3, 4, 1, 5]\n2",
-            output: "7",
-            explanation: "Subarray [3, 4] gives sum 7",
-          }
-        );
-      } else if (pLower.includes("two sum") || pLower.includes("target")) {
-        list.push(
-          {
-            input: "[2, 7, 11, 15]\n9",
-            output: "[0, 1]",
-            explanation: "nums[0] + nums[1] == 9",
-          },
-          {
-            input: "[3, 2, 4]\n6",
-            output: "[1, 2]",
-            explanation: "nums[1] + nums[2] == 6",
-          }
-        );
-      } else {
-        list.push(
-          {
-            input: "[2, 7, 11, 15]\n9",
-            output: "[0, 1]",
-            explanation: "nums[0] + nums[1] == 9",
-          },
-          {
-            input: "[3, 2, 4]\n6",
-            output: "[1, 2]",
-            explanation: "nums[1] + nums[2] == 6",
-          }
-        );
       }
     }
 
@@ -778,16 +715,20 @@ export default function NewAdminQuestionPreview() {
                       <p className="text-slate-700 text-xs">{reason || "No reason text provided."}</p>
                     </div>
                   </div>
-                ) : /<[a-z][\s\S]*>/i.test(question.prompt || "") ? (
-                  <div
-                    className="text-[13px] md:text-sm text-slate-800 leading-relaxed font-sans prose prose-slate max-w-none [&_ol]:list-decimal [&_ol]:pl-5 [&_ul]:list-disc [&_ul]:pl-5 [&_li]:my-1 [&_p]:my-1.5 [&_pre]:bg-[#18181b] [&_pre]:text-amber-300 [&_pre]:p-3 [&_pre]:rounded-sm [&_pre]:font-mono [&_pre]:text-xs [&_pre]:overflow-x-auto [&_code]:font-mono [&_code]:text-xs [&_code]:bg-slate-100 [&_code]:text-pink-600 [&_code]:px-1 [&_code]:py-0.5 [&_code]:rounded-xs [&_pre_code]:bg-transparent [&_pre_code]:text-inherit [&_pre_code]:p-0"
-                    dangerouslySetInnerHTML={{ __html: question.prompt || "" }}
-                  />
-                ) : (
-                  <div className="text-[13px] md:text-sm text-slate-800 leading-relaxed whitespace-pre-wrap font-normal">
-                    {question.prompt || "No description provided for this question."}
-                  </div>
-                )}
+                ) : (() => {
+                    const promptHtml = decodeHtmlIfNeeded(question.prompt || "");
+                    const isHtml = /<[a-z][\s\S]*>/i.test(promptHtml);
+                    return isHtml ? (
+                      <div
+                        className="text-[13px] md:text-sm text-slate-800 leading-relaxed font-sans prose prose-slate max-w-none [&_h3]:text-sm [&_h3]:font-bold [&_h3]:text-slate-900 [&_h3]:mt-4 [&_h3]:mb-1.5 [&_ol]:list-decimal [&_ol]:pl-5 [&_ul]:list-disc [&_ul]:pl-5 [&_li]:my-1 [&_p]:my-1.5 [&_pre]:bg-[#18181b] [&_pre]:text-amber-300 [&_pre]:p-3 [&_pre]:rounded-sm [&_pre]:font-mono [&_pre]:text-xs [&_pre]:overflow-x-auto [&_code]:font-mono [&_code]:text-xs [&_code]:bg-slate-100 [&_code]:text-pink-600 [&_code]:px-1 [&_code]:py-0.5 [&_code]:rounded-xs [&_pre_code]:bg-transparent [&_pre_code]:text-inherit [&_pre_code]:p-0"
+                        dangerouslySetInnerHTML={{ __html: promptHtml }}
+                      />
+                    ) : (
+                      <div className="text-[13px] md:text-sm text-slate-800 leading-relaxed whitespace-pre-wrap font-normal">
+                        {promptHtml || "No description provided for this question."}
+                      </div>
+                    );
+                  })()}
 
                 {/* Question Image */}
                 {question.imageUrl && (
@@ -846,6 +787,16 @@ export default function NewAdminQuestionPreview() {
                         )}
                       </div>
                     ))}
+                  </div>
+                )}
+
+                {/* Sample Explanation standalone if testcases have no individual explanations */}
+                {isCoding && sampleTestcases.length === 0 && question.sampleExplanation && (
+                  <div className="pt-2">
+                    <h3 className="text-xs font-bold text-slate-900 mb-1.5">Sample Explanation:</h3>
+                    <div className="p-3 bg-slate-50 border border-slate-200 rounded text-slate-700 font-mono text-xs whitespace-pre-wrap leading-relaxed">
+                      {question.sampleExplanation}
+                    </div>
                   </div>
                 )}
               </div>

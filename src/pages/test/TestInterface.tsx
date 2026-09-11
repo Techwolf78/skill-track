@@ -10,6 +10,13 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { QuestionImage } from "@/components/ui/QuestionImage";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -33,7 +40,7 @@ import Editor from "@monaco-editor/react";
 import { apiClient } from "@/lib/api-client";
 import { testService, CodeTemplateEntry, TestCaseResult } from "@/lib/test-service";
 import { proctoringService } from "@/lib/proctoring-service";
-import { LANGUAGE_MAP, type LanguageKey, resolveStarterCode, getAvailableLanguages } from "@/lib/exam/languageMap";
+import { LANGUAGE_MAP, type LanguageKey, resolveStarterCode, getAvailableLanguages, DEFAULT_STARTER_CODES } from "@/lib/exam/languageMap";
 import { formatTime } from "@/lib/exam/formatTime";
 import { isTerminalStatus, mapTestCaseResults, buildSubmitOutputMessage, buildRunOutputMessage } from "@/lib/exam/codeExecution";
 import { isDevToolsKey, isClipboardShortcut, isPrintScreen } from "@/lib/proctoring/keyboardSecurity";
@@ -41,12 +48,12 @@ import { countTabSwitches, shouldAutoSubmitOnTabSwitch } from "@/lib/proctoring/
 import { computeFullscreenPolicy, tickFullscreenTimer, resetFullscreenTimer, FULLSCREEN_GRACE_PERIOD } from "@/lib/proctoring/fullscreenLogic";
 import { ProctoringProvider, useProctoring, ProctoringConfigDto } from "@/proctoring/ProctoringProvider";
 import { CameraPreview } from "@/proctoring/components/CameraPreview";
-import { ViolationToast } from "@/proctoring/components/ViolationToast";
 import { EnvironmentCheck } from "@/proctoring/components/EnvironmentCheck";
 import { IdentityVerification } from "@/proctoring/components/IdentityVerification";
 import { Shield, ShieldAlert, ShieldCheck as ShieldCheckIcon, Camera } from "lucide-react";
 import { AnswerStore, computeContentHash } from "@/lib/exam/answerStorage";
 import { detectTimeExtension } from "@/lib/exam/sessionLogic";
+import { decodeHtmlIfNeeded, isHtmlContent } from "@/lib/html-utils";
 
 import { mapBackendToFrontendLang } from "../../types/question";
 
@@ -62,6 +69,7 @@ interface Question {
   sampleOutput?: string;
   sampleExplanation?: string;
   codeTemplate?: Record<string, CodeTemplateEntry>;
+  languageTemplates?: Record<string, any>;
   starterCode?: Record<string, string>;
   difficulty?: string;
   constraints?: string;
@@ -382,6 +390,8 @@ function TestInterfaceContent({ testId, sessionId, navigate, toast }: { testId?:
   const [testCaseResults, setTestCaseResults] = useState<TestCaseResult[]>([]);
   const [selectedTestCaseIdx, setSelectedTestCaseIdx] = useState<number | null>(null);
   const [submissionPhase, setSubmissionPhase] = useState<"idle" | "running" | "result">("idle");
+  const [overallStatus, setOverallStatus] = useState<string | null>(null);
+  const [consoleOutput, setConsoleOutput] = useState<string>("");
 
   // Fullscreen enforcement
   const [isFullscreen, setIsFullscreen] = useState(true);
@@ -592,6 +602,7 @@ useEffect(() => {
       .sort((a, b) => a.orderIndex - b.orderIndex)
       .map(tq => {
         const rawStarterCode = tq.question?.coding?.starterCode || tq.question?.starterCode;
+        const rawTemplates = (tq.question as any)?.languageTemplates || (tq.question?.coding as any)?.languageTemplates;
         const processedStarterCode: Record<string, string> = {};
         if (rawStarterCode) {
           Object.entries(rawStarterCode).forEach(([lang, val]) => {
@@ -599,19 +610,30 @@ useEffect(() => {
             processedStarterCode[frontendLang] = val as string;
           });
         }
+        if (rawTemplates) {
+          Object.entries(rawTemplates).forEach(([lang, val]) => {
+            const frontendLang = mapBackendToFrontendLang(lang);
+            const templateStr = typeof val === "string" ? val : (val as any)?.template || (val as any)?.code || "";
+            if (templateStr && !processedStarterCode[frontendLang]) {
+              processedStarterCode[frontendLang] = templateStr;
+            }
+          });
+        }
 
         return {
+          ...(tq.question || {}),
           id: tq.questionId,
           type: tq.question?.questionType || tq.question?.type || "MCQ",
           prompt: tq.question?.prompt || "No prompt",
           marks: tq.marks,
           sectionName: tq.sectionName || (tq as any).section || undefined,
-          options: tq.question?.mcqOptions || [],
+          options: tq.question?.mcqOptions || (tq.question as any)?.options || [],
           problemStatement: tq.question?.prompt,
           sampleInput: tq.question?.sampleInput,
           sampleOutput: tq.question?.sampleOutput,
           sampleExplanation: tq.question?.sampleExplanation,
           codeTemplate: tq.question?.codeTemplate,
+          languageTemplates: rawTemplates,
           starterCode: processedStarterCode,
           difficulty: tq.question?.difficulty,
           constraints: tq.question?.constraints,
@@ -623,7 +645,7 @@ useEffect(() => {
           imageUrl: (tq.question as { imageUrl?: string })?.imageUrl,
         };
       });
-    
+
     console.log("🔍 Processed questions:", qs);
     setQuestions(qs);
 
@@ -653,7 +675,7 @@ useEffect(() => {
 // Initialize code editor when question changes
 useEffect(() => {
   const currentQ = questions[currentIndex];
-  if (currentQ?.type === "CODING" && (currentQ.starterCode || currentQ.codeTemplate) && sessionId) {
+  if (currentQ?.type === "CODING" && sessionId) {
     console.log("🎯 Initializing code editor for language:", language);
     
     // 1. Check if there is an answer already set in local state (which holds the submitted code)
@@ -672,33 +694,14 @@ useEffect(() => {
       return;
     }
 
-    // 3. Fallback to starter template
-    const newTemplate = currentQ.starterCode?.[language];
-    const oldTemplate = currentQ.codeTemplate?.[language]?.code;
-    const templateCode = newTemplate !== undefined ? newTemplate : oldTemplate;
-
-    if (templateCode) {
-      console.log("🎯 Setting code from template for", language);
-      setCode(templateCode);
+    // 3. Resolve starter template using robust resolution
+    const resolvedCode = resolveStarterCode(currentQ, language);
+    if (resolvedCode) {
+      console.log("🎯 Setting code from resolved starter template for", language);
+      setCode(resolvedCode);
     } else {
-      // Try to get first available language
-      const firstLang = Object.keys(currentQ.starterCode || currentQ.codeTemplate || {})[0];
-      const fallbackTemplate = currentQ.starterCode?.[firstLang] !== undefined
-        ? currentQ.starterCode[firstLang]
-        : currentQ.codeTemplate?.[firstLang]?.code;
-
-      if (firstLang && fallbackTemplate) {
-        console.log("🎯 Falling back to first available language:", firstLang);
-        setLanguage(firstLang as LanguageKey);
-        
-        // Also check if fallback language has a draft
-        const fallbackDraft = AnswerStore.getDraft(sessionId, currentQ.id, firstLang);
-        if (fallbackDraft !== null) {
-          setCode(fallbackDraft);
-        } else {
-          setCode(fallbackTemplate);
-        }
-      }
+      console.log("🎯 Falling back to default starter code for", language);
+      setCode(DEFAULT_STARTER_CODES[language] || "");
     }
   }
 }, [currentIndex, questions, language, answers, sessionId]);
@@ -1109,6 +1112,8 @@ useEffect(() => {
     setOutput(null);
     setTestCaseResults([]);
     setSelectedTestCaseIdx(null);
+    setOverallStatus(null);
+    setConsoleOutput("> Compiling & executing source code on sandbox...\n");
 
     try {
       const resultsArray = await testService.executeCode({
@@ -1118,28 +1123,50 @@ useEffect(() => {
         sourceCode: code,
       });
       
-      const mappedTestCases = resultsArray.map((tc: TestCaseResult) => ({
+      const mappedTestCases = (Array.isArray(resultsArray) ? resultsArray : []).map((tc: any) => ({
+        status: tc.status || "ACCEPTED",
         passed: tc.status === "ACCEPTED",
-        ...tc
+        input: tc.input || "",
+        output: tc.actualOutput || tc.stdout || tc.stderr || tc.compileOutput || "",
+        expected: tc.expectedOutput || (tc as any).expected || "",
+        compileOutput: tc.compileOutput || "",
+        stderr: tc.stderr || "",
+        execTimeMs: tc.execTimeMs || tc.executionTimeMs || 0,
       }));
 
       setTestCaseResults(mappedTestCases);
+
+      let computedStatus = "ACCEPTED";
+      for (const res of mappedTestCases) {
+        if (res.status !== "ACCEPTED") {
+          computedStatus = res.status;
+          break;
+        }
+      }
+
+      setOverallStatus(computedStatus);
+      setConsoleOutput(
+        `> Execution completed with status: ${computedStatus}\n` +
+          (mappedTestCases[0]?.compileOutput ? `\nCompiler Logs:\n${mappedTestCases[0].compileOutput}` : "")
+      );
+
       const passedCount = mappedTestCases.filter((tc: { passed: boolean }) => tc.passed).length;
-      
       if (mappedTestCases.length > 0) {
         if (passedCount === mappedTestCases.length) {
-          setOutput({ type: 'success', message: `✓ All ${passedCount} test cases passed!` });
+          setOutput({ type: 'success', message: `✓ All ${passedCount} sample test cases passed!` });
+          toast({ title: "Passed", description: "All sample test cases passed!" });
         } else {
-          setOutput({ type: 'error', message: `✗ ${passedCount}/${mappedTestCases.length} test cases passed` });
+          setOutput({ type: 'error', message: `✗ ${passedCount}/${mappedTestCases.length} sample test cases passed (${computedStatus.replace(/_/g, " ")})` });
+          toast({ title: "Result", description: `Execution result: ${computedStatus.replace(/_/g, " ")}`, variant: "destructive" });
         }
       } else {
-         setOutput({ type: 'error', message: "No test cases returned." });
+        setOutput({ type: 'error', message: "No test cases returned." });
       }
       setIsDraftSynced(true);
       setSubmissionPhase("result");
     } catch (error: unknown) {
       console.error("Run code error:", error);
-      let errMsg = "Failed to execute code. Please try again.";
+      let errMsg = "Failed to execute code on sandbox.";
       if (axios.isAxiosError(error)) {
         if (error.response?.status === 429) {
           toast({
@@ -1152,10 +1179,13 @@ useEffect(() => {
       } else if (error instanceof Error) {
         errMsg = error.message;
       }
+      setOverallStatus("EXECUTION_ERROR");
+      setConsoleOutput(`> Error: ${errMsg}\n`);
       setOutput({ 
         type: 'error', 
         message: errMsg
       });
+      toast({ title: "Execution Error", description: errMsg, variant: "destructive" });
     } finally {
       setIsRunning(false);
     }
@@ -1378,9 +1408,7 @@ useEffect(() => {
   const handleResetCode = useCallback(() => {
     const currentQ = questions[currentIndex];
     if (currentQ) {
-      const newTemplate = currentQ.starterCode?.[language];
-      const oldTemplate = currentQ.codeTemplate?.[language]?.code;
-      const originalTemplate = newTemplate !== undefined ? newTemplate : oldTemplate;
+      const originalTemplate = resolveStarterCode(currentQ, language) || DEFAULT_STARTER_CODES[language];
       if (originalTemplate) {
         setCode(originalTemplate);
         AnswerStore.saveDraft(sessionId || "demo-session", currentQ.id, language, originalTemplate);
@@ -1643,188 +1671,108 @@ useEffect(() => {
               transition={{ duration: 0.2 }}
               className="space-y-6"
             >
-              <Card>
-                <CardContent className="p-6 space-y-4">
-                  <div className="flex justify-between items-start flex-wrap gap-4">
-                    <div>
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <Badge variant={currentQuestion.type === "CODING" ? "default" : "secondary"}>
-                          {currentQuestion.type === "CODING" ? <Code2 className="w-3 h-3 mr-1" /> : <FileText className="w-3 h-3 mr-1" />}
-                          {currentQuestion.type}
-                        </Badge>
-                        <Badge variant="outline">{currentQuestion.marks} marks</Badge>
-                        {currentQuestion.difficulty && (
-                          <Badge variant="outline" className={cn(
-                            currentQuestion.difficulty === "EASY" && "bg-green-500/10 text-green-500 border-green-500/20",
-                            currentQuestion.difficulty === "MEDIUM" && "bg-yellow-500/10 text-yellow-500 border-yellow-500/20",
-                            currentQuestion.difficulty === "HARD" && "bg-red-500/10 text-red-500 border-red-500/20",
-                          )}>
-                            {currentQuestion.difficulty}
-                          </Badge>
-                        )}
-                        {isCurrentAnswered() && (
-                          <Badge variant="outline" className="bg-green-500/20 text-green-700 border-green-500/30">
-                            <CheckCircle className="w-3 h-3 mr-1" /> Answered
-                          </Badge>
-                        )}
-                      </div>
-                      {currentQuestion.title &&
-                        !/<[a-z][\s\S]*>/i.test(currentQuestion.title) &&
-                        currentQuestion.title !== currentQuestion.prompt && (
-                          <h2 className="text-lg font-bold text-slate-900 mt-2 mb-1">
-                            {currentQuestion.title}
-                          </h2>
-                        )}
-                      {/<[a-z][\s\S]*>/i.test(currentQuestion.prompt || currentQuestion.title || "") ? (
-                        <div
-                          className="text-base font-normal mt-3 prose prose-slate max-w-none [&_ol]:list-decimal [&_ol]:pl-5 [&_ul]:list-disc [&_ul]:pl-5 [&_pre]:bg-slate-900 [&_pre]:text-slate-100 [&_pre]:p-3 [&_pre]:rounded-sm [&_code]:bg-slate-100 [&_code]:text-pink-600 [&_code]:px-1 [&_code]:py-0.5"
-                          dangerouslySetInnerHTML={{
-                            __html: currentQuestion.prompt || currentQuestion.title || "",
-                          }}
-                        />
-                      ) : (
-                        <div className="text-base font-medium mt-3 whitespace-pre-wrap">
-                          {currentQuestion.prompt || currentQuestion.title}
-                        </div>
-                      )}
-                      {currentQuestion.tags && currentQuestion.tags.length > 0 && (
-                        <div className="flex flex-wrap gap-1 mt-2">
-                          {currentQuestion.tags.map((tag, idx) => (
-                            <span key={idx} className="text-[10px] bg-muted px-2 py-0.5 rounded text-muted-foreground border">
-                              {tag}
-                            </span>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => {
-                        const newFlagged = new Set(flagged);
-                        if (newFlagged.has(currentQuestion.id)) {
-                          newFlagged.delete(currentQuestion.id);
-                        } else {
-                          newFlagged.add(currentQuestion.id);
-                        }
-                        setFlagged(newFlagged);
-                      }}
-                    >
-                      <Flag className={cn("w-4 h-4 mr-2", flagged.has(currentQuestion.id) && "fill-yellow-500 text-yellow-500")} />
-                      {flagged.has(currentQuestion.id) ? "Flagged" : "Flag for review"}
-                    </Button>
-                  </div>
+              {currentQuestion.type === "CODING" ? (
+                /* ── 2-Column Coding Workspace Layout (Matching Admin Preview) ── */
+                <div className="bg-white border border-slate-200 rounded-lg overflow-hidden shadow-xs">
+                  <div className="grid grid-cols-1 lg:grid-cols-12 divide-y lg:divide-y-0 lg:divide-x divide-slate-200 min-h-[680px]">
+                    {/* ── Left Column: Problem Description, Constraints, Sample Cases (5 cols) ── */}
+                    <div className="lg:col-span-5 p-6 flex flex-col justify-between bg-white overflow-y-auto max-h-[85vh]">
+                      <div className="space-y-4">
+                        {/* Top Badges & Flag */}
+                        <div className="flex items-center justify-between gap-2 pb-2 border-b border-slate-100 flex-wrap">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <Badge variant="default" className="bg-slate-900 text-white hover:bg-slate-800 text-[11px]">
+                              <Code2 className="w-3 h-3 mr-1" />
+                              CODING
+                            </Badge>
+                            <Badge variant="outline" className="text-slate-700 text-[11px]">{currentQuestion.marks} marks</Badge>
+                            {currentQuestion.difficulty && (
+                              <Badge variant="outline" className={cn(
+                                "text-[11px]",
+                                currentQuestion.difficulty === "EASY" && "bg-green-500/10 text-green-700 border-green-500/20",
+                                currentQuestion.difficulty === "MEDIUM" && "bg-yellow-500/10 text-yellow-700 border-yellow-500/20",
+                                currentQuestion.difficulty === "HARD" && "bg-red-500/10 text-red-700 border-red-500/20",
+                              )}>
+                                {currentQuestion.difficulty}
+                              </Badge>
+                            )}
+                            {isCurrentAnswered() && (
+                              <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-300 text-[11px]">
+                                <CheckCircle className="w-3 h-3 mr-1" /> Answered
+                              </Badge>
+                            )}
+                          </div>
 
-                  {currentQuestion.imageUrl && (
-                    <div className="mt-2">
-                      <QuestionImage
-                        src={currentQuestion.imageUrl}
-                        alt="Question diagram"
-                        enableZoom={true}
-                        className="max-w-full max-h-96 rounded-lg object-contain"
-                      />
-                    </div>
-                  )}
-
-                  {currentQuestion.type === "MCQ" && currentQuestion.options && (
-                    <div className="space-y-4">
-                      <RadioGroup
-                        value={(answers[currentQuestion.id] as string) || ""}
-                        onValueChange={(value) => handleMcqSelect(currentQuestion.id, value)}
-                        className="space-y-2 pt-2"
-                      >
-                        {currentQuestion.options.map((optionItem: unknown, idx: number) => {
-                          const option = optionItem as { id?: string; text?: string; imageUrl?: string } | string;
-                          const optionId = (typeof option === "object" && option !== null ? (option.id || option.text || "") : option) as string;
-                          const optionText = (typeof option === "object" && option !== null ? (option.text || "") : option) as string;
-                          const optionImageUrl = typeof option === "object" && option !== null ? option.imageUrl : undefined;
-                          return (
-                            <Label 
-                              key={idx} 
-                              className={cn(
-                                "flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-all",
-                                answers[currentQuestion.id] === optionId 
-                                   ? "border-primary bg-primary/5 ring-1 ring-primary" 
-                                   : "border-border hover:bg-muted/50 hover:border-primary/30"
-                              )}
-                            >
-                              <RadioGroupItem value={optionId} id={`option-${idx}`} className="mt-0.5" />
-                              <div className="flex-1 min-w-0">
-                                {/<[a-z][\s\S]*>/i.test(optionText) ? (
-                                  <span
-                                    className="text-sm prose prose-sm max-w-none [&_p]:inline [&_p]:my-0"
-                                    dangerouslySetInnerHTML={{ __html: optionText }}
-                                  />
-                                ) : (
-                                  <span className="text-sm">{optionText}</span>
-                                )}
-                                {optionImageUrl && (
-                                  <div className="mt-2">
-                                    <QuestionImage
-                                      src={optionImageUrl}
-                                      alt={`Option ${idx + 1}`}
-                                      enableZoom={true}
-                                      className="max-h-40 rounded object-contain bg-muted/20"
-                                    />
-                                  </div>
-                                )}
-                              </div>
-                            </Label>
-                          );
-                        })}
-                      </RadioGroup>
-                      {answers[currentQuestion.id] && (
-                        <div className="flex justify-end items-center gap-1.5 text-xs text-muted-foreground font-medium pt-1">
-                          <CheckCircle className="w-3.5 h-3.5 text-green-500" />
-                          <span>Selection auto-saved</span>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 text-xs text-slate-500"
+                            onClick={() => {
+                              const newFlagged = new Set(flagged);
+                              if (newFlagged.has(currentQuestion.id)) {
+                                newFlagged.delete(currentQuestion.id);
+                              } else {
+                                newFlagged.add(currentQuestion.id);
+                              }
+                              setFlagged(newFlagged);
+                            }}
+                          >
+                            <Flag className={cn("w-3.5 h-3.5 mr-1.5", flagged.has(currentQuestion.id) && "fill-yellow-500 text-yellow-500")} />
+                            {flagged.has(currentQuestion.id) ? "Flagged" : "Flag for review"}
+                          </Button>
                         </div>
-                      )}
-                    </div>
-                  )}
 
-                  {currentQuestion.type === "CODING" && (
-                    <div className="space-y-4">
-                      <div className="rounded-lg bg-muted/30 p-4 space-y-4">
-                        <div className="prose prose-sm dark:prose-invert max-w-none">
-                          {/<[a-z][\s\S]*>/i.test(currentQuestion.problemStatement || currentQuestion.prompt || "") ? (
+                        {/* Description Header */}
+                        <div className="text-[11px] font-bold tracking-wider text-slate-500 uppercase">
+                          DESCRIPTION
+                        </div>
+
+                        {/* Problem Statement Title */}
+                        <h2 className="text-sm font-bold text-slate-900">Problem Statement</h2>
+
+                        {/* Formatted HTML Problem Statement */}
+                        {(() => {
+                          const rawPrompt = currentQuestion.prompt || currentQuestion.title || "";
+                          const decodedPrompt = decodeHtmlIfNeeded(rawPrompt);
+                          return isHtmlContent(decodedPrompt) ? (
                             <div
-                              className="leading-relaxed [&_ol]:list-decimal [&_ol]:pl-5 [&_ul]:list-disc [&_ul]:pl-5 [&_pre]:bg-slate-900 [&_pre]:text-slate-100 [&_pre]:p-3 [&_pre]:rounded-sm [&_code]:bg-slate-100 dark:[&_code]:bg-slate-800 [&_code]:text-pink-600 [&_code]:px-1 [&_code]:py-0.5"
-                              dangerouslySetInnerHTML={{ __html: currentQuestion.problemStatement || currentQuestion.prompt || "" }}
+                              className="text-[13px] md:text-sm text-slate-800 leading-relaxed font-sans prose prose-slate max-w-none [&_h3]:text-sm [&_h3]:font-bold [&_h3]:text-slate-900 [&_h3]:mt-4 [&_h3]:mb-1.5 [&_ol]:list-decimal [&_ol]:pl-5 [&_ul]:list-disc [&_ul]:pl-5 [&_li]:my-1 [&_p]:my-1.5 [&_pre]:bg-[#18181b] [&_pre]:text-amber-300 [&_pre]:p-3 [&_pre]:rounded-sm [&_pre]:font-mono [&_pre]:text-xs [&_pre]:overflow-x-auto [&_code]:font-mono [&_code]:text-xs [&_code]:bg-slate-100 [&_code]:text-pink-600 [&_code]:px-1 [&_code]:py-0.5 [&_code]:rounded-xs"
+                              dangerouslySetInnerHTML={{
+                                __html: decodedPrompt,
+                              }}
                             />
                           ) : (
-                            <p className="whitespace-pre-wrap leading-relaxed">
-                              {currentQuestion.problemStatement || currentQuestion.prompt}
-                            </p>
-                          )}
-                        </div>
+                            <div className="text-[13px] md:text-sm text-slate-800 leading-relaxed whitespace-pre-wrap font-normal">
+                              {decodedPrompt}
+                            </div>
+                          );
+                        })()}
 
-                        {(currentQuestion.timeLimitSecs || currentQuestion.memoryLimitMb) && (
-                          <div className="flex gap-4 text-xs font-semibold text-muted-foreground border-y py-2">
-                            {currentQuestion.timeLimitSecs && (
-                              <div className="flex items-center gap-1">
-                                <Clock className="w-3 h-3" /> Time Limit: {currentQuestion.timeLimitSecs}s
-                              </div>
-                            )}
-                            {currentQuestion.memoryLimitMb && (
-                              <div className="flex items-center gap-1">
-                                <Database className="w-3 h-3" /> Memory Limit: {currentQuestion.memoryLimitMb}MB
-                              </div>
-                            )}
+                        {/* Question Image */}
+                        {currentQuestion.imageUrl && (
+                          <div className="pt-2">
+                            <QuestionImage
+                              src={currentQuestion.imageUrl}
+                              alt="Question diagram"
+                              enableZoom={true}
+                              className="max-w-full max-h-96 rounded-lg object-contain shadow-xs"
+                            />
                           </div>
                         )}
 
+                        {/* Constraints Section */}
                         {currentQuestion.constraints && (
-                          <div className="space-y-1">
-                            <div className="text-xs font-semibold text-muted-foreground">Constraints:</div>
-                            <div className="text-sm bg-background/50 p-2 rounded border font-mono">
+                          <div className="pt-2">
+                            <h3 className="text-xs font-bold text-slate-900 mb-1.5">Constraints:</h3>
+                            <div className="p-3 bg-slate-50 border border-slate-200 rounded text-slate-700 font-mono text-xs whitespace-pre-wrap leading-relaxed">
                               {currentQuestion.constraints}
                             </div>
                           </div>
                         )}
 
+                        {/* Sample Test Cases in Sequence */}
                         {(((test as unknown) as { examples?: { input: string; output: string; explanation?: string }[] })?.examples || currentQuestion.sampleInput) && (
-                          <div className="space-y-3">
-                            <div className="text-xs font-semibold text-muted-foreground">Examples:</div>
+                          <div className="space-y-4 pt-2">
                             {(currentQuestion.sampleInput ? [
                               { 
                                 input: currentQuestion.sampleInput, 
@@ -1832,20 +1780,33 @@ useEffect(() => {
                                 explanation: currentQuestion.sampleExplanation 
                               }
                             ] : (((test as unknown) as { examples?: { input: string; output: string; explanation?: string }[] })?.examples || [])).map((ex: { input: string; output: string; explanation?: string }, idx: number) => (
-                              <div key={idx} className="space-y-2 last:border-0 border-b pb-3 border-dashed">
-                                <div className="grid gap-3 md:grid-cols-2">
-                                  <div className="rounded-lg bg-background p-2 border">
-                                    <div className="text-[10px] font-bold text-muted-foreground mb-1 uppercase tracking-tight">Input:</div>
-                                    <pre className="text-xs font-mono">{ex.input}</pre>
-                                  </div>
-                                  <div className="rounded-lg bg-background p-2 border">
-                                    <div className="text-[10px] font-bold text-muted-foreground mb-1 uppercase tracking-tight">Output:</div>
-                                    <pre className="text-xs font-mono">{ex.output}</pre>
-                                  </div>
+                              <div key={idx} className="space-y-2">
+                                <div>
+                                  <h4 className="text-xs font-bold text-slate-900">
+                                    Sample Input {idx + 1}:
+                                  </h4>
+                                  <pre className="mt-1 p-3 bg-[#18181b] text-amber-300 font-mono text-xs rounded-sm overflow-x-auto whitespace-pre-wrap leading-relaxed shadow-xs border border-slate-800">
+                                    {ex.input || "No input"}
+                                  </pre>
                                 </div>
+
+                                <div>
+                                  <h4 className="text-xs font-bold text-slate-900">
+                                    Sample Output {idx + 1}:
+                                  </h4>
+                                  <pre className="mt-1 p-3 bg-[#18181b] text-slate-100 font-mono text-xs rounded-sm overflow-x-auto whitespace-pre-wrap leading-relaxed shadow-xs border border-slate-800">
+                                    {ex.output || "No output"}
+                                  </pre>
+                                </div>
+
                                 {ex.explanation && (
-                                  <div className="text-xs text-muted-foreground bg-background/50 p-2 rounded border-l-2 border-primary/30">
-                                    <span className="font-semibold">Explanation:</span> {ex.explanation}
+                                  <div>
+                                    <h4 className="text-xs font-bold text-slate-900 mb-0.5">
+                                      Explanation:
+                                    </h4>
+                                    <p className="text-xs text-slate-600 leading-relaxed whitespace-pre-wrap">
+                                      {ex.explanation}
+                                    </p>
                                   </div>
                                 )}
                               </div>
@@ -1853,19 +1814,20 @@ useEffect(() => {
                           </div>
                         )}
 
+                        {/* Hints Accordion */}
                         {currentQuestion.hints && (currentQuestion.hints as string[]).length > 0 && (
-                          <Accordion type="single" collapsible className="w-full">
+                          <Accordion type="single" collapsible className="w-full pt-2">
                             <AccordionItem value="hints" className="border-none">
                               <AccordionTrigger className="text-xs font-semibold text-primary py-1 hover:no-underline">
                                 <span className="flex items-center gap-1">
-                                  <Lightbulb className="w-3 h-3" /> Need a hint?
+                                  <Lightbulb className="w-3.5 h-3.5" /> Need a hint?
                                 </span>
                               </AccordionTrigger>
                               <AccordionContent className="pt-2">
                                 <ul className="space-y-2">
                                   {(currentQuestion.hints as string[]).map((hint: string, hIdx: number) => (
-                                    <li key={hIdx} className="text-sm bg-yellow-500/5 p-2 rounded border border-yellow-500/10">
-                                      <span className="font-semibold text-xs text-yellow-600 mr-1">Hint {hIdx + 1}:</span> {hint}
+                                    <li key={hIdx} className="text-xs bg-yellow-500/5 p-2.5 rounded border border-yellow-500/20">
+                                      <span className="font-semibold text-yellow-700 mr-1">Hint {hIdx + 1}:</span> {hint}
                                     </li>
                                   ))}
                                 </ul>
@@ -1875,176 +1837,358 @@ useEffect(() => {
                         )}
                       </div>
 
-                      <div className="rounded-lg border overflow-hidden">
-                        <div className="flex justify-between items-center border-b px-4 py-2 bg-muted/30">
-                          <div className="flex items-center gap-2">
-                            <span className="text-sm font-medium">Code Editor</span>
-                            <span
-                              title={isDraftSynced ? "Synced to server" : "Draft saved locally"}
-                              className={cn(
-                                "w-2 h-2 rounded-full transition-colors duration-500",
-                                isDraftSynced ? "bg-emerald-500 shadow-sm shadow-emerald-500/50" : "bg-amber-400 shadow-sm shadow-amber-400/50"
-                              )}
-                            />
+                      {/* Left Column Bottom Metadata */}
+                      <div className="mt-6 pt-4 border-t border-slate-200 space-y-2 text-xs text-slate-600">
+                        {currentQuestion.timeLimitSecs && (
+                          <div>
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-0.5">EXECUTION TIME LIMIT</span>
+                            <span>{currentQuestion.timeLimitSecs} seconds</span>
                           </div>
-                          <div className="flex items-center gap-2">
-                            <select
-                              value={language}
-                              onChange={(e) => setLanguage(e.target.value as LanguageKey)}
-                              className="rounded border bg-background px-2 py-1 text-xs"
-                            >
-                              {availableLanguages.map((lang) => (
-                                <option key={lang} value={lang}>
-                                  {LANGUAGE_MAP[lang]?.name || lang}
-                                </option>
-                              ))}
-                            </select>
+                        )}
+                        {currentQuestion.tags && currentQuestion.tags.length > 0 && (
+                          <div className="flex flex-wrap gap-1 pt-1">
+                            {currentQuestion.tags.map((tag, idx) => (
+                              <span key={idx} className="text-[10px] bg-slate-100 px-2 py-0.5 rounded text-slate-600 border border-slate-200">
+                                {tag}
+                              </span>
+                            ))}
                           </div>
-                        </div>
-                        <Editor
-                          height="400px"
-                          language={LANGUAGE_MAP[language]?.monaco || "python"}
-                          value={code}
-                          onChange={(value) => setCode(value || "")}
-                          theme="vs-dark"
-                          options={{ 
-                            minimap: { enabled: false }, 
-                            fontSize: 13,
-                            scrollBeyondLastLine: false,
-                            automaticLayout: true
-                          }}
-                        />
-                        <div className="flex gap-2 p-3 border-t bg-muted/30">
+                        )}
+                      </div>
+                    </div>
+
+                    {/* ── Right Column: Solution Code & Runner (7 cols) ── */}
+                    <div className="lg:col-span-7 p-6 flex flex-col justify-between bg-white border-t lg:border-t-0 min-h-[680px]">
+                      <div className="flex flex-col flex-1 space-y-3">
+                        {/* Solution Code Header with Submit Button */}
+                        <div className="flex items-start justify-between gap-4 pb-2.5 border-b border-slate-100">
+                          <div>
+                            <h2 className="text-sm font-bold text-slate-900">Solution code</h2>
+                            <p className="text-xs text-slate-500">
+                              Please choose a language and write your code.
+                            </p>
+                          </div>
+
                           <IdempotentButton
-                            size="sm"
-                            variant="outline"
-                            onClick={handleRunCode}
-                            isLoading={isRunning}
-                            loadingText="Running..."
-                            disabled={isSubmittingCode}
-                          >
-                            <Play className="w-4 h-4 mr-2" />
-                            Run Code
-                          </IdempotentButton>
-                          <IdempotentButton
-                            size="sm"
                             onClick={handleSubmitQuestion}
                             isLoading={isSubmittingCode}
-                            loadingText="Submitting..."
+                            loadingText="SUBMITTING..."
                             disabled={isRunning}
+                            className="px-3.5 py-1.5 bg-[#4353a4] hover:bg-[#344287] text-white text-xs font-semibold rounded shadow-xs flex items-center gap-1.5 transition-colors cursor-pointer"
                           >
-                            <Save className="w-4 h-4 mr-2" />
-                            Submit Solution
-                          </IdempotentButton>
-                          <IdempotentButton
-                            size="sm"
-                            variant="ghost"
-                            onClick={handleResetCode}
-                            disabled={isRunning || isSubmittingCode}
-                            className="text-muted-foreground hover:text-foreground ml-auto"
-                          >
-                            <RotateCcw className="w-4 h-4 mr-2" />
-                            Reset Code
+                            <Save className="w-3.5 h-3.5" />
+                            <span>SUBMIT</span>
                           </IdempotentButton>
                         </div>
 
-                        {(output || testCaseResults.length > 0) && (
-                          <div className="border-t bg-card border-border overflow-hidden">
-                            <div className="p-4 space-y-4">
-                              {output && (
-                                <div className={cn(
-                                  "p-3 rounded-lg text-sm font-mono flex items-start gap-2",
-                                  output.type === 'success' 
-                                    ? "bg-green-500/10 text-green-400 border border-green-500/20" 
-                                    : "bg-red-500/10 text-red-400 border border-red-500/20"
-                                )}>
-                                  {output.type === 'success' ? (
-                                    <CheckCircle className="w-4 h-4 text-green-400 mt-0.5 flex-shrink-0" />
-                                  ) : (
-                                    <XCircle className="w-4 h-4 text-red-400 mt-0.5 flex-shrink-0" />
-                                  )}
-                                  <div className="whitespace-pre-wrap">{output.message}</div>
-                                </div>
+                        {/* Controls Bar: Language Selector, RUN CODE, Reset */}
+                        <div className="py-1 flex flex-wrap items-center justify-end gap-2">
+                          <Select
+                            value={language}
+                            onValueChange={(val) => setLanguage(val as LanguageKey)}
+                          >
+                            <SelectTrigger className="h-8 w-44 text-xs font-medium bg-slate-50 border-slate-200">
+                              <SelectValue placeholder="Language" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {availableLanguages.map((lang) => (
+                                <SelectItem key={lang} value={lang}>
+                                  {LANGUAGE_MAP[lang]?.name || lang}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+
+                          <IdempotentButton
+                            onClick={handleRunCode}
+                            isLoading={isRunning}
+                            loadingText="RUNNING..."
+                            disabled={isSubmittingCode}
+                            className="px-3 py-1.5 bg-slate-900 hover:bg-black text-white text-xs font-semibold rounded flex items-center gap-1.5 transition-colors cursor-pointer"
+                          >
+                            <Play className="w-3.5 h-3.5 fill-current text-emerald-400" />
+                            <span>RUN CODE</span>
+                          </IdempotentButton>
+
+                          <button
+                            onClick={handleResetCode}
+                            title="Reset code to default template"
+                            disabled={isRunning || isSubmittingCode}
+                            className="p-1.5 border border-slate-200 hover:bg-slate-100 text-slate-600 rounded transition-colors cursor-pointer disabled:opacity-50"
+                          >
+                            <RotateCcw className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+
+                        {/* Monaco Code Editor */}
+                        <div className="flex-1 min-h-[380px] border border-slate-200 rounded overflow-hidden relative shadow-inner">
+                          <Editor
+                            height="380px"
+                            language={LANGUAGE_MAP[language]?.monaco || "python"}
+                            value={code}
+                            onChange={(value) => setCode(value || "")}
+                            theme="vs-dark"
+                            options={{ 
+                              minimap: { enabled: false }, 
+                              fontSize: 13,
+                              scrollBeyondLastLine: false,
+                              automaticLayout: true,
+                              lineNumbers: "on",
+                              tabSize: 4,
+                              wordWrap: "on",
+                              padding: { top: 8, bottom: 8 },
+                            }}
+                          />
+                        </div>
+
+                        {/* Execution Results Console */}
+                        {(isRunning || testCaseResults.length > 0 || consoleOutput) && (
+                          <div className="border border-slate-200 rounded overflow-hidden bg-slate-50 mt-2">
+                            <div className="px-3.5 py-1.5 bg-slate-100 border-b border-slate-200 flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <Terminal className="w-3.5 h-3.5 text-slate-600" />
+                                <span className="text-xs font-bold text-slate-800 uppercase tracking-wider">
+                                  Execution Results
+                                </span>
+                              </div>
+                              {overallStatus && (
+                                <span
+                                  className={`text-[10px] font-bold px-2 py-0.5 rounded border uppercase ${
+                                    overallStatus === "ACCEPTED"
+                                      ? "bg-emerald-100 text-emerald-800 border-emerald-300"
+                                      : "bg-rose-100 text-rose-800 border-rose-300"
+                                  }`}
+                                >
+                                  {overallStatus.replace(/_/g, " ")}
+                                </span>
                               )}
-                              {testCaseResults.length > 0 && (
-                                <div className="space-y-3">
-                                  <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Test Cases (Click to view details):</div>
-                                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                                    {testCaseResults.map((tc, idx) => (
-                                      <button
-                                        key={idx}
-                                        onClick={() => setSelectedTestCaseIdx(prev => prev === idx ? null : idx)}
-                                        className={cn(
-                                          "p-2.5 rounded-lg text-center text-xs font-mono border transition-all flex flex-col items-center justify-center gap-1",
-                                          tc.passed 
-                                            ? "bg-green-500/5 hover:bg-green-500/10 text-green-400 border-green-500/20" 
-                                            : "bg-red-500/5 hover:bg-red-500/10 text-red-400 border-red-500/20",
-                                          selectedTestCaseIdx === idx && "ring-2 ring-primary"
-                                        )}
-                                      >
-                                        <div className="font-bold">Case {idx + 1}</div>
-                                        <div className="text-[10px]">{tc.passed ? "✓ Passed" : "✗ Failed"}</div>
-                                      </button>
-                                    ))}
-                                  </div>
+                            </div>
 
-                                  {selectedTestCaseIdx !== null && testCaseResults[selectedTestCaseIdx] && (() => {
-                                    const tc = testCaseResults[selectedTestCaseIdx];
-                                    return (
-                                      <div className="rounded-lg border bg-black/25 p-4 space-y-3 text-xs font-mono animate-in fade-in slide-in-from-bottom-2 duration-200">
-                                        <div className="flex justify-between items-center border-b border-border/40 pb-2">
-                                          <div className="font-bold text-primary">Case {selectedTestCaseIdx + 1} Execution Details</div>
-                                          <div className="flex gap-3 text-[10px] text-muted-foreground">
-                                            {tc.execTimeMs !== undefined && (
-                                              <div>Runtime: <span className="text-foreground">{tc.execTimeMs}ms</span></div>
-                                            )}
-                                            {tc.memoryKb !== undefined && (
-                                              <div>Memory: <span className="text-foreground">{(tc.memoryKb / 1024).toFixed(2)}MB</span></div>
-                                            )}
-                                          </div>
-                                        </div>
-
-                                        <div className="grid md:grid-cols-2 gap-3">
-                                          {tc.input && (
-                                            <div className="space-y-1">
-                                              <div className="text-[10px] text-muted-foreground uppercase">Stdin:</div>
-                                              <pre className="p-2 rounded bg-muted/30 border text-[11px] overflow-x-auto whitespace-pre-wrap">{tc.input}</pre>
-                                            </div>
-                                          )}
-                                          {tc.expectedOutput && (
-                                            <div className="space-y-1">
-                                              <div className="text-[10px] text-muted-foreground uppercase">Expected Output:</div>
-                                              <pre className="p-2 rounded bg-muted/30 border text-[11px] overflow-x-auto whitespace-pre-wrap">{tc.expectedOutput}</pre>
-                                            </div>
-                                          )}
-                                        </div>
-
-                                        {(tc.actualOutput || tc.stdout) && (
-                                          <div className="space-y-1">
-                                            <div className="text-[10px] text-muted-foreground uppercase font-semibold">Stdout / Output:</div>
-                                            <pre className="p-2.5 rounded bg-muted/40 border text-[11px] overflow-x-auto whitespace-pre-wrap text-foreground">{tc.actualOutput || tc.stdout}</pre>
-                                          </div>
-                                        )}
-
-                                        {(tc.stderr || tc.compileOutput) && (
-                                          <div className="space-y-1">
-                                            <div className="text-[10px] text-red-400 uppercase font-semibold">Diagnostics / Error Logs:</div>
-                                            <pre className="p-2.5 rounded bg-red-950/20 border border-red-500/20 text-[11px] overflow-x-auto whitespace-pre-wrap text-red-300">{tc.stderr || tc.compileOutput}</pre>
-                                          </div>
+                            <div className="p-3 text-xs space-y-2.5 max-h-56 overflow-y-auto font-mono">
+                              {isRunning ? (
+                                <div className="flex items-center gap-2 text-slate-600 p-2 font-sans">
+                                  <Loader2 className="w-4 h-4 animate-spin text-indigo-600" />
+                                  <span>Executing on Judge0 sandbox...</span>
+                                </div>
+                              ) : (
+                                <>
+                                  {testCaseResults.map((tc: any, idx) => (
+                                    <div
+                                      key={idx}
+                                      className={`p-2.5 rounded border ${
+                                        tc.status === "ACCEPTED" || tc.passed
+                                          ? "bg-emerald-50/60 border-emerald-200"
+                                          : "bg-rose-50/60 border-rose-200"
+                                      }`}
+                                    >
+                                      <div className="flex items-center justify-between font-bold text-[11px] mb-1">
+                                        <span
+                                          className={
+                                            tc.status === "ACCEPTED" || tc.passed ? "text-emerald-700" : "text-rose-700"
+                                          }
+                                        >
+                                          Testcase {idx + 1}: {tc.status || (tc.passed ? "ACCEPTED" : "FAILED")}
+                                        </span>
+                                        {tc.execTimeMs !== undefined && (
+                                          <span className="text-slate-500 font-normal">
+                                            {tc.execTimeMs} ms
+                                          </span>
                                         )}
                                       </div>
-                                    );
-                                  })()}
-                                </div>
+                                      {tc.input && (
+                                        <div className="text-[11px] text-slate-600 mb-1">
+                                          <span className="font-semibold text-slate-700">Input: </span>
+                                          <span className="bg-white px-1.5 py-0.5 rounded border border-slate-200">
+                                            {tc.input}
+                                          </span>
+                                        </div>
+                                      )}
+                                      {tc.expected && (
+                                        <div className="text-[11px] text-slate-600 mb-1">
+                                          <span className="font-semibold text-slate-700">Expected: </span>
+                                          <span className="bg-white px-1.5 py-0.5 rounded border border-slate-200">
+                                            {tc.expected}
+                                          </span>
+                                        </div>
+                                      )}
+                                      {tc.output && (
+                                        <div className="text-[11px] text-slate-700">
+                                          <span className="font-semibold text-slate-800">Your Output: </span>
+                                          <span
+                                            className={`px-1.5 py-0.5 rounded border ${
+                                              tc.status === "ACCEPTED" || tc.passed
+                                                ? "bg-white border-emerald-300 text-emerald-800"
+                                                : "bg-white border-rose-300 text-rose-800"
+                                            }`}
+                                          >
+                                            {tc.output}
+                                          </span>
+                                        </div>
+                                      )}
+                                    </div>
+                                  ))}
+                                  {consoleOutput && (
+                                    <pre className="text-slate-600 text-[11px] whitespace-pre-wrap bg-white p-2 border border-slate-200 rounded">
+                                      {consoleOutput}
+                                    </pre>
+                                  )}
+                                </>
                               )}
                             </div>
                           </div>
                         )}
                       </div>
                     </div>
-                  )}
-                </CardContent>
-              </Card>
+                  </div>
+                </div>
+              ) : (
+                /* ── Standard MCQ Card Layout ── */
+                <Card>
+                  <CardContent className="p-6 space-y-4">
+                    <div className="flex justify-between items-start flex-wrap gap-4">
+                      <div>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <Badge variant="secondary">
+                            <FileText className="w-3 h-3 mr-1" />
+                            {currentQuestion.type}
+                          </Badge>
+                          <Badge variant="outline">{currentQuestion.marks} marks</Badge>
+                          {currentQuestion.difficulty && (
+                            <Badge variant="outline" className={cn(
+                              currentQuestion.difficulty === "EASY" && "bg-green-500/10 text-green-500 border-green-500/20",
+                              currentQuestion.difficulty === "MEDIUM" && "bg-yellow-500/10 text-yellow-500 border-yellow-500/20",
+                              currentQuestion.difficulty === "HARD" && "bg-red-500/10 text-red-500 border-red-500/20",
+                            )}>
+                              {currentQuestion.difficulty}
+                            </Badge>
+                          )}
+                          {isCurrentAnswered() && (
+                            <Badge variant="outline" className="bg-green-500/20 text-green-700 border-green-500/30">
+                              <CheckCircle className="w-3 h-3 mr-1" /> Answered
+                            </Badge>
+                          )}
+                        </div>
+                        {currentQuestion.title &&
+                          !/<[a-z][\s\S]*>/i.test(currentQuestion.title) &&
+                          currentQuestion.title !== currentQuestion.prompt && (
+                            <h2 className="text-lg font-bold text-slate-900 mt-2 mb-1">
+                              {currentQuestion.title}
+                            </h2>
+                          )}
+                        {(() => {
+                          const rawPrompt = currentQuestion.prompt || currentQuestion.title || "";
+                          const decodedPrompt = decodeHtmlIfNeeded(rawPrompt);
+                          return isHtmlContent(decodedPrompt) ? (
+                            <div
+                              className="text-base font-normal mt-3 prose prose-slate max-w-none [&_ol]:list-decimal [&_ol]:pl-5 [&_ul]:list-disc [&_ul]:pl-5 [&_pre]:bg-slate-900 [&_pre]:text-slate-100 [&_pre]:p-3 [&_pre]:rounded-sm [&_code]:bg-slate-100 [&_code]:text-pink-600 [&_code]:px-1 [&_code]:py-0.5"
+                              dangerouslySetInnerHTML={{
+                                __html: decodedPrompt,
+                              }}
+                            />
+                          ) : (
+                            <div className="text-base font-medium mt-3 whitespace-pre-wrap">
+                              {decodedPrompt}
+                            </div>
+                          );
+                        })()}
+                        {currentQuestion.tags && currentQuestion.tags.length > 0 && (
+                          <div className="flex flex-wrap gap-1 mt-2">
+                            {currentQuestion.tags.map((tag, idx) => (
+                              <span key={idx} className="text-[10px] bg-muted px-2 py-0.5 rounded text-muted-foreground border">
+                                {tag}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          const newFlagged = new Set(flagged);
+                          if (newFlagged.has(currentQuestion.id)) {
+                            newFlagged.delete(currentQuestion.id);
+                          } else {
+                            newFlagged.add(currentQuestion.id);
+                          }
+                          setFlagged(newFlagged);
+                        }}
+                      >
+                        <Flag className={cn("w-4 h-4 mr-2", flagged.has(currentQuestion.id) && "fill-yellow-500 text-yellow-500")} />
+                        {flagged.has(currentQuestion.id) ? "Flagged" : "Flag for review"}
+                      </Button>
+                    </div>
+
+                    {currentQuestion.imageUrl && (
+                      <div className="mt-2">
+                        <QuestionImage
+                          src={currentQuestion.imageUrl}
+                          alt="Question diagram"
+                          enableZoom={true}
+                          className="max-w-full max-h-96 rounded-lg object-contain"
+                        />
+                      </div>
+                    )}
+
+                    {currentQuestion.options && (
+                      <div className="space-y-4">
+                        <RadioGroup
+                          value={(answers[currentQuestion.id] as string) || ""}
+                          onValueChange={(value) => handleMcqSelect(currentQuestion.id, value)}
+                          className="space-y-2 pt-2"
+                        >
+                          {currentQuestion.options.map((optionItem: unknown, idx: number) => {
+                            const option = optionItem as { id?: string; text?: string; imageUrl?: string } | string;
+                            const optionId = (typeof option === "object" && option !== null ? (option.id || option.text || "") : option) as string;
+                            const rawOptionText = (typeof option === "object" && option !== null ? (option.text || "") : option) as string;
+                            const optionText = decodeHtmlIfNeeded(rawOptionText);
+                            const optionImageUrl = typeof option === "object" && option !== null ? option.imageUrl : undefined;
+                            return (
+                              <Label 
+                                key={idx} 
+                                className={cn(
+                                  "flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-all",
+                                  answers[currentQuestion.id] === optionId 
+                                     ? "border-primary bg-primary/5 ring-1 ring-primary" 
+                                     : "border-border hover:bg-muted/50 hover:border-primary/30"
+                                )}
+                              >
+                                <RadioGroupItem value={optionId} id={`option-${idx}`} className="mt-0.5" />
+                                <div className="flex-1 min-w-0">
+                                  {isHtmlContent(optionText) ? (
+                                    <span
+                                      className="text-sm prose prose-sm max-w-none [&_p]:inline [&_p]:my-0"
+                                      dangerouslySetInnerHTML={{ __html: optionText }}
+                                    />
+                                  ) : (
+                                    <span className="text-sm">{optionText}</span>
+                                  )}
+                                  {optionImageUrl && (
+                                    <div className="mt-2">
+                                      <QuestionImage
+                                        src={optionImageUrl}
+                                        alt={`Option ${idx + 1}`}
+                                        enableZoom={true}
+                                        className="max-h-40 rounded object-contain bg-muted/20"
+                                      />
+                                    </div>
+                                  )}
+                                </div>
+                              </Label>
+                            );
+                          })}
+                        </RadioGroup>
+                        {answers[currentQuestion.id] && (
+                          <div className="flex justify-end items-center gap-1.5 text-xs text-muted-foreground font-medium pt-1">
+                            <CheckCircle className="w-3.5 h-3.5 text-green-500" />
+                            <span>Selection auto-saved</span>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
             </motion.div>
           </AnimatePresence>
         </main>
@@ -2207,7 +2351,6 @@ useEffect(() => {
       </AlertDialog>
 
       {config?.camera && <CameraPreview position="bottom-right" size="small" showOnHover />}
-      <ViolationToast />
       </div>
     </div>
   );

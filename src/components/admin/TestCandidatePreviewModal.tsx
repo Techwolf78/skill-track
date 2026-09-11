@@ -51,6 +51,8 @@ import {
 } from "@/components/ui/alert-dialog";
 import { cn } from "@/lib/utils";
 import { Test, TestQuestion, Question } from "@/lib/test-service";
+import { decodeHtmlIfNeeded, isHtmlContent } from "@/lib/html-utils";
+import { resolveStarterCode, DEFAULT_STARTER_CODES } from "@/lib/exam/languageMap";
 
 export interface EnrichedTestQuestion extends TestQuestion {
   question?: Question & {
@@ -101,6 +103,35 @@ export function TestCandidatePreviewModal({
       setIsFullscreen(false);
     }
   }, [isOpen, test]);
+
+  // Update preview code when index, language, or questions change
+  useEffect(() => {
+    if (!isOpen || questions.length === 0) return;
+    const currentQ = questions[currentIndex]?.question;
+    if (!currentQ) return;
+
+    const rawQType = (
+      currentQ.questionType ||
+      (currentQ as { type?: string })?.type ||
+      ""
+    ).toUpperCase();
+
+    const isCodingQ =
+      rawQType === "CODING" ||
+      !!currentQ.codeTemplate ||
+      !!currentQ.starterCode ||
+      !!currentQ.coding;
+
+    if (isCodingQ && currentQ.id) {
+      const qId = currentQ.id;
+      if (!answers[qId]) {
+        const starter = resolveStarterCode(currentQ as any, selectedLanguage) || DEFAULT_STARTER_CODES[selectedLanguage as keyof typeof DEFAULT_STARTER_CODES] || "";
+        if (starter) {
+          setAnswers((prev) => ({ ...prev, [qId]: starter }));
+        }
+      }
+    }
+  }, [isOpen, currentIndex, selectedLanguage, questions]);
 
   // Toggle native browser full screen (like Chrome F11)
   const toggleBrowserFullscreen = async () => {
@@ -468,18 +499,22 @@ export function TestCandidatePreviewModal({
                           </div>
                         </div>
                       ) : (
-                        <h2 className="text-lg font-medium mt-3 whitespace-pre-wrap leading-relaxed">
-                          {isCoding
-                            ? (currentQ as { title?: string })?.title || currentQ?.prompt
-                            : currentQ?.prompt || (currentQ as { title?: string })?.title}
-                        </h2>
-                      )}
-
-                      {/* Coding Problem Description */}
-                      {isCoding && currentQ?.prompt && (currentQ as { title?: string })?.title && (
-                        <p className="text-sm text-muted-foreground mt-2 whitespace-pre-wrap">
-                          {currentQ.prompt}
-                        </p>
+                        <div className="mt-3">
+                          {(() => {
+                            const rawPrompt = currentQ?.prompt || (currentQ as { title?: string })?.title || "";
+                            const decodedPrompt = decodeHtmlIfNeeded(rawPrompt);
+                            return isHtmlContent(decodedPrompt) ? (
+                              <div
+                                className="prose prose-slate max-w-none text-base font-normal [&_ol]:list-decimal [&_ol]:pl-5 [&_ul]:list-disc [&_ul]:pl-5 [&_code]:bg-slate-100 [&_code]:text-pink-600 [&_code]:px-1 [&_code]:py-0.5"
+                                dangerouslySetInnerHTML={{ __html: decodedPrompt }}
+                              />
+                            ) : (
+                              <h2 className="text-lg font-medium whitespace-pre-wrap leading-relaxed">
+                                {decodedPrompt}
+                              </h2>
+                            );
+                          })()}
+                        </div>
                       )}
 
                       {/* Question Image */}

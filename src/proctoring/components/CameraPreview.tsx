@@ -14,7 +14,7 @@ export const CameraPreview: React.FC<CameraPreviewProps> = ({
   size = "small",
   showOnHover = true
 }) => {
-  const { videoRef, isProctoringActive, trustScore, config } = useProctoring();
+  const { videoRef, isProctoringActive, config } = useProctoring();
   const [isMinimized, setIsMinimized] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
 
@@ -44,8 +44,7 @@ export const CameraPreview: React.FC<CameraPreviewProps> = ({
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
-      <div className="relative w-full h-full rounded-lg overflow-hidden border-2 shadow-2xl bg-black/80 backdrop-blur-md"
-        style={{ borderColor: trustScore > 80 ? "#10b981" : trustScore > 50 ? "#f59e0b" : "#ef4444" }}>
+      <div className="relative w-full h-full rounded-lg overflow-hidden border border-slate-700/80 shadow-2xl bg-black/80 backdrop-blur-md">
         
         {!isMinimized && (
           <video 
@@ -69,15 +68,6 @@ export const CameraPreview: React.FC<CameraPreviewProps> = ({
             </span>
           )}
         </div>
-
-        {/* Trust Score Overlay */}
-        {!isMinimized && (
-          <div className="absolute bottom-2 left-2 right-2 flex justify-between items-center">
-            <div className="bg-black/60 backdrop-blur-sm px-2 py-1 rounded text-[10px] text-white font-mono">
-              Trust: {trustScore}%
-            </div>
-          </div>
-        )}
 
         {/* Controls */}
         <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
