@@ -10,7 +10,10 @@ import {
 } from "./idempotency";
 
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8081";
+const API_BASE_URL =
+  import.meta.env.VITE_API_BASE_URL !== undefined && import.meta.env.VITE_API_BASE_URL !== ""
+    ? import.meta.env.VITE_API_BASE_URL
+    : (import.meta.env.PROD ? "https://api.gryphon360.com" : "http://localhost:8081");
 
 export const apiClient = axios.create({
   baseURL: API_BASE_URL,

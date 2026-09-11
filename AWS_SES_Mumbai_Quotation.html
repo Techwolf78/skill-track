@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AWS SES Quotation - Mumbai (ap-south-1)</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+    
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background-color: #f1f5f9;
+      color: #0f172a;
+      padding: 40px 20px;
+      display: flex;
+      justify-content: center;
+    }
+
+    .quotation-sheet {
+      background: #ffffff;
+      width: 100%;
+      max-width: 850px;
+      padding: 44px 48px;
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.08), 0 8px 10px -6px rgba(0, 0, 0, 0.05);
+      border-radius: 8px;
+      position: relative;
+    }
+
+    .top-accent-bar {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 4px;
+      display: flex;
+      border-top-left-radius: 8px;
+      border-top-right-radius: 8px;
+      overflow: hidden;
+    }
+
+    .bar-dark { background: #232F3E; width: 70%; height: 100%; }
+    .bar-orange { background: #FF9900; width: 30%; height: 100%; }
+
+    .header-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+    }
+
+    .aws-logo {
+      height: 52px;
+      width: auto;
+      object-fit: contain;
+    }
+
+    .doc-meta {
+      text-align: right;
+    }
+
+    .doc-meta h1 {
+      font-size: 18px;
+      font-weight: 800;
+      color: #232F3E;
+      letter-spacing: -0.02em;
+    }
+
+    .doc-meta p {
+      font-size: 11px;
+      color: #64748b;
+      margin-top: 4px;
+      line-height: 1.5;
+    }
+
+    .divider-orange {
+      height: 2.5px;
+      background: #FF9900;
+      margin-bottom: 18px;
+    }
+
+    .parties-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+
+    .party-card {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+      padding: 14px;
+    }
+
+    .party-card h3 {
+      font-size: 10.5px;
+      font-weight: 700;
+      color: #0073BB;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      margin-bottom: 8px;
+    }
+
+    .party-card p {
+      font-size: 12px;
+      color: #334155;
+      line-height: 1.5;
+    }
+
+    .section-title {
+      font-size: 11.5px;
+      font-weight: 700;
+      color: #232F3E;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      margin-bottom: 8px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 16px;
+    }
+
+    th {
+      background: #f1f5f9;
+      font-size: 11px;
+      font-weight: 700;
+      color: #232F3E;
+      text-align: left;
+      padding: 9px 12px;
+      border: 1px solid #e2e8f0;
+    }
+
+    th.text-right { text-align: right; }
+
+    td {
+      padding: 10px 12px;
+      font-size: 11.5px;
+      border: 1px solid #e2e8f0;
+      vertical-align: middle;
+    }
+
+    td.text-right { text-align: right; }
+
+    tr:nth-child(even) {
+      background: #f8fafc;
+    }
+
+    .item-desc {
+      font-size: 10.5px;
+      color: #64748b;
+      margin-top: 2px;
+    }
+
+    .totals-box {
+      border: 1.5px solid #cbd5e1;
+      border-radius: 6px;
+      overflow: hidden;
+      margin-bottom: 20px;
+    }
+
+    .total-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 16px;
+      background: #f8fafc;
+      border-bottom: 1px solid #e2e8f0;
+      font-size: 12px;
+    }
+
+    .total-row:last-child {
+      border-bottom: none;
+      background: #fffbeb;
+      padding: 14px 16px;
+    }
+
+    .total-label {
+      font-weight: 700;
+      color: #232F3E;
+    }
+
+    .total-value-usd {
+      font-weight: 700;
+      color: #0f172a;
+      font-size: 13px;
+    }
+
+    .total-value-inr {
+      font-weight: 800;
+      color: #d97706;
+      font-size: 18px;
+    }
+
+    .terms-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-bottom: 22px;
+    }
+
+    .terms-box {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+      padding: 14px;
+    }
+
+    .terms-box h4 {
+      font-size: 10.5px;
+      font-weight: 700;
+      color: #0073BB;
+      margin-bottom: 8px;
+      text-transform: uppercase;
+    }
+
+    .terms-box ul {
+      list-style: none;
+      padding: 0;
+    }
+
+    .terms-box li {
+      font-size: 11px;
+      color: #334155;
+      margin-bottom: 6px;
+      line-height: 1.4;
+    }
+
+    .terms-box li strong {
+      color: #0f172a;
+    }
+
+    .sign-cards-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-top: 10px;
+    }
+
+    .sign-card {
+      background: #f8fafc;
+      border: 1px solid #cbd5e1;
+      border-radius: 6px;
+      padding: 14px 16px;
+    }
+
+    .sign-card h4 {
+      font-size: 11px;
+      font-weight: 700;
+      color: #232F3E;
+      text-transform: uppercase;
+    }
+
+    .sign-card .sign-dept {
+      font-size: 10px;
+      color: #64748b;
+      margin-top: 2px;
+    }
+
+    .signing-space {
+      height: 40px;
+      border-bottom: 1px solid #94a3b8;
+      margin-bottom: 8px;
+    }
+
+    .sign-meta-line {
+      font-size: 10.5px;
+      color: #334155;
+      line-height: 1.6;
+    }
+
+    .footer-note {
+      margin-top: 24px;
+      display: flex;
+      justify-content: space-between;
+      font-size: 10px;
+      color: #94a3b8;
+      border-top: 1px solid #e2e8f0;
+      padding-top: 12px;
+    }
+
+    @media print {
+      body {
+        background: #ffffff;
+        padding: 0;
+      }
+      .quotation-sheet {
+        box-shadow: none;
+        padding: 24px;
+        max-width: 100%;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="quotation-sheet">
+    <div class="top-accent-bar">
+      <div class="bar-dark"></div>
+      <div class="bar-orange"></div>
+    </div>
+
+    <div class="header-row">
+      <div>
+        <img src="aws_logo_official_highres.png" alt="AWS Logo" class="aws-logo" />
+        <div style="font-size: 11px; color: #475569; margin-top: 6px; font-weight: 600;">
+          Amazon Web Services India (AISPL)
+          <div style="font-size: 10px; color: #94a3b8; font-weight: 400;">Simple Email Service (SES) Production Infrastructure</div>
+        </div>
+      </div>
+      <div class="doc-meta">
+        <h1>COMMERCIAL ESTIMATE &amp; QUOTATION</h1>
+        <p>
+          <strong>Quotation Ref:</strong> AWS-SES-BOM-2026<br />
+          <strong>Export Date:</strong> 09/11/2026<br />
+          <strong>Region:</strong> Asia Pacific (Mumbai) [ap-south-1]<br />
+          <strong>Service Status:</strong> Active Production Gateway
+        </p>
+      </div>
+    </div>
+
+    <div class="divider-orange"></div>
+
+    <div class="parties-grid">
+      <div class="party-card">
+        <h3>Cloud Infrastructure Provider</h3>
+        <p>
+          <strong>Amazon Web Services India</strong><br />
+          Entity: Amazon Internet Services Pvt. Ltd. (AISPL)<br />
+          Region: Asia Pacific (Mumbai) / ap-south-1<br />
+          Service: Amazon Simple Email Service (SES)
+        </p>
+      </div>
+      <div class="party-card">
+        <h3>Client / Billing Account</h3>
+        <p>
+          <strong>Enterprise Account Operations</strong><br />
+          Attn: Accounts &amp; Finance Department<br />
+          Domain: Verified Custom Sending Domain<br />
+          Payment: Company Credit Card (Auto-Debit)
+        </p>
+      </div>
+    </div>
+
+    <div class="section-title">Detailed AWS Estimate Bill of Materials (Mumbai Region)</div>
+    <table>
+      <thead>
+        <tr>
+          <th>Service Item &amp; Description</th>
+          <th>Allocated Volume</th>
+          <th class="text-right">Monthly (USD)</th>
+          <th class="text-right">Monthly (INR)</th>
+          <th class="text-right">Annual (INR)</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>
+            <strong>Amazon SES - High-Speed Outbound Emails</strong>
+            <div class="item-desc">Candidate test invitations, login OTPs, automated scorecards, notifications</div>
+          </td>
+          <td>27,800 emails/mo<br /><span style="font-size: 10px; color: #64748b;">(333,600 / year)</span></td>
+          <td class="text-right">$ 2.78</td>
+          <td class="text-right">INR 265.62</td>
+          <td class="text-right">INR 3,187.41</td>
+        </tr>
+        <tr>
+          <td>
+            <strong>SES Mail Manager &amp; Ingress Processing</strong>
+            <div class="item-desc">Open ingress endpoints, authenticated routing, bounce &amp; suppression handling</div>
+          </td>
+          <td>27,800 emails/mo<br /><span style="font-size: 10px; color: #64748b;">Ingress Endpoints</span></td>
+          <td class="text-right">$ 1.39</td>
+          <td class="text-right">INR 132.81</td>
+          <td class="text-right">INR 1,593.71</td>
+        </tr>
+        <tr>
+          <td>
+            <strong>Custom Domain Identity (DKIM, SPF &amp; DMARC)</strong>
+            <div class="item-desc">DNS cryptographic identity verification for 99.9% direct inbox delivery</div>
+          </td>
+          <td>Production Domain<br /><span style="font-size: 10px; color: #64748b;">Full Authentication</span></td>
+          <td class="text-right">$ 0.00</td>
+          <td class="text-right">INR 0.00</td>
+          <td class="text-right">INR 0.00</td>
+        </tr>
+        <tr>
+          <td>
+            <strong>Infrastructure Setup &amp; Account Verification</strong>
+            <div class="item-desc">AWS sandbox exit request, dedicated SMTP credentials, API secret provisioning</div>
+          </td>
+          <td>One-Time Setup<br /><span style="font-size: 10px; color: #64748b;">Zero Upfront</span></td>
+          <td class="text-right">$ 0.00</td>
+          <td class="text-right">INR 0.00</td>
+          <td class="text-right">INR 0.00</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="totals-box">
+      <div class="total-row">
+        <span class="total-label">Upfront Provisioning Cost:</span>
+        <span class="total-value-usd">$ 0.00 USD</span>
+        <span style="font-weight: 700; color: #0f172a;">INR 0.00</span>
+      </div>
+      <div class="total-row">
+        <span class="total-label">Monthly Recurring Cost:</span>
+        <span class="total-value-usd">$ 4.17 USD / mo</span>
+        <span style="font-weight: 700; color: #0f172a;">INR 398.43 / mo</span>
+      </div>
+      <div class="total-row">
+        <span class="total-label" style="font-size: 13.5px;">TOTAL 12 MONTHS COMMITMENT:</span>
+        <span class="total-value-usd" style="font-size: 13.5px;">$ 50.04 USD</span>
+        <span class="total-value-inr">INR 4,781.12</span>
+      </div>
+    </div>
+
+    <div class="terms-grid">
+      <div class="terms-box">
+        <h4>Commercial &amp; Billing Terms</h4>
+        <ul>
+          <li>- <strong>Billing Entity:</strong> Billed by Amazon Internet Services Pvt. Ltd. (AISPL).</li>
+          <li>- <strong>Pricing Model:</strong> Pay-as-you-go consumption with zero lock-in.</li>
+          <li>- <strong>Payment Method:</strong> Company Credit Card recurring auto-debit.</li>
+          <li>- <strong>Setup Capital:</strong> INR 0.00 upfront investment required.</li>
+        </ul>
+      </div>
+      <div class="terms-box">
+        <h4>Deliverability &amp; SLA</h4>
+        <ul>
+          <li>- <strong>Uptime Guarantee:</strong> 99.99% AWS Simple Email Service availability.</li>
+          <li>- <strong>Inbox Placement:</strong> Direct inbox routing via DKIM / SPF / DMARC.</li>
+          <li>- <strong>Delivery Speed:</strong> High throughput transactional email dispatch.</li>
+          <li>- <strong>Security:</strong> Full TLS 1.3 cryptographic transport encryption.</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="sign-cards-grid">
+      <div class="sign-card">
+        <h4>AWS Document Validation</h4>
+        <div class="sign-dept">Amazon Web Services Electronic Billing Gateway</div>
+        <div style="margin-top: 14px; font-size: 11px; line-height: 1.6; color: #334155;">
+          <div><strong>Issuing Portal:</strong> AWS Cloud Architecture Portal</div>
+          <div><strong>Status:</strong> <span style="color: #059669; font-weight: 700;">DIGITALLY VERIFIED (ONLINE ESTIMATE)</span></div>
+          <div><strong>System Ref:</strong> AWS-SES-BOM-2026-VAL</div>
+          <div style="margin-top: 6px; font-size: 10px; color: #64748b; font-style: italic;">* Computer-generated AWS quotation sent electronically. No physical signature required from AWS.</div>
+        </div>
+      </div>
+      <div class="sign-card">
+        <h4>Authorized &amp; Accepted By (Company Approval)</h4>
+        <div class="sign-dept">Company Management &amp; Corporate Finance Department</div>
+        <div class="signing-space"></div>
+        <div class="sign-meta-line"><strong>Authorized Signature:</strong> ____________________________</div>
+        <div class="sign-meta-line"><strong>Name &amp; Title:</strong> ___________________________________</div>
+        <div class="sign-meta-line"><strong>Company Stamp &amp; Date:</strong> __________________________</div>
+      </div>
+    </div>
+
+    <div class="footer-note">
+      <span>Amazon Web Services (AWS) Simple Email Service • Asia Pacific (Mumbai) • Commercial Estimate</span>
+      <span>Page 1 of 1</span>
+    </div>
+  </div>
+</body>
+</html>

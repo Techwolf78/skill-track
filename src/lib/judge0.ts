@@ -242,7 +242,6 @@ export function inferMetadataFromSnippets(
   };
 }
 
-const JUDGE0_URL = "https://judge0-ce.p.rapidapi.com";
 const env =
   typeof import.meta !== "undefined"
     ? (import.meta as unknown as { env: Record<string, string> }).env
@@ -250,12 +249,27 @@ const env =
 const globalObj = globalThis as unknown as {
   process?: { env?: Record<string, string> };
 };
+
+const JUDGE0_URL =
+  env?.VITE_JUDGE0_URL ||
+  env?.VITE_JUDGE0_API_URL ||
+  globalObj.process?.env?.VITE_JUDGE0_URL ||
+  "https://judge0-ce.p.rapidapi.com";
+
 const RAPIDAPI_KEY =
   env?.VITE_RAPIDAPI_KEY ||
+  env?.VITE_JUDGE0_API_KEY ||
   env?.RAPIDAPI_KEY ||
   globalObj.process?.env?.VITE_RAPIDAPI_KEY ||
+  globalObj.process?.env?.VITE_JUDGE0_API_KEY ||
   globalObj.process?.env?.RAPIDAPI_KEY;
-const RAPIDAPI_HOST = "judge0-ce.p.rapidapi.com";
+
+const RAPIDAPI_HOST =
+  env?.VITE_JUDGE0_HOST ||
+  env?.VITE_RAPIDAPI_HOST ||
+  globalObj.process?.env?.VITE_JUDGE0_HOST ||
+  globalObj.process?.env?.VITE_RAPIDAPI_HOST ||
+  "judge0-ce.p.rapidapi.com";
 
 function encodeBase64(input: string): string {
   if (typeof btoa === "function") {
