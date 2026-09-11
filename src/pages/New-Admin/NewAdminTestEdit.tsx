@@ -1233,6 +1233,40 @@ export default function NewAdminTestEdit() {
   };
 
 
+  const formatTextForPdf = (rawText?: string): string => {
+    if (!rawText) return "";
+    let text = rawText;
+    // Iteratively decode double-escaped entities
+    for (let i = 0; i < 3; i++) {
+      if (text.includes("&lt;") || text.includes("&gt;") || text.includes("&amp;") || text.includes("&quot;") || text.includes("&#39;")) {
+        text = text
+          .replace(/&lt;/g, "<")
+          .replace(/&gt;/g, ">")
+          .replace(/&amp;/g, "&")
+          .replace(/&quot;/g, '"')
+          .replace(/&#39;/g, "'")
+          .replace(/&nbsp;/g, " ");
+      }
+    }
+    // Convert basic HTML break / paragraph / list elements to clean text formatting
+    text = text
+      .replace(/<br\s*[\/]?>/gi, "\n")
+      .replace(/<\/p>/gi, "\n\n")
+      .replace(/<p[^>]*>/gi, "")
+      .replace(/<\/li>/gi, "\n")
+      .replace(/<li[^>]*>/gi, "• ")
+      .replace(/<h[1-6][^>]*>/gi, "\n\n")
+      .replace(/<\/h[1-6]>/gi, "\n")
+      .replace(/<code[^>]*>/gi, "`")
+      .replace(/<\/code>/gi, "`")
+      .replace(/<pre[^>]*>/gi, "\n")
+      .replace(/<\/pre>/gi, "\n")
+      .replace(/<[^>]+>/g, ""); // Strip any remaining tags
+
+    // Normalize excess whitespace
+    return text.replace(/\n{3,}/g, "\n\n").trim();
+  };
+
   const downloadAdvancedReport = async (inv: CandidateInvitation) => {
     try {
       const scoreData = candidateResults[inv.id];
@@ -1303,6 +1337,25 @@ export default function NewAdminTestEdit() {
       }
       const questionsList = rawQuestionsList;
       const submissionsList = resumeData?.submissions || resumeData?.data?.submissions || [];
+
+      // Fetch coding submission results (test cases passed, total, status, execution metrics)
+      const codingResultMap = new Map<string, any>();
+      const codingSubs = submissionsList.filter((s: any) => s.questionType === "CODING" && s.id);
+      if (codingSubs.length > 0) {
+        await Promise.all(
+          codingSubs.map(async (sub: any) => {
+            try {
+              const res = await apiClient.get(`/api/code/execute/submit/${sub.id}/result`);
+              const resData = res.data?.data || res.data;
+              if (resData) {
+                codingResultMap.set(String(sub.id).toLowerCase(), resData);
+              }
+            } catch {
+              // Gracefully handle if result not yet ready or unavailable
+            }
+          })
+        );
+      }
 
       const scoreText =
         scoreData?.result?.totalScore !== undefined
@@ -1623,6 +1676,12 @@ export default function NewAdminTestEdit() {
             .filter(Boolean)
             .map((id) => String(id).trim().toLowerCase());
 
+          // Fetch true correct options list & question definition
+          const enrichedTQ = questions.find(
+            (tq) => tq.questionId === questionId || tq.id === questionId || tq.question?.id === questionId,
+          );
+          const enrichedQuestion = enrichedTQ?.question;
+
           const sub = submissionsList.find(
             (s: {
               questionId?: string;
@@ -1635,7 +1694,11 @@ export default function NewAdminTestEdit() {
               return sQId !== "" && targetQIds.includes(sQId);
             },
           );
-          const isCoding = q.type === "CODING";
+          const isCoding =
+            String(q.type || "").toUpperCase() === "CODING" ||
+            String(enrichedQuestion?.type || "").toUpperCase() === "CODING" ||
+            Boolean(q.coding || (enrichedQuestion as any)?.coding) ||
+            String(sub?.questionType || "").toUpperCase() === "CODING";
 
           // Build exact selected ID set & raw answers list
           const selectedValues = new Set<string>();
@@ -1657,11 +1720,6 @@ export default function NewAdminTestEdit() {
             }
           }
 
-          // Fetch true correct options list
-          const enrichedTQ = questions.find(
-            (tq) => tq.questionId === questionId || tq.id === questionId || tq.question?.id === questionId,
-          );
-          const enrichedQuestion = enrichedTQ?.question;
           const correctOptions = (enrichedQuestion?.mcqOptions && enrichedQuestion.mcqOptions.length > 0)
             ? enrichedQuestion.mcqOptions
             : ((enrichedQuestion as any)?.options?.length > 0)
@@ -1682,11 +1740,15 @@ export default function NewAdminTestEdit() {
           const timeSpentText =
             minutes > 0 ? `${minutes}m ${seconds}s` : `${seconds}s`;
 
+          // Clean and format question prompt for PDF
+          const rawPrompt = q.prompt || enrichedQuestion?.prompt || (q as any).title || "";
+          const cleanPrompt = formatTextForPdf(rawPrompt);
+
           // Build structured body rows
           const bodyRows: unknown[][] = [
             [
               {
-                content: `Question:\n${q.prompt || enrichedQuestion?.prompt || ""}`,
+                content: `Question:\n${cleanPrompt}`,
                 colSpan: 3,
                 styles: {
                   textColor: [15, 23, 42],
@@ -1699,14 +1761,35 @@ export default function NewAdminTestEdit() {
           ];
 
           if (isCoding) {
+            const codingResult = sub?.id ? codingResultMap.get(String(sub.id).toLowerCase()) : null;
+            const languageUsed = sub?.gradingLanguage || (q as any).coding?.language || (enrichedQuestion as any)?.coding?.language || "Code";
+            const passedTc = codingResult?.testCasesPassed !== undefined ? codingResult.testCasesPassed : null;
+            const totalTc = codingResult?.testCasesTotal !== undefined ? codingResult.testCasesTotal : null;
+            const execStatus = codingResult?.status || (passedTc !== null && totalTc !== null ? (passedTc === totalTc ? "ACCEPTED" : passedTc > 0 ? "PARTIAL" : "FAILED") : null);
+            const execTime = codingResult?.execTimeMs ? `${codingResult.execTimeMs}ms` : null;
+
+            let tcSummary = "";
+            if (passedTc !== null && totalTc !== null) {
+              const hiddenFailed = totalTc > passedTc;
+              tcSummary = `Test Cases: ${passedTc}/${totalTc} Passed (Sample & Hidden)` + (hiddenFailed ? ` — ${totalTc - passedTc} Failed` : " — All Passed");
+            }
+
+            const headerInfo = [
+              `Language: ${languageUsed.toUpperCase()}`,
+              execStatus ? `Status: ${execStatus}` : null,
+              tcSummary || null,
+              execTime ? `Exec Time: ${execTime}` : null,
+            ].filter(Boolean).join("  |  ");
+
             bodyRows.push([
               {
-                content: `Submitted Code:\n${sub?.answerText || "No submission"}`,
+                content: `CODING SUBMISSION METRICS:\n${headerInfo || "No execution telemetry recorded"}\n\nSubmitted Code:\n${sub?.answerText || "No code submitted"}`,
                 colSpan: 3,
                 styles: {
                   fontStyle: "normal",
                   fillColor: [248, 250, 252],
                   textColor: [15, 23, 42],
+                  fontSize: 8,
                 },
               },
             ]);

@@ -672,6 +672,25 @@ useEffect(() => {
   }
 }, [test]);
 
+// Reconcile language when question or currentIndex changes
+useEffect(() => {
+  const currentQ = questions[currentIndex];
+  if (currentQ?.type === "CODING") {
+    let questionLangs: LanguageKey[] = [];
+    if (currentQ.starterCode && Object.keys(currentQ.starterCode).length > 0) {
+      questionLangs = Object.keys(currentQ.starterCode) as LanguageKey[];
+    } else if (currentQ.codeTemplate && Object.keys(currentQ.codeTemplate).length > 0) {
+      questionLangs = Object.keys(currentQ.codeTemplate) as LanguageKey[];
+    } else if ((currentQ as any).languageTemplates && Object.keys((currentQ as any).languageTemplates).length > 0) {
+      questionLangs = Object.keys((currentQ as any).languageTemplates).map(k => k === "python" ? "python3" : k) as LanguageKey[];
+    }
+
+    if (questionLangs.length > 0 && !questionLangs.includes(language)) {
+      setLanguage(questionLangs[0]);
+    }
+  }
+}, [currentIndex, questions, language]);
+
 // Initialize code editor when question changes
 useEffect(() => {
   const currentQ = questions[currentIndex];
@@ -1888,7 +1907,9 @@ useEffect(() => {
                             onValueChange={(val) => setLanguage(val as LanguageKey)}
                           >
                             <SelectTrigger className="h-8 w-44 text-xs font-medium bg-slate-50 border-slate-200">
-                              <SelectValue placeholder="Language" />
+                              <SelectValue placeholder="Language">
+                                {LANGUAGE_MAP[language]?.name || language || "Python 3"}
+                              </SelectValue>
                             </SelectTrigger>
                             <SelectContent>
                               {availableLanguages.map((lang) => (

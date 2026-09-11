@@ -890,7 +890,17 @@ export default function NewAdminQuestionPreview() {
                       onValueChange={(val) => setSelectedLanguage(val)}
                     >
                       <SelectTrigger className="h-8 w-44 text-xs font-medium bg-slate-50 border-slate-200">
-                        <SelectValue placeholder="Language" />
+                        <SelectValue placeholder="Language">
+                          {selectedLanguage === "python3"
+                            ? "Python 3"
+                            : selectedLanguage === "javascript"
+                            ? "JavaScript (Node)"
+                            : selectedLanguage === "java"
+                            ? "Java 17 (OpenJDK)"
+                            : selectedLanguage === "cpp"
+                            ? "C++ (GCC)"
+                            : selectedLanguage}
+                        </SelectValue>
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="python3">Python 3</SelectItem>

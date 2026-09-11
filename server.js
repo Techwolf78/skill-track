@@ -13,7 +13,7 @@ const PORT = parseInt(process.env.PORT || '8080', 10);
 const HOST = '0.0.0.0';
 
 // Backend Proxy Target (defaults to production Airtel Cloud VM gateway)
-const BACKEND_URL = process.env.BACKEND_URL || 'https://api.gryphon360.com';
+const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:8081';
 const backendParsed = new URL(BACKEND_URL);
 const backendClient = backendParsed.protocol === 'https:' ? https : http;
 
