@@ -35,7 +35,7 @@ export default function Login() {
   const { login: loginToContext } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
 
-  const [adminEmail, setAdminEmail] = useState("superadmin@gryphonacademy.co.in");
+  const [adminEmail, setAdminEmail] = useState("superadmin@gryphon360.com");
   const [adminPassword, setAdminPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
 
@@ -94,7 +94,7 @@ export default function Login() {
   };
 
   const fillAdminCredentials = () => {
-    setAdminEmail("superadmin@gryphonacademy.co.in");
+    setAdminEmail("superadmin@gryphon360.com");
     setAdminPassword("password123");
   };
 
