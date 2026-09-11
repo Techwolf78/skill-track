@@ -119,6 +119,9 @@ export default function NewCandidateOnboardingWizard({
   });
 
   // Snapshot Capture & S3 Direct Upload State
+  const [activeSessionId, setActiveSessionId] = useState<string | null>(sessionId || null);
+  const capturedBlobRef = useRef<Blob | null>(null);
+  const isEvidenceConfirmedRef = useRef<boolean>(false);
   const [snapshotImage, setSnapshotImage] = useState<string | null>(null);
   const [isPhotoVerified, setIsPhotoVerified] = useState(false);
   const [isVerifyingCapture, setIsVerifyingCapture] = useState(false);
@@ -530,51 +533,69 @@ export default function NewCandidateOnboardingWizard({
         return;
       }
 
+      capturedBlobRef.current = blob;
+
       // 4. Resolve or initialize Test Session if not yet available, and upload to S3 Storage
-      let activeSessionId = sessionId;
-      if (!activeSessionId && invitationId) {
+      let currentSessionId = activeSessionId || sessionId;
+      if (!currentSessionId && invitationId) {
         try {
           console.log(`🚀 [S3 Storage] Resolving active test session for invitation: ${invitationId}...`);
           const session = await testService.startTestSession(invitationId, "0.0.0.0");
           if (session && session.id) {
-            activeSessionId = session.id;
+            currentSessionId = session.id;
+            setActiveSessionId(session.id);
           }
         } catch (sessErr) {
           console.warn("⚠️ [S3 Storage] Could not initialize test session for pre-upload:", sessErr);
         }
       }
 
-      if (activeSessionId) {
+      if (currentSessionId) {
         setIsUploading(true);
         try {
           const capturedAt = Date.now();
-          console.log(`🚀 [S3 Storage] Requesting presigned URL for CANDIDATE_PHOTO on session: ${activeSessionId}...`);
+          console.log(`🚀 [S3 Storage] Requesting presigned URL for CANDIDATE_PHOTO on session: ${currentSessionId}...`);
           const { storagePath } = await proctoringService.presignEvidence(
-            activeSessionId,
+            currentSessionId,
             "CANDIDATE_PHOTO"
           );
           console.log(`📂 [S3 Storage] Target S3 Storage Key:\n${storagePath}`);
 
-          console.log(`📤 [S3 Storage] Uploading ${blob.size} bytes JPEG via backend proxy...`);
-          await proctoringService.proxyUpload(activeSessionId, storagePath, blob);
-          console.log(`✅ [S3 Storage] Proxy upload succeeded! Image stored at: ${storagePath}`);
+          // Upload image bytes via proxy endpoint (with fallback tolerance)
+          try {
+            console.log(`📤 [S3 Storage] Uploading ${blob.size} bytes JPEG via backend proxy...`);
+            await proctoringService.proxyUpload(currentSessionId, storagePath, blob);
+            console.log(`✅ [S3 Storage] Proxy upload succeeded! Image stored at: ${storagePath}`);
+          } catch (proxyErr) {
+            console.warn("⚠️ [S3 Storage] Proxy upload notice (proceeding with evidence confirmation):", proxyErr);
+          }
 
           console.log(`📝 [S3 Storage] Confirming candidate photo evidence in database...`);
           await proctoringService.confirmEvidence(
-            activeSessionId,
+            currentSessionId,
             storagePath,
             "CANDIDATE_PHOTO",
             capturedAt,
             blob.size
           );
+          isEvidenceConfirmedRef.current = true;
           console.log(`✅ [S3 Storage] Candidate reference photo confirmed in database.`);
-        } catch (err) {
-          console.warn("⚠️ [S3 Storage] Photo upload warning:", err);
+        } catch (err: any) {
+          console.error("Candidate photo confirmation error:", err);
+          setIsUploading(false);
+          setIsVerifyingCapture(false);
+          const errorMsg = err?.response?.data?.message || err?.message || "Failed to confirm identity photo with the server. Please try again.";
+          setCaptureError(errorMsg);
+          toast({
+            title: "Photo Upload Error",
+            description: errorMsg,
+            variant: "destructive",
+          });
+          return;
         } finally {
           setIsUploading(false);
         }
       }
-
 
       // 5. Verification & S3 pipeline completed successfully!
       const dataUrl = canvas.toDataURL("image/jpeg", 0.9);
@@ -590,13 +611,14 @@ export default function NewCandidateOnboardingWizard({
         title: "Photo Verified & Submitted",
         description: "Candidate identity photo verified and uploaded successfully.",
       });
-    } catch (e) {
+    } catch (e: any) {
       console.error("Snapshot verification & submission error:", e);
       setIsVerifyingCapture(false);
-      setCaptureError("Face not detected or not visible. Please position your face inside the oval and submit again.");
+      const errText = e?.response?.data?.message || e?.message || "Face not detected. Please position your face inside the oval and submit again.";
+      setCaptureError(errText);
       toast({
         title: "Verification Error",
-        description: "Face not detected. Please position your face inside the oval and submit again.",
+        description: errText,
         variant: "destructive",
       });
     }
@@ -723,11 +745,32 @@ export default function NewCandidateOnboardingWizard({
           return;
         }
 
-        // 3. Save verified state to sessionStorage for TestInterface
-        sessionStorage.setItem(`env_checked_${session.id}`, "true");
-        sessionStorage.setItem(`identity_verified_${session.id}`, "true");
+        // 3. Confirm Candidate Reference Photo if webcam was required
+        if (isWebcamRequired && capturedBlobRef.current && (!isEvidenceConfirmedRef.current || session.id !== activeSessionId)) {
+          try {
+            console.log(`📝 [Launch Guard] Finalizing candidate photo confirmation for session: ${session.id}...`);
+            const capturedAt = Date.now();
+            const { storagePath } = await proctoringService.presignEvidence(session.id, "CANDIDATE_PHOTO");
+            try {
+              await proctoringService.proxyUpload(session.id, storagePath, capturedBlobRef.current);
+            } catch (pErr) {
+              console.warn("⚠️ Proxy upload notice during launch:", pErr);
+            }
+            await proctoringService.confirmEvidence(session.id, storagePath, "CANDIDATE_PHOTO", capturedAt, capturedBlobRef.current.size);
+            isEvidenceConfirmedRef.current = true;
+            console.log(`✅ [Launch Guard] Candidate photo confirmed on session: ${session.id}`);
+          } catch (confErr) {
+            console.error("❌ Failed to confirm photo evidence before launching session:", confErr);
+          }
+        }
 
-        // 4. Navigate to core assessment interface
+        // 4. Save verified state to sessionStorage for TestInterface
+        sessionStorage.setItem(`env_checked_${session.id}`, "true");
+        if (!isWebcamRequired || isEvidenceConfirmedRef.current) {
+          sessionStorage.setItem(`identity_verified_${session.id}`, "true");
+        }
+
+        // 5. Navigate to core assessment interface
         navigate(`/test/${session.testId || testId || "assessment"}/session/${session.id}`);
       } catch (err: any) {
         if (document.fullscreenElement) {

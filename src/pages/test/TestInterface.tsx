@@ -244,18 +244,40 @@ export default function TestInterface() {
     setIdentityVerified(true);
   };
 
+  const handleRequireIdentityVerification = () => {
+    if (sessionId) {
+      sessionStorage.removeItem(`identity_verified_${sessionId}`);
+    }
+    setIdentityVerified(false);
+  };
+
   const handleEnvironmentComplete = async () => {
     if (sessionId) {
       try {
         // Activate test session on backend (starts countdown timer)
         await testService.activateTestSession(sessionId);
         toast({ title: "Assessment Activated", description: "All checks passed. Assessment timer started!" });
-      } catch (err) {
+        sessionStorage.setItem(`env_checked_${sessionId}`, "true");
+        setEnvChecked(true);
+      } catch (err: any) {
+        const errMsg = err?.response?.data?.message || err?.message || "";
         console.error("Session activation error:", err);
+        if (errMsg.toLowerCase().includes("candidate photo") || errMsg.toLowerCase().includes("photo must be uploaded")) {
+          sessionStorage.removeItem(`identity_verified_${sessionId}`);
+          setIdentityVerified(false);
+          toast({
+            title: "Photo Verification Required",
+            description: "Please capture and upload your identity snapshot to activate the assessment.",
+            variant: "destructive"
+          });
+          return;
+        }
+        sessionStorage.setItem(`env_checked_${sessionId}`, "true");
+        setEnvChecked(true);
       }
-      sessionStorage.setItem(`env_checked_${sessionId}`, "true");
+    } else {
+      setEnvChecked(true);
     }
-    setEnvChecked(true);
   };
 
   if (!config) {
@@ -273,13 +295,13 @@ export default function TestInterface() {
       ) : !envChecked ? (
         <EnvironmentCheck config={config} onComplete={handleEnvironmentComplete} />
       ) : (
-        <TestInterfaceContent testId={testId} sessionId={sessionId} navigate={navigate} toast={toast} />
+        <TestInterfaceContent testId={testId} sessionId={sessionId} navigate={navigate} toast={toast} onRequireIdentityVerification={handleRequireIdentityVerification} />
       )}
     </ProctoringProvider>
   );
 }
 
-function TestInterfaceContent({ testId, sessionId, navigate, toast }: { testId?: string; sessionId?: string; navigate: (path: string) => void; toast: (props: { title?: string; description?: string; variant?: "default" | "destructive" }) => void }) {
+function TestInterfaceContent({ testId, sessionId, navigate, toast, onRequireIdentityVerification }: { testId?: string; sessionId?: string; navigate: (path: string) => void; toast: (props: { title?: string; description?: string; variant?: "default" | "destructive" }) => void; onRequireIdentityVerification?: () => void }) {
   const { violations, trustScore, isProctoringActive, startProctoring, syncViolations, flushEvidence, videoRef, config } = useProctoring();
   const lastWarnedCountRef = useRef(0);
   const hasWarnedFullscreenRef = useRef(false);
@@ -466,10 +488,18 @@ function TestInterfaceContent({ testId, sessionId, navigate, toast }: { testId?:
         try {
           await testService.activateTestSession(sessionId);
           console.log("✅ STEP 2b: Session activated.");
-        } catch (activateErr) {
-          // If activation fails (e.g. photo not yet uploaded) log a warning and continue;
-          // getTestPaper will surface the real error if the session is still not ACTIVE.
-          console.warn("⚠️ Session activation warning:", activateErr);
+        } catch (activateErr: any) {
+          const errMsg = activateErr?.response?.data?.message || activateErr?.message || "";
+          console.warn("⚠️ Session activation error:", activateErr);
+          if (errMsg.toLowerCase().includes("candidate photo") || errMsg.toLowerCase().includes("photo must be uploaded")) {
+            console.log("🔄 Candidate photo missing on backend. Falling back to Identity Verification...");
+            if (onRequireIdentityVerification) {
+              onRequireIdentityVerification();
+              return;
+            }
+          }
+          // If activation failed for a reason other than missing photo, throw to display appropriate error
+          throw activateErr;
         }
       }
 
