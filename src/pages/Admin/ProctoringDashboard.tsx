@@ -122,9 +122,11 @@ export type ProctoringEventSeverity = "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
 
 export interface AssessmentSchedule {
   id: string;
+  testId?: string;
   assessmentName: string;
   scheduledDate: string;
   startTime: string;
+  formattedTimeRange?: string;
   proctoringMode: ProctoringMode;
   totalCandidates?: number;
   activeCandidates?: number;
@@ -317,24 +319,69 @@ export default function ProctoringDashboard() {
     setLoadingSchedules(true);
     setErrorSchedules(null);
     try {
-      const standardSchedules = await testService.getAllTestSchedules({
-        size: 1000,
+      const [standardSchedules, allTests] = await Promise.all([
+        testService.getAllTestSchedules({ size: 1000 }),
+        testService.getAllTests({ size: 1000 }).catch(() => []),
+      ]);
+
+      const testMap = new Map((allTests || []).map((t) => [t.id, t]));
+
+      const scheduleList: AssessmentSchedule[] = standardSchedules.map((s) => {
+        const test = (s.testId ? testMap.get(s.testId) : null) || s.test;
+        const testTitle = test?.title || (s.testId ? `Assessment (${s.testId.slice(0, 8)})` : `Assessment #${s.id.slice(0, 8)}`);
+
+        let scheduledDate = "Open Schedule";
+        let startTimeStr = "";
+        let formattedTimeRange = "";
+
+        if (s.startTime) {
+          const startDt = new Date(s.startTime);
+          if (!isNaN(startDt.getTime())) {
+            scheduledDate = startDt.toLocaleDateString("en-US", {
+              month: "short",
+              day: "numeric",
+              year: "numeric",
+            });
+            startTimeStr = startDt.toLocaleTimeString("en-US", {
+              hour: "numeric",
+              minute: "2-digit",
+              hour12: true,
+            });
+
+            if (s.endTime) {
+              const endDt = new Date(s.endTime);
+              if (!isNaN(endDt.getTime())) {
+                const endTimeStr = endDt.toLocaleTimeString("en-US", {
+                  hour: "numeric",
+                  minute: "2-digit",
+                  hour12: true,
+                });
+                formattedTimeRange = `${startTimeStr} – ${endTimeStr}`;
+              } else {
+                formattedTimeRange = startTimeStr;
+              }
+            } else {
+              formattedTimeRange = startTimeStr;
+            }
+          }
+        }
+
+        const proctorMode = (test?.proctoringMode || (s as { proctoringMode?: string }).proctoringMode || "MEDIUM") as ProctoringMode;
+
+        return {
+          id: s.id,
+          testId: s.testId,
+          assessmentName: testTitle,
+          scheduledDate,
+          startTime: startTimeStr,
+          formattedTimeRange: formattedTimeRange || startTimeStr || "Flexible",
+          proctoringMode: proctorMode,
+          totalCandidates: s.maxCandidates || 0,
+          activeCandidates: 0,
+          submittedCandidates: 0,
+          flaggedCandidates: 0,
+        };
       });
-      const scheduleList: AssessmentSchedule[] = standardSchedules.map((s) => ({
-        id: s.id,
-        assessmentName: s.test?.title || `Schedule #${s.id.slice(0, 8)}`,
-        scheduledDate: s.startTime
-          ? new Date(s.startTime).toLocaleDateString()
-          : "Active",
-        startTime: s.startTime
-          ? new Date(s.startTime).toLocaleTimeString()
-          : "",
-        proctoringMode: (s.test?.proctoringMode || "MEDIUM") as ProctoringMode,
-        totalCandidates: s.maxCandidates || 0,
-        activeCandidates: 0,
-        submittedCandidates: 0,
-        flaggedCandidates: 0,
-      }));
 
       setSchedules(scheduleList);
       if (scheduleList.length > 0) {
@@ -1372,21 +1419,28 @@ export default function ProctoringDashboard() {
               role="combobox"
               aria-expanded={scheduleComboboxOpen}
               disabled={loadingSchedules}
-              className="w-full justify-between h-9 px-3 border-border/80 bg-background/50 hover:bg-background/80 focus:ring-2 focus:ring-primary/20 text-left font-normal text-xs md:text-sm"
+              className="w-full justify-between h-auto min-h-[42px] py-2 px-3.5 border-border/80 bg-background/50 hover:bg-background/80 focus:ring-2 focus:ring-primary/20 text-left font-normal text-xs md:text-sm shadow-xs"
             >
               {selectedSchedule ? (
-                <div className="flex items-center gap-3 truncate">
-                  <span className="font-semibold text-foreground truncate">
+                <div className="flex flex-wrap items-center gap-2 md:gap-3 truncate w-full pr-2">
+                  <span className="font-semibold text-foreground text-sm truncate max-w-[320px] md:max-w-md">
                     {selectedSchedule.assessmentName}
                   </span>
-                  <span className="text-xs text-muted-foreground shrink-0 font-mono">
-                    — {selectedSchedule.scheduledDate} (
-                    {selectedSchedule.startTime})
-                  </span>
+                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground font-mono bg-muted/40 px-2 py-0.5 rounded-md border border-border/50 shrink-0">
+                    <Calendar className="h-3 w-3 text-orange-500" />
+                    <span>{selectedSchedule.scheduledDate}</span>
+                    {selectedSchedule.formattedTimeRange && (
+                      <>
+                        <span className="opacity-40">•</span>
+                        <Clock className="h-3 w-3 text-orange-500" />
+                        <span>{selectedSchedule.formattedTimeRange}</span>
+                      </>
+                    )}
+                  </div>
                   {selectedSchedule.proctoringMode && (
                     <Badge
                       variant="secondary"
-                      className="text-[10px] uppercase font-mono shrink-0 hidden sm:inline-flex"
+                      className="text-[10px] uppercase font-mono shrink-0 hidden sm:inline-flex bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border border-border/60"
                     >
                       {selectedSchedule.proctoringMode} MODE
                     </Badge>
@@ -1402,12 +1456,12 @@ export default function ProctoringDashboard() {
               <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
             </Button>
           </PopoverTrigger>
-          <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-2 bg-card border-border shadow-2xl rounded-xl z-50">
+          <PopoverContent className="w-[var(--radix-popover-trigger-width)] min-w-[340px] p-2 bg-card border-border shadow-2xl rounded-xl z-50">
             <div className="space-y-2">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
-                  placeholder="Type to search schedules..."
+                  placeholder="Search assessment name, date, or time..."
                   value={scheduleSearchQuery}
                   onChange={(e) => setScheduleSearchQuery(e.target.value)}
                   className="pl-9 h-9 border-border/70 text-xs bg-background"
@@ -1422,7 +1476,7 @@ export default function ProctoringDashboard() {
                 )}
               </div>
 
-              <div className="max-h-64 overflow-y-auto space-y-1 pr-1">
+              <div className="max-h-72 overflow-y-auto space-y-1 pr-1">
                 {schedules.filter(
                   (sch) =>
                     sch.assessmentName
@@ -1430,10 +1484,14 @@ export default function ProctoringDashboard() {
                       .includes(scheduleSearchQuery.toLowerCase()) ||
                     sch.scheduledDate
                       .toLowerCase()
-                      .includes(scheduleSearchQuery.toLowerCase()),
+                      .includes(scheduleSearchQuery.toLowerCase()) ||
+                    (sch.formattedTimeRange &&
+                      sch.formattedTimeRange
+                        .toLowerCase()
+                        .includes(scheduleSearchQuery.toLowerCase())),
                 ).length === 0 ? (
                   <div className="p-4 text-center text-xs text-muted-foreground">
-                    No matching schedules found.
+                    No matching assessment schedules found.
                   </div>
                 ) : (
                   schedules
@@ -1444,7 +1502,11 @@ export default function ProctoringDashboard() {
                           .includes(scheduleSearchQuery.toLowerCase()) ||
                         sch.scheduledDate
                           .toLowerCase()
-                          .includes(scheduleSearchQuery.toLowerCase()),
+                          .includes(scheduleSearchQuery.toLowerCase()) ||
+                        (sch.formattedTimeRange &&
+                          sch.formattedTimeRange
+                            .toLowerCase()
+                            .includes(scheduleSearchQuery.toLowerCase())),
                     )
                     .map((sch) => {
                       const isSelected = sch.id === selectedScheduleId;
@@ -1457,29 +1519,38 @@ export default function ProctoringDashboard() {
                           }}
                           className={`w-full flex items-center justify-between p-2.5 rounded-lg text-xs text-left transition-colors ${
                             isSelected
-                              ? "bg-rose-500/10 text-rose-600 dark:text-rose-400 font-semibold border border-rose-500/20"
+                              ? "bg-orange-500/10 text-orange-600 dark:text-orange-400 font-semibold border border-orange-500/20"
                               : "hover:bg-muted/60 text-foreground"
                           }`}
                         >
-                          <div className="truncate pr-2">
-                            <div className="font-medium truncate">
+                          <div className="truncate pr-2 space-y-1">
+                            <div className="font-semibold text-xs text-foreground truncate">
                               {sch.assessmentName}
                             </div>
-                            <div className="text-[11px] text-muted-foreground font-mono">
-                              {sch.scheduledDate} ({sch.startTime})
+                            <div className="flex items-center gap-2 text-[11px] text-muted-foreground font-mono">
+                              <span className="flex items-center gap-1">
+                                <Calendar className="h-3 w-3 text-orange-500/80" />
+                                {sch.scheduledDate}
+                              </span>
+                              {sch.formattedTimeRange && (
+                                <span className="flex items-center gap-1">
+                                  <Clock className="h-3 w-3 text-orange-500/80" />
+                                  {sch.formattedTimeRange}
+                                </span>
+                              )}
                             </div>
                           </div>
                           <div className="flex items-center gap-1.5 shrink-0">
                             {sch.proctoringMode && (
                               <Badge
                                 variant="outline"
-                                className="text-[10px] font-mono uppercase px-1.5 py-0"
+                                className="text-[10px] font-mono uppercase px-1.5 py-0 bg-background/80 border-border/70"
                               >
                                 {sch.proctoringMode}
                               </Badge>
                             )}
                             {isSelected && (
-                              <Check className="h-4 w-4 text-rose-500 shrink-0" />
+                              <Check className="h-4 w-4 text-orange-600 shrink-0" />
                             )}
                           </div>
                         </button>
