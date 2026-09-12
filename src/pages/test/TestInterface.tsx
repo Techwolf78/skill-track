@@ -68,6 +68,9 @@ interface Question {
   sampleInput?: string;
   sampleOutput?: string;
   sampleExplanation?: string;
+  examples?: Array<{ input: string; output?: string; expectedOutput?: string; explanation?: string }>;
+  visibleTestCases?: Array<{ id?: string; input: string; expectedOutput: string; explanation?: string }>;
+  testCases?: Array<{ id?: string; input: string; expectedOutput?: string; output?: string; expected?: string; explanation?: string; sample?: boolean; isSample?: boolean; isHidden?: boolean }>;
   codeTemplate?: Record<string, CodeTemplateEntry>;
   languageTemplates?: Record<string, any>;
   starterCode?: Record<string, string>;
@@ -101,8 +104,110 @@ interface RawPaperQuestion {
     tags?: string[];
     title?: string;
     examples?: Array<{ input: string; expectedOutput: string; explanation?: string }>;
+    visibleTestCases?: Array<{ id?: string; input: string; expectedOutput: string; explanation?: string }>;
+    testCases?: Array<{ id?: string; input: string; expectedOutput?: string; output?: string; expected?: string; explanation?: string; sample?: boolean; isSample?: boolean; isHidden?: boolean }>;
+    sampleInput?: string;
+    sampleOutput?: string;
+    sampleExplanation?: string;
   };
+  testCases?: Array<{ id?: string; input: string; expectedOutput?: string; output?: string; expected?: string; explanation?: string; sample?: boolean; isSample?: boolean; isHidden?: boolean }>;
 }
+
+// Helper to extract ONLY sample (public) test cases for candidate display
+const getSampleTestcases = (q: any): Array<{ input: string; output: string; explanation?: string }> => {
+  if (!q) return [];
+  const list: Array<{ input: string; output: string; explanation?: string }> = [];
+
+  // 1. Check visibleTestCases (from backend snapshot - already filtered by TestCases::isSample)
+  const visibleCases = q.visibleTestCases || q.coding?.visibleTestCases;
+  if (Array.isArray(visibleCases) && visibleCases.length > 0) {
+    for (const tc of visibleCases) {
+      if (tc && !tc.isHidden) {
+        list.push({
+          input: tc.input != null ? String(tc.input) : "",
+          output: tc.expectedOutput != null ? String(tc.expectedOutput) : tc.output != null ? String(tc.output) : tc.expected != null ? String(tc.expected) : "",
+          explanation: tc.explanation || q.sampleExplanation || q.coding?.sampleExplanation,
+        });
+      }
+    }
+  }
+
+  // 2. Check testCases array (STRICTLY filter: only sample === true || isSample === true, and !isHidden)
+  if (list.length === 0) {
+    const rawCases = q.testCases || q.testcases || q.test_cases || q.coding?.testCases || q.coding?.test_cases;
+    if (Array.isArray(rawCases) && rawCases.length > 0) {
+      const sampleCases = rawCases.filter((tc: any) => (tc.sample === true || tc.isSample === true) && !tc.isHidden);
+      for (const tc of sampleCases) {
+        list.push({
+          input: tc.input != null ? String(tc.input) : "",
+          output:
+            tc.expectedOutput != null
+              ? String(tc.expectedOutput)
+              : tc.output != null
+              ? String(tc.output)
+              : tc.expected != null
+              ? String(tc.expected)
+              : "",
+          explanation: tc.explanation || q.sampleExplanation || q.coding?.sampleExplanation,
+        });
+      }
+    }
+  }
+
+  // 3. Check examples array
+  if (list.length === 0) {
+    const rawExamples = q.examples || q.coding?.examples || (Array.isArray(q.coding?.examples?.data) ? q.coding.examples.data : null);
+    if (Array.isArray(rawExamples) && rawExamples.length > 0) {
+      for (const ex of rawExamples) {
+        if (ex && !ex.isHidden) {
+          list.push({
+            input: ex.input != null ? String(ex.input) : "",
+            output:
+              ex.output != null
+                ? String(ex.output)
+                : ex.expectedOutput != null
+                ? String(ex.expectedOutput)
+                : ex.expected != null
+                ? String(ex.expected)
+                : "",
+            explanation: ex.explanation || q.sampleExplanation || q.coding?.sampleExplanation,
+          });
+        }
+      }
+    }
+  }
+
+  // 4. Check sampleInput & sampleOutput
+  if (list.length === 0 && (q.sampleInput || q.coding?.sampleInput)) {
+    list.push({
+      input: q.sampleInput || q.coding?.sampleInput || "",
+      output: q.sampleOutput || q.coding?.sampleOutput || "",
+      explanation: q.sampleExplanation || q.coding?.sampleExplanation,
+    });
+  }
+
+  // 5. Fallback regex extraction from prompt text for legacy questions
+  if (list.length === 0 && q.prompt) {
+    const pText = `${q.prompt || ""}\n${q.sampleExplanation || ""}\n${q.constraints || ""}`;
+    const exampleRegex =
+      /(?:Example\s*(\d+)|\*\*Example\s*(\d+)\*\*|###\s*Example\s*(\d+))[\s\S]*?(?:Input|\*\*Input:\*\*)\s*[:\.]?\s*`?([^`\n\r]+)`?[\s\S]*?(?:Output|\*\*Output:\*\*)\s*[:\.]?\s*`?([^`\n\r]+)`?(?:[\s\S]*?(?:Explanation|\*\*Explanation:\*\*)\s*[:\.]?\s*([^\n\r]+))?/gi;
+    let match;
+    while ((match = exampleRegex.exec(pText)) !== null && list.length < 3) {
+      const rawIn = match[4]?.trim();
+      const rawOut = match[5]?.trim();
+      const rawExp = match[6]?.trim();
+      if (rawIn && rawOut) {
+        list.push({
+          input: rawIn.replace(/^nums\s*=\s*/i, "").replace(/^coins\s*=\s*/i, "").trim(),
+          output: rawOut.trim(),
+          explanation: rawExp || undefined,
+        });
+      }
+    }
+  }
+
+  return list;
+};
 
 interface RawTestPaper {
   testId: string;
@@ -517,6 +622,9 @@ function TestInterfaceContent({ testId, sessionId, navigate, toast, onRequireIde
         
         // Map the snapshot questions back to the format TestInterface expects
         const mappedQuestions = (paper.questions || []).map((q: RawPaperQuestion) => {
+          const sampleCases = getSampleTestcases(q);
+          const firstSample = sampleCases[0];
+
           return {
             id: q.snapshotQuestionId || q.sourceQuestionId,
             testId: paper.testId,
@@ -533,9 +641,11 @@ function TestInterfaceContent({ testId, sessionId, navigate, toast, onRequireIde
               marks: q.marks,
               imageUrl: q.imageUrl,
               mcqOptions: q.options as { text: string; isCorrect: boolean }[] || [],
-              sampleInput: q.coding?.examples?.[0]?.input || "",
-              sampleOutput: q.coding?.examples?.[0]?.expectedOutput || "",
-              sampleExplanation: q.coding?.examples?.[0]?.explanation || "",
+              sampleInput: firstSample?.input || q.coding?.sampleInput || "",
+              sampleOutput: firstSample?.output || q.coding?.sampleOutput || "",
+              sampleExplanation: firstSample?.explanation || q.coding?.sampleExplanation || "",
+              examples: sampleCases,
+              visibleTestCases: q.coding?.visibleTestCases,
               codeTemplate: q.coding?.starterCode,
               difficulty: q.coding?.difficulty,
               constraints: q.coding?.constraints,
@@ -662,6 +772,10 @@ useEffect(() => {
           sampleInput: tq.question?.sampleInput,
           sampleOutput: tq.question?.sampleOutput,
           sampleExplanation: tq.question?.sampleExplanation,
+          examples: (tq.question as any)?.examples,
+          visibleTestCases: (tq.question as any)?.visibleTestCases,
+          testCases: ((tq.question as any)?.testCases || (tq.question as any)?.coding?.testCases || [])
+            .filter((tc: any) => (tc.sample === true || tc.isSample === true) && !tc.isHidden),
           codeTemplate: tq.question?.codeTemplate,
           languageTemplates: rawTemplates,
           starterCode: processedStarterCode,
@@ -1819,49 +1933,47 @@ useEffect(() => {
                           </div>
                         )}
 
-                        {/* Sample Test Cases in Sequence */}
-                        {(((test as unknown) as { examples?: { input: string; output: string; explanation?: string }[] })?.examples || currentQuestion.sampleInput) && (
-                          <div className="space-y-4 pt-2">
-                            {(currentQuestion.sampleInput ? [
-                              { 
-                                input: currentQuestion.sampleInput, 
-                                output: currentQuestion.sampleOutput, 
-                                explanation: currentQuestion.sampleExplanation 
-                              }
-                            ] : (((test as unknown) as { examples?: { input: string; output: string; explanation?: string }[] })?.examples || [])).map((ex: { input: string; output: string; explanation?: string }, idx: number) => (
-                              <div key={idx} className="space-y-2">
-                                <div>
-                                  <h4 className="text-xs font-bold text-slate-900">
-                                    Sample Input {idx + 1}:
-                                  </h4>
-                                  <pre className="mt-1 p-3 bg-[#18181b] text-amber-300 font-mono text-xs rounded-sm overflow-x-auto whitespace-pre-wrap leading-relaxed shadow-xs border border-slate-800">
-                                    {ex.input || "No input"}
-                                  </pre>
-                                </div>
-
-                                <div>
-                                  <h4 className="text-xs font-bold text-slate-900">
-                                    Sample Output {idx + 1}:
-                                  </h4>
-                                  <pre className="mt-1 p-3 bg-[#18181b] text-slate-100 font-mono text-xs rounded-sm overflow-x-auto whitespace-pre-wrap leading-relaxed shadow-xs border border-slate-800">
-                                    {ex.output || "No output"}
-                                  </pre>
-                                </div>
-
-                                {ex.explanation && (
+                        {/* Sample Test Cases in Sequence (ONLY Sample Cases) */}
+                        {(() => {
+                          const sampleCases = getSampleTestcases(currentQuestion);
+                          if (!sampleCases || sampleCases.length === 0) return null;
+                          return (
+                            <div className="space-y-4 pt-2">
+                              {sampleCases.map((ex: { input: string; output: string; explanation?: string }, idx: number) => (
+                                <div key={idx} className="space-y-2">
                                   <div>
-                                    <h4 className="text-xs font-bold text-slate-900 mb-0.5">
-                                      Explanation:
+                                    <h4 className="text-xs font-bold text-slate-900">
+                                      Sample Input {idx + 1}:
                                     </h4>
-                                    <p className="text-xs text-slate-600 leading-relaxed whitespace-pre-wrap">
-                                      {ex.explanation}
-                                    </p>
+                                    <pre className="mt-1 p-3 bg-[#18181b] text-amber-300 font-mono text-xs rounded-sm overflow-x-auto whitespace-pre-wrap leading-relaxed shadow-xs border border-slate-800">
+                                      {ex.input || "No input"}
+                                    </pre>
                                   </div>
-                                )}
-                              </div>
-                            ))}
-                          </div>
-                        )}
+
+                                  <div>
+                                    <h4 className="text-xs font-bold text-slate-900">
+                                      Sample Output {idx + 1}:
+                                    </h4>
+                                    <pre className="mt-1 p-3 bg-[#18181b] text-slate-100 font-mono text-xs rounded-sm overflow-x-auto whitespace-pre-wrap leading-relaxed shadow-xs border border-slate-800">
+                                      {ex.output || "No output"}
+                                    </pre>
+                                  </div>
+
+                                  {ex.explanation && (
+                                    <div>
+                                      <h4 className="text-xs font-bold text-slate-900 mb-0.5">
+                                        Explanation:
+                                      </h4>
+                                      <p className="text-xs text-slate-600 leading-relaxed whitespace-pre-wrap">
+                                        {ex.explanation}
+                                      </p>
+                                    </div>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          );
+                        })()}
 
                         {/* Hints Accordion */}
                         {currentQuestion.hints && (currentQuestion.hints as string[]).length > 0 && (

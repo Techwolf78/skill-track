@@ -93,10 +93,6 @@ export default function Login() {
     }
   };
 
-  const fillAdminCredentials = () => {
-    setAdminEmail("superadmin@gryphon360.com");
-    setAdminPassword("password123");
-  };
 
   return (
     <div className="min-h-screen flex">
@@ -181,18 +177,6 @@ export default function Login() {
           </div>
 
           <div className="mt-6">
-            <div className="flex items-center justify-between gap-3 mb-4">
-              <p className="text-sm text-muted-foreground">
-                Use quick-fill credentials for demo login.
-              </p>
-              <button
-                type="button"
-                onClick={fillAdminCredentials}
-                className="text-sm font-medium text-primary hover:underline"
-              >
-                Fill Admin
-              </button>
-            </div>
             <form onSubmit={handleAdminLogin} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="adminEmail">Email</Label>
