@@ -9,11 +9,12 @@ import {
   releaseActiveRequestLock,
 } from "./idempotency";
 
-
 const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL !== undefined && import.meta.env.VITE_API_BASE_URL !== ""
+  import.meta.env.VITE_API_BASE_URL !== undefined
     ? import.meta.env.VITE_API_BASE_URL
-    : (import.meta.env.PROD ? "https://api.gryphon360.com" : "http://localhost:8081");
+    : import.meta.env.PROD
+      ? "https://api.gryphon360.com"
+      : "";
 
 export const apiClient = axios.create({
   baseURL: API_BASE_URL,
@@ -57,13 +58,15 @@ apiClient.interceptors.response.use(
   (response) => response,
   (error: AxiosError) => {
     if (error.response?.status === 401) {
-      const isKeepAlive = error.config?.headers?.["X-Keep-Alive"] === "true" || 
-                          error.config?.headers?.get?.("X-Keep-Alive") === "true" ||
-                          error.config?.url?.includes("_cb=bootstrap");
-                          
-      const isTestAccessPage = typeof window !== "undefined" && 
-                               (window.location.pathname.includes("/test/access") || 
-                                window.location.pathname.includes("/tests/access"));
+      const isKeepAlive =
+        error.config?.headers?.["X-Keep-Alive"] === "true" ||
+        error.config?.headers?.get?.("X-Keep-Alive") === "true" ||
+        error.config?.url?.includes("_cb=bootstrap");
+
+      const isTestAccessPage =
+        typeof window !== "undefined" &&
+        (window.location.pathname.includes("/test/access") ||
+          window.location.pathname.includes("/tests/access"));
 
       if (!isKeepAlive && !isTestAccessPage) {
         // 🔥 Token expired / invalid
@@ -71,7 +74,9 @@ apiClient.interceptors.response.use(
         localStorage.removeItem("user");
 
         // Prevent infinite redirect loop if already on login page or if the request is to login
-        const isLoginPage = typeof window !== "undefined" && window.location.pathname === "/login";
+        const isLoginPage =
+          typeof window !== "undefined" &&
+          window.location.pathname === "/login";
         const isLoginRequest = error.config?.url?.includes("/auth/login");
 
         if (!isLoginPage && !isLoginRequest) {
@@ -82,8 +87,10 @@ apiClient.interceptors.response.use(
 
     if (error.response?.status === 429) {
       const data = error.response.data as Record<string, unknown> | undefined;
-      const retryAfterHeader = error.response.headers?.["retry-after"] || error.response.headers?.["Retry-After"];
-      
+      const retryAfterHeader =
+        error.response.headers?.["retry-after"] ||
+        error.response.headers?.["Retry-After"];
+
       let secondsLeft = 30;
       if (retryAfterHeader) {
         const parsed = parseInt(retryAfterHeader as string, 10);
@@ -94,7 +101,7 @@ apiClient.interceptors.response.use(
 
       const defaultMsg = `Too many requests. Please try again in ${secondsLeft} seconds.`;
       const finalMsg = data?.message ? (data.message as string) : defaultMsg;
-      
+
       error.message = finalMsg;
       if (data) {
         data.message = finalMsg;
