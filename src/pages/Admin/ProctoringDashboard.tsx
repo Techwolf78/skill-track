@@ -1370,15 +1370,6 @@ export default function ProctoringDashboard() {
         </div>
         <div className="flex items-center gap-2 shrink-0">
           <Button
-            variant="default"
-            onClick={() => setShowTestUploadModal(true)}
-            className="h-8.5 text-xs bg-indigo-600 hover:bg-indigo-700 text-white font-medium px-3"
-          >
-            <Camera className="h-3.5 w-3.5 mr-1.5" />
-            Test Photo Upload
-          </Button>
-
-          <Button
             variant="outline"
             onClick={handleRetry}
             disabled={loadingSchedules || loadingCandidates}
@@ -2095,7 +2086,7 @@ export default function ProctoringDashboard() {
                               size="sm"
                               variant="outline"
                               onClick={() => handleOpenExtendTimeModal(cand)}
-                              className="h-8 text-xs text-amber-400 bg-amber-500/10 border-amber-500/20 hover:bg-amber-500/20 text-white font-semibold flex gap-1 items-center"
+                              className="h-8 text-xs text-amber-600 dark:text-amber-400 bg-amber-500/10 border-amber-500/20 hover:bg-amber-500/20 font-semibold flex gap-1 items-center"
                             >
                               <Clock className="h-3.5 w-3.5" /> + Time
                             </Button>
