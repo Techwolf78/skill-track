@@ -110,6 +110,7 @@ const App = () => (
                 <Route path="users" element={<Users />} />
                 <Route path="students" element={<Students />} />
                 <Route path="questions" element={<QuestionBank />} />
+                <Route path="question-bank" element={<Navigate to="/superadmin/questions" replace />} />
                 <Route
                   path="dsa-playground"
                   element={<DSAPlayground />}
@@ -142,9 +143,6 @@ const App = () => (
                 <Route path="tests/edit/:id" element={<TestsEdit />} />
                 <Route path="tests/:id" element={<TestDetails />} />
                 <Route path="tests/:id/questions" element={<TestQuestions />} />
-                <Route path="questions/add" element={<AddQuestion />} />
-                <Route path="questions/create" element={<AddQuestion />} />
-                <Route path="questions/edit/:id" element={<EditQuestion />} />
                 <Route path="reports" element={<Reports />} />
                 <Route path="proctoring" element={<ProctoringDashboard />} />
                 <Route path="proctoring/:sessionId" element={<ProctoringDashboard />} />
@@ -221,6 +219,32 @@ const App = () => (
                 path="/admin/library/edit/:id"
                 element={
                   <ProtectedRoute requiredRoles={[ROLES.ADMIN, ROLES.SUPERADMIN]}>
+                    <NewAdminQuestionCreate />
+                  </ProtectedRoute>
+                }
+              />
+
+              {/* Standalone Full-Screen Question Create / Edit for SuperAdmin */}
+              <Route
+                path="/superadmin/questions/create"
+                element={
+                  <ProtectedRoute requiredRoles={[ROLES.SUPERADMIN]}>
+                    <NewAdminQuestionCreate />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/superadmin/questions/add"
+                element={
+                  <ProtectedRoute requiredRoles={[ROLES.SUPERADMIN]}>
+                    <NewAdminQuestionCreate />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/superadmin/questions/edit/:id"
+                element={
+                  <ProtectedRoute requiredRoles={[ROLES.SUPERADMIN]}>
                     <NewAdminQuestionCreate />
                   </ProtectedRoute>
                 }

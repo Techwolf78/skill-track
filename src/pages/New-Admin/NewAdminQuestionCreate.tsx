@@ -209,6 +209,18 @@ export default function NewAdminQuestionCreate() {
     difficulty: "MEDIUM" as const,
   };
 
+  const isSuperAdminContext =
+    location.pathname.startsWith("/superadmin") ||
+    initialData.visibility === "PUBLIC" ||
+    user?.role === "SUPERADMIN";
+
+  const [visibility, setVisibility] = useState<"PUBLIC" | "ORG_OWNED">(
+    initialData.visibility || (isSuperAdminContext ? "PUBLIC" : "ORG_OWNED")
+  );
+
+  const returnPath = isSuperAdminContext ? "/superadmin/questions" : "/admin/library";
+  const libraryLabel = isSuperAdminContext ? "Question Bank" : "Library";
+
   const [isCoding, setIsCoding] = useState(initialData.questionType === "CODING");
   const [isLoadingQuestion, setIsLoadingQuestion] = useState(Boolean(editQuestionId));
   const [isSaving, setIsSaving] = useState(false);
@@ -306,6 +318,7 @@ export default function NewAdminQuestionCreate() {
         setPrompt(q.prompt || "");
         setQuestionImageUrl(q.imageUrl || (q as any).image_url || "");
         if (q.difficulty) setDifficulty(q.difficulty);
+        if (q.visibility) setVisibility(q.visibility);
         if (q.marks !== undefined) setMarks(q.marks);
         if (q.avg_time_seconds) setSolvingTimeMins(String(Math.round(q.avg_time_seconds / 60)));
         if (q.subject_id || q.subjectId || q.subject?.id) {
@@ -528,7 +541,7 @@ export default function NewAdminQuestionCreate() {
       subtopic_id: subtopicId || undefined,
       difficulty,
       marks,
-      visibility: "ORG_OWNED",
+      visibility: visibility || (isSuperAdminContext ? "PUBLIC" : "ORG_OWNED"),
       avg_time_seconds: avgTimeSecs,
       timeLimitSecs: Number(timeLimitSecs) || 2,
       memoryLimitMb: Number(memoryLimitMb) || 256,
@@ -634,7 +647,7 @@ export default function NewAdminQuestionCreate() {
         subtopic_id: subtopicId || undefined,
         difficulty,
         marks,
-        visibility: "ORG_OWNED",
+        visibility: visibility || (isSuperAdminContext ? "PUBLIC" : "ORG_OWNED"),
         avg_time_seconds: avgTimeSecs,
         timeLimitSecs: Number(timeLimitSecs) || 2,
         memoryLimitMb: Number(memoryLimitMb) || 256,
@@ -677,7 +690,7 @@ export default function NewAdminQuestionCreate() {
         subtopic_id: subtopicId || undefined,
         difficulty,
         marks,
-        visibility: "ORG_OWNED",
+        visibility: visibility || (isSuperAdminContext ? "PUBLIC" : "ORG_OWNED"),
         avg_time_seconds: avgTimeSecs,
         domain: "ENGINEERING",
         cognitiveLevel: "APPLY",
@@ -707,7 +720,7 @@ export default function NewAdminQuestionCreate() {
         setTitle(`${title.trim()} (Copy)`);
         toast.info("Cloned draft ready for editing");
       } else {
-        navigate("/admin/library");
+        navigate(returnPath);
       }
     } catch (err: any) {
       console.error("[NewAdminQuestionCreate] Failed to save:", err);
@@ -730,10 +743,10 @@ export default function NewAdminQuestionCreate() {
     <div className="min-h-screen flex flex-col bg-[#F6F8FA] text-slate-800 font-sans antialiased">
       {/* ── 1. Top Navbar (Dark Navy Bar, NO Second Sub-navbar) ── */}
       <header className="h-20 bg-[#081225] border-b border-[#142340] px-4 md:px-8 flex items-center justify-between z-30 sticky top-0 shadow-md">
-        {/* Left Side: Logo + Divider + Breadcrumb (Library > Problem Title) */}
+        {/* Left Side: Logo + Divider + Breadcrumb (Library/Question Bank > Problem Title) */}
         <div className="flex items-center space-x-3 md:space-x-4">
           <div
-            onClick={() => navigate("/admin/library")}
+            onClick={() => navigate(returnPath)}
             className="flex items-center gap-2 cursor-pointer group"
           >
             <GryphonLogo variant="dark" size="md" />
@@ -743,10 +756,10 @@ export default function NewAdminQuestionCreate() {
 
           <div className="flex items-center text-xs md:text-sm text-slate-400 font-medium space-x-1.5">
             <button
-              onClick={() => navigate("/admin/library")}
+              onClick={() => navigate(returnPath)}
               className="hover:text-slate-200 cursor-pointer transition-colors"
             >
-              Library
+              {libraryLabel}
             </button>
             <ChevronRight className="w-3.5 h-3.5 text-slate-500" />
             <span className="text-slate-200 font-semibold max-w-[200px] truncate">{title || (isEditMode ? "Edit Problem" : "New Problem")}</span>
@@ -803,13 +816,13 @@ export default function NewAdminQuestionCreate() {
 
       {/* ── 3. Main Workspace Area (Title tightly placed above cards) ── */}
       <main className="max-w-7xl mx-auto px-4 md:px-8 pt-6 pb-20 w-full relative z-10">
-        {/* Back to Library Button above title */}
+        {/* Back to Library / Question Bank Button above title */}
         <button
-          onClick={() => navigate("/admin/library")}
+          onClick={() => navigate(returnPath)}
           className="inline-flex items-center gap-1.5 text-xs text-slate-400 hover:text-white transition-colors cursor-pointer mb-2.5"
         >
           <ChevronLeft className="w-4 h-4" />
-          <span>Back to Library</span>
+          <span>Back to {libraryLabel}</span>
         </button>
 
         {/* Title & Type Metadata Row (Tightly above white card) */}
@@ -1553,7 +1566,7 @@ export default function NewAdminQuestionCreate() {
 
               <button
                 type="button"
-                onClick={() => navigate("/admin/library")}
+                onClick={() => navigate(returnPath)}
                 className="w-full py-2 text-xs font-semibold text-slate-500 hover:text-slate-700 transition-colors text-center cursor-pointer"
               >
                 Cancel

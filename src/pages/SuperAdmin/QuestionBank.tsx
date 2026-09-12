@@ -82,6 +82,7 @@ import {
   resolveTaxonomyForRow,
 } from "@/lib/admin/questionImport";
 import { QuestionPreview } from "./QuestionPreview";
+import { CreateProblemModal } from "@/components/admin/CreateProblemModal";
 
 const difficultyColors: Record<string, string> = {
   EASY: "bg-green-500/10 text-green-500 border-green-500/20",
@@ -122,6 +123,7 @@ export default function SuperAdminQuestionBank() {
 
   const [selectedAdvancedQuestion, setSelectedAdvancedQuestion] = useState<ExtendedQuestion | null>(null);
   const [importDialogOpen, setImportDialogOpen] = useState(false);
+  const [createModalOpen, setCreateModalOpen] = useState(false);
 
   // Mock questions for Business, Corporate, and Aptitude taxonomy representation
   const [mockQuestions, setMockQuestions] = useState<ExtendedQuestion[]>([]);
@@ -328,9 +330,12 @@ export default function SuperAdminQuestionBank() {
             <Upload className="w-4 h-4" />
             Import Questions
           </Button>
-          <Button variant="hero" onClick={handleAdd}>
-            <Plus className="w-4 h-4 mr-2" />
-            Add Question
+          <Button
+            className="gap-2 bg-[#6366F1] hover:bg-[#4F46E5] text-white shadow-sm font-semibold"
+            onClick={() => setCreateModalOpen(true)}
+          >
+            <Plus className="w-4 h-4" />
+            Create Question
           </Button>
         </div>
       </div>
@@ -883,6 +888,19 @@ export default function SuperAdminQuestionBank() {
         onImportSuccess={() => {
           // Questions query will automatically refetch
         }}
+      />
+
+      {/* SuperAdmin Create Problem Modal */}
+      <CreateProblemModal
+        isOpen={createModalOpen}
+        onClose={() => setCreateModalOpen(false)}
+        onCreate={(initialData) => {
+          setCreateModalOpen(false);
+          navigate("/superadmin/questions/create", {
+            state: { ...initialData, visibility: "PUBLIC" },
+          });
+        }}
+        onOpenBulkUploader={() => setImportDialogOpen(true)}
       />
     </div>
   );
