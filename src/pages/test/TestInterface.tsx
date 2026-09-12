@@ -1291,7 +1291,13 @@ useEffect(() => {
       try {
         let sessionData: { timerRemainingSecs?: number; remainingSeconds?: number; remainingTimeSecs?: number } | null = null;
         try {
-          const hbRes = await apiClient.post(`/test-sessions/${sessionId}/heartbeat`, {});
+          const remaining = typeof prevRemainingRef.current === "number" && !isNaN(prevRemainingRef.current) && prevRemainingRef.current >= 0 
+            ? prevRemainingRef.current 
+            : (typeof timeLeft === "number" && !isNaN(timeLeft) && timeLeft >= 0 ? timeLeft : 0);
+
+          const hbRes = await apiClient.post(`/test-sessions/${sessionId}/heartbeat`, {
+            timerRemainingSecs: remaining,
+          });
           sessionData = hbRes.data?.data ?? hbRes.data;
         } catch {
           const sessionResponse = await apiClient.get(`/test-sessions/${sessionId}/resume`);
@@ -1777,12 +1783,14 @@ useEffect(() => {
     );
   }
 
+  const isFullscreenLocked = !isFullscreen && isProctoringActive;
+
   return (
     <div className="min-h-screen bg-background flex flex-col relative">
       {/* Fullscreen Enforcement Overlay on Reload & Tab Switch */}
-      {!isFullscreen && isProctoringActive && Boolean(config?.fullscreen || config?.fullscreenExitTracking || config?.tabSwitch) && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-md p-4">
-          <div className="bg-white p-8 rounded-2xl border border-slate-200 shadow-2xl text-center max-w-md w-full animate-in zoom-in duration-300">
+      {isFullscreenLocked && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/75 backdrop-blur-sm p-4 pointer-events-auto">
+          <div className="bg-white p-8 rounded-2xl border border-slate-200 shadow-2xl text-center max-w-md w-full animate-in zoom-in duration-200">
             <div className="mx-auto mb-5 w-16 h-16 rounded-full bg-orange-500/10 flex items-center justify-center animate-pulse">
               <Monitor className="w-8 h-8 text-orange-600" />
             </div>
@@ -1804,7 +1812,7 @@ useEffect(() => {
 
       <div className={cn(
         "flex-1 flex flex-col overflow-hidden",
-        !isFullscreen && isProctoringActive && "blur-md pointer-events-none"
+        isFullscreenLocked && "blur-md pointer-events-none select-none"
       )}>
         {/* Header */}
         <header className="sticky top-0 z-40 border-b bg-card/90 backdrop-blur px-6 py-4 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
