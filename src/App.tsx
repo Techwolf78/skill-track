@@ -11,58 +11,59 @@ import ErrorBoundary from "./components/ErrorBoundary";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { ROLES } from "./lib/roles";
 import { CandidateLayout } from "./pages/Candidate/CandidateLayout";
+import { lazyWithRetry } from "./lib/lazyWithRetry";
 
-// Lazy load pages
-const Login = React.lazy(() => import("./pages/Login"));
-const NotFound = React.lazy(() => import("./pages/NotFound"));
-const NationalLandingPage = React.lazy(() => import("./pages/NationalLandingPage"));
-const AdminDashboard = React.lazy(() => import("./pages/SuperAdmin/Dashboard"));
-const Organisations = React.lazy(() => import("./pages/SuperAdmin/Organisations"));
-const Students = React.lazy(() => import("./pages/SuperAdmin/SuperAdminCandidates"));
-const Users = React.lazy(() => import("./pages/SuperAdmin/Users"));
-const QuestionBank = React.lazy(() => import("./pages/SuperAdmin/QuestionBank"));
-const ManageSubjects = React.lazy(() => import("./pages/SuperAdmin/ManageSubjects"));
-const Tests = React.lazy(() => import("./pages/SuperAdmin/Tests"));
-const TestCreate = React.lazy(() => import("./pages/SuperAdmin/TestCreate"));
-const TestsEdit = React.lazy(() => import("./pages/SuperAdmin/TestsEdit"));
-const TestQuestions = React.lazy(() => import("./pages/SuperAdmin/TestQuestions"));
-const TestDetails = React.lazy(() => import("./pages/SuperAdmin/TestDetails"));
-const TestScheduleDetails = React.lazy(() => import("./pages/SuperAdmin/TestScheduleDetails"));
-const InviteCandidates = React.lazy(() => import("./pages/SuperAdmin/InviteCandidates"));
-const InvitedCandidatesHistory = React.lazy(() => import("./pages/SuperAdmin/InvitedCandidatesHistory"));
-const EditQuestion = React.lazy(() => import("./pages/SuperAdmin/EditQuestion"));
-const AddQuestion = React.lazy(() => import("./pages/SuperAdmin/AddQuestion"));
-const Settings = React.lazy(() => import("./pages/SuperAdmin/Settings"));
-const DSAPlayground = React.lazy(() => import("./pages/SuperAdmin/DSAPlayground"));
-const Reports = React.lazy(() => import("./pages/SuperAdmin/Reports"));
-const TestSchedules = React.lazy(() => import("./pages/SuperAdmin/TestSchedules"));
-const AuditLogs = React.lazy(() => import("./pages/SuperAdmin/AuditLogs"));
-const Documentation = React.lazy(() => import("./pages/SuperAdmin/Documentation"));
-const SeedData = React.lazy(() => import("./pages/SeedData"));
-const ProctoringDashboard = React.lazy(() => import("@/pages/Admin/ProctoringDashboard"));
+// Lazy load pages with auto-recovery on deployment updates
+const Login = lazyWithRetry(() => import("./pages/Login"));
+const NotFound = lazyWithRetry(() => import("./pages/NotFound"));
+const NationalLandingPage = lazyWithRetry(() => import("./pages/NationalLandingPage"));
+const AdminDashboard = lazyWithRetry(() => import("./pages/SuperAdmin/Dashboard"));
+const Organisations = lazyWithRetry(() => import("./pages/SuperAdmin/Organisations"));
+const Students = lazyWithRetry(() => import("./pages/SuperAdmin/SuperAdminCandidates"));
+const Users = lazyWithRetry(() => import("./pages/SuperAdmin/Users"));
+const QuestionBank = lazyWithRetry(() => import("./pages/SuperAdmin/QuestionBank"));
+const ManageSubjects = lazyWithRetry(() => import("./pages/SuperAdmin/ManageSubjects"));
+const Tests = lazyWithRetry(() => import("./pages/SuperAdmin/Tests"));
+const TestCreate = lazyWithRetry(() => import("./pages/SuperAdmin/TestCreate"));
+const TestsEdit = lazyWithRetry(() => import("./pages/SuperAdmin/TestsEdit"));
+const TestQuestions = lazyWithRetry(() => import("./pages/SuperAdmin/TestQuestions"));
+const TestDetails = lazyWithRetry(() => import("./pages/SuperAdmin/TestDetails"));
+const TestScheduleDetails = lazyWithRetry(() => import("./pages/SuperAdmin/TestScheduleDetails"));
+const InviteCandidates = lazyWithRetry(() => import("./pages/SuperAdmin/InviteCandidates"));
+const InvitedCandidatesHistory = lazyWithRetry(() => import("./pages/SuperAdmin/InvitedCandidatesHistory"));
+const EditQuestion = lazyWithRetry(() => import("./pages/SuperAdmin/EditQuestion"));
+const AddQuestion = lazyWithRetry(() => import("./pages/SuperAdmin/AddQuestion"));
+const Settings = lazyWithRetry(() => import("./pages/SuperAdmin/Settings"));
+const DSAPlayground = lazyWithRetry(() => import("./pages/SuperAdmin/DSAPlayground"));
+const Reports = lazyWithRetry(() => import("./pages/SuperAdmin/Reports"));
+const TestSchedules = lazyWithRetry(() => import("./pages/SuperAdmin/TestSchedules"));
+const AuditLogs = lazyWithRetry(() => import("./pages/SuperAdmin/AuditLogs"));
+const Documentation = lazyWithRetry(() => import("./pages/SuperAdmin/Documentation"));
+const SeedData = lazyWithRetry(() => import("./pages/SeedData"));
+const ProctoringDashboard = lazyWithRetry(() => import("@/pages/Admin/ProctoringDashboard"));
 
 // New-Admin pages
-const NewAdminLayout = React.lazy(() => import("./pages/New-Admin/NewAdminLayout"));
-const NewAdminTests = React.lazy(() => import("./pages/New-Admin/NewAdminTests"));
-const NewAdminHome = React.lazy(() => import("./pages/New-Admin/NewAdminHome"));
-const NewAdminLibrary = React.lazy(() => import("./pages/New-Admin/NewAdminLibrary"));
-const NewAdminQuestionCreate = React.lazy(() => import("./pages/New-Admin/NewAdminQuestionCreate"));
-const NewAdminQuestionPreview = React.lazy(() => import("./pages/New-Admin/NewAdminQuestionPreview"));
-const NewAdminTestEdit = React.lazy(() => import("./pages/New-Admin/NewAdminTestEdit"));
-const NewAdminTestAddProblems = React.lazy(() => import("./pages/New-Admin/NewAdminTestAddProblems"));
-const NewAdminSettings = React.lazy(() => import("./pages/New-Admin/NewAdminSettings"));
+const NewAdminLayout = lazyWithRetry(() => import("./pages/New-Admin/NewAdminLayout"));
+const NewAdminTests = lazyWithRetry(() => import("./pages/New-Admin/NewAdminTests"));
+const NewAdminHome = lazyWithRetry(() => import("./pages/New-Admin/NewAdminHome"));
+const NewAdminLibrary = lazyWithRetry(() => import("./pages/New-Admin/NewAdminLibrary"));
+const NewAdminQuestionCreate = lazyWithRetry(() => import("./pages/New-Admin/NewAdminQuestionCreate"));
+const NewAdminQuestionPreview = lazyWithRetry(() => import("./pages/New-Admin/NewAdminQuestionPreview"));
+const NewAdminTestEdit = lazyWithRetry(() => import("./pages/New-Admin/NewAdminTestEdit"));
+const NewAdminTestAddProblems = lazyWithRetry(() => import("./pages/New-Admin/NewAdminTestAddProblems"));
+const NewAdminSettings = lazyWithRetry(() => import("./pages/New-Admin/NewAdminSettings"));
 
 // Test Taking
-const TestInterface = React.lazy(() => import("./pages/test/TestInterface"));
-const TestResults = React.lazy(() => import("./pages/test/TestResults"));
-const NewCandidateTestWelcome = React.lazy(() => import("./pages/test/NewCandidateTestWelcome"));
+const TestInterface = lazyWithRetry(() => import("./pages/test/TestInterface"));
+const TestResults = lazyWithRetry(() => import("./pages/test/TestResults"));
+const NewCandidateTestWelcome = lazyWithRetry(() => import("./pages/test/NewCandidateTestWelcome"));
 
 // Candidate Dashboard pages
-const CandidateDashboard = React.lazy(() => import("./pages/Candidate/Dashboard"));
-const MyAssessments = React.lazy(() => import("./pages/Candidate/MyAssessments"));
-const ResultsReports = React.lazy(() => import("./pages/Candidate/ResultsReports"));
-const Profile = React.lazy(() => import("./pages/Candidate/Profile"));
-const CandidateAssessmentFlow = React.lazy(() => import("./pages/Candidate/CandidateAssessmentFlow"));
+const CandidateDashboard = lazyWithRetry(() => import("./pages/Candidate/Dashboard"));
+const MyAssessments = lazyWithRetry(() => import("./pages/Candidate/MyAssessments"));
+const ResultsReports = lazyWithRetry(() => import("./pages/Candidate/ResultsReports"));
+const Profile = lazyWithRetry(() => import("./pages/Candidate/Profile"));
+const CandidateAssessmentFlow = lazyWithRetry(() => import("./pages/Candidate/CandidateAssessmentFlow"));
 
 const queryClient = new QueryClient({
   defaultOptions: {

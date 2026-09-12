@@ -33,7 +33,7 @@ import {
   Clock, ChevronLeft, ChevronRight, Flag, Send,
   AlertTriangle, CheckCircle, Play, Terminal, XCircle,
   Loader2, Save, FileText, Code2, Database, Lightbulb, Monitor,
-  Wifi, WifiOff, RotateCcw
+  Wifi, WifiOff, RotateCcw, Maximize
 } from "lucide-react";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import Editor from "@monaco-editor/react";
@@ -521,19 +521,46 @@ function TestInterfaceContent({ testId, sessionId, navigate, toast, onRequireIde
   const [consoleOutput, setConsoleOutput] = useState<string>("");
 
   // Fullscreen enforcement
-  const [isFullscreen, setIsFullscreen] = useState(true);
+  const [isFullscreen, setIsFullscreen] = useState(() => {
+    return !!(
+      document.fullscreenElement ||
+      (document as any).webkitFullscreenElement ||
+      (document as any).mozFullScreenElement ||
+      (document as any).msFullscreenElement
+    );
+  });
   const [fullscreenTimer, setFullscreenTimer] = useState(10);
 
   // Connection and caching state
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [unsyncedCount, setUnsyncedCount] = useState(0);
 
+  const enterFullscreen = useCallback(async () => {
+    try {
+      const docEl = document.documentElement as any;
+      const requestFs =
+        docEl.requestFullscreen ||
+        docEl.webkitRequestFullscreen ||
+        docEl.mozRequestFullScreen ||
+        docEl.msRequestFullscreen;
 
-  const enterFullscreen = () => {
-    document.documentElement.requestFullscreen().catch(err => {
-      console.error("Fullscreen error:", err);
-    });
-  };
+      if (requestFs) {
+        await requestFs.call(docEl);
+        setIsFullscreen(true);
+        toast({
+          title: "Full Screen Active",
+          description: "You have returned to full screen mode. Resuming assessment.",
+        });
+      }
+    } catch (err) {
+      console.warn("Fullscreen request error:", err);
+      toast({
+        title: "Permission Required",
+        description: "Please allow full screen in your browser to proceed with the assessment.",
+        variant: "destructive",
+      });
+    }
+  }, [toast]);
 
 
 
@@ -1022,20 +1049,38 @@ useEffect(() => {
   // Fullscreen enforcement effects
   useEffect(() => {
     const handleFullscreenChange = () => {
-      setIsFullscreen(!!document.fullscreenElement);
+      const isFs = !!(
+        document.fullscreenElement ||
+        (document as any).webkitFullscreenElement ||
+        (document as any).mozFullScreenElement ||
+        (document as any).msFullscreenElement
+      );
+      setIsFullscreen(isFs);
     };
+
+    handleFullscreenChange();
     document.addEventListener("fullscreenchange", handleFullscreenChange);
-    return () => document.removeEventListener("fullscreenchange", handleFullscreenChange);
+    document.addEventListener("webkitfullscreenchange", handleFullscreenChange);
+    document.addEventListener("mozfullscreenchange", handleFullscreenChange);
+    document.addEventListener("MSFullscreenChange", handleFullscreenChange);
+
+    return () => {
+      document.removeEventListener("fullscreenchange", handleFullscreenChange);
+      document.removeEventListener("webkitfullscreenchange", handleFullscreenChange);
+      document.removeEventListener("mozfullscreenchange", handleFullscreenChange);
+      document.removeEventListener("MSFullscreenChange", handleFullscreenChange);
+    };
   }, []);
 
   useEffect(() => {
     let timer: NodeJS.Timeout;
-    if (isProctoringActive && config?.fullscreenExitTracking && !isFullscreen) {
+    const isRequired = Boolean(config?.fullscreen || config?.fullscreenExitTracking || config?.tabSwitch);
+    if (isProctoringActive && isRequired && !isFullscreen) {
       if (fullscreenTimer === 10 && !hasWarnedFullscreenRef.current) {
         hasWarnedFullscreenRef.current = true;
         toast({
           title: "Fullscreen Required",
-          description: "Please return to fullscreen mode immediately.",
+          description: "Please return to fullscreen mode to continue your assessment.",
           variant: "destructive"
         });
       }
@@ -1044,9 +1089,10 @@ useEffect(() => {
       }, 1000);
     } else {
       setFullscreenTimer(10);
+      hasWarnedFullscreenRef.current = false;
     }
     return () => clearInterval(timer);
-  }, [isProctoringActive, isFullscreen, toast, fullscreenTimer, config?.fullscreenExitTracking]);
+  }, [isProctoringActive, isFullscreen, toast, fullscreenTimer, config]);
 
   useEffect(() => {
     if (!isProctoringActive) return;
@@ -1733,24 +1779,24 @@ useEffect(() => {
 
   return (
     <div className="min-h-screen bg-background flex flex-col relative">
-      {/* Fullscreen Enforcement Overlay */}
-      {!isFullscreen && isProctoringActive && config?.fullscreenExitTracking && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-md">
-          <div className="bg-background p-8 rounded-xl border-2 border-destructive shadow-2xl text-center max-w-md animate-in zoom-in duration-300">
-            <div className="mx-auto mb-6 w-20 h-20 rounded-full bg-destructive/10 flex items-center justify-center animate-pulse">
-              <Monitor className="w-10 h-10 text-destructive" />
+      {/* Fullscreen Enforcement Overlay on Reload & Tab Switch */}
+      {!isFullscreen && isProctoringActive && Boolean(config?.fullscreen || config?.fullscreenExitTracking || config?.tabSwitch) && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-md p-4">
+          <div className="bg-white p-8 rounded-2xl border border-slate-200 shadow-2xl text-center max-w-md w-full animate-in zoom-in duration-300">
+            <div className="mx-auto mb-5 w-16 h-16 rounded-full bg-orange-500/10 flex items-center justify-center animate-pulse">
+              <Monitor className="w-8 h-8 text-orange-600" />
             </div>
-            <h2 className="text-2xl font-bold mb-2">FULLSCREEN EXITED</h2>
-            <p className="text-muted-foreground mb-6 text-sm">
-              You must be in fullscreen mode to continue the test. Please return to fullscreen to resume.
+            <h2 className="text-xl font-bold text-slate-900 mb-2 tracking-tight">Full Screen Required</h2>
+            <p className="text-slate-600 mb-6 text-xs sm:text-sm leading-relaxed">
+              Assessment in progress. If you reloaded the page, switched tabs, or exited full screen, please click below to return to full screen and continue your test.
             </p>
             <Button 
               size="lg" 
-              variant="destructive" 
-              className="w-full h-14 text-xl font-bold shadow-lg hover:shadow-destructive/20 transition-all hover:scale-105 mb-4"
+              className="w-full h-12 text-sm font-semibold bg-orange-500 hover:bg-orange-600 text-white shadow-md shadow-orange-500/20 transition-all hover:scale-[1.01] cursor-pointer"
               onClick={enterFullscreen}
             >
-              Go Fullscreen Now
+              <Maximize className="w-4 h-4 mr-2" />
+              Return to Full Screen
             </Button>
           </div>
         </div>

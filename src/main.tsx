@@ -3,6 +3,23 @@ import * as Sentry from "@sentry/react";
 import App from "./App.tsx";
 import "./index.css";
 import { initKeepAlive } from "./lib/keep-alive";
+import { isChunkLoadError, triggerChunkReload } from "./lib/lazyWithRetry";
+
+// Global listener for Vite dynamic import preload errors (native to Vite)
+window.addEventListener("vite:preloadError", (event) => {
+  console.warn("[Vite Preload Error]: Dynamic asset chunk could not be loaded, triggering reload...", event);
+  event.preventDefault(); // Suppress unhandled error
+  triggerChunkReload();
+});
+
+// Global unhandled rejection listener for dynamic module script failures
+window.addEventListener("unhandledrejection", (event) => {
+  if (isChunkLoadError(event.reason)) {
+    console.warn("[Unhandled Chunk Error]: Dynamic import rejected, recovering with page reload...", event.reason);
+    event.preventDefault();
+    triggerChunkReload();
+  }
+});
 
 const sentryDsn = import.meta.env.VITE_SENTRY_DSN;
 if (sentryDsn) {
@@ -22,6 +39,13 @@ if (sentryDsn) {
     // Session Replay
     replaysSessionSampleRate: 0.1,
     replaysOnErrorSampleRate: 1.0,
+    beforeSend(event, hint) {
+      // Don't send noisy chunk load errors to Sentry as they are auto-recovered by reload
+      if (isChunkLoadError(hint.originalException)) {
+        return null;
+      }
+      return event;
+    },
   });
 }
 
@@ -37,4 +61,5 @@ if ("serviceWorker" in navigator) {
       .catch((err) => console.error("Service Worker registration failed:", err));
   });
 }
+
 

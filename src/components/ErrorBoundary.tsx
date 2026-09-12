@@ -10,6 +10,7 @@ import {
   ChevronRight,
   Terminal,
 } from "lucide-react";
+import { isChunkLoadError, triggerChunkReload } from "@/lib/lazyWithRetry";
 
 
 interface Props {
@@ -38,6 +39,14 @@ class ErrorBoundary extends Component<Props, State> {
 
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     console.error("Uncaught error:", error, errorInfo);
+
+    // Auto-recover if it's a stale chunk/dynamic import error from a new deployment
+    if (isChunkLoadError(error)) {
+      const reloaded = triggerChunkReload();
+      if (reloaded) {
+        return;
+      }
+    }
     
     // Capture error in Sentry
     Sentry.captureException(error, {
@@ -63,6 +72,7 @@ class ErrorBoundary extends Component<Props, State> {
   };
 
   private handleReload = () => {
+    // Force hard reload to bust stale browser cache
     window.location.reload();
   };
 

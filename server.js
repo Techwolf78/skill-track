@@ -120,7 +120,9 @@ const server = http.createServer((req, res) => {
     if (!err && stats.isFile()) {
       const ext = path.extname(filePath).toLowerCase();
       const contentType = MIME_TYPES[ext] || 'application/octet-stream';
-      const cacheControl = ext === '.html' ? 'no-cache' : 'public, max-age=31536000, immutable';
+      const cacheControl = ext === '.html'
+        ? 'no-cache, no-store, must-revalidate'
+        : 'public, max-age=31536000, immutable';
 
       res.writeHead(200, {
         'Content-Type': contentType,
@@ -135,6 +137,16 @@ const server = http.createServer((req, res) => {
 
       fs.createReadStream(filePath).pipe(res);
     } else {
+      // If a specific static asset (like an old JS chunk in /assets/) is missing, return 404 instead of index.html
+      if (reqPath.startsWith('/assets/') || reqPath.startsWith('/models/')) {
+        res.writeHead(404, {
+          'Content-Type': 'text/plain',
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+        });
+        res.end('Asset not found');
+        return;
+      }
+
       // SPA fallback: return index.html for all client-side React routes (e.g. /dashboard, /login)
       const indexPath = path.join(DIST_DIR, 'index.html');
       fs.stat(indexPath, (indexErr, indexStats) => {
@@ -146,7 +158,9 @@ const server = http.createServer((req, res) => {
 
         res.writeHead(200, {
           'Content-Type': 'text/html; charset=UTF-8',
-          'Cache-Control': 'no-cache',
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0',
           'Content-Length': indexStats.size,
         });
 
