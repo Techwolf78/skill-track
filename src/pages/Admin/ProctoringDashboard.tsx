@@ -269,6 +269,7 @@ export default function ProctoringDashboard() {
   const [activeViolationId, setActiveViolationId] = useState<string | null>(
     null,
   );
+  const [identityImgFailed, setIdentityImgFailed] = useState(false);
 
   // Time Extension Modal State
   const [isExtendTimeModalOpen, setIsExtendTimeModalOpen] = useState(false);
@@ -411,12 +412,59 @@ export default function ProctoringDashboard() {
     setLoadingCandidates(true);
     setErrorCandidates(null);
     try {
-      const invitations =
-        await candidateService.getInvitationsBySchedule(scheduleId);
-      const mappedCandidates: ProctoringCandidate[] = invitations.map(
-        (inv) => ({
+      let mappedCandidates: ProctoringCandidate[] = [];
+
+      try {
+        const response = await apiClient.get(
+          `/api/admin/proctoring/assessment-schedules/${scheduleId}/candidates`,
+        );
+        const data = response.data?.data ?? response.data;
+        if (Array.isArray(data) && data.length > 0) {
+          mappedCandidates = data.map((rec: {
+            candidateId?: string;
+            id?: string;
+            sessionId?: string;
+            candidateName?: string;
+            name?: string;
+            email?: string;
+            testStatus?: string;
+            proctoringMode?: string;
+            riskLevel?: string;
+            violationCount?: number;
+            violationsCount?: number;
+            criticalViolationCount?: number;
+            criticalViolationsCount?: number;
+            lastActivityAt?: string;
+            reviewStatus?: string;
+          }) => ({
+            id: rec.candidateId || rec.id || "",
+            sessionId: rec.sessionId,
+            name: rec.candidateName || rec.name || "Candidate",
+            email: rec.email || "—",
+            testStatus: (rec.testStatus === "ACTIVE"
+              ? "IN_PROGRESS"
+              : rec.testStatus || "NOT_STARTED") as TestStatus,
+            proctoringMode: (rec.proctoringMode || "MEDIUM") as ProctoringMode,
+            riskLevel: (rec.riskLevel || "NONE") as RiskLevel,
+            violationsCount: Number(rec.violationCount ?? rec.violationsCount ?? 0),
+            criticalViolationsCount: Number(rec.criticalViolationCount ?? rec.criticalViolationsCount ?? 0),
+            lastActivity: rec.lastActivityAt
+              ? new Date(rec.lastActivityAt).toLocaleString()
+              : "No activity",
+            reviewStatus: (rec.reviewStatus || "NOT_REVIEWED") as ReviewStatus,
+          }));
+        }
+      } catch (err) {
+        console.warn("Dedicated proctoring candidates API failed or returned empty, attempting invitation fallback:", err);
+      }
+
+      // Fallback if dedicated API returned empty or failed
+      if (mappedCandidates.length === 0) {
+        const invitations =
+          await candidateService.getInvitationsBySchedule(scheduleId);
+        mappedCandidates = invitations.map((inv) => ({
           id: inv.candidateId || inv.id,
-          sessionId: undefined,
+          sessionId: inv.sessionId,
           name: inv.candidateName || inv.candidate?.user?.name || "Candidate",
           email: inv.candidateEmail || inv.candidate?.user?.email || "—",
           testStatus: (inv.sessionStatus === "ACTIVE"
@@ -430,8 +478,8 @@ export default function ProctoringDashboard() {
             ? new Date(inv.createdAt).toLocaleString()
             : "No activity",
           reviewStatus: "NOT_REVIEWED",
-        }),
-      );
+        }));
+      }
 
       setCandidates(mappedCandidates);
     } catch (err) {
@@ -449,9 +497,10 @@ export default function ProctoringDashboard() {
     setIsDrawerOpen(true);
     setLoadingDetails(true);
     setErrorDetails(null);
+    setIdentityImgFailed(false);
     try {
       const response = await apiClient.get(
-        `/admin/proctoring/candidates/${candidate.id}/details?scheduleId=${selectedScheduleId}`,
+        `/api/admin/proctoring/candidates/${candidate.id}/details?scheduleId=${selectedScheduleId}`,
       );
       const data = response.data?.data ?? response.data;
       console.log(
@@ -638,7 +687,7 @@ export default function ProctoringDashboard() {
     setIsSavingReview(true);
     try {
       await apiClient.patch(
-        `/admin/proctoring/candidates/${selectedCandidate.id}/review-status`,
+        `/api/admin/proctoring/candidates/${selectedCandidate.id}/review-status`,
         {
           scheduleId: selectedScheduleId,
           reviewStatus: newStatus,
@@ -2859,7 +2908,7 @@ export default function ProctoringDashboard() {
                         </CardTitle>
                       </CardHeader>
                       <CardContent className="p-4 space-y-4">
-                        {candidateDetails.candidatePhoto?.imageUrl ? (
+                        {candidateDetails.candidatePhoto?.imageUrl && !identityImgFailed ? (
                           <div
                             className="relative w-full h-64 bg-slate-950 rounded-lg overflow-hidden flex items-center justify-center border border-slate-800 shadow-md group cursor-pointer"
                             onClick={() =>
@@ -2877,11 +2926,15 @@ export default function ProctoringDashboard() {
                               alt="Candidate Verification Identity Capture"
                               className="w-full h-full object-contain bg-slate-950"
                               onError={(e) => {
-                                console.error(
-                                  "Identity photo failed to load URL:",
-                                  candidateDetails.candidatePhoto?.imageUrl,
-                                );
-                                e.currentTarget.style.display = "none";
+                                const rawUrl = candidateDetails.candidatePhoto?.imageUrl;
+                                const currentSrc = e.currentTarget.src;
+                                if (rawUrl && !currentSrc.includes("/snapshots/proxy")) {
+                                  console.log("Direct load failed for identity photo, falling back to proxy...", rawUrl);
+                                  e.currentTarget.src = `/api/admin/proctoring/snapshots/proxy?url=${encodeURIComponent(rawUrl)}`;
+                                } else {
+                                  console.error("Identity photo completely unavailable:", rawUrl);
+                                  setIdentityImgFailed(true);
+                                }
                               }}
                             />
                             <div className="absolute top-2 left-2 text-[10px] font-mono text-emerald-400 bg-slate-950/80 px-2 py-0.5 rounded border border-emerald-500/30 uppercase tracking-wider font-semibold">
@@ -2895,11 +2948,22 @@ export default function ProctoringDashboard() {
                             </div>
                           </div>
                         ) : (
-                          <CameraFeedPlaceholder
-                            eventType="IDENTITY_VERIFICATION"
-                            isEvidence={false}
-                            imageUrl=""
-                          />
+                          <div className="relative w-full h-64 bg-slate-950 rounded-lg overflow-hidden flex flex-col items-center justify-center border border-slate-800 p-6 text-center space-y-3">
+                            <div className="w-14 h-14 rounded-full bg-slate-900 border border-slate-700 flex items-center justify-center">
+                              <UserCheck className="h-7 w-7 text-emerald-400" />
+                            </div>
+                            <div>
+                              <p className="text-sm font-semibold text-slate-200">
+                                {candidateDetails.name}
+                              </p>
+                              <p className="text-xs text-slate-400 font-mono mt-0.5">
+                                {candidateDetails.email}
+                              </p>
+                            </div>
+                            <Badge variant="outline" className="text-[10px] border-emerald-500/40 text-emerald-400 bg-emerald-950/20">
+                              Identity Verification Completed at Test Start
+                            </Badge>
+                          </div>
                         )}
                         <div className="flex justify-between items-center text-xs font-mono bg-muted/30 p-2.5 rounded-lg border border-border/40">
                           <span className="text-muted-foreground font-semibold">

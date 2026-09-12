@@ -59,6 +59,14 @@ export const resolveStarterCode = (
     if (legacyMap[langKey]?.code) return legacyMap[langKey].code;
     if (legacyMap[language]?.template) return legacyMap[language].template;
     if (legacyMap[langKey]?.template) return legacyMap[langKey].template;
+
+    // Fallback to first available language in template
+    const entries = Object.values(legacyMap) as any[];
+    for (const entry of entries) {
+      if (typeof entry === "string" && entry.trim()) return entry;
+      if (entry && typeof entry.code === "string" && entry.code.trim()) return entry.code;
+      if (entry && typeof entry.template === "string" && entry.template.trim()) return entry.template;
+    }
   }
 
   return null;

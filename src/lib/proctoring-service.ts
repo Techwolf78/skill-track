@@ -125,24 +125,13 @@ export const proctoringService = {
   proxyUpload: async (sessionId: string, storagePath: string, blob: Blob): Promise<void> => {
     const token = localStorage.getItem("token");
     const encodedPath = encodeURIComponent(storagePath);
-    const base = (apiClient.defaults.baseURL || "").replace(/\/+$/, "");
     const cleanPath = `/test-sessions/${sessionId}/evidence/upload-proxy?path=${encodedPath}&contentType=${encodeURIComponent(blob.type || "image/jpeg")}`;
-    const uploadUrl = base.startsWith("http") ? `${base}${cleanPath}` : `/api${cleanPath}`;
 
-    const res = await fetch(
-      uploadUrl,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/octet-stream",
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        body: blob,
-      }
-    );
-    if (!res.ok) {
-      const text = await res.text().catch(() => res.statusText);
-      throw new Error(`Proxy upload failed (${res.status}): ${text}`);
-    }
+    await apiClient.post(cleanPath, blob, {
+      headers: {
+        "Content-Type": "application/octet-stream",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+    });
   },
 };
