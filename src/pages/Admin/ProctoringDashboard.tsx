@@ -96,7 +96,10 @@ import { useToast } from "@/hooks/use-toast";
 import { apiClient } from "@/lib/api-client";
 import { testService, TestSession } from "@/lib/test-service";
 import { candidateService } from "@/lib/candidate-service";
-import { ExtendTimeModal, ExtendTimeCandidateSession } from "@/components/admin/ExtendTimeModal";
+import {
+  ExtendTimeModal,
+  ExtendTimeCandidateSession,
+} from "@/components/admin/ExtendTimeModal";
 
 // ==========================================
 // 7. TypeScript Types & Enums
@@ -258,16 +261,25 @@ export default function ProctoringDashboard() {
     capturedAt?: string;
     eventType?: string;
   } | null>(null);
-  const [compareWithBaseline, setCompareWithBaseline] = useState<string | null>(null); // frame ID being compared
-  const [activeViolationId, setActiveViolationId] = useState<string | null>(null);
+  const [compareWithBaseline, setCompareWithBaseline] = useState<string | null>(
+    null,
+  ); // frame ID being compared
+  const [activeViolationId, setActiveViolationId] = useState<string | null>(
+    null,
+  );
 
   // Time Extension Modal State
   const [isExtendTimeModalOpen, setIsExtendTimeModalOpen] = useState(false);
-  const [selectedCandidateForExtension, setSelectedCandidateForExtension] = useState<ExtendTimeCandidateSession | null>(null);
+  const [selectedCandidateForExtension, setSelectedCandidateForExtension] =
+    useState<ExtendTimeCandidateSession | null>(null);
 
-  const handleOpenExtendTimeModal = (candidate: ProctoringCandidate | CandidateProctoringDetail) => {
+  const handleOpenExtendTimeModal = (
+    candidate: ProctoringCandidate | CandidateProctoringDetail,
+  ) => {
     const currentSchedule = schedules.find((s) => s.id === selectedScheduleId);
-    const resolvedSessionId = candidate.sessionId || candidates.find((c) => c.id === candidate.id)?.sessionId;
+    const resolvedSessionId =
+      candidate.sessionId ||
+      candidates.find((c) => c.id === candidate.id)?.sessionId;
 
     if (!resolvedSessionId) {
       toast({
@@ -305,12 +317,18 @@ export default function ProctoringDashboard() {
     setLoadingSchedules(true);
     setErrorSchedules(null);
     try {
-      const standardSchedules = await testService.getAllTestSchedules({ size: 1000 });
+      const standardSchedules = await testService.getAllTestSchedules({
+        size: 1000,
+      });
       const scheduleList: AssessmentSchedule[] = standardSchedules.map((s) => ({
         id: s.id,
         assessmentName: s.test?.title || `Schedule #${s.id.slice(0, 8)}`,
-        scheduledDate: s.startTime ? new Date(s.startTime).toLocaleDateString() : "Active",
-        startTime: s.startTime ? new Date(s.startTime).toLocaleTimeString() : "",
+        scheduledDate: s.startTime
+          ? new Date(s.startTime).toLocaleDateString()
+          : "Active",
+        startTime: s.startTime
+          ? new Date(s.startTime).toLocaleTimeString()
+          : "",
         proctoringMode: (s.test?.proctoringMode || "MEDIUM") as ProctoringMode,
         totalCandidates: s.maxCandidates || 0,
         activeCandidates: 0,
@@ -320,13 +338,19 @@ export default function ProctoringDashboard() {
 
       setSchedules(scheduleList);
       if (scheduleList.length > 0) {
-        setSelectedScheduleId((prev) => (prev && scheduleList.some((s) => s.id === prev) ? prev : scheduleList[0].id));
+        setSelectedScheduleId((prev) =>
+          prev && scheduleList.some((s) => s.id === prev)
+            ? prev
+            : scheduleList[0].id,
+        );
       } else {
         setSelectedScheduleId("");
       }
     } catch (err) {
       console.error("Failed to load schedules:", err);
-      setErrorSchedules("Could not load assessment schedules. Check your connection or try again.");
+      setErrorSchedules(
+        "Could not load assessment schedules. Check your connection or try again.",
+      );
       setSchedules([]);
       setSelectedScheduleId("");
     } finally {
@@ -340,20 +364,27 @@ export default function ProctoringDashboard() {
     setLoadingCandidates(true);
     setErrorCandidates(null);
     try {
-      const invitations = await candidateService.getInvitationsBySchedule(scheduleId);
-      const mappedCandidates: ProctoringCandidate[] = invitations.map((inv) => ({
-        id: inv.candidateId || inv.id,
-        sessionId: undefined,
-        name: inv.candidateName || inv.candidate?.user?.name || "Candidate",
-        email: inv.candidateEmail || inv.candidate?.user?.email || "—",
-        testStatus: (inv.sessionStatus === "ACTIVE" ? "IN_PROGRESS" : (inv.sessionStatus || "NOT_STARTED")) as TestStatus,
-        proctoringMode: "MEDIUM",
-        riskLevel: "NONE",
-        violationsCount: 0,
-        criticalViolationsCount: 0,
-        lastActivity: inv.createdAt ? new Date(inv.createdAt).toLocaleString() : "No activity",
-        reviewStatus: "NOT_REVIEWED",
-      }));
+      const invitations =
+        await candidateService.getInvitationsBySchedule(scheduleId);
+      const mappedCandidates: ProctoringCandidate[] = invitations.map(
+        (inv) => ({
+          id: inv.candidateId || inv.id,
+          sessionId: undefined,
+          name: inv.candidateName || inv.candidate?.user?.name || "Candidate",
+          email: inv.candidateEmail || inv.candidate?.user?.email || "—",
+          testStatus: (inv.sessionStatus === "ACTIVE"
+            ? "IN_PROGRESS"
+            : inv.sessionStatus || "NOT_STARTED") as TestStatus,
+          proctoringMode: "MEDIUM",
+          riskLevel: "NONE",
+          violationsCount: 0,
+          criticalViolationsCount: 0,
+          lastActivity: inv.createdAt
+            ? new Date(inv.createdAt).toLocaleString()
+            : "No activity",
+          reviewStatus: "NOT_REVIEWED",
+        }),
+      );
 
       setCandidates(mappedCandidates);
     } catch (err) {
@@ -364,8 +395,6 @@ export default function ProctoringDashboard() {
       setLoadingCandidates(false);
     }
   }, []);
-
-
 
   // Fetch Candidate Detailed Info API
   const loadCandidateDetails = async (candidate: ProctoringCandidate) => {
@@ -378,10 +407,19 @@ export default function ProctoringDashboard() {
         `/admin/proctoring/candidates/${candidate.id}/details?scheduleId=${selectedScheduleId}`,
       );
       const data = response.data?.data ?? response.data;
-      console.log(`[Proctoring Dashboard] loadCandidateDetails response:`, data);
-      console.log(`[Proctoring Dashboard] raw candidatePhoto:`, data?.candidatePhoto);
+      console.log(
+        `[Proctoring Dashboard] loadCandidateDetails response:`,
+        data,
+      );
+      console.log(
+        `[Proctoring Dashboard] raw candidatePhoto:`,
+        data?.candidatePhoto,
+      );
       console.log(`[Proctoring Dashboard] raw evidence list:`, data?.evidence);
-      console.log(`[Proctoring Dashboard] raw snapshots list:`, data?.snapshots);
+      console.log(
+        `[Proctoring Dashboard] raw snapshots list:`,
+        data?.snapshots,
+      );
 
       if (data && typeof data === "object") {
         const mappedDetail: CandidateProctoringDetail = {
@@ -389,60 +427,146 @@ export default function ProctoringDashboard() {
           sessionId: data.systemInfo?.sessionId || candidate.sessionId,
           name: data.candidate?.candidateName || candidate.name,
           email: data.candidate?.email || candidate.email,
-          testStatus: data.testStatus === "ACTIVE" ? "IN_PROGRESS" : data.testStatus,
+          testStatus:
+            data.testStatus === "ACTIVE" ? "IN_PROGRESS" : data.testStatus,
           riskScore: Math.round(data.riskScore || 0),
           riskLevel: data.riskLevel || "NONE",
           violationsCount: data.violationCount || 0,
           criticalViolationsCount: data.criticalViolationCount || 0,
-          startedAt: data.systemInfo?.startedAt ? new Date(data.systemInfo.startedAt).toLocaleString() : "N/A",
-          submittedAt: data.systemInfo?.endedAt ? new Date(data.systemInfo.endedAt).toLocaleString() : null,
-          violations: data.violations?.map((v: { eventId?: string; id?: string; occurredAt?: string; eventType?: string; severity?: ProctoringEventSeverity; metadata?: { description?: string } }) => ({
-            id: v.eventId || v.id,
-            time: v.occurredAt ? new Date(v.occurredAt).toLocaleTimeString() : "N/A",
-            eventType: v.eventType,
-            severity: v.severity,
-            description: v.metadata?.description || `Triggered ${v.eventType?.replace(/_/g, " ") || "violation"}`,
-            evidenceAvailable: data.evidence?.some((e: { eventId?: string }) => e.eventId === v.eventId) || false,
-          })) || [],
-          evidences: data.evidence?.map((e: { id?: string; imageUrl?: string; imageData?: string; s3Key?: string; snapshotType?: string; capturedAt?: string }) => {
-            const fullUrl = e.imageUrl || (e.s3Key && e.s3Key.startsWith("http") ? e.s3Key : (e.imageData ? (e.imageData.startsWith("data:") ? e.imageData : `data:image/jpeg;base64,${e.imageData}`) : e.s3Key || ""));
-            return {
-              id: e.id,
-              imageUrl: fullUrl,
-              eventType: e.snapshotType || "VIOLATION",
-              capturedAt: e.capturedAt ? new Date(e.capturedAt).toLocaleString() : "N/A",
-              severity: "HIGH" as ProctoringEventSeverity,
-              description: e.s3Key || "Attached Frame Capture",
-            };
-          }) || [],
-          snapshots: data.snapshots?.map((s: { id?: string; imageUrl?: string; imageData?: string; s3Key?: string; capturedAt?: string }) => {
-            const fullUrl = s.imageUrl || (s.s3Key && s.s3Key.startsWith("http") ? s.s3Key : (s.imageData ? (s.imageData.startsWith("data:") ? s.imageData : `data:image/jpeg;base64,${s.imageData}`) : s.s3Key || ""));
-            return {
-              id: s.id,
-              imageUrl: fullUrl,
-              capturedAt: s.capturedAt ? new Date(s.capturedAt).toLocaleTimeString() : "N/A",
-            };
-          }) || [],
-          candidatePhoto: data.candidatePhoto ? {
-            imageUrl: data.candidatePhoto.imageUrl || (data.candidatePhoto.imageData
-              ? (data.candidatePhoto.imageData.startsWith("data:") ? data.candidatePhoto.imageData : `data:image/jpeg;base64,${data.candidatePhoto.imageData}`)
-              : (data.candidatePhoto.s3Key || "")),
-            capturedAt: data.candidatePhoto.capturedAt ? new Date(data.candidatePhoto.capturedAt).toLocaleString() : "N/A",
-          } : (() => {
-            const photoEvidence = data.evidence?.find((e: { snapshotType?: string }) => e.snapshotType === "CANDIDATE_PHOTO");
-            return photoEvidence ? {
-              imageUrl: photoEvidence.imageUrl || (photoEvidence.imageData
-                ? (photoEvidence.imageData.startsWith("data:") ? photoEvidence.imageData : `data:image/jpeg;base64,${photoEvidence.imageData}`)
-                : (photoEvidence.s3Key || "")),
-              capturedAt: photoEvidence.capturedAt ? new Date(photoEvidence.capturedAt).toLocaleString() : "N/A",
-            } : null;
-          })(),
+          startedAt: data.systemInfo?.startedAt
+            ? new Date(data.systemInfo.startedAt).toLocaleString()
+            : "N/A",
+          submittedAt: data.systemInfo?.endedAt
+            ? new Date(data.systemInfo.endedAt).toLocaleString()
+            : null,
+          violations:
+            data.violations?.map(
+              (v: {
+                eventId?: string;
+                id?: string;
+                occurredAt?: string;
+                eventType?: string;
+                severity?: ProctoringEventSeverity;
+                metadata?: { description?: string };
+              }) => ({
+                id: v.eventId || v.id,
+                time: v.occurredAt
+                  ? new Date(v.occurredAt).toLocaleTimeString()
+                  : "N/A",
+                eventType: v.eventType,
+                severity: v.severity,
+                description:
+                  v.metadata?.description ||
+                  `Triggered ${v.eventType?.replace(/_/g, " ") || "violation"}`,
+                evidenceAvailable:
+                  data.evidence?.some(
+                    (e: { eventId?: string }) => e.eventId === v.eventId,
+                  ) || false,
+              }),
+            ) || [],
+          evidences:
+            data.evidence?.map(
+              (e: {
+                id?: string;
+                imageUrl?: string;
+                imageData?: string;
+                s3Key?: string;
+                snapshotType?: string;
+                capturedAt?: string;
+              }) => {
+                const fullUrl =
+                  e.imageUrl ||
+                  (e.s3Key && e.s3Key.startsWith("http")
+                    ? e.s3Key
+                    : e.imageData
+                      ? e.imageData.startsWith("data:")
+                        ? e.imageData
+                        : `data:image/jpeg;base64,${e.imageData}`
+                      : e.s3Key || "");
+                return {
+                  id: e.id,
+                  imageUrl: fullUrl,
+                  eventType: e.snapshotType || "VIOLATION",
+                  capturedAt: e.capturedAt
+                    ? new Date(e.capturedAt).toLocaleString()
+                    : "N/A",
+                  severity: "HIGH" as ProctoringEventSeverity,
+                  description: e.s3Key || "Attached Frame Capture",
+                };
+              },
+            ) || [],
+          snapshots:
+            data.snapshots?.map(
+              (s: {
+                id?: string;
+                imageUrl?: string;
+                imageData?: string;
+                s3Key?: string;
+                capturedAt?: string;
+              }) => {
+                const fullUrl =
+                  s.imageUrl ||
+                  (s.s3Key && s.s3Key.startsWith("http")
+                    ? s.s3Key
+                    : s.imageData
+                      ? s.imageData.startsWith("data:")
+                        ? s.imageData
+                        : `data:image/jpeg;base64,${s.imageData}`
+                      : s.s3Key || "");
+                return {
+                  id: s.id,
+                  imageUrl: fullUrl,
+                  capturedAt: s.capturedAt
+                    ? new Date(s.capturedAt).toLocaleTimeString()
+                    : "N/A",
+                };
+              },
+            ) || [],
+          candidatePhoto: data.candidatePhoto
+            ? {
+                imageUrl:
+                  data.candidatePhoto.imageUrl ||
+                  (data.candidatePhoto.imageData
+                    ? data.candidatePhoto.imageData.startsWith("data:")
+                      ? data.candidatePhoto.imageData
+                      : `data:image/jpeg;base64,${data.candidatePhoto.imageData}`
+                    : data.candidatePhoto.s3Key || ""),
+                capturedAt: data.candidatePhoto.capturedAt
+                  ? new Date(data.candidatePhoto.capturedAt).toLocaleString()
+                  : "N/A",
+              }
+            : (() => {
+                const photoEvidence = data.evidence?.find(
+                  (e: { snapshotType?: string }) =>
+                    e.snapshotType === "CANDIDATE_PHOTO",
+                );
+                return photoEvidence
+                  ? {
+                      imageUrl:
+                        photoEvidence.imageUrl ||
+                        (photoEvidence.imageData
+                          ? photoEvidence.imageData.startsWith("data:")
+                            ? photoEvidence.imageData
+                            : `data:image/jpeg;base64,${photoEvidence.imageData}`
+                          : photoEvidence.s3Key || ""),
+                      capturedAt: photoEvidence.capturedAt
+                        ? new Date(photoEvidence.capturedAt).toLocaleString()
+                        : "N/A",
+                    }
+                  : null;
+              })(),
           systemInfo: {
-            browser: data.systemInfo?.latestEventMetadata?.userAgent || data.systemInfo?.latestEventMetadata?.browser || "Chrome / Safari",
-            os: data.systemInfo?.latestEventMetadata?.os || "Windows 11 / macOS",
+            browser:
+              data.systemInfo?.latestEventMetadata?.userAgent ||
+              data.systemInfo?.latestEventMetadata?.browser ||
+              "Chrome / Safari",
+            os:
+              data.systemInfo?.latestEventMetadata?.os || "Windows 11 / macOS",
             ipAddress: data.systemInfo?.ipAddress || "Unknown",
             device: data.systemInfo?.latestEventMetadata?.device || "Desktop",
-            screenResolution: data.systemInfo?.latestEventMetadata?.screenResolution || "1920x1080",
+            screenResolution:
+              data.systemInfo?.latestEventMetadata?.screenResolution ||
+              "1920x1080",
           },
           reviewStatus: data.reviewDecision?.reviewStatus || "NOT_REVIEWED",
         };
@@ -451,7 +575,9 @@ export default function ProctoringDashboard() {
         throw new Error("Invalid response");
       }
     } catch {
-      setErrorDetails("Could not load detailed proctoring data for this candidate.");
+      setErrorDetails(
+        "Could not load detailed proctoring data for this candidate.",
+      );
       setCandidateDetails(null);
     } finally {
       setLoadingDetails(false);
@@ -495,7 +621,8 @@ export default function ProctoringDashboard() {
       console.error("Failed to update candidate review status:", err);
       toast({
         title: "Update Failed",
-        description: "Could not save candidate review status to database. Please try again.",
+        description:
+          "Could not save candidate review status to database. Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -557,88 +684,199 @@ export default function ProctoringDashboard() {
 
           try {
             const detailRes = await apiClient.get(
-              `/api/admin/proctoring/candidates/${candidateId}/details?scheduleId=${scheduleId}`
+              `/api/admin/proctoring/candidates/${candidateId}/details?scheduleId=${scheduleId}`,
             );
             const data = detailRes.data?.data ?? detailRes.data;
-            console.log(`[Proctoring Dashboard] Candidate Details Raw Response from Backend:`, data);
-            console.log(`[Proctoring Dashboard] candidatePhoto payload:`, data?.candidatePhoto);
-            console.log(`[Proctoring Dashboard] evidence list payload:`, data?.evidence);
+            console.log(
+              `[Proctoring Dashboard] Candidate Details Raw Response from Backend:`,
+              data,
+            );
+            console.log(
+              `[Proctoring Dashboard] candidatePhoto payload:`,
+              data?.candidatePhoto,
+            );
+            console.log(
+              `[Proctoring Dashboard] evidence list payload:`,
+              data?.evidence,
+            );
             if (data && typeof data === "object") {
               const mappedDetail: CandidateProctoringDetail = {
                 id: data.candidate?.candidateId || candidateId,
                 name: data.candidate?.candidateName || "Candidate",
                 email: data.candidate?.email || "",
-                testStatus: data.testStatus === "ACTIVE" ? "IN_PROGRESS" : data.testStatus,
+                testStatus:
+                  data.testStatus === "ACTIVE"
+                    ? "IN_PROGRESS"
+                    : data.testStatus,
                 riskScore: Math.round(data.riskScore || 0),
                 riskLevel: data.riskLevel || "NONE",
                 violationsCount: data.violationCount || 0,
                 criticalViolationsCount: data.criticalViolationCount || 0,
-                startedAt: data.systemInfo?.startedAt ? new Date(data.systemInfo.startedAt).toLocaleString() : "N/A",
-                submittedAt: data.systemInfo?.endedAt ? new Date(data.systemInfo.endedAt).toLocaleString() : null,
-                violations: data.violations?.map((v: { eventId?: string; id?: string; occurredAt?: string; eventType?: string; severity?: ProctoringEventSeverity; metadata?: { description?: string } }) => ({
-                  id: v.eventId || v.id,
-                  time: v.occurredAt ? new Date(v.occurredAt).toLocaleTimeString() : "N/A",
-                  eventType: v.eventType,
-                  severity: v.severity,
-                  description: v.metadata?.description || `Triggered ${v.eventType?.replace(/_/g, " ") || "violation"}`,
-                  evidenceAvailable: data.evidence?.some((e: { eventId?: string }) => e.eventId === v.eventId) || false,
-                })) || [],
-                evidences: data.evidence?.map((e: { id?: string; imageUrl?: string; imageData?: string; s3Key?: string; snapshotType?: string; capturedAt?: string }) => {
-                  const fullUrl = e.imageUrl || (e.s3Key && e.s3Key.startsWith("http") ? e.s3Key : (e.imageData ? (e.imageData.startsWith("data:") ? e.imageData : `data:image/jpeg;base64,${e.imageData}`) : e.s3Key || ""));
-                  return {
-                    id: e.id,
-                    imageUrl: fullUrl,
-                    eventType: e.snapshotType || "VIOLATION",
-                    capturedAt: e.capturedAt ? new Date(e.capturedAt).toLocaleString() : "N/A",
-                    severity: "HIGH" as ProctoringEventSeverity,
-                    description: e.s3Key || "Attached Frame Capture",
-                  };
-                }) || [],
-                snapshots: data.snapshots?.map((s: { id?: string; imageUrl?: string; imageData?: string; s3Key?: string; capturedAt?: string }) => {
-                  const fullUrl = s.imageUrl || (s.s3Key && s.s3Key.startsWith("http") ? s.s3Key : (s.imageData ? (s.imageData.startsWith("data:") ? s.imageData : `data:image/jpeg;base64,${s.imageData}`) : s.s3Key || ""));
-                  return {
-                    id: s.id,
-                    imageUrl: fullUrl,
-                    capturedAt: s.capturedAt ? new Date(s.capturedAt).toLocaleTimeString() : "N/A",
-                  };
-                }) || [],
-                candidatePhoto: data.candidatePhoto ? {
-                  imageUrl: data.candidatePhoto.imageUrl || (data.candidatePhoto.imageData
-                    ? (data.candidatePhoto.imageData.startsWith("data:") ? data.candidatePhoto.imageData : `data:image/jpeg;base64,${data.candidatePhoto.imageData}`)
-                    : (data.candidatePhoto.s3Key || "")),
-                  capturedAt: data.candidatePhoto.capturedAt ? new Date(data.candidatePhoto.capturedAt).toLocaleString() : "N/A",
-                } : (() => {
-                  const photoEvidence = data.evidence?.find((e: { snapshotType?: string }) => e.snapshotType === "CANDIDATE_PHOTO");
-                  return photoEvidence ? {
-                    imageUrl: photoEvidence.imageUrl || (photoEvidence.imageData
-                      ? (photoEvidence.imageData.startsWith("data:") ? photoEvidence.imageData : `data:image/jpeg;base64,${photoEvidence.imageData}`)
-                      : (photoEvidence.s3Key || "")),
-                    capturedAt: photoEvidence.capturedAt ? new Date(photoEvidence.capturedAt).toLocaleString() : "N/A",
-                  } : null;
-                })(),
+                startedAt: data.systemInfo?.startedAt
+                  ? new Date(data.systemInfo.startedAt).toLocaleString()
+                  : "N/A",
+                submittedAt: data.systemInfo?.endedAt
+                  ? new Date(data.systemInfo.endedAt).toLocaleString()
+                  : null,
+                violations:
+                  data.violations?.map(
+                    (v: {
+                      eventId?: string;
+                      id?: string;
+                      occurredAt?: string;
+                      eventType?: string;
+                      severity?: ProctoringEventSeverity;
+                      metadata?: { description?: string };
+                    }) => ({
+                      id: v.eventId || v.id,
+                      time: v.occurredAt
+                        ? new Date(v.occurredAt).toLocaleTimeString()
+                        : "N/A",
+                      eventType: v.eventType,
+                      severity: v.severity,
+                      description:
+                        v.metadata?.description ||
+                        `Triggered ${v.eventType?.replace(/_/g, " ") || "violation"}`,
+                      evidenceAvailable:
+                        data.evidence?.some(
+                          (e: { eventId?: string }) => e.eventId === v.eventId,
+                        ) || false,
+                    }),
+                  ) || [],
+                evidences:
+                  data.evidence?.map(
+                    (e: {
+                      id?: string;
+                      imageUrl?: string;
+                      imageData?: string;
+                      s3Key?: string;
+                      snapshotType?: string;
+                      capturedAt?: string;
+                    }) => {
+                      const fullUrl =
+                        e.imageUrl ||
+                        (e.s3Key && e.s3Key.startsWith("http")
+                          ? e.s3Key
+                          : e.imageData
+                            ? e.imageData.startsWith("data:")
+                              ? e.imageData
+                              : `data:image/jpeg;base64,${e.imageData}`
+                            : e.s3Key || "");
+                      return {
+                        id: e.id,
+                        imageUrl: fullUrl,
+                        eventType: e.snapshotType || "VIOLATION",
+                        capturedAt: e.capturedAt
+                          ? new Date(e.capturedAt).toLocaleString()
+                          : "N/A",
+                        severity: "HIGH" as ProctoringEventSeverity,
+                        description: e.s3Key || "Attached Frame Capture",
+                      };
+                    },
+                  ) || [],
+                snapshots:
+                  data.snapshots?.map(
+                    (s: {
+                      id?: string;
+                      imageUrl?: string;
+                      imageData?: string;
+                      s3Key?: string;
+                      capturedAt?: string;
+                    }) => {
+                      const fullUrl =
+                        s.imageUrl ||
+                        (s.s3Key && s.s3Key.startsWith("http")
+                          ? s.s3Key
+                          : s.imageData
+                            ? s.imageData.startsWith("data:")
+                              ? s.imageData
+                              : `data:image/jpeg;base64,${s.imageData}`
+                            : s.s3Key || "");
+                      return {
+                        id: s.id,
+                        imageUrl: fullUrl,
+                        capturedAt: s.capturedAt
+                          ? new Date(s.capturedAt).toLocaleTimeString()
+                          : "N/A",
+                      };
+                    },
+                  ) || [],
+                candidatePhoto: data.candidatePhoto
+                  ? {
+                      imageUrl:
+                        data.candidatePhoto.imageUrl ||
+                        (data.candidatePhoto.imageData
+                          ? data.candidatePhoto.imageData.startsWith("data:")
+                            ? data.candidatePhoto.imageData
+                            : `data:image/jpeg;base64,${data.candidatePhoto.imageData}`
+                          : data.candidatePhoto.s3Key || ""),
+                      capturedAt: data.candidatePhoto.capturedAt
+                        ? new Date(
+                            data.candidatePhoto.capturedAt,
+                          ).toLocaleString()
+                        : "N/A",
+                    }
+                  : (() => {
+                      const photoEvidence = data.evidence?.find(
+                        (e: { snapshotType?: string }) =>
+                          e.snapshotType === "CANDIDATE_PHOTO",
+                      );
+                      return photoEvidence
+                        ? {
+                            imageUrl:
+                              photoEvidence.imageUrl ||
+                              (photoEvidence.imageData
+                                ? photoEvidence.imageData.startsWith("data:")
+                                  ? photoEvidence.imageData
+                                  : `data:image/jpeg;base64,${photoEvidence.imageData}`
+                                : photoEvidence.s3Key || ""),
+                            capturedAt: photoEvidence.capturedAt
+                              ? new Date(
+                                  photoEvidence.capturedAt,
+                                ).toLocaleString()
+                              : "N/A",
+                          }
+                        : null;
+                    })(),
                 systemInfo: {
-                  browser: data.systemInfo?.latestEventMetadata?.userAgent || data.systemInfo?.latestEventMetadata?.browser || "Chrome / Safari",
-                  os: data.systemInfo?.latestEventMetadata?.os || "Windows 11 / macOS",
+                  browser:
+                    data.systemInfo?.latestEventMetadata?.userAgent ||
+                    data.systemInfo?.latestEventMetadata?.browser ||
+                    "Chrome / Safari",
+                  os:
+                    data.systemInfo?.latestEventMetadata?.os ||
+                    "Windows 11 / macOS",
                   ipAddress: data.systemInfo?.ipAddress || "Unknown",
-                  device: data.systemInfo?.latestEventMetadata?.device || "Desktop",
-                  screenResolution: data.systemInfo?.latestEventMetadata?.screenResolution || "1920x1080",
+                  device:
+                    data.systemInfo?.latestEventMetadata?.device || "Desktop",
+                  screenResolution:
+                    data.systemInfo?.latestEventMetadata?.screenResolution ||
+                    "1920x1080",
                 },
-                reviewStatus: data.reviewDecision?.reviewStatus || "NOT_REVIEWED",
+                reviewStatus:
+                  data.reviewDecision?.reviewStatus || "NOT_REVIEWED",
               };
               setCandidateDetails(mappedDetail);
-              setSelectedCandidate((prev) => prev ? {
-                ...prev,
-                name: mappedDetail.name,
-                email: mappedDetail.email,
-                testStatus: mappedDetail.testStatus,
-                riskLevel: mappedDetail.riskLevel,
-                violationsCount: mappedDetail.violationsCount,
-                criticalViolationsCount: mappedDetail.criticalViolationsCount,
-                reviewStatus: mappedDetail.reviewStatus,
-              } : null);
+              setSelectedCandidate((prev) =>
+                prev
+                  ? {
+                      ...prev,
+                      name: mappedDetail.name,
+                      email: mappedDetail.email,
+                      testStatus: mappedDetail.testStatus,
+                      riskLevel: mappedDetail.riskLevel,
+                      violationsCount: mappedDetail.violationsCount,
+                      criticalViolationsCount:
+                        mappedDetail.criticalViolationsCount,
+                      reviewStatus: mappedDetail.reviewStatus,
+                    }
+                  : null,
+              );
             }
           } catch {
-            setErrorDetails("Could not load detailed proctoring data for this candidate.");
+            setErrorDetails(
+              "Could not load detailed proctoring data for this candidate.",
+            );
             setCandidateDetails(null);
           } finally {
             setLoadingDetails(false);
@@ -989,10 +1227,17 @@ export default function ProctoringDashboard() {
     isEvidence: boolean;
     imageUrl?: string;
   }) => {
-    if (imageUrl && (imageUrl.startsWith("http") || imageUrl.startsWith("data:"))) {
+    if (
+      imageUrl &&
+      (imageUrl.startsWith("http") || imageUrl.startsWith("data:"))
+    ) {
       return (
         <div className="relative w-full h-36 bg-slate-950 rounded-lg overflow-hidden flex items-center justify-center border border-slate-850">
-          <img src={imageUrl} alt="Proctoring feed capture" className="w-full h-full object-cover" />
+          <img
+            src={imageUrl}
+            alt="Proctoring feed capture"
+            className="w-full h-full object-cover"
+          />
           <div className="absolute top-2 left-2 text-[8px] font-mono text-white bg-slate-950/60 px-1 rounded uppercase tracking-wider">
             {isEvidence ? "VIOLATION FRAME" : "PERIODIC AUDIT"}
           </div>
@@ -1077,7 +1322,6 @@ export default function ProctoringDashboard() {
           </p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
-
           <Button
             variant="default"
             onClick={() => setShowTestUploadModal(true)}
@@ -1105,16 +1349,23 @@ export default function ProctoringDashboard() {
       <div className="bg-card p-3 md:p-4 rounded-lg border border-border/60 shadow-sm backdrop-blur-md space-y-2">
         <div className="flex items-center justify-between">
           <Label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-            <Layers className="h-3.5 w-3.5 text-rose-500" /> Select Assessment Schedule
+            <Layers className="h-3.5 w-3.5 text-rose-500" /> Select Assessment
+            Schedule
           </Label>
           {schedules.length > 0 && (
-            <Badge variant="outline" className="text-[10px] font-mono font-semibold border-border/80 text-muted-foreground px-1.5 py-0">
+            <Badge
+              variant="outline"
+              className="text-[10px] font-mono font-semibold border-border/80 text-muted-foreground px-1.5 py-0"
+            >
               {schedules.length} Schedules
             </Badge>
           )}
         </div>
 
-        <Popover open={scheduleComboboxOpen} onOpenChange={setScheduleComboboxOpen}>
+        <Popover
+          open={scheduleComboboxOpen}
+          onOpenChange={setScheduleComboboxOpen}
+        >
           <PopoverTrigger asChild>
             <Button
               variant="outline"
@@ -1129,17 +1380,23 @@ export default function ProctoringDashboard() {
                     {selectedSchedule.assessmentName}
                   </span>
                   <span className="text-xs text-muted-foreground shrink-0 font-mono">
-                    — {selectedSchedule.scheduledDate} ({selectedSchedule.startTime})
+                    — {selectedSchedule.scheduledDate} (
+                    {selectedSchedule.startTime})
                   </span>
                   {selectedSchedule.proctoringMode && (
-                    <Badge variant="secondary" className="text-[10px] uppercase font-mono shrink-0 hidden sm:inline-flex">
+                    <Badge
+                      variant="secondary"
+                      className="text-[10px] uppercase font-mono shrink-0 hidden sm:inline-flex"
+                    >
                       {selectedSchedule.proctoringMode} MODE
                     </Badge>
                   )}
                 </div>
               ) : (
                 <span className="text-muted-foreground">
-                  {loadingSchedules ? "Loading schedules..." : "Search or choose an assessment schedule..."}
+                  {loadingSchedules
+                    ? "Loading schedules..."
+                    : "Search or choose an assessment schedule..."}
                 </span>
               )}
               <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
@@ -1239,13 +1496,19 @@ export default function ProctoringDashboard() {
       {loadingSchedules ? (
         <div className="flex flex-col items-center justify-center py-24 gap-4">
           <RefreshCw className="h-10 w-10 animate-spin text-rose-500" />
-          <p className="text-muted-foreground text-sm font-medium">Loading assessment schedules...</p>
+          <p className="text-muted-foreground text-sm font-medium">
+            Loading assessment schedules...
+          </p>
         </div>
       ) : !errorSchedules && schedules.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 border border-dashed rounded-xl bg-card/10 text-center gap-3">
           <Shield className="h-12 w-12 text-muted-foreground/30" />
-          <p className="text-base font-semibold text-muted-foreground">No assessment schedules found.</p>
-          <p className="text-sm text-muted-foreground/70">Create a scheduled test first to begin proctoring.</p>
+          <p className="text-base font-semibold text-muted-foreground">
+            No assessment schedules found.
+          </p>
+          <p className="text-sm text-muted-foreground/70">
+            Create a scheduled test first to begin proctoring.
+          </p>
         </div>
       ) : !selectedScheduleId ? (
         <div className="flex flex-col items-center justify-center py-20 border border-dashed rounded-xl bg-card/10 text-center">
@@ -1257,13 +1520,22 @@ export default function ProctoringDashboard() {
       ) : loadingCandidates ? (
         <div className="flex flex-col items-center justify-center py-24 gap-4">
           <RefreshCw className="h-10 w-10 animate-spin text-rose-500" />
-          <p className="text-muted-foreground text-sm font-medium">Fetching proctoring metrics and candidate telemetry...</p>
+          <p className="text-muted-foreground text-sm font-medium">
+            Fetching proctoring metrics and candidate telemetry...
+          </p>
         </div>
       ) : errorCandidates ? (
         <div className="flex flex-col items-center justify-center py-20 border border-dashed rounded-xl bg-card/10 text-center gap-3">
           <AlertCircle className="h-10 w-10 text-red-400/60" />
-          <p className="text-base font-semibold text-muted-foreground">{errorCandidates}</p>
-          <Button variant="outline" size="sm" onClick={() => loadCandidates(selectedScheduleId)} className="mt-1">
+          <p className="text-base font-semibold text-muted-foreground">
+            {errorCandidates}
+          </p>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => loadCandidates(selectedScheduleId)}
+            className="mt-1"
+          >
             <RefreshCw className="h-3.5 w-3.5 mr-2" /> Retry
           </Button>
         </div>
@@ -1280,7 +1552,9 @@ export default function ProctoringDashboard() {
                   <Users className="h-4 w-4 text-blue-600 dark:text-blue-400" />
                 </div>
                 <div className="mt-2">
-                  <span className="text-2xl md:text-3xl font-bold">{totalCount}</span>
+                  <span className="text-2xl md:text-3xl font-bold">
+                    {totalCount}
+                  </span>
                   <p className="text-[10px] text-muted-foreground mt-0.5">
                     Invited to assessment
                   </p>
@@ -1412,7 +1686,9 @@ export default function ProctoringDashboard() {
                     <SelectItem value="NOT_STARTED">Not Started</SelectItem>
                     <SelectItem value="IN_PROGRESS">In Progress</SelectItem>
                     <SelectItem value="SUBMITTED">Submitted</SelectItem>
-                    <SelectItem value="AUTO_SUBMITTED">Auto Submitted</SelectItem>
+                    <SelectItem value="AUTO_SUBMITTED">
+                      Auto Submitted
+                    </SelectItem>
                     <SelectItem value="TERMINATED">Terminated</SelectItem>
                   </SelectContent>
                 </Select>
@@ -1427,7 +1703,9 @@ export default function ProctoringDashboard() {
                     <SelectItem value="ALL">All Review Statuses</SelectItem>
                     <SelectItem value="NOT_REVIEWED">Not Reviewed</SelectItem>
                     <SelectItem value="CLEAN">Clean</SelectItem>
-                    <SelectItem value="WARNING_ISSUED">Warning Issued</SelectItem>
+                    <SelectItem value="WARNING_ISSUED">
+                      Warning Issued
+                    </SelectItem>
                     <SelectItem value="NEEDS_MANUAL_REVIEW">
                       Needs Review
                     </SelectItem>
@@ -1441,8 +1719,15 @@ export default function ProctoringDashboard() {
             <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-border/40 text-xs">
               <div className="flex items-center gap-2">
                 <span className="text-muted-foreground font-medium">
-                  Showing <strong className="text-foreground">{totalFilteredCount}</strong> of{" "}
-                  <strong className="text-foreground">{candidates.length}</strong> candidates
+                  Showing{" "}
+                  <strong className="text-foreground">
+                    {totalFilteredCount}
+                  </strong>{" "}
+                  of{" "}
+                  <strong className="text-foreground">
+                    {candidates.length}
+                  </strong>{" "}
+                  candidates
                 </span>
                 {(searchQuery ||
                   filterRisk !== "ALL" ||
@@ -1498,7 +1783,8 @@ export default function ProctoringDashboard() {
                           onClick={handleExportCSV}
                           className="h-8 text-xs border-border/80 hover:bg-muted gap-1.5 font-medium disabled:opacity-50"
                         >
-                          <Download className="h-3.5 w-3.5 text-rose-500" /> Export CSV
+                          <Download className="h-3.5 w-3.5 text-rose-500" />{" "}
+                          Export CSV
                         </Button>
                       </span>
                     </TooltipTrigger>
@@ -1521,7 +1807,8 @@ export default function ProctoringDashboard() {
                 No candidates found for this schedule.
               </p>
               <p className="text-xs text-muted-foreground/80 max-w-xs mx-auto">
-                No telemetry details match your search terms or filter configurations.
+                No telemetry details match your search terms or filter
+                configurations.
               </p>
             </div>
           ) : (
@@ -1584,7 +1871,9 @@ export default function ProctoringDashboard() {
                         key={cand.id}
                         className="hover:bg-muted/5 transition-colors border-b"
                       >
-                        <TableCell className={`pl-6 ${isCompact ? "py-2" : "py-3.5"}`}>
+                        <TableCell
+                          className={`pl-6 ${isCompact ? "py-2" : "py-3.5"}`}
+                        >
                           <div>
                             <p className="font-semibold text-sm text-foreground">
                               {cand.name}
@@ -1597,13 +1886,17 @@ export default function ProctoringDashboard() {
                         <TableCell className={isCompact ? "py-2" : "py-3.5"}>
                           {getTestStatusBadge(cand.testStatus)}
                         </TableCell>
-                        <TableCell className={`font-mono text-xs font-semibold uppercase ${isCompact ? "py-2" : "py-3.5"}`}>
+                        <TableCell
+                          className={`font-mono text-xs font-semibold uppercase ${isCompact ? "py-2" : "py-3.5"}`}
+                        >
                           {cand.proctoringMode}
                         </TableCell>
                         <TableCell className={isCompact ? "py-2" : "py-3.5"}>
                           {getRiskBadge(cand.riskLevel)}
                         </TableCell>
-                        <TableCell className={`text-center font-mono font-medium ${isCompact ? "py-2" : "py-3.5"}`}>
+                        <TableCell
+                          className={`text-center font-mono font-medium ${isCompact ? "py-2" : "py-3.5"}`}
+                        >
                           <span
                             className={
                               cand.violationsCount > 0
@@ -1628,13 +1921,17 @@ export default function ProctoringDashboard() {
                             )
                           </span>
                         </TableCell>
-                        <TableCell className={`font-mono text-xs text-muted-foreground ${isCompact ? "py-2" : "py-3.5"}`}>
+                        <TableCell
+                          className={`font-mono text-xs text-muted-foreground ${isCompact ? "py-2" : "py-3.5"}`}
+                        >
                           {cand.lastActivity}
                         </TableCell>
                         <TableCell className={isCompact ? "py-2" : "py-3.5"}>
                           {getReviewStatusBadge(cand.reviewStatus)}
                         </TableCell>
-                        <TableCell className={`text-right pr-6 ${isCompact ? "py-2" : "py-3.5"}`}>
+                        <TableCell
+                          className={`text-right pr-6 ${isCompact ? "py-2" : "py-3.5"}`}
+                        >
                           <div className="flex items-center justify-end gap-2">
                             {cand.testStatus === "IN_PROGRESS" && (
                               <Button
@@ -1695,7 +1992,8 @@ export default function ProctoringDashboard() {
                             Violations (Crit)
                           </span>
                           <span className="font-mono font-bold text-slate-700 dark:text-slate-350">
-                            {cand.violationsCount} ({cand.criticalViolationsCount})
+                            {cand.violationsCount} (
+                            {cand.criticalViolationsCount})
                           </span>
                         </div>
 
@@ -1749,13 +2047,25 @@ export default function ProctoringDashboard() {
               <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-card p-4 rounded-xl border border-border/60 shadow-sm text-xs">
                 <div className="flex items-center gap-3 text-muted-foreground">
                   <span>
-                    Showing <strong className="text-foreground font-semibold">{totalFilteredCount > 0 ? startIndex + 1 : 0}</strong> to{" "}
-                    <strong className="text-foreground font-semibold">{Math.min(startIndex + pageSize, totalFilteredCount)}</strong> of{" "}
-                    <strong className="text-foreground font-semibold">{totalFilteredCount}</strong> records
+                    Showing{" "}
+                    <strong className="text-foreground font-semibold">
+                      {totalFilteredCount > 0 ? startIndex + 1 : 0}
+                    </strong>{" "}
+                    to{" "}
+                    <strong className="text-foreground font-semibold">
+                      {Math.min(startIndex + pageSize, totalFilteredCount)}
+                    </strong>{" "}
+                    of{" "}
+                    <strong className="text-foreground font-semibold">
+                      {totalFilteredCount}
+                    </strong>{" "}
+                    records
                   </span>
 
                   <div className="flex items-center gap-1.5 ml-2">
-                    <span className="hidden sm:inline text-muted-foreground">Rows per page:</span>
+                    <span className="hidden sm:inline text-muted-foreground">
+                      Rows per page:
+                    </span>
                     <Select
                       value={String(pageSize)}
                       onValueChange={(val) => setPageSize(Number(val))}
@@ -1800,7 +2110,9 @@ export default function ProctoringDashboard() {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                    onClick={() =>
+                      setCurrentPage((p) => Math.min(totalPages, p + 1))
+                    }
                     disabled={currentPage >= totalPages}
                     className="h-8 w-8 p-0"
                     title="Next Page"
@@ -1835,7 +2147,8 @@ export default function ProctoringDashboard() {
                   Candidate Audit
                 </SheetTitle>
                 <SheetDescription className="text-xs text-muted-foreground">
-                  Session diagnostics, screenshots timeline, and malpractice decision.
+                  Session diagnostics, screenshots timeline, and malpractice
+                  decision.
                 </SheetDescription>
               </div>
             </div>
@@ -1855,7 +2168,9 @@ export default function ProctoringDashboard() {
                 <div className="p-4 rounded-xl border bg-card/60 relative shrink-0">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     <div className="space-y-1">
-                      <h3 className="text-lg font-bold">{candidateDetails.name}</h3>
+                      <h3 className="text-lg font-bold">
+                        {candidateDetails.name}
+                      </h3>
                       <p className="text-xs text-muted-foreground">
                         {candidateDetails.email}
                       </p>
@@ -1867,7 +2182,9 @@ export default function ProctoringDashboard() {
                           <Button
                             size="sm"
                             variant="outline"
-                            onClick={() => handleOpenExtendTimeModal(candidateDetails)}
+                            onClick={() =>
+                              handleOpenExtendTimeModal(candidateDetails)
+                            }
                             className="h-6 text-xs text-amber-400 bg-amber-500/10 border-amber-500/30 hover:bg-amber-500/20 hover:text-amber-300 font-semibold gap-1 px-2.5 ml-2"
                           >
                             <Clock className="h-3 w-3 text-amber-400" />
@@ -1879,7 +2196,10 @@ export default function ProctoringDashboard() {
 
                     {/* Radial Risk Score Gauge */}
                     <div className="relative h-24 w-24 flex items-center justify-center self-center sm:self-auto shrink-0 bg-background rounded-full border border-border shadow-sm">
-                      <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
+                      <svg
+                        className="w-full h-full transform -rotate-90"
+                        viewBox="0 0 100 100"
+                      >
                         <circle
                           cx="50"
                           cy="50"
@@ -1902,7 +2222,9 @@ export default function ProctoringDashboard() {
                           strokeWidth="8"
                           fill="transparent"
                           strokeDasharray={251.2}
-                          strokeDashoffset={251.2 - (251.2 * candidateDetails.riskScore) / 100}
+                          strokeDashoffset={
+                            251.2 - (251.2 * candidateDetails.riskScore) / 100
+                          }
                           strokeLinecap="round"
                         />
                       </svg>
@@ -1919,34 +2241,65 @@ export default function ProctoringDashboard() {
                 </div>
 
                 {/* Tabs inside drawer */}
-                <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full flex-1 flex flex-col">
+                <Tabs
+                  value={activeTab}
+                  onValueChange={setActiveTab}
+                  className="w-full flex-1 flex flex-col"
+                >
                   {/* Radix tab selector styled beautifully */}
                   <TabsList className="flex flex-wrap h-auto bg-muted/80 p-1.5 rounded-lg shrink-0 justify-start gap-1 w-full border border-border/40">
-                    <TabsTrigger value="overview" className="text-xs px-2.5 py-1.5 flex gap-1">
+                    <TabsTrigger
+                      value="overview"
+                      className="text-xs px-2.5 py-1.5 flex gap-1"
+                    >
                       <Info className="h-3.5 w-3.5" /> Overview
                     </TabsTrigger>
-                    <TabsTrigger value="violations" className="text-xs px-2.5 py-1.5 flex gap-1">
-                      <AlertTriangle className="h-3.5 w-3.5" /> Violations ({candidateDetails.violationsCount})
+                    <TabsTrigger
+                      value="violations"
+                      className="text-xs px-2.5 py-1.5 flex gap-1"
+                    >
+                      <AlertTriangle className="h-3.5 w-3.5" /> Violations (
+                      {candidateDetails.violationsCount})
                     </TabsTrigger>
-                    <TabsTrigger value="evidence" className="text-xs px-2.5 py-1.5 flex gap-1">
-                      <FileText className="h-3.5 w-3.5" /> Evidence ({candidateDetails.evidences.length})
+                    <TabsTrigger
+                      value="evidence"
+                      className="text-xs px-2.5 py-1.5 flex gap-1"
+                    >
+                      <FileText className="h-3.5 w-3.5" /> Evidence (
+                      {candidateDetails.evidences.length})
                     </TabsTrigger>
-                    <TabsTrigger value="snapshots" className="text-xs px-2.5 py-1.5 flex gap-1">
-                      <Grid className="h-3.5 w-3.5" /> Snapshots ({candidateDetails.snapshots.length})
+                    <TabsTrigger
+                      value="snapshots"
+                      className="text-xs px-2.5 py-1.5 flex gap-1"
+                    >
+                      <Grid className="h-3.5 w-3.5" /> Snapshots (
+                      {candidateDetails.snapshots.length})
                     </TabsTrigger>
-                    <TabsTrigger value="system" className="text-xs px-2.5 py-1.5 flex gap-1">
+                    <TabsTrigger
+                      value="system"
+                      className="text-xs px-2.5 py-1.5 flex gap-1"
+                    >
                       <Laptop className="h-3.5 w-3.5" /> System Info
                     </TabsTrigger>
-                    <TabsTrigger value="review" className="text-xs px-2.5 py-1.5 flex gap-1">
+                    <TabsTrigger
+                      value="review"
+                      className="text-xs px-2.5 py-1.5 flex gap-1"
+                    >
                       <Check className="h-3.5 w-3.5" /> Review
                     </TabsTrigger>
-                    <TabsTrigger value="identity_pic" className="text-xs px-2.5 py-1.5 flex gap-1 font-semibold text-rose-500">
+                    <TabsTrigger
+                      value="identity_pic"
+                      className="text-xs px-2.5 py-1.5 flex gap-1 font-semibold text-rose-500"
+                    >
                       <UserCheck className="h-3.5 w-3.5" /> Identity Pic
                     </TabsTrigger>
                   </TabsList>
 
                   {/* Overview Tab Content */}
-                  <TabsContent value="overview" className="space-y-4 pt-4 flex-1">
+                  <TabsContent
+                    value="overview"
+                    className="space-y-4 pt-4 flex-1"
+                  >
                     <div className="grid grid-cols-2 gap-4">
                       <div className="bg-muted/30 p-3 rounded-lg border border-border/40">
                         <span className="text-[10px] text-muted-foreground uppercase font-bold block">
@@ -1990,33 +2343,67 @@ export default function ProctoringDashboard() {
                       </CardHeader>
                       <CardContent className="p-4 space-y-2 text-xs">
                         <div className="flex justify-between items-center py-1">
-                          <span className="text-muted-foreground">Webcam Image Proctoring</span>
-                          <Badge variant="outline" className="bg-emerald-50 text-emerald-600 border-emerald-200 text-[9px]">ACTIVE</Badge>
+                          <span className="text-muted-foreground">
+                            Webcam Image Proctoring
+                          </span>
+                          <Badge
+                            variant="outline"
+                            className="bg-emerald-50 text-emerald-600 border-emerald-200 text-[9px]"
+                          >
+                            ACTIVE
+                          </Badge>
                         </div>
                         <div className="flex justify-between items-center py-1">
-                          <span className="text-muted-foreground">Tab Switch Protection</span>
-                          <Badge variant="outline" className="bg-emerald-50 text-emerald-600 border-emerald-200 text-[9px]">ACTIVE</Badge>
+                          <span className="text-muted-foreground">
+                            Tab Switch Protection
+                          </span>
+                          <Badge
+                            variant="outline"
+                            className="bg-emerald-50 text-emerald-600 border-emerald-200 text-[9px]"
+                          >
+                            ACTIVE
+                          </Badge>
                         </div>
                         <div className="flex justify-between items-center py-1">
-                          <span className="text-muted-foreground">Object Recognition AI</span>
-                          <Badge variant="outline" className="bg-emerald-50 text-emerald-600 border-emerald-200 text-[9px]">ACTIVE</Badge>
+                          <span className="text-muted-foreground">
+                            Object Recognition AI
+                          </span>
+                          <Badge
+                            variant="outline"
+                            className="bg-emerald-50 text-emerald-600 border-emerald-200 text-[9px]"
+                          >
+                            ACTIVE
+                          </Badge>
                         </div>
                         <div className="flex justify-between items-center py-1">
-                          <span className="text-muted-foreground">Browser DevTools Detection</span>
-                          <Badge variant="outline" className="bg-emerald-50 text-emerald-600 border-emerald-200 text-[9px]">ACTIVE</Badge>
+                          <span className="text-muted-foreground">
+                            Browser DevTools Detection
+                          </span>
+                          <Badge
+                            variant="outline"
+                            className="bg-emerald-50 text-emerald-600 border-emerald-200 text-[9px]"
+                          >
+                            ACTIVE
+                          </Badge>
                         </div>
                       </CardContent>
                     </Card>
                   </TabsContent>
 
                   {/* Violations Timeline Tab Content */}
-                  <TabsContent value="violations" className="space-y-4 pt-4 flex-1">
+                  <TabsContent
+                    value="violations"
+                    className="space-y-4 pt-4 flex-1"
+                  >
                     {candidateDetails.violations.length === 0 ? (
                       <div className="text-center py-14 space-y-2 border border-dashed rounded-lg bg-emerald-500/5 border-emerald-500/20">
                         <CheckCircle className="h-10 w-10 text-emerald-500 mx-auto opacity-70" />
-                        <h4 className="font-semibold text-emerald-600 text-sm">No Malpractice Detected</h4>
+                        <h4 className="font-semibold text-emerald-600 text-sm">
+                          No Malpractice Detected
+                        </h4>
                         <p className="text-xs text-muted-foreground/80 max-w-xs mx-auto">
-                          Candidate has maintained a clean record and triggered no warnings.
+                          Candidate has maintained a clean record and triggered
+                          no warnings.
                         </p>
                       </div>
                     ) : (
@@ -2028,28 +2415,34 @@ export default function ProctoringDashboard() {
                               key={viol.id}
                               id={`violation-item-${viol.id}`}
                               className={`relative space-y-1 p-2 rounded-lg transition-all ${
-                                isHighlighted ? "bg-rose-500/10 border border-rose-500/30 ring-1 ring-rose-500/30" : ""
+                                isHighlighted
+                                  ? "bg-rose-500/10 border border-rose-500/30 ring-1 ring-rose-500/30"
+                                  : ""
                               }`}
                             >
                               {/* Dot indicator */}
-                              <span className={`absolute -left-[22.5px] top-3 h-3 w-3 rounded-full border bg-background ${
-                                viol.severity === "CRITICAL"
-                                  ? "border-red-500 ring-2 ring-red-500/20"
-                                  : viol.severity === "HIGH"
-                                    ? "border-orange-500"
-                                    : "border-yellow-500"
-                              }`} />
+                              <span
+                                className={`absolute -left-[22.5px] top-3 h-3 w-3 rounded-full border bg-background ${
+                                  viol.severity === "CRITICAL"
+                                    ? "border-red-500 ring-2 ring-red-500/20"
+                                    : viol.severity === "HIGH"
+                                      ? "border-orange-500"
+                                      : "border-yellow-500"
+                                }`}
+                              />
                               <div className="flex items-center justify-between gap-2">
                                 <span className="text-[10px] font-mono text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
                                   {viol.time}
                                 </span>
-                                <Badge className={`text-[9px] px-1.5 py-0 border-none ${
-                                  viol.severity === "CRITICAL"
-                                    ? "bg-red-500 text-white"
-                                    : viol.severity === "HIGH"
-                                      ? "bg-orange-500 text-white"
-                                      : "bg-yellow-500 text-slate-900"
-                                }`}>
+                                <Badge
+                                  className={`text-[9px] px-1.5 py-0 border-none ${
+                                    viol.severity === "CRITICAL"
+                                      ? "bg-red-500 text-white"
+                                      : viol.severity === "HIGH"
+                                        ? "bg-orange-500 text-white"
+                                        : "bg-yellow-500 text-slate-900"
+                                  }`}
+                                >
                                   {viol.severity}
                                 </Badge>
                               </div>
@@ -2066,7 +2459,8 @@ export default function ProctoringDashboard() {
                                   onClick={() => setActiveTab("evidence")}
                                   className="h-6 px-2 text-[9px] text-rose-500 hover:text-rose-600 hover:bg-rose-500/10 font-semibold font-mono uppercase flex gap-1 items-center mt-1"
                                 >
-                                  <Camera className="h-3 w-3" /> View Frame Evidence
+                                  <Camera className="h-3 w-3" /> View Frame
+                                  Evidence
                                 </Button>
                               )}
                             </div>
@@ -2077,13 +2471,19 @@ export default function ProctoringDashboard() {
                   </TabsContent>
 
                   {/* Evidence Tab Content */}
-                  <TabsContent value="evidence" className="space-y-4 pt-4 flex-1">
+                  <TabsContent
+                    value="evidence"
+                    className="space-y-4 pt-4 flex-1"
+                  >
                     {candidateDetails.evidences.length === 0 ? (
                       <div className="text-center py-16 space-y-2 border border-dashed rounded-lg bg-card/10">
                         <Camera className="h-8 w-8 text-muted-foreground/40 mx-auto" />
-                        <h4 className="font-semibold text-muted-foreground text-sm">No Recorded Frame Captures</h4>
+                        <h4 className="font-semibold text-muted-foreground text-sm">
+                          No Recorded Frame Captures
+                        </h4>
                         <p className="text-xs text-muted-foreground/80">
-                          There is no image capture evidence required for review.
+                          There is no image capture evidence required for
+                          review.
                         </p>
                       </div>
                     ) : (
@@ -2091,26 +2491,55 @@ export default function ProctoringDashboard() {
                         {candidateDetails.evidences.map((ev) => {
                           const isComparing = compareWithBaseline === ev.id;
                           return (
-                            <div key={ev.id} className="bg-card border border-border/60 rounded-xl p-3.5 space-y-3 shadow-sm hover:shadow transition-shadow">
+                            <div
+                              key={ev.id}
+                              className="bg-card border border-border/60 rounded-xl p-3.5 space-y-3 shadow-sm hover:shadow transition-shadow"
+                            >
                               {/* Side-by-side identity comparison OR standard image view */}
-                              {isComparing && candidateDetails.candidatePhoto?.imageUrl ? (
+                              {isComparing &&
+                              candidateDetails.candidatePhoto?.imageUrl ? (
                                 <div className="grid grid-cols-2 gap-2 bg-slate-950 p-1.5 rounded-lg border border-slate-800">
                                   <div className="relative h-32 rounded overflow-hidden border border-emerald-500/40">
-                                    <img src={candidateDetails.candidatePhoto.imageUrl} alt="Baseline Identity" className="w-full h-full object-cover" />
+                                    <img
+                                      src={
+                                        candidateDetails.candidatePhoto.imageUrl
+                                      }
+                                      alt="Baseline Identity"
+                                      className="w-full h-full object-cover"
+                                    />
                                     <span className="absolute top-1 left-1 text-[7px] font-mono text-emerald-400 bg-slate-950/80 px-1 rounded uppercase font-bold">
                                       BASELINE IDENTITY
                                     </span>
                                   </div>
                                   <div className="relative h-32 rounded overflow-hidden border border-rose-500/40">
-                                    <img src={ev.imageUrl} alt="Captured Evidence" className="w-full h-full object-cover" />
+                                    <img
+                                      src={ev.imageUrl}
+                                      alt="Captured Evidence"
+                                      className="w-full h-full object-cover"
+                                    />
                                     <span className="absolute top-1 left-1 text-[7px] font-mono text-rose-400 bg-slate-950/80 px-1 rounded uppercase font-bold">
                                       VIOLATION FRAME
                                     </span>
                                   </div>
                                 </div>
                               ) : (
-                                <div className="relative group cursor-pointer" onClick={() => ev.imageUrl && setLightboxImage({ url: ev.imageUrl, title: `Evidence Frame: ${ev.eventType.replace(/_/g, " ")}`, capturedAt: ev.capturedAt, eventType: ev.eventType })}>
-                                  <CameraFeedPlaceholder eventType={ev.eventType} isEvidence={true} imageUrl={ev.imageUrl} />
+                                <div
+                                  className="relative group cursor-pointer"
+                                  onClick={() =>
+                                    ev.imageUrl &&
+                                    setLightboxImage({
+                                      url: ev.imageUrl,
+                                      title: `Evidence Frame: ${ev.eventType.replace(/_/g, " ")}`,
+                                      capturedAt: ev.capturedAt,
+                                      eventType: ev.eventType,
+                                    })
+                                  }
+                                >
+                                  <CameraFeedPlaceholder
+                                    eventType={ev.eventType}
+                                    isEvidence={true}
+                                    imageUrl={ev.imageUrl}
+                                  />
                                   <div className="absolute inset-0 bg-slate-950/40 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg flex items-center justify-center gap-2">
                                     <Badge className="bg-white/90 text-slate-900 font-semibold text-[10px] flex gap-1 items-center">
                                       <ZoomIn className="h-3 w-3" /> Zoom Frame
@@ -2118,19 +2547,21 @@ export default function ProctoringDashboard() {
                                   </div>
                                 </div>
                               )}
-                              
+
                               <div className="space-y-2">
                                 <div className="flex justify-between items-center gap-1.5">
                                   <span className="text-xs font-bold text-foreground truncate uppercase max-w-[120px]">
                                     {ev.eventType.replace(/_/g, " ")}
                                   </span>
-                                  <Badge className={`text-[9px] px-1.5 py-0 border-none ${
-                                    ev.severity === "CRITICAL"
-                                      ? "bg-red-500 text-white animate-pulse"
-                                      : ev.severity === "HIGH"
-                                        ? "bg-orange-500 text-white"
-                                        : "bg-yellow-500 text-slate-900"
-                                  }`}>
+                                  <Badge
+                                    className={`text-[9px] px-1.5 py-0 border-none ${
+                                      ev.severity === "CRITICAL"
+                                        ? "bg-red-500 text-white animate-pulse"
+                                        : ev.severity === "HIGH"
+                                          ? "bg-orange-500 text-white"
+                                          : "bg-yellow-500 text-slate-900"
+                                    }`}
+                                  >
                                     {ev.severity}
                                   </Badge>
                                 </div>
@@ -2144,21 +2575,38 @@ export default function ProctoringDashboard() {
                                     <Button
                                       size="sm"
                                       variant="outline"
-                                      onClick={() => setLightboxImage({ url: ev.imageUrl!, title: `Evidence Frame: ${ev.eventType.replace(/_/g, " ")}`, capturedAt: ev.capturedAt, eventType: ev.eventType })}
+                                      onClick={() =>
+                                        setLightboxImage({
+                                          url: ev.imageUrl!,
+                                          title: `Evidence Frame: ${ev.eventType.replace(/_/g, " ")}`,
+                                          capturedAt: ev.capturedAt,
+                                          eventType: ev.eventType,
+                                        })
+                                      }
                                       className="h-7 text-[10px] px-2 flex gap-1 items-center"
                                     >
                                       <ZoomIn className="h-3 w-3" /> Inspect
                                     </Button>
                                   )}
 
-                                  {candidateDetails.candidatePhoto?.imageUrl && (
+                                  {candidateDetails.candidatePhoto
+                                    ?.imageUrl && (
                                     <Button
                                       size="sm"
-                                      variant={isComparing ? "secondary" : "outline"}
-                                      onClick={() => setCompareWithBaseline(isComparing ? null : ev.id)}
+                                      variant={
+                                        isComparing ? "secondary" : "outline"
+                                      }
+                                      onClick={() =>
+                                        setCompareWithBaseline(
+                                          isComparing ? null : ev.id,
+                                        )
+                                      }
                                       className="h-7 text-[10px] px-2 flex gap-1 items-center text-rose-500 border-rose-500/20 hover:bg-rose-500/10"
                                     >
-                                      <Columns className="h-3 w-3" /> {isComparing ? "Close Split" : "Compare ID"}
+                                      <Columns className="h-3 w-3" />{" "}
+                                      {isComparing
+                                        ? "Close Split"
+                                        : "Compare ID"}
                                     </Button>
                                   )}
 
@@ -2183,18 +2631,43 @@ export default function ProctoringDashboard() {
                   </TabsContent>
 
                   {/* Snapshots Grid Tab Content */}
-                  <TabsContent value="snapshots" className="space-y-4 pt-4 flex-1">
+                  <TabsContent
+                    value="snapshots"
+                    className="space-y-4 pt-4 flex-1"
+                  >
                     <div className="space-y-3.5">
                       <div className="flex items-center justify-between text-xs">
-                        <span className="text-muted-foreground">Periodic Webcam Audits</span>
-                        <span className="text-slate-500 font-mono">Total Feed Frames: {candidateDetails.snapshots.length}</span>
+                        <span className="text-muted-foreground">
+                          Periodic Webcam Audits
+                        </span>
+                        <span className="text-slate-500 font-mono">
+                          Total Feed Frames: {candidateDetails.snapshots.length}
+                        </span>
                       </div>
-                      
+
                       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                         {candidateDetails.snapshots.map((snap, idx) => (
-                          <div key={snap.id} className="bg-slate-950/5 border border-border/60 p-2 rounded-lg flex flex-col space-y-2 group">
-                            <div className="relative cursor-pointer" onClick={() => snap.imageUrl && setLightboxImage({ url: snap.imageUrl, title: `Periodic Snapshot #${idx + 1}`, capturedAt: snap.capturedAt, eventType: "PERIODIC_AUDIT" })}>
-                              <CameraFeedPlaceholder eventType="AUDIT_SNAP" isEvidence={false} imageUrl={snap.imageUrl} />
+                          <div
+                            key={snap.id}
+                            className="bg-slate-950/5 border border-border/60 p-2 rounded-lg flex flex-col space-y-2 group"
+                          >
+                            <div
+                              className="relative cursor-pointer"
+                              onClick={() =>
+                                snap.imageUrl &&
+                                setLightboxImage({
+                                  url: snap.imageUrl,
+                                  title: `Periodic Snapshot #${idx + 1}`,
+                                  capturedAt: snap.capturedAt,
+                                  eventType: "PERIODIC_AUDIT",
+                                })
+                              }
+                            >
+                              <CameraFeedPlaceholder
+                                eventType="AUDIT_SNAP"
+                                isEvidence={false}
+                                imageUrl={snap.imageUrl}
+                              />
                               <div className="absolute inset-0 bg-slate-950/40 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg flex items-center justify-center">
                                 <ZoomIn className="h-5 w-5 text-white" />
                               </div>
@@ -2214,33 +2687,47 @@ export default function ProctoringDashboard() {
                     <div className="bg-card border rounded-xl divide-y divide-border/50 overflow-hidden shadow-sm">
                       <div className="flex justify-between items-center p-3 text-xs">
                         <span className="text-muted-foreground flex items-center gap-1.5 font-medium">
-                          <Globe className="h-4 w-4 text-slate-500" /> Browser Client
+                          <Globe className="h-4 w-4 text-slate-500" /> Browser
+                          Client
                         </span>
-                        <span className="font-mono text-foreground font-semibold">{candidateDetails.systemInfo.browser}</span>
+                        <span className="font-mono text-foreground font-semibold">
+                          {candidateDetails.systemInfo.browser}
+                        </span>
                       </div>
                       <div className="flex justify-between items-center p-3 text-xs">
                         <span className="text-muted-foreground flex items-center gap-1.5 font-medium">
-                          <Monitor className="h-4 w-4 text-slate-500" /> Operating System
+                          <Monitor className="h-4 w-4 text-slate-500" />{" "}
+                          Operating System
                         </span>
-                        <span className="font-mono text-foreground font-semibold">{candidateDetails.systemInfo.os}</span>
+                        <span className="font-mono text-foreground font-semibold">
+                          {candidateDetails.systemInfo.os}
+                        </span>
                       </div>
                       <div className="flex justify-between items-center p-3 text-xs">
                         <span className="text-muted-foreground flex items-center gap-1.5 font-medium">
                           <Info className="h-4 w-4 text-slate-500" /> IP Address
                         </span>
-                        <span className="font-mono text-foreground font-semibold">{candidateDetails.systemInfo.ipAddress}</span>
+                        <span className="font-mono text-foreground font-semibold">
+                          {candidateDetails.systemInfo.ipAddress}
+                        </span>
                       </div>
                       <div className="flex justify-between items-center p-3 text-xs">
                         <span className="text-muted-foreground flex items-center gap-1.5 font-medium">
-                          <Laptop className="h-4 w-4 text-slate-500" /> Device Type
+                          <Laptop className="h-4 w-4 text-slate-500" /> Device
+                          Type
                         </span>
-                        <span className="font-mono text-foreground font-semibold">{candidateDetails.systemInfo.device}</span>
+                        <span className="font-mono text-foreground font-semibold">
+                          {candidateDetails.systemInfo.device}
+                        </span>
                       </div>
                       <div className="flex justify-between items-center p-3 text-xs">
                         <span className="text-muted-foreground flex items-center gap-1.5 font-medium">
-                          <Maximize className="h-4 w-4 text-slate-500" /> Screen Resolution
+                          <Maximize className="h-4 w-4 text-slate-500" /> Screen
+                          Resolution
                         </span>
-                        <span className="font-mono text-foreground font-semibold">{candidateDetails.systemInfo.screenResolution}</span>
+                        <span className="font-mono text-foreground font-semibold">
+                          {candidateDetails.systemInfo.screenResolution}
+                        </span>
                       </div>
                     </div>
                   </TabsContent>
@@ -2250,58 +2737,89 @@ export default function ProctoringDashboard() {
                     <Card className="border-border/50">
                       <CardHeader className="py-3 px-4 border-b bg-muted/10">
                         <CardTitle className="text-xs uppercase font-bold tracking-wider text-muted-foreground flex items-center gap-1.5">
-                          <Check className="h-4 w-4 text-emerald-500" /> Admin Decision Audit
+                          <Check className="h-4 w-4 text-emerald-500" /> Admin
+                          Decision Audit
                         </CardTitle>
                       </CardHeader>
                       <CardContent className="p-4 space-y-4 text-xs">
                         <div className="space-y-2">
-                          <Label className="text-xs font-semibold text-foreground">Update Candidate Audit Ruling</Label>
+                          <Label className="text-xs font-semibold text-foreground">
+                            Update Candidate Audit Ruling
+                          </Label>
                           <Select
                             value={candidateDetails.reviewStatus}
-                            onValueChange={(val) => handleUpdateReviewStatus(val as ReviewStatus)}
+                            onValueChange={(val) =>
+                              handleUpdateReviewStatus(val as ReviewStatus)
+                            }
                             disabled={isSavingReview}
                           >
                             <SelectTrigger className="w-full h-10 border-border/80 bg-background/50">
                               <SelectValue placeholder="Update status" />
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="NOT_REVIEWED">Not Reviewed</SelectItem>
-                              <SelectItem value="CLEAN">Clean (Approved)</SelectItem>
-                              <SelectItem value="WARNING_ISSUED">Warning Issued</SelectItem>
-                              <SelectItem value="NEEDS_MANUAL_REVIEW">Needs Review</SelectItem>
-                              <SelectItem value="DISQUALIFIED">Disqualified</SelectItem>
+                              <SelectItem value="NOT_REVIEWED">
+                                Not Reviewed
+                              </SelectItem>
+                              <SelectItem value="CLEAN">
+                                Clean (Approved)
+                              </SelectItem>
+                              <SelectItem value="WARNING_ISSUED">
+                                Warning Issued
+                              </SelectItem>
+                              <SelectItem value="NEEDS_MANUAL_REVIEW">
+                                Needs Review
+                              </SelectItem>
+                              <SelectItem value="DISQUALIFIED">
+                                Disqualified
+                              </SelectItem>
                             </SelectContent>
                           </Select>
                         </div>
-                        
+
                         <p className="text-[10px] text-muted-foreground italic leading-relaxed">
-                          Review status decisions are saved directly to candidate audit records in the database.
+                          Review status decisions are saved directly to
+                          candidate audit records in the database.
                         </p>
                       </CardContent>
                     </Card>
                   </TabsContent>
 
                   {/* Identity Pic Tab Content */}
-                  <TabsContent value="identity_pic" className="space-y-4 pt-4 flex-1">
+                  <TabsContent
+                    value="identity_pic"
+                    className="space-y-4 pt-4 flex-1"
+                  >
                     <Card className="border-border/50">
                       <CardHeader className="py-3 px-4 border-b bg-muted/10">
                         <CardTitle className="text-xs uppercase font-bold tracking-wider text-rose-500 flex items-center gap-1.5">
-                          <UserCheck className="h-4 w-4" /> Candidate Identity Verification Photo
+                          <UserCheck className="h-4 w-4" /> Candidate Identity
+                          Verification Photo
                         </CardTitle>
                       </CardHeader>
                       <CardContent className="p-4 space-y-4">
                         {candidateDetails.candidatePhoto?.imageUrl ? (
                           <div
                             className="relative w-full h-64 bg-slate-950 rounded-lg overflow-hidden flex items-center justify-center border border-slate-800 shadow-md group cursor-pointer"
-                            onClick={() => setLightboxImage({ url: candidateDetails.candidatePhoto!.imageUrl, title: "Verified Identity Baseline Photo", capturedAt: candidateDetails.candidatePhoto?.capturedAt, eventType: "IDENTITY_VERIFICATION" })}
+                            onClick={() =>
+                              setLightboxImage({
+                                url: candidateDetails.candidatePhoto!.imageUrl,
+                                title: "Verified Identity Baseline Photo",
+                                capturedAt:
+                                  candidateDetails.candidatePhoto?.capturedAt,
+                                eventType: "IDENTITY_VERIFICATION",
+                              })
+                            }
                           >
                             <img
                               src={candidateDetails.candidatePhoto.imageUrl}
                               alt="Candidate Verification Identity Capture"
                               className="w-full h-full object-contain bg-slate-950"
                               onError={(e) => {
-                                console.error("Identity photo failed to load URL:", candidateDetails.candidatePhoto?.imageUrl);
-                                e.currentTarget.style.display = 'none';
+                                console.error(
+                                  "Identity photo failed to load URL:",
+                                  candidateDetails.candidatePhoto?.imageUrl,
+                                );
+                                e.currentTarget.style.display = "none";
                               }}
                             />
                             <div className="absolute top-2 left-2 text-[10px] font-mono text-emerald-400 bg-slate-950/80 px-2 py-0.5 rounded border border-emerald-500/30 uppercase tracking-wider font-semibold">
@@ -2309,7 +2827,8 @@ export default function ProctoringDashboard() {
                             </div>
                             <div className="absolute inset-0 bg-slate-950/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                               <Badge className="bg-white/90 text-slate-900 font-semibold text-xs flex gap-1 items-center">
-                                <ZoomIn className="h-3.5 w-3.5" /> Fullscreen View
+                                <ZoomIn className="h-3.5 w-3.5" /> Fullscreen
+                                View
                               </Badge>
                             </div>
                           </div>
@@ -2321,9 +2840,13 @@ export default function ProctoringDashboard() {
                           />
                         )}
                         <div className="flex justify-between items-center text-xs font-mono bg-muted/30 p-2.5 rounded-lg border border-border/40">
-                          <span className="text-muted-foreground font-semibold">Captured At:</span>
+                          <span className="text-muted-foreground font-semibold">
+                            Captured At:
+                          </span>
                           <span className="font-bold text-foreground">
-                            {candidateDetails.candidatePhoto?.capturedAt || candidateDetails.startedAt || "Identity Verification Stage"}
+                            {candidateDetails.candidatePhoto?.capturedAt ||
+                              candidateDetails.startedAt ||
+                              "Identity Verification Stage"}
                           </span>
                         </div>
                       </CardContent>
@@ -2337,7 +2860,10 @@ export default function ProctoringDashboard() {
       </Sheet>
 
       {/* 5. Fullscreen Image Lightbox Modal */}
-      <Dialog open={!!lightboxImage} onOpenChange={(open) => !open && setLightboxImage(null)}>
+      <Dialog
+        open={!!lightboxImage}
+        onOpenChange={(open) => !open && setLightboxImage(null)}
+      >
         <DialogContent className="max-w-4xl w-[95vw] bg-slate-950 border border-slate-800 text-white p-4">
           <DialogHeader className="flex flex-row items-center justify-between border-b border-slate-850 pb-3">
             <div>
@@ -2365,7 +2891,9 @@ export default function ProctoringDashboard() {
 
           <div className="flex justify-between items-center pt-2 border-t border-slate-850 text-xs">
             <span className="font-mono text-slate-400 text-[11px]">
-              {lightboxImage?.eventType ? `Type: ${lightboxImage.eventType}` : "Proctor Telemetry Image"}
+              {lightboxImage?.eventType
+                ? `Type: ${lightboxImage.eventType}`
+                : "Proctor Telemetry Image"}
             </span>
             {lightboxImage?.url && (
               <a
