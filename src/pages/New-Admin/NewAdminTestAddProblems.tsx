@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect, useRef } from "react";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import {
   Search,
@@ -173,52 +173,62 @@ export default function NewAdminTestAddProblems() {
       });
   }, [id]);
 
-  // Handle Adding a Question to Test (Checkpoint 1: Surface warning if UNDER_REVIEW)
-  const handleAddQuestion = async (q: Question) => {
+  // Serialises all add operations so concurrent clicks never race on orderIndex
+  const addQueueRef = useRef<Promise<void>>(Promise.resolve());
+
+  // Handle Adding a Question to Test
+  // All adds are chained onto addQueueRef so they run one-at-a-time,
+  // eliminating the orderIndex race condition on rapid multi-question clicks.
+  const handleAddQuestion = (q: Question) => {
     if (!id) return;
+    if (addedQuestionIds.has(q.id)) return;   // already in test
+    if (addingIds.has(q.id)) return;           // double-click guard
 
-    // Guard 1: Already added — skip silently (prevents 409 "already linked")
-    if (addedQuestionIds.has(q.id)) return;
+    setAddingIds((prev) => new Set([...prev, q.id]));
 
-    // Guard 2: Already in-flight for this question — skip (prevents double-click race)
-    if (addingIds.has(q.id)) return;
+    addQueueRef.current = addQueueRef.current.then(async () => {
+      try {
+        // Fetch fresh list so each queued add sees the latest maxOrder
+        const existing = await testService.getTestQuestions(id);
 
-    try {
-      setAddingIds((prev) => new Set([...prev, q.id]));
-      const existing = await testService.getTestQuestions(id);
-      const maxOrder = (existing || []).reduce((max, tq) => Math.max(max, tq.orderIndex ?? 0), 0);
-      const nextOrderIndex = maxOrder + 1;
-      const marks = q.marks ?? (q.questionType === "CODING" ? 100 : 10);
+        // If another queued add already linked this question, skip silently
+        if (existing.some((tq) => tq.questionId === q.id)) {
+          setAddedQuestionIds((prev) => new Set([...prev, q.id]));
+          return;
+        }
 
-      const res = await testService.addQuestionToTestWithWarnings(id, q.id, nextOrderIndex, marks, undefined, targetSection);
-      setAddedQuestionIds((prev) => new Set([...prev, q.id]));
-      toast.success(`"${q.title || 'Problem'}" added to test!`);
+        const maxOrder = (existing || []).reduce((max, tq) => Math.max(max, tq.orderIndex ?? 0), 0);
+        const nextOrderIndex = maxOrder + 1;
+        const marks = q.marks ?? (q.questionType === "CODING" ? 100 : 10);
 
-      // Checkpoint 1 Non-blocking Warning Toast
-      if (res.warnings && res.warnings.length > 0) {
-        res.warnings.forEach((warn) => toast.warning(warn, { duration: 7000 }));
-      } else if (q.status === "UNDER_REVIEW" || (q.questionType === "CODING" && (!q.verifiedLanguages || q.verifiedLanguages.length === 0))) {
-        toast.warning(
-          `Notice: Question "${q.title || 'Problem'}" is currently UNDER_REVIEW. Execution drivers have not been verified against reference solutions.`,
-          { duration: 7000 }
-        );
-      }
-    } catch (err: any) {
-      console.error("[NewAdminTestAddProblems] Failed to add question:", err);
-      const msg: string = err?.response?.data?.message || err.message || "Unknown error";
-      // If the backend still says it's already linked, treat it as success silently
-      if (msg.includes("already linked") || msg.includes("already used")) {
+        const res = await testService.addQuestionToTestWithWarnings(id, q.id, nextOrderIndex, marks, undefined, targetSection);
         setAddedQuestionIds((prev) => new Set([...prev, q.id]));
-      } else {
-        toast.error("Failed to add question to test: " + msg);
+        toast.success(`"${q.title || "Problem"}" added to test!`);
+
+        if (res.warnings && res.warnings.length > 0) {
+          res.warnings.forEach((warn) => toast.warning(warn, { duration: 7000 }));
+        } else if (q.status === "UNDER_REVIEW" || (q.questionType === "CODING" && (!q.verifiedLanguages || q.verifiedLanguages.length === 0))) {
+          toast.warning(
+            `Notice: Question "${q.title || "Problem"}" is currently UNDER_REVIEW. Execution drivers have not been verified against reference solutions.`,
+            { duration: 7000 }
+          );
+        }
+      } catch (err: any) {
+        console.error("[NewAdminTestAddProblems] Failed to add question:", err);
+        const msg: string = err?.response?.data?.message || err.message || "Unknown error";
+        if (msg.includes("already linked") || msg.includes("already used")) {
+          setAddedQuestionIds((prev) => new Set([...prev, q.id]));
+        } else {
+          toast.error("Failed to add question to test: " + msg);
+        }
+      } finally {
+        setAddingIds((prev) => {
+          const next = new Set(prev);
+          next.delete(q.id);
+          return next;
+        });
       }
-    } finally {
-      setAddingIds((prev) => {
-        const next = new Set(prev);
-        next.delete(q.id);
-        return next;
-      });
-    }
+    });
   };
 
 
