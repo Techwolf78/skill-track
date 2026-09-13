@@ -150,7 +150,10 @@ export default function NewAdminTestAddProblems() {
   const [selectedLevel, setSelectedLevel] = useState<"ALL" | "EASY" | "MEDIUM" | "HARD">("ALL");
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
-``
+
+  // Tracks the highest known orderIndex for collision-free adds
+  const maxOrderRef = useRef<number>(-1);
+
   // Fetch Test Details and Existing Mappings
   useEffect(() => {
     if (!id) return;
@@ -164,6 +167,9 @@ export default function NewAdminTestAddProblems() {
         setTest(testData);
         const ids = new Set((testQuestionsData || []).map((tq) => tq.questionId));
         setAddedQuestionIds(ids);
+        // Seed the orderIndex counter from live data so the first add is always valid
+        const liveMax = (testQuestionsData || []).reduce((m, tq) => Math.max(m, tq.orderIndex ?? 0), 0);
+        maxOrderRef.current = liveMax;
       })
       .catch((err) => {
         console.error("[NewAdminTestAddProblems] Error loading test details:", err);
@@ -173,35 +179,26 @@ export default function NewAdminTestAddProblems() {
       });
   }, [id]);
 
-  // Serialises all add operations so concurrent clicks never race on orderIndex
-  const addQueueRef = useRef<Promise<void>>(Promise.resolve());
-
-  // Handle Adding a Question to Test
-  // All adds are chained onto addQueueRef so they run one-at-a-time,
-  // eliminating the orderIndex race condition on rapid multi-question clicks.
+  // Handle Adding a Question to Test.
+  // Uses a monotonically-incrementing local counter (maxOrderRef) so concurrent
+  // clicks on different questions each get a unique, collision-free orderIndex
+  // without any extra getTestQuestions round-trips.
   const handleAddQuestion = (q: Question) => {
     if (!id) return;
-    if (addedQuestionIds.has(q.id)) return;   // already in test
-    if (addingIds.has(q.id)) return;           // double-click guard
+    if (addedQuestionIds.has(q.id)) return;  // already in test
+    if (addingIds.has(q.id)) return;          // double-click guard
 
     setAddingIds((prev) => new Set([...prev, q.id]));
 
-    addQueueRef.current = addQueueRef.current.then(async () => {
+    // Claim the next orderIndex immediately (atomic increment — no await)
+    const nextOrderIndex = ++maxOrderRef.current;
+    const marks = q.marks ?? (q.questionType === "CODING" ? 100 : 10);
+
+    const doAdd = async () => {
       try {
-        // Fetch fresh list so each queued add sees the latest maxOrder
-        const existing = await testService.getTestQuestions(id);
-
-        // If another queued add already linked this question, skip silently
-        if (existing.some((tq) => tq.questionId === q.id)) {
-          setAddedQuestionIds((prev) => new Set([...prev, q.id]));
-          return;
-        }
-
-        const maxOrder = (existing || []).reduce((max, tq) => Math.max(max, tq.orderIndex ?? 0), 0);
-        const nextOrderIndex = maxOrder + 1;
-        const marks = q.marks ?? (q.questionType === "CODING" ? 100 : 10);
-
-        const res = await testService.addQuestionToTestWithWarnings(id, q.id, nextOrderIndex, marks, undefined, targetSection);
+        const res = await testService.addQuestionToTestWithWarnings(
+          id, q.id, maxOrderRef.current, marks, undefined, targetSection
+        );
         setAddedQuestionIds((prev) => new Set([...prev, q.id]));
         toast.success(`"${q.title || "Problem"}" added to test!`);
 
@@ -219,7 +216,22 @@ export default function NewAdminTestAddProblems() {
         if (msg.includes("already linked") || msg.includes("already used")) {
           setAddedQuestionIds((prev) => new Set([...prev, q.id]));
         } else {
-          toast.error("Failed to add question to test: " + msg);
+          // On orderIndex conflict, bump the ref and retry once
+          if (msg.includes("Order index")) {
+            maxOrderRef.current += 10;
+            try {
+              const res = await testService.addQuestionToTestWithWarnings(
+                id, q.id, maxOrderRef.current, marks, undefined, targetSection
+              );
+              setAddedQuestionIds((prev) => new Set([...prev, q.id]));
+              toast.success(`"${q.title || "Problem"}" added to test!`);
+              if (res.warnings?.length) res.warnings.forEach((w) => toast.warning(w, { duration: 7000 }));
+            } catch {
+              toast.error("Failed to add question to test. Please try again.");
+            }
+          } else {
+            toast.error("Failed to add question to test: " + msg);
+          }
         }
       } finally {
         setAddingIds((prev) => {
@@ -228,7 +240,9 @@ export default function NewAdminTestAddProblems() {
           return next;
         });
       }
-    });
+    };
+
+    doAdd();
   };
 
 
