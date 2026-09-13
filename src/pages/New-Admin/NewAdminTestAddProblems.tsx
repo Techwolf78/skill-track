@@ -165,11 +165,29 @@ export default function NewAdminTestAddProblems() {
     ])
       .then(([testData, testQuestionsData]) => {
         setTest(testData);
-        const ids = new Set((testQuestionsData || []).map((tq) => tq.questionId));
+
+        // Collect all test questions from both getTestQuestions and testData.questions
+        const allQuestions: any[] = [
+          ...(testQuestionsData || []),
+          ...(testData?.questions || []),
+          ...(testData?.testQuestions || []),
+        ];
+
+        const ids = new Set<string>();
+        let highestOrder = -1;
+
+        allQuestions.forEach((tq) => {
+          const qId = tq.questionId || tq.question?.id || tq.id;
+          if (qId) ids.add(qId);
+
+          if (typeof tq.orderIndex === "number" && tq.orderIndex > highestOrder) {
+            highestOrder = tq.orderIndex;
+          }
+        });
+
         setAddedQuestionIds(ids);
-        // Seed the orderIndex counter from live data so the first add is always valid
-        const liveMax = (testQuestionsData || []).reduce((m, tq) => Math.max(m, tq.orderIndex ?? 0), 0);
-        maxOrderRef.current = liveMax;
+        // Seed the orderIndex counter from live data (backend uses 0-based indexing: 0, 1, 2, ...)
+        maxOrderRef.current = highestOrder;
       })
       .catch((err) => {
         console.error("[NewAdminTestAddProblems] Error loading test details:", err);
@@ -181,30 +199,37 @@ export default function NewAdminTestAddProblems() {
 
   // Handle Adding a Question to Test.
   // Uses a monotonically-incrementing local counter (maxOrderRef) so concurrent
-  // clicks on different questions each get a unique, collision-free orderIndex
-  // without any extra getTestQuestions round-trips.
+  // clicks on different questions each get a unique, collision-free orderIndex.
   const handleAddQuestion = (q: Question) => {
     if (!id) return;
-    if (addedQuestionIds.has(q.id)) return;  // already in test
-    if (addingIds.has(q.id)) return;          // double-click guard
+    if (addedQuestionIds.has(q.id)) return; // already in test
+    if (addingIds.has(q.id)) return; // double-click guard
 
     setAddingIds((prev) => new Set([...prev, q.id]));
 
-    // Claim the next orderIndex immediately (atomic increment — no await)
+    // Claim the next orderIndex immediately (atomic increment)
     const nextOrderIndex = ++maxOrderRef.current;
     const marks = q.marks ?? (q.questionType === "CODING" ? 100 : 10);
 
-    const doAdd = async () => {
+    const doAdd = async (orderToUse: number, retryCount = 0) => {
       try {
         const res = await testService.addQuestionToTestWithWarnings(
-          id, q.id, maxOrderRef.current, marks, undefined, targetSection
+          id,
+          q.id,
+          orderToUse,
+          marks,
+          undefined,
+          targetSection
         );
         setAddedQuestionIds((prev) => new Set([...prev, q.id]));
         toast.success(`"${q.title || "Problem"}" added to test!`);
 
         if (res.warnings && res.warnings.length > 0) {
           res.warnings.forEach((warn) => toast.warning(warn, { duration: 7000 }));
-        } else if (q.status === "UNDER_REVIEW" || (q.questionType === "CODING" && (!q.verifiedLanguages || q.verifiedLanguages.length === 0))) {
+        } else if (
+          q.status === "UNDER_REVIEW" ||
+          (q.questionType === "CODING" && (!q.verifiedLanguages || q.verifiedLanguages.length === 0))
+        ) {
           toast.warning(
             `Notice: Question "${q.title || "Problem"}" is currently UNDER_REVIEW. Execution drivers have not been verified against reference solutions.`,
             { duration: 7000 }
@@ -213,36 +238,36 @@ export default function NewAdminTestAddProblems() {
       } catch (err: any) {
         console.error("[NewAdminTestAddProblems] Failed to add question:", err);
         const msg: string = err?.response?.data?.message || err.message || "Unknown error";
-        if (msg.includes("already linked") || msg.includes("already used")) {
-          setAddedQuestionIds((prev) => new Set([...prev, q.id]));
-        } else {
-          // On orderIndex conflict, bump the ref and retry once
-          if (msg.includes("Order index")) {
-            maxOrderRef.current += 10;
-            try {
-              const res = await testService.addQuestionToTestWithWarnings(
-                id, q.id, maxOrderRef.current, marks, undefined, targetSection
-              );
-              setAddedQuestionIds((prev) => new Set([...prev, q.id]));
-              toast.success(`"${q.title || "Problem"}" added to test!`);
-              if (res.warnings?.length) res.warnings.forEach((w) => toast.warning(w, { duration: 7000 }));
-            } catch {
-              toast.error("Failed to add question to test. Please try again.");
-            }
-          } else {
-            toast.error("Failed to add question to test: " + msg);
-          }
+
+        // 1. If it's an Order Index conflict: bump orderIndex and retry!
+        // (Do NOT check "already used" before this, because "Order index is already used in this test" contains "already used")
+        if (msg.includes("Order index") && retryCount < 3) {
+          maxOrderRef.current = Math.max(maxOrderRef.current + 1, orderToUse + 10);
+          const bumpedOrder = maxOrderRef.current;
+          console.warn(`[NewAdminTestAddProblems] Order index collision at ${orderToUse}. Retrying with orderIndex ${bumpedOrder}...`);
+          return doAdd(bumpedOrder, retryCount + 1);
         }
+
+        // 2. If it's truly already linked to this test
+        if (msg.includes("already linked")) {
+          setAddedQuestionIds((prev) => new Set([...prev, q.id]));
+          toast.info(`"${q.title || "Problem"}" is already in this test.`);
+          return;
+        }
+
+        toast.error("Failed to add question to test: " + msg);
       } finally {
-        setAddingIds((prev) => {
-          const next = new Set(prev);
-          next.delete(q.id);
-          return next;
-        });
+        if (retryCount === 0) {
+          setAddingIds((prev) => {
+            const next = new Set(prev);
+            next.delete(q.id);
+            return next;
+          });
+        }
       }
     };
 
-    doAdd();
+    doAdd(nextOrderIndex);
   };
 
 
