@@ -135,7 +135,7 @@ export default function NewAdminTestAddProblems() {
 
   const [test, setTest] = useState<Test | null>(null);
   const [addedQuestionIds, setAddedQuestionIds] = useState<Set<string>>(new Set());
-  const [addingId, setAddingId] = useState<string | null>(null);
+  const [addingIds, setAddingIds] = useState<Set<string>>(new Set());
   const [loadingTest, setLoadingTest] = useState(Boolean(id));
 
   // Library Queries & States
@@ -150,7 +150,7 @@ export default function NewAdminTestAddProblems() {
   const [selectedLevel, setSelectedLevel] = useState<"ALL" | "EASY" | "MEDIUM" | "HARD">("ALL");
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
-
+``
   // Fetch Test Details and Existing Mappings
   useEffect(() => {
     if (!id) return;
@@ -176,8 +176,15 @@ export default function NewAdminTestAddProblems() {
   // Handle Adding a Question to Test (Checkpoint 1: Surface warning if UNDER_REVIEW)
   const handleAddQuestion = async (q: Question) => {
     if (!id) return;
+
+    // Guard 1: Already added — skip silently (prevents 409 "already linked")
+    if (addedQuestionIds.has(q.id)) return;
+
+    // Guard 2: Already in-flight for this question — skip (prevents double-click race)
+    if (addingIds.has(q.id)) return;
+
     try {
-      setAddingId(q.id);
+      setAddingIds((prev) => new Set([...prev, q.id]));
       const existing = await testService.getTestQuestions(id);
       const maxOrder = (existing || []).reduce((max, tq) => Math.max(max, tq.orderIndex ?? 0), 0);
       const nextOrderIndex = maxOrder + 1;
@@ -198,11 +205,22 @@ export default function NewAdminTestAddProblems() {
       }
     } catch (err: any) {
       console.error("[NewAdminTestAddProblems] Failed to add question:", err);
-      toast.error("Failed to add question to test: " + (err?.response?.data?.message || err.message || "Unknown error"));
+      const msg: string = err?.response?.data?.message || err.message || "Unknown error";
+      // If the backend still says it's already linked, treat it as success silently
+      if (msg.includes("already linked") || msg.includes("already used")) {
+        setAddedQuestionIds((prev) => new Set([...prev, q.id]));
+      } else {
+        toast.error("Failed to add question to test: " + msg);
+      }
     } finally {
-      setAddingId(null);
+      setAddingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(q.id);
+        return next;
+      });
     }
   };
+
 
   const filteredQuestions = useMemo(() => {
     const list = dbQuestions.filter((q) => {
@@ -612,7 +630,7 @@ export default function NewAdminTestAddProblems() {
                   {paginatedQuestions.map((q) => {
                     const isCoding = (q.questionType ?? "").toUpperCase() === "CODING";
                     const isAlreadyAdded = addedQuestionIds.has(q.id);
-                    const isCurrentlyAdding = addingId === q.id;
+                    const isCurrentlyAdding = addingIds.has(q.id);
                     const time = fmtTime(q);
 
                     return (
