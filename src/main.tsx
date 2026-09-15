@@ -2,7 +2,6 @@ import { createRoot } from "react-dom/client";
 import * as Sentry from "@sentry/react";
 import App from "./App.tsx";
 import "./index.css";
-import { initKeepAlive } from "./lib/keep-alive";
 import { isChunkLoadError, triggerChunkReload } from "./lib/lazyWithRetry";
 
 // Global listener for Vite dynamic import preload errors (native to Vite)
@@ -30,7 +29,7 @@ if (sentryDsn) {
       Sentry.replayIntegration(),
     ],
     // Tracing
-    tracesSampleRate: 1.0, // Capture 100% of the transactions
+    tracesSampleRate: 0.1, // Sample 10% of transactions
     // Set 'tracePropagationTargets' to control for which URLs distributed tracing should be enabled
     tracePropagationTargets: [
       "localhost",
@@ -50,7 +49,6 @@ if (sentryDsn) {
 }
 
 createRoot(document.getElementById("root")!).render(<App />);
-// initKeepAlive(); // Disabled: backend hosted on dedicated Airtel Cloud VPS (24/7 active)
 
 
 if ("serviceWorker" in navigator) {

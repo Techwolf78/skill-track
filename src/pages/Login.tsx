@@ -32,8 +32,15 @@ const features = [
 export default function Login() {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { login: loginToContext } = useAuth();
+  const { login: loginToContext, isAuthenticated, user } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    if (isAuthenticated && user?.role) {
+      const redirectPath = getRedirectPathForRole(user.role);
+      navigate(redirectPath, { replace: true });
+    }
+  }, [isAuthenticated, user, navigate]);
 
   const [adminEmail, setAdminEmail] = useState("superadmin@gryphon360.com");
   const [adminPassword, setAdminPassword] = useState("");

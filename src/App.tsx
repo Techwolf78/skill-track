@@ -31,15 +31,12 @@ const TestDetails = lazyWithRetry(() => import("./pages/SuperAdmin/TestDetails")
 const TestScheduleDetails = lazyWithRetry(() => import("./pages/SuperAdmin/TestScheduleDetails"));
 const InviteCandidates = lazyWithRetry(() => import("./pages/SuperAdmin/InviteCandidates"));
 const InvitedCandidatesHistory = lazyWithRetry(() => import("./pages/SuperAdmin/InvitedCandidatesHistory"));
-const EditQuestion = lazyWithRetry(() => import("./pages/SuperAdmin/EditQuestion"));
-const AddQuestion = lazyWithRetry(() => import("./pages/SuperAdmin/AddQuestion"));
 const Settings = lazyWithRetry(() => import("./pages/SuperAdmin/Settings"));
 const DSAPlayground = lazyWithRetry(() => import("./pages/SuperAdmin/DSAPlayground"));
 const Reports = lazyWithRetry(() => import("./pages/SuperAdmin/Reports"));
 const TestSchedules = lazyWithRetry(() => import("./pages/SuperAdmin/TestSchedules"));
 const AuditLogs = lazyWithRetry(() => import("./pages/SuperAdmin/AuditLogs"));
 const Documentation = lazyWithRetry(() => import("./pages/SuperAdmin/Documentation"));
-const SeedData = lazyWithRetry(() => import("./pages/SeedData"));
 const ProctoringDashboard = lazyWithRetry(() => import("@/pages/Admin/ProctoringDashboard"));
 
 // New-Admin pages
@@ -63,7 +60,6 @@ const CandidateDashboard = lazyWithRetry(() => import("./pages/Candidate/Dashboa
 const MyAssessments = lazyWithRetry(() => import("./pages/Candidate/MyAssessments"));
 const ResultsReports = lazyWithRetry(() => import("./pages/Candidate/ResultsReports"));
 const Profile = lazyWithRetry(() => import("./pages/Candidate/Profile"));
-const CandidateAssessmentFlow = lazyWithRetry(() => import("./pages/Candidate/CandidateAssessmentFlow"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -94,9 +90,7 @@ const App = () => (
               <Routes>
               <Route path="/" element={<NationalLandingPage />} />
               <Route path="/login" element={<Login />} />
-              <Route path="/unauthorized" element={<NotFound />} />
-              <Route path="/seed-data" element={<SeedData />} />
-              <Route path="/seed" element={<SeedData />} />
+              <Route path="/unauthorized" element={<Navigate to="/login" replace />} />
               {/* SuperAdmin Routes (SUPERADMIN role only) */}
               <Route
                 path="/superadmin"
@@ -171,7 +165,6 @@ const App = () => (
                 <Route path="assessments" element={<MyAssessments />} />
                 <Route path="results" element={<ResultsReports />} />
                 <Route path="profile" element={<Profile />} />
-                <Route path="flow" element={<CandidateAssessmentFlow />} />
               </Route>
 
               {/* Admin Routes (ADMIN and SUPERADMIN access) */}

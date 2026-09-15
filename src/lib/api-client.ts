@@ -58,28 +58,25 @@ apiClient.interceptors.response.use(
   (response) => response,
   (error: AxiosError) => {
     if (error.response?.status === 401) {
-      const isKeepAlive =
-        error.config?.headers?.["X-Keep-Alive"] === "true" ||
-        error.config?.headers?.get?.("X-Keep-Alive") === "true" ||
-        error.config?.url?.includes("_cb=bootstrap");
-
       const isTestAccessPage =
         typeof window !== "undefined" &&
         (window.location.pathname.includes("/test/access") ||
           window.location.pathname.includes("/tests/access"));
 
-      if (!isKeepAlive && !isTestAccessPage) {
-        // 🔥 Token expired / invalid
+      const isLoginRequest = error.config?.url?.includes("/auth/login");
+      const isCandidateValidation = error.config?.url?.includes("/candidate-invitations/validate");
+
+      if (!isTestAccessPage && !isLoginRequest && !isCandidateValidation) {
+        // Genuine authenticated request rejected with 401 — token expired / invalid
         localStorage.removeItem("token");
         localStorage.removeItem("user");
 
-        // Prevent infinite redirect loop if already on login page or if the request is to login
+        // Prevent infinite redirect loop if already on login page
         const isLoginPage =
           typeof window !== "undefined" &&
           window.location.pathname === "/login";
-        const isLoginRequest = error.config?.url?.includes("/auth/login");
 
-        if (!isLoginPage && !isLoginRequest) {
+        if (!isLoginPage) {
           window.location.href = "/login";
         }
       }

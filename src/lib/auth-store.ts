@@ -10,24 +10,11 @@ interface AuthState {
   initialize: () => void;
 }
 
-export const useAuthStore = create<AuthState>((set) => ({
-  user: null,
-  token: null,
-  isLoading: true,
-  login: (token, user) => {
-    localStorage.setItem("token", token);
-    localStorage.setItem("user", JSON.stringify(user));
-    set({ token, user, isLoading: false });
-  },
-  logout: () => {
-    localStorage.removeItem("token");
-    localStorage.removeItem("user");
-    set({ token: null, user: null, isLoading: false });
-    if (window.location.pathname !== "/login") {
-      window.location.href = "/login";
+const getStoredAuth = (): { token: string | null; user: UserData | null } => {
+  try {
+    if (typeof window === "undefined" || !window.localStorage) {
+      return { token: null, user: null };
     }
-  },
-  initialize: () => {
     const savedToken = localStorage.getItem("token");
     const savedUser = localStorage.getItem("user");
     let user: UserData | null = null;
@@ -38,6 +25,42 @@ export const useAuthStore = create<AuthState>((set) => ({
         console.error("Failed to parse user from localStorage", e);
       }
     }
-    set({ token: savedToken, user, isLoading: false });
+    return { token: savedToken, user };
+  } catch {
+    return { token: null, user: null };
+  }
+};
+
+const initialAuth = getStoredAuth();
+
+export const useAuthStore = create<AuthState>((set) => ({
+  user: initialAuth.user,
+  token: initialAuth.token,
+  isLoading: false,
+  login: (token, user) => {
+    try {
+      localStorage.setItem("token", token);
+      localStorage.setItem("user", JSON.stringify(user));
+    } catch (e) {
+      console.error("Failed to persist auth to localStorage", e);
+    }
+    set({ token, user, isLoading: false });
+  },
+  logout: () => {
+    try {
+      localStorage.removeItem("token");
+      localStorage.removeItem("user");
+    } catch (e) {
+      console.error("Failed to clear auth from localStorage", e);
+    }
+    set({ token: null, user: null, isLoading: false });
+    if (typeof window !== "undefined" && window.location.pathname !== "/login") {
+      window.location.href = "/login";
+    }
+  },
+  initialize: () => {
+    const { token, user } = getStoredAuth();
+    set({ token, user, isLoading: false });
   },
 }));
+
