@@ -68,11 +68,11 @@ interface Question {
   sampleInput?: string;
   sampleOutput?: string;
   sampleExplanation?: string;
-  examples?: Array<{ input: string; output?: string; expectedOutput?: string; explanation?: string }>;
-  visibleTestCases?: Array<{ id?: string; input: string; expectedOutput: string; explanation?: string }>;
-  testCases?: Array<{ id?: string; input: string; expectedOutput?: string; output?: string; expected?: string; explanation?: string; sample?: boolean; isSample?: boolean; isHidden?: boolean }>;
+  examples?: TestCaseSampleItem[];
+  visibleTestCases?: TestCaseSampleItem[];
+  testCases?: TestCaseSampleItem[];
   codeTemplate?: Record<string, CodeTemplateEntry>;
-  languageTemplates?: Record<string, any>;
+  languageTemplates?: Record<string, unknown>;
   starterCode?: Record<string, string>;
   difficulty?: string;
   constraints?: string;
@@ -82,6 +82,48 @@ interface Question {
   tags?: string[];
   title?: string;
   imageUrl?: string;
+}
+
+type VendorDocument = Document & {
+  webkitFullscreenElement?: Element | null;
+  mozFullScreenElement?: Element | null;
+  msFullscreenElement?: Element | null;
+};
+
+interface TestCaseSampleItem {
+  id?: string;
+  input?: string | number | null;
+  output?: string | number | null;
+  expectedOutput?: string | number | null;
+  expected?: string | number | null;
+  explanation?: string;
+  sample?: boolean;
+  isSample?: boolean;
+  isHidden?: boolean;
+}
+
+interface QuestionLikeObject {
+  visibleTestCases?: TestCaseSampleItem[];
+  testCases?: TestCaseSampleItem[];
+  testcases?: TestCaseSampleItem[];
+  test_cases?: TestCaseSampleItem[];
+  coding?: {
+    visibleTestCases?: TestCaseSampleItem[];
+    testCases?: TestCaseSampleItem[];
+    test_cases?: TestCaseSampleItem[];
+    sampleExplanation?: string;
+    sampleInput?: string;
+    sampleOutput?: string;
+    examples?: { data?: TestCaseSampleItem[] } | TestCaseSampleItem[];
+    languageTemplates?: Record<string, unknown>;
+  };
+  sampleExplanation?: string;
+  sampleInput?: string;
+  sampleOutput?: string;
+  prompt?: string;
+  constraints?: string;
+  examples?: TestCaseSampleItem[];
+  languageTemplates?: Record<string, unknown>;
 }
 
 interface RawPaperQuestion {
@@ -114,7 +156,7 @@ interface RawPaperQuestion {
 }
 
 // Helper to extract ONLY sample (public) test cases for candidate display
-const getSampleTestcases = (q: any): Array<{ input: string; output: string; explanation?: string }> => {
+const getSampleTestcases = (q: QuestionLikeObject | null | undefined): Array<{ input: string; output: string; explanation?: string }> => {
   if (!q) return [];
   const list: Array<{ input: string; output: string; explanation?: string }> = [];
 
@@ -136,7 +178,7 @@ const getSampleTestcases = (q: any): Array<{ input: string; output: string; expl
   if (list.length === 0) {
     const rawCases = q.testCases || q.testcases || q.test_cases || q.coding?.testCases || q.coding?.test_cases;
     if (Array.isArray(rawCases) && rawCases.length > 0) {
-      const sampleCases = rawCases.filter((tc: any) => (tc.sample === true || tc.isSample === true) && !tc.isHidden);
+      const sampleCases = rawCases.filter((tc: TestCaseSampleItem) => (tc.sample === true || tc.isSample === true) && !tc.isHidden);
       for (const tc of sampleCases) {
         list.push({
           input: tc.input != null ? String(tc.input) : "",
@@ -156,7 +198,7 @@ const getSampleTestcases = (q: any): Array<{ input: string; output: string; expl
 
   // 3. Check examples array
   if (list.length === 0) {
-    const rawExamples = q.examples || q.coding?.examples || (Array.isArray(q.coding?.examples?.data) ? q.coding.examples.data : null);
+    const rawExamples = q.examples || (Array.isArray(q.coding?.examples) ? q.coding.examples : (q.coding?.examples && "data" in q.coding.examples && Array.isArray(q.coding.examples.data) ? q.coding.examples.data : null));
     if (Array.isArray(rawExamples) && rawExamples.length > 0) {
       for (const ex of rawExamples) {
         if (ex && !ex.isHidden) {
@@ -364,8 +406,9 @@ export default function TestInterface() {
         toast({ title: "Assessment Activated", description: "All checks passed. Assessment timer started!" });
         sessionStorage.setItem(`env_checked_${sessionId}`, "true");
         setEnvChecked(true);
-      } catch (err: any) {
-        const errMsg = err?.response?.data?.message || err?.message || "";
+      } catch (err: unknown) {
+        const errorObj = err as { response?: { data?: { message?: string } }; message?: string };
+        const errMsg = errorObj?.response?.data?.message || errorObj?.message || "";
         console.error("Session activation error:", err);
         if (errMsg.toLowerCase().includes("candidate photo") || errMsg.toLowerCase().includes("photo must be uploaded")) {
           sessionStorage.removeItem(`identity_verified_${sessionId}`);
@@ -532,11 +575,16 @@ function TestInterfaceContent({ testId, sessionId, navigate, toast, onRequireIde
 
   // Fullscreen enforcement
   const [isFullscreen, setIsFullscreen] = useState(() => {
+    const doc = document as Document & {
+      webkitFullscreenElement?: Element | null;
+      mozFullScreenElement?: Element | null;
+      msFullscreenElement?: Element | null;
+    };
     return !!(
-      document.fullscreenElement ||
-      (document as any).webkitFullscreenElement ||
-      (document as any).mozFullScreenElement ||
-      (document as any).msFullscreenElement
+      doc.fullscreenElement ||
+      doc.webkitFullscreenElement ||
+      doc.mozFullScreenElement ||
+      doc.msFullscreenElement
     );
   });
   const [fullscreenTimer, setFullscreenTimer] = useState(10);
@@ -547,7 +595,11 @@ function TestInterfaceContent({ testId, sessionId, navigate, toast, onRequireIde
 
   const enterFullscreen = useCallback(async () => {
     try {
-      const docEl = document.documentElement as any;
+      const docEl = document.documentElement as HTMLElement & {
+        webkitRequestFullscreen?: () => Promise<void>;
+        mozRequestFullScreen?: () => Promise<void>;
+        msRequestFullscreen?: () => Promise<void>;
+      };
       const requestFs =
         docEl.requestFullscreen ||
         docEl.webkitRequestFullscreen ||
@@ -630,8 +682,9 @@ function TestInterfaceContent({ testId, sessionId, navigate, toast, onRequireIde
         try {
           await testService.activateTestSession(sessionId);
           console.log("✅ STEP 2b: Session activated.");
-        } catch (activateErr: any) {
-          const errMsg = activateErr?.response?.data?.message || activateErr?.message || "";
+        } catch (activateErr: unknown) {
+          const activateErrObj = activateErr as { response?: { data?: { message?: string } }; message?: string };
+          const errMsg = activateErrObj?.response?.data?.message || activateErrObj?.message || "";
           console.warn("⚠️ Session activation error:", activateErr);
           if (errMsg.toLowerCase().includes("candidate photo") || errMsg.toLowerCase().includes("photo must be uploaded")) {
             console.log("🔄 Candidate photo missing on backend. Falling back to Identity Verification...");
@@ -779,7 +832,7 @@ useEffect(() => {
       .sort((a, b) => a.orderIndex - b.orderIndex)
       .map(tq => {
         const rawStarterCode = tq.question?.coding?.starterCode || tq.question?.starterCode;
-        const rawTemplates = (tq.question as any)?.languageTemplates || (tq.question?.coding as any)?.languageTemplates;
+        const rawTemplates = (tq.question as { languageTemplates?: Record<string, unknown> } | undefined)?.languageTemplates || (tq.question?.coding as { languageTemplates?: Record<string, unknown> } | undefined)?.languageTemplates;
         const processedStarterCode: Record<string, string> = {};
         if (rawStarterCode) {
           Object.entries(rawStarterCode).forEach(([lang, val]) => {
@@ -790,40 +843,58 @@ useEffect(() => {
         if (rawTemplates) {
           Object.entries(rawTemplates).forEach(([lang, val]) => {
             const frontendLang = mapBackendToFrontendLang(lang);
-            const templateStr = typeof val === "string" ? val : (val as any)?.template || (val as any)?.code || "";
+            const templateObj = typeof val === "object" && val !== null ? (val as { template?: string; code?: string }) : undefined;
+            const templateStr = typeof val === "string" ? val : templateObj?.template || templateObj?.code || "";
             if (templateStr && !processedStarterCode[frontendLang]) {
               processedStarterCode[frontendLang] = templateStr;
             }
           });
         }
 
+        const tqWithSection = tq as typeof tq & { section?: string };
+        const qObj = tq.question as (QuestionLikeObject & {
+          questionType?: "MCQ" | "CODING";
+          type?: "MCQ" | "CODING";
+          prompt?: string;
+          mcqOptions?: unknown[];
+          options?: unknown[];
+          difficulty?: string;
+          timeLimitSecs?: number;
+          memoryLimitMb?: number;
+          hints?: string[];
+          tags?: string[];
+          title?: string;
+          codeTemplate?: Record<string, CodeTemplateEntry>;
+          imageUrl?: string;
+        }) | undefined;
+
         return {
           ...(tq.question || {}),
           id: tq.questionId,
-          type: tq.question?.questionType || tq.question?.type || "MCQ",
-          prompt: tq.question?.prompt || "No prompt",
+          type: qObj?.questionType || qObj?.type || "MCQ",
+          prompt: qObj?.prompt || "No prompt",
           marks: tq.marks,
-          sectionName: tq.sectionName || (tq as any).section || undefined,
-          options: tq.question?.mcqOptions || (tq.question as any)?.options || [],
-          problemStatement: tq.question?.prompt,
-          sampleInput: tq.question?.sampleInput,
-          sampleOutput: tq.question?.sampleOutput,
-          sampleExplanation: tq.question?.sampleExplanation,
-          examples: (tq.question as any)?.examples,
-          visibleTestCases: (tq.question as any)?.visibleTestCases,
-          testCases: ((tq.question as any)?.testCases || (tq.question as any)?.coding?.testCases || [])
-            .filter((tc: any) => (tc.sample === true || tc.isSample === true) && !tc.isHidden),
-          codeTemplate: tq.question?.codeTemplate,
+          sectionName: tq.sectionName || tqWithSection.section || undefined,
+          options: qObj?.mcqOptions || qObj?.options || [],
+          problemStatement: qObj?.prompt,
+          sampleInput: qObj?.sampleInput,
+          sampleOutput: qObj?.sampleOutput,
+          sampleExplanation: qObj?.sampleExplanation,
+          examples: qObj?.examples,
+          visibleTestCases: qObj?.visibleTestCases,
+          testCases: ((qObj?.testCases || qObj?.coding?.testCases || []) as TestCaseSampleItem[])
+            .filter((tc: TestCaseSampleItem) => (tc.sample === true || tc.isSample === true) && !tc.isHidden),
+          codeTemplate: qObj?.codeTemplate,
           languageTemplates: rawTemplates,
           starterCode: processedStarterCode,
-          difficulty: tq.question?.difficulty,
-          constraints: tq.question?.constraints,
-          timeLimitSecs: tq.question?.timeLimitSecs || tq.timeLimitSecs,
-          memoryLimitMb: tq.question?.memoryLimitMb,
-          hints: tq.question?.hints,
-          tags: tq.question?.tags,
-          title: tq.question?.title,
-          imageUrl: (tq.question as { imageUrl?: string })?.imageUrl,
+          difficulty: qObj?.difficulty,
+          constraints: qObj?.constraints,
+          timeLimitSecs: qObj?.timeLimitSecs || tq.timeLimitSecs,
+          memoryLimitMb: qObj?.memoryLimitMb,
+          hints: qObj?.hints,
+          tags: qObj?.tags,
+          title: qObj?.title,
+          imageUrl: qObj?.imageUrl,
         };
       });
 
@@ -862,8 +933,8 @@ useEffect(() => {
       questionLangs = Object.keys(currentQ.starterCode) as LanguageKey[];
     } else if (currentQ.codeTemplate && Object.keys(currentQ.codeTemplate).length > 0) {
       questionLangs = Object.keys(currentQ.codeTemplate) as LanguageKey[];
-    } else if ((currentQ as any).languageTemplates && Object.keys((currentQ as any).languageTemplates).length > 0) {
-      questionLangs = Object.keys((currentQ as any).languageTemplates).map(k => k === "python" ? "python3" : k) as LanguageKey[];
+    } else if (currentQ.languageTemplates && Object.keys(currentQ.languageTemplates).length > 0) {
+      questionLangs = Object.keys(currentQ.languageTemplates).map(k => k === "python" ? "python3" : k) as LanguageKey[];
     }
 
     if (questionLangs.length > 0 && !questionLangs.includes(language)) {
@@ -1077,11 +1148,12 @@ useEffect(() => {
   // Fullscreen enforcement effects
   useEffect(() => {
     const handleFullscreenChange = () => {
+      const doc = document as VendorDocument;
       const isFs = !!(
-        document.fullscreenElement ||
-        (document as any).webkitFullscreenElement ||
-        (document as any).mozFullScreenElement ||
-        (document as any).msFullscreenElement
+        doc.fullscreenElement ||
+        doc.webkitFullscreenElement ||
+        doc.mozFullScreenElement ||
+        doc.msFullscreenElement
       );
       setIsFullscreen(isFs);
     };
@@ -1360,12 +1432,12 @@ useEffect(() => {
         sourceCode: code,
       });
       
-      const mappedTestCases = (Array.isArray(resultsArray) ? resultsArray : []).map((tc: any) => ({
+      const mappedTestCases: TestCaseResult[] = (Array.isArray(resultsArray) ? resultsArray : []).map((tc: TestCaseResult & { expected?: string; actualOutput?: string; stdout?: string; executionTimeMs?: number }) => ({
         status: tc.status || "ACCEPTED",
-        passed: tc.status === "ACCEPTED",
+        passed: tc.status === "ACCEPTED" || tc.passed === true,
         input: tc.input || "",
-        output: tc.actualOutput || tc.stdout || tc.stderr || tc.compileOutput || "",
-        expected: tc.expectedOutput || (tc as any).expected || "",
+        output: tc.actualOutput || tc.output || tc.stdout || tc.stderr || tc.compileOutput || "",
+        expected: tc.expectedOutput || tc.expected || "",
         compileOutput: tc.compileOutput || "",
         stderr: tc.stderr || "",
         execTimeMs: tc.execTimeMs || tc.executionTimeMs || 0,
@@ -2209,7 +2281,7 @@ useEffect(() => {
                                 </div>
                               ) : (
                                 <>
-                                  {testCaseResults.map((tc: any, idx) => (
+                                  {testCaseResults.map((tc: TestCaseResult, idx: number) => (
                                     <div
                                       key={idx}
                                       className={`p-2.5 rounded border ${

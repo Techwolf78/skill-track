@@ -340,6 +340,7 @@ export const ProctoringProvider: React.FC<{
   );
 };
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const useProctoring = () => {
   const context = useContext(ProctoringContext);
   if (!context) throw new Error("useProctoring must be used within ProctoringProvider");

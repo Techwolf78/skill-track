@@ -101,26 +101,28 @@ export function useCameraMonitor(
             onViolation("LOOK_AWAY", { message: "No face detected" });
             lastViolationTime = now;
           } else if (predictions.length === 1) {
-            const prediction = predictions[0] as any;
-            const landmarks = prediction.landmarks as Array<[number, number]>;
+            const pred = predictions[0];
+            const landmarks = Array.isArray(pred.landmarks) ? (pred.landmarks as unknown as number[][]) : null;
             if (landmarks && landmarks.length >= 3) {
               const rightEye = landmarks[0];
               const leftEye = landmarks[1];
               const nose = landmarks[2];
 
-              const eyeMidpointX = (rightEye[0] + leftEye[0]) / 2;
-              const eyeDistance = Math.abs(leftEye[0] - rightEye[0]);
+              if (Array.isArray(rightEye) && Array.isArray(leftEye) && Array.isArray(nose)) {
+                const eyeMidpointX = (rightEye[0] + leftEye[0]) / 2;
+                const eyeDistance = Math.abs(leftEye[0] - rightEye[0]);
 
-              if (eyeDistance > 0) {
-                const noseOffsetRatio = (nose[0] - eyeMidpointX) / eyeDistance;
-                const ROTATION_THRESHOLD = 0.35; // Trigger threshold for lateral head rotation
+                if (eyeDistance > 0) {
+                  const noseOffsetRatio = (nose[0] - eyeMidpointX) / eyeDistance;
+                  const ROTATION_THRESHOLD = 0.35; // Trigger threshold for lateral head rotation
 
-                if (Math.abs(noseOffsetRatio) > ROTATION_THRESHOLD) {
-                  onViolation("LOOK_AWAY", {
-                    message: "Head rotation look-away detected",
-                    offset: noseOffsetRatio.toFixed(3)
-                  });
-                  lastViolationTime = now;
+                  if (Math.abs(noseOffsetRatio) > ROTATION_THRESHOLD) {
+                    onViolation("LOOK_AWAY", {
+                      message: "Head rotation look-away detected",
+                      offset: noseOffsetRatio.toFixed(3),
+                    });
+                    lastViolationTime = now;
+                  }
                 }
               }
             }
