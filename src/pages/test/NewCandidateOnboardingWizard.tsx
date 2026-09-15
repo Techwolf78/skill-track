@@ -1814,37 +1814,32 @@ export default function NewCandidateOnboardingWizard({
                                 </svg>
 
                                 {/* Top/Bottom Status Badge inside Camera */}
-                                <div
-                                  className={`absolute bottom-3 px-3 py-1 rounded-full text-[11px] font-bold tracking-wide flex items-center gap-1.5 shadow-md backdrop-blur-xs transition-all ${
-                                    isVerifyingCapture
-                                      ? "bg-indigo-600/90 text-white"
-                                      : faceCheck.isValid
+                                {!isVerifyingCapture && (
+                                  <div
+                                    className={`absolute bottom-3 px-3 py-1 rounded-full text-[11px] font-bold tracking-wide flex items-center gap-1.5 shadow-md backdrop-blur-xs transition-all ${
+                                      faceCheck.isValid
                                         ? "bg-emerald-600/90 text-white"
                                         : "bg-rose-600/90 text-white"
-                                  }`}
-                                >
-                                  {isVerifyingCapture ? (
-                                    <>
-                                      <Loader2 className="w-3 h-3 animate-spin" />
-                                      <span>Verifying captured face...</span>
-                                    </>
-                                  ) : isModelLoading ? (
-                                    <>
-                                      <Loader2 className="w-3 h-3 animate-spin" />
-                                      <span>Loading Face Detector...</span>
-                                    </>
-                                  ) : faceCheck.isValid ? (
-                                    <>
-                                      <CheckCircle2 className="w-3.5 h-3.5" />
-                                      <span>{faceCheck.message}</span>
-                                    </>
-                                  ) : (
-                                    <>
-                                      <AlertCircle className="w-3.5 h-3.5" />
-                                      <span>{faceCheck.message}</span>
-                                    </>
-                                  )}
-                                </div>
+                                    }`}
+                                  >
+                                    {isModelLoading ? (
+                                      <>
+                                        <Loader2 className="w-3 h-3 animate-spin" />
+                                        <span>Loading Face Detector...</span>
+                                      </>
+                                    ) : faceCheck.isValid ? (
+                                      <>
+                                        <CheckCircle2 className="w-3.5 h-3.5" />
+                                        <span>{faceCheck.message}</span>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <AlertCircle className="w-3.5 h-3.5" />
+                                        <span>{faceCheck.message}</span>
+                                      </>
+                                    )}
+                                  </div>
+                                )}
                               </div>
 
                               {webcamStatus === "error" && (
@@ -1910,13 +1905,6 @@ export default function NewCandidateOnboardingWizard({
                                 </>
                               )}
                             </Button>
-                            {!faceCheck.isValid &&
-                              !isModelLoading &&
-                              !isVerifyingCapture && (
-                                <span className="text-[10px] text-slate-400">
-                                  Position face inside oval to submit photo
-                                </span>
-                              )}
                           </div>
                         )}
                       </div>
@@ -1964,7 +1952,7 @@ export default function NewCandidateOnboardingWizard({
                   </div>
 
                   <div
-                    onClick={() => setIsDeclarationAgreed(!isDeclarationAgreed)}
+                    onClick={() => setIsDeclarationAgreed((prev) => !prev)}
                     className={`flex items-start gap-3 p-4 border rounded-sm transition-all cursor-pointer select-none ${
                       isDeclarationAgreed
                         ? "bg-indigo-50/70 border-indigo-200 ring-1 ring-indigo-200/50"
@@ -1977,17 +1965,15 @@ export default function NewCandidateOnboardingWizard({
                       onCheckedChange={(checked) =>
                         setIsDeclarationAgreed(Boolean(checked))
                       }
-                      className="mt-0.5"
+                      onClick={(e) => e.stopPropagation()}
+                      className="mt-0.5 cursor-pointer"
                     />
-                    <div className="space-y-0.5">
-                      <label
-                        htmlFor="declaration"
-                        className="text-xs text-slate-800 font-medium cursor-pointer select-none leading-relaxed block"
-                      >
+                    <div className="space-y-0.5 flex-1">
+                      <span className="text-xs text-slate-800 font-medium cursor-pointer select-none leading-relaxed block">
                         I confirm that I am the registered candidate, have
                         reviewed the rules, and agree to abide by the assessment
                         integrity guidelines.
-                      </label>
+                      </span>
                       {!isDeclarationAgreed && (
                         <p className="text-[11px] text-amber-600 font-medium flex items-center gap-1">
                           Please check this box to confirm and enable the start
