@@ -16,11 +16,16 @@ export default defineConfig(({ mode }) => {
         overlay: false,
       },
       proxy: {
-        "^/(auth|users|tests|questions|organisations|test-sessions|candidates|admin|test-schedules|test-results|topics|subtopics|subjects|submissions|test-cases|test-questions|candidate-invitations|api|actuator)": {
-          target: env.BACKEND_URL || (mode === "production" ? "https://api.gryphon360.com" : "http://localhost:8081"),
-          changeOrigin: true,
-          secure: false,
-        },
+        "^/(auth|users|tests|questions|organisations|test-sessions|candidates|admin|test-schedules|test-results|topics|subtopics|subjects|submissions|test-cases|test-questions|candidate-invitations|api|actuator)":
+          {
+            target:
+              env.BACKEND_URL ||
+              (mode === "production"
+                ? "https://api.gryphon360.com"
+                : "http://localhost:8081"),
+            changeOrigin: true,
+            secure: false,
+          },
       },
     },
     plugins: [react(), mode === "development" && componentTagger()].filter(
