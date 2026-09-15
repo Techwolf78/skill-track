@@ -20,6 +20,31 @@ const SUSPICIOUS_WORDS = [
   "window"
 ];
 
+interface SpeechRecognitionResultItem {
+  transcript: string;
+}
+
+interface SpeechRecognitionResultList {
+  [index: number]: SpeechRecognitionResultItem[];
+}
+
+interface SpeechRecognitionEvent {
+  resultIndex: number;
+  results: SpeechRecognitionResultList;
+}
+
+interface SpeechRecognitionInstance {
+  continuous: boolean;
+  interimResults: boolean;
+  lang: string;
+  onresult: ((event: SpeechRecognitionEvent) => void) | null;
+  onend: (() => void) | null;
+  onerror: (() => void) | null;
+  start: () => void;
+  stop: () => void;
+  abort: () => void;
+}
+
 export function useAudioMonitor(
   isActive: boolean,
   onViolation: (type: "SPEECH", metadata: Record<string, unknown>) => void
@@ -27,22 +52,49 @@ export function useAudioMonitor(
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
-  const recognitionRef = useRef<any>(null);
+  const recognitionRef = useRef<SpeechRecognitionInstance | null>(null);
 
   useEffect(() => {
-    if (!isActive) {
+    const cleanupMedia = () => {
       if (recognitionRef.current) {
         try {
-          recognitionRef.current.stop();
-        } catch (e) {}
+          recognitionRef.current.onend = null;
+          recognitionRef.current.onerror = null;
+          recognitionRef.current.onresult = null;
+          recognitionRef.current.abort();
+        } catch (e) {
+          void e;
+        }
         recognitionRef.current = null;
       }
+
+      if (streamRef.current) {
+        try {
+          streamRef.current.getTracks().forEach((t) => t.stop());
+        } catch (e) {
+          void e;
+        }
+        streamRef.current = null;
+      }
+
+      if (audioContextRef.current) {
+        try {
+          audioContextRef.current.close().catch(() => {});
+        } catch (e) {
+          void e;
+        }
+        audioContextRef.current = null;
+      }
+    };
+
+    if (!isActive) {
+      cleanupMedia();
       return;
     }
 
     const SpeechRecognitionClass = 
-      (window as any).SpeechRecognition || 
-      (window as any).webkitSpeechRecognition;
+      (window as unknown as { SpeechRecognition?: new () => SpeechRecognitionInstance }).SpeechRecognition || 
+      (window as unknown as { webkitSpeechRecognition?: new () => SpeechRecognitionInstance }).webkitSpeechRecognition;
 
     if (SpeechRecognitionClass) {
       // Use Web Speech API (Smart AI local keyword checking)
@@ -55,7 +107,7 @@ export function useAudioMonitor(
       let lastViolationTime = 0;
       const VIOLATION_COOLDOWN = 5000;
 
-      recognition.onresult = (event: any) => {
+      recognition.onresult = (event: SpeechRecognitionEvent) => {
         const resultIndex = event.resultIndex;
         const transcript = event.results[resultIndex][0].transcript.toLowerCase();
         console.log("🎤 Audio Monitor Transcript:", transcript);
@@ -87,11 +139,7 @@ export function useAudioMonitor(
       }
 
       return () => {
-        if (recognitionRef.current) {
-          try {
-            recognitionRef.current.stop();
-          } catch (e) {}
-        }
+        cleanupMedia();
       };
     } else {
       // Fallback to simple volume threshold check
@@ -150,8 +198,7 @@ export function useAudioMonitor(
       initAudio();
 
       return () => {
-        streamRef.current?.getTracks().forEach(t => t.stop());
-        audioContextRef.current?.close();
+        cleanupMedia();
       };
     }
   }, [isActive, onViolation]);

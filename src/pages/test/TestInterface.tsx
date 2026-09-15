@@ -190,7 +190,7 @@ const getSampleTestcases = (q: any): Array<{ input: string; output: string; expl
   if (list.length === 0 && q.prompt) {
     const pText = `${q.prompt || ""}\n${q.sampleExplanation || ""}\n${q.constraints || ""}`;
     const exampleRegex =
-      /(?:Example\s*(\d+)|\*\*Example\s*(\d+)\*\*|###\s*Example\s*(\d+))[\s\S]*?(?:Input|\*\*Input:\*\*)\s*[:\.]?\s*`?([^`\n\r]+)`?[\s\S]*?(?:Output|\*\*Output:\*\*)\s*[:\.]?\s*`?([^`\n\r]+)`?(?:[\s\S]*?(?:Explanation|\*\*Explanation:\*\*)\s*[:\.]?\s*([^\n\r]+))?/gi;
+      /(?:Example\s*(\d+)|\*\*Example\s*(\d+)\*\*|###\s*Example\s*(\d+))[\s\S]*?(?:Input|\*\*Input:\*\*)\s*[:.]?\s*`?([^`\n\r]+)`?[\s\S]*?(?:Output|\*\*Output:\*\*)\s*[:.]?\s*`?([^`\n\r]+)`?(?:[\s\S]*?(?:Explanation|\*\*Explanation:\*\*)\s*[:.]?\s*([^\n\r]+))?/gi;
     let match;
     while ((match = exampleRegex.exec(pText)) !== null && list.length < 3) {
       const rawIn = match[4]?.trim();
@@ -407,9 +407,19 @@ export default function TestInterface() {
 }
 
 function TestInterfaceContent({ testId, sessionId, navigate, toast, onRequireIdentityVerification }: { testId?: string; sessionId?: string; navigate: (path: string) => void; toast: (props: { title?: string; description?: string; variant?: "default" | "destructive" }) => void; onRequireIdentityVerification?: () => void }) {
-  const { violations, trustScore, isProctoringActive, startProctoring, syncViolations, flushEvidence, videoRef, config } = useProctoring();
+  const { violations, trustScore, isProctoringActive, startProctoring, stopProctoring, syncViolations, flushEvidence, videoRef, config } = useProctoring();
   const lastWarnedCountRef = useRef(0);
   const hasWarnedFullscreenRef = useRef(false);
+
+  // Stop all proctoring and media hardware when TestInterface unmounts
+  useEffect(() => {
+    return () => {
+      stopProctoring();
+      if (document.fullscreenElement) {
+        document.exitFullscreen().catch(() => {});
+      }
+    };
+  }, [stopProctoring]);
 
   const [isDraftSynced, setIsDraftSynced] = useState(false);
   const saveVersionsRef = useRef<Record<string, number>>({});
@@ -1017,10 +1027,28 @@ useEffect(() => {
       }
 
       // Use the new dedicated submit endpoint
-      await testService.submitSession(sessionId, answers);
+      await testService.submitSession(sessionId);
 
       // Clear local storage session cache
       AnswerStore.clearSession(sessionId);
+
+      // Stop proctoring, release camera/mic/screen streams, and exit fullscreen immediately
+      stopProctoring();
+      if (document.fullscreenElement) {
+        document.exitFullscreen().catch(() => {});
+      }
+      document.querySelectorAll<HTMLMediaElement>("video, audio").forEach((el) => {
+        if (el.srcObject instanceof MediaStream) {
+          el.srcObject.getTracks().forEach((track) => {
+            try {
+              track.stop();
+            } catch (e) {
+              void e;
+            }
+          });
+          el.srcObject = null;
+        }
+      });
 
       toast({ title: "Success", description: "Test submitted successfully, your responses have been recorded" });
       navigate(`/test/${testId}/results?session=${sessionId}`);
@@ -1036,7 +1064,7 @@ useEffect(() => {
       setSubmitting(false);
       setShowSubmitDialog(false);
     }
-  }, [sessionId, answers, testId, navigate, toast, syncViolations, flushEvidence, questions, currentIndex, flushQuestionTiming, submitting]);
+  }, [sessionId, answers, testId, navigate, toast, syncViolations, flushEvidence, stopProctoring, questions, currentIndex, language, flushQuestionTiming, submitting]);
 
   const handleAutoSubmit = useCallback(async () => {
     toast({

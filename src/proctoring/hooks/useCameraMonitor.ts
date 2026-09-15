@@ -27,14 +27,17 @@ export function useCameraMonitor(
     }
   }, []);
 
+  const streamRef = useRef<MediaStream | null>(null);
+
   useEffect(() => {
-    let stream: MediaStream | null = null;
+    const videoEl = videoRef.current;
 
     const startCamera = async () => {
       try {
-        stream = await navigator.mediaDevices.getUserMedia({ video: true });
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        streamRef.current = stream;
+        if (videoEl) {
+          videoEl.srcObject = stream;
         }
       } catch (err) {
         console.error("Failed to start camera:", err);
@@ -48,14 +51,27 @@ export function useCameraMonitor(
         initDetector();
       }
     } else {
-      if (videoRef.current) {
-        videoRef.current.srcObject = null;
+      if (videoEl) {
+        if (videoEl.srcObject instanceof MediaStream) {
+          videoEl.srcObject.getTracks().forEach((t) => t.stop());
+        }
+        videoEl.srcObject = null;
       }
-      stream?.getTracks().forEach(t => t.stop());
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((t) => t.stop());
+        streamRef.current = null;
+      }
     }
 
     return () => {
-      stream?.getTracks().forEach(t => t.stop());
+      if (videoEl?.srcObject instanceof MediaStream) {
+        videoEl.srcObject.getTracks().forEach((t) => t.stop());
+        videoEl.srcObject = null;
+      }
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((t) => t.stop());
+        streamRef.current = null;
+      }
     };
   }, [isActive, detector, isInitializing, initDetector]);
 

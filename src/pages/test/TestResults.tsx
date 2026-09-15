@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
 import { CheckCircle2, Clock, Calendar, ArrowRight, ShieldCheck } from "lucide-react";
@@ -8,6 +9,41 @@ export default function TestResults() {
   const [params] = useSearchParams();
   const sessionId = params.get("session");
   const fromResubmit = params.get("submitted") === "true";
+
+  // Force stop all active media streams (camera, microphone, screen sharing) and release fullscreen
+  useEffect(() => {
+    // 1. Release fullscreen if active
+    if (document.fullscreenElement) {
+      document.exitFullscreen().catch(() => {});
+    }
+
+    // 2. Stop any remaining media tracks on all video/audio elements
+    document.querySelectorAll<HTMLMediaElement>("video, audio").forEach((el) => {
+      if (el.srcObject instanceof MediaStream) {
+        el.srcObject.getTracks().forEach((track) => {
+          try {
+            track.stop();
+          } catch (e) {
+            void e;
+          }
+        });
+        el.srcObject = null;
+      }
+    });
+
+    // 3. Abort speech recognition if any lingering instance exists
+    const SpeechRecognitionClass =
+      (window as unknown as { SpeechRecognition?: new () => { abort: () => void } }).SpeechRecognition ||
+      (window as unknown as { webkitSpeechRecognition?: new () => { abort: () => void } }).webkitSpeechRecognition;
+    if (SpeechRecognitionClass) {
+      try {
+        const recognition = new SpeechRecognitionClass();
+        recognition.abort();
+      } catch (e) {
+        void e;
+      }
+    }
+  }, []);
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4 font-sans relative overflow-hidden">

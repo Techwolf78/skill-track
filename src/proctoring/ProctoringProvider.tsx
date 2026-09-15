@@ -280,8 +280,38 @@ export const ProctoringProvider: React.FC<{
     return () => window.removeEventListener("online", handleOnline);
   }, []);
 
-  const startProctoring = () => setState(prev => ({ ...prev, isProctoringActive: true }));
-  const stopProctoring = () => setState(prev => ({ ...prev, isProctoringActive: false }));
+  const startProctoring = useCallback(() => setState(prev => ({ ...prev, isProctoringActive: true })), []);
+  
+  const stopProctoring = useCallback(() => {
+    setState(prev => ({
+      ...prev,
+      isProctoringActive: false,
+      cameraActive: false,
+      screenActive: false,
+      micActive: false,
+    }));
+
+    // Explicitly stop all media streams attached to any video/audio element
+    document.querySelectorAll<HTMLMediaElement>("video, audio").forEach((el) => {
+      if (el.srcObject instanceof MediaStream) {
+        el.srcObject.getTracks().forEach((track) => {
+          try {
+            track.stop();
+          } catch (e) {
+            void e;
+          }
+        });
+        el.srcObject = null;
+      }
+    });
+  }, []);
+
+  // Cleanup on provider unmount
+  useEffect(() => {
+    return () => {
+      stopProctoring();
+    };
+  }, [stopProctoring]);
 
   const syncViolations = useCallback(async () => {
     const score = await store.current.syncToBackend();
