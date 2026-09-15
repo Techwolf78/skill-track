@@ -1905,6 +1905,13 @@ export default function NewCandidateOnboardingWizard({
                                 </>
                               )}
                             </Button>
+                            {!faceCheck.isValid &&
+                              !isModelLoading &&
+                              !isVerifyingCapture && (
+                                <span className="text-[10px] text-slate-400">
+                                  Position face inside oval to submit photo
+                                </span>
+                              )}
                           </div>
                         )}
                       </div>
