@@ -1,3 +1,11 @@
+// Suppress all non-error console output (only console.error will be displayed)
+const noop = () => {};
+console.log = noop;
+console.info = noop;
+console.warn = noop;
+console.debug = noop;
+console.trace = noop;
+
 import { createRoot } from "react-dom/client";
 import * as Sentry from "@sentry/react";
 import App from "./App.tsx";
