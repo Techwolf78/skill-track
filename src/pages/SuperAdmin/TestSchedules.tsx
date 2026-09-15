@@ -60,6 +60,7 @@ import {
   useCreateTestScheduleMutation,
   useUpdateTestScheduleStatusMutation,
 } from "@/hooks/use-query-hooks";
+import { formatDateTime, toBackendDateTime } from "@/lib/date-utils";
 
 interface Organisation {
   id: string;
@@ -254,8 +255,8 @@ export default function TestSchedules() {
     try {
       await createScheduleMutation.mutateAsync({
         testId: formData.testId,
-        startTime: formData.startTime,
-        endTime: formData.endTime,
+        startTime: toBackendDateTime(formData.startTime),
+        endTime: toBackendDateTime(formData.endTime),
         maxCandidates: formData.maxCandidates,
       });
 
@@ -288,18 +289,13 @@ export default function TestSchedules() {
 
   const getStatusBadge = (status: string) => {
     const styles: Record<string, string> = {
-      SCHEDULED: "bg-yellow-500/10 text-yellow-500",
-      LIVE: "bg-green-500/10 text-green-500",
-      COMPLETED: "bg-gray-500/10 text-gray-500",
+      SCHEDULED: "bg-amber-500/10 text-amber-600 border border-amber-500/30",
+      LIVE: "bg-emerald-500/10 text-emerald-600 border border-emerald-500/30",
+      COMPLETED: "bg-slate-500/10 text-slate-600 border border-slate-500/30",
     };
     return styles[status] || styles.SCHEDULED;
   };
 
-  const formatDateTime = (dateStr: string) => {
-    return new Date(dateStr).toLocaleString();
-  };
-
-  // Get available actions based on current status
   // Get available actions based on current status
   const getAvailableActions = (currentStatus: string) => {
     switch (currentStatus) {
@@ -343,87 +339,6 @@ export default function TestSchedules() {
     return matchesSearch;
   });
 
-  // Auto-status checker - only calls API when status actually changes
-  const autoCheckAndUpdateStatuses = useCallback(async () => {
-    const now = new Date();
-    const schedulesToUpdate: {
-      id: string;
-      currentStatus: string;
-      newStatus: string;
-    }[] = [];
-
-    // Check locally first - NO API CALLS
-    for (const schedule of schedules) {
-      const startTime = new Date(schedule.startTime);
-      const endTime = new Date(schedule.endTime);
-
-      // SCHEDULED -> LIVE
-      if (
-        schedule.status === "SCHEDULED" &&
-        now >= startTime &&
-        now <= endTime
-      ) {
-        schedulesToUpdate.push({
-          id: schedule.id,
-          currentStatus: schedule.status,
-          newStatus: "LIVE",
-        });
-      }
-      // SCHEDULED/LIVE -> COMPLETED
-      else if (
-        (schedule.status === "SCHEDULED" || schedule.status === "LIVE") &&
-        now > endTime
-      ) {
-        schedulesToUpdate.push({
-          id: schedule.id,
-          currentStatus: schedule.status,
-          newStatus: "COMPLETED",
-        });
-      }
-    }
-
-    // If no updates needed, exit without any API calls
-    if (schedulesToUpdate.length === 0) {
-      return;
-    }
-
-    console.log(
-      `🔄 Need to update ${schedulesToUpdate.length} schedules:`,
-      schedulesToUpdate,
-    );
-
-    // Only update schedules that actually need status change
-    let updatedCount = 0;
-    for (const update of schedulesToUpdate) {
-      try {
-        await testService.updateTestScheduleStatus(update.id, update.newStatus);
-
-        console.log(
-          `✅ Updated schedule ${update.id}: ${update.currentStatus} → ${update.newStatus}`,
-        );
-        updatedCount++;
-      } catch (error) {
-        console.error(`Failed to update schedule ${update.id}:`, error);
-      }
-    }
-
-    // Refresh data once if any updates succeeded
-    if (updatedCount > 0) {
-      await fetchData();
-    }
-  }, [schedules, fetchData]);
-
-  // Run auto-check periodically
-  useEffect(() => {
-    // Check immediately on mount
-    autoCheckAndUpdateStatuses();
-
-    // Check every 2 minutes (less frequent = even less server load)
-    const interval = setInterval(autoCheckAndUpdateStatuses, 120000); // 2 minutes
-
-    return () => clearInterval(interval);
-  }, [autoCheckAndUpdateStatuses]);
-
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -439,10 +354,10 @@ export default function TestSchedules() {
         <div className="flex gap-2 shrink-0">
           <Button
             variant="outline"
-            onClick={() => autoCheckAndUpdateStatuses()}
+            onClick={() => fetchData()}
           >
             <RefreshCw className="w-4 h-4 mr-2" />
-            Check Status
+            Refresh
           </Button>
           <Button onClick={() => setIsCreateDialogOpen(true)}>
             <Plus className="w-4 h-4 mr-2" />

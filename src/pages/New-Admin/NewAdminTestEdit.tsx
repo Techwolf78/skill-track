@@ -103,6 +103,7 @@ import autoTable from "jspdf-autotable";
 import * as XLSX from "xlsx";
 import { toast } from "sonner";
 import { GryphonLogo } from "@/components/ui/GryphonLogo";
+import { formatDateTime, toBackendDateTime, parseBackendDateTime } from "@/lib/date-utils";
 
 type JsPDFWithAutoTable = jsPDF & { lastAutoTable: { finalY: number } };
 
@@ -156,11 +157,6 @@ const formatTimeTaken = (totalSeconds: number) => {
     return `${m}m`;
   }
   return "< 1m";
-};
-
-const formatDateTime = (dateStr: string) => {
-  if (!dateStr) return "";
-  return new Date(dateStr).toLocaleString();
 };
 
 const getProctoringPreset = (mode: ProctoringMode) => {
@@ -416,8 +412,10 @@ export default function NewAdminTestEdit() {
         if (activeSchedule) {
           setSelectedScheduleId(activeSchedule.id);
           setSelectedScheduleData(activeSchedule as any);
-          const start = activeSchedule.startTime ? activeSchedule.startTime.slice(0, 16) : "";
-          const end = activeSchedule.endTime ? activeSchedule.endTime.slice(0, 16) : "";
+          const startParsed = parseBackendDateTime(activeSchedule.startTime);
+          const endParsed = parseBackendDateTime(activeSchedule.endTime);
+          const start = startParsed.date ? toBackendDateTime(startParsed.date, startParsed.time) : "";
+          const end = endParsed.date ? toBackendDateTime(endParsed.date, endParsed.time) : "";
           setScheduleStartTime(start);
           setScheduleEndTime(end);
           setInitialScheduleStart(start);
@@ -898,8 +896,18 @@ export default function NewAdminTestEdit() {
       toast.error("Both start time and end time are required.");
       return;
     }
-    const startDate = new Date(scheduleStartTime);
-    const endDate = new Date(scheduleEndTime);
+    const startParsed = parseBackendDateTime(scheduleStartTime);
+    const endParsed = parseBackendDateTime(scheduleEndTime);
+    if (!startParsed.date || !endParsed.date) {
+      toast.error("Please provide both valid start and end dates.");
+      return;
+    }
+
+    const payloadStart = toBackendDateTime(startParsed.date, startParsed.time);
+    const payloadEnd = toBackendDateTime(endParsed.date, endParsed.time);
+
+    const startDate = new Date(payloadStart);
+    const endDate = new Date(payloadEnd);
     if (endDate <= startDate) {
       toast.error("Schedule end time must be after start time.");
       return;
@@ -910,16 +918,16 @@ export default function NewAdminTestEdit() {
       let targetId = selectedScheduleId;
       if (selectedScheduleId) {
         const res = await apiClient.patch(`/test-schedules/${selectedScheduleId}`, {
-          startTime: scheduleStartTime,
-          endTime: scheduleEndTime,
+          startTime: payloadStart,
+          endTime: payloadEnd,
         });
         const d = res.data?.data || res.data;
         if (d) setSelectedScheduleData(d);
       } else {
         const res = await apiClient.post("/test-schedules", {
           testId: id,
-          startTime: scheduleStartTime,
-          endTime: scheduleEndTime,
+          startTime: payloadStart,
+          endTime: payloadEnd,
           maxCandidates: 100,
         });
         const d = res.data?.data || res.data;
@@ -929,8 +937,10 @@ export default function NewAdminTestEdit() {
           setSelectedScheduleData(d);
         }
       }
-      setInitialScheduleStart(scheduleStartTime);
-      setInitialScheduleEnd(scheduleEndTime);
+      setInitialScheduleStart(payloadStart);
+      setInitialScheduleEnd(payloadEnd);
+      setScheduleStartTime(payloadStart);
+      setScheduleEndTime(payloadEnd);
       toast.success("Test schedule has been saved successfully.");
 
       // Refresh candidate and schedule data immediately
@@ -3021,25 +3031,16 @@ export default function NewAdminTestEdit() {
                           >
                             <span className="flex items-center gap-2">
                               <Calendar className="w-4 h-4 text-slate-400" />
-                              {scheduleStartTime
-                                ? scheduleStartTime.split("T")[0]
-                                : "Select Date"}
+                              {parseBackendDateTime(scheduleStartTime).date || "Select Date"}
                             </span>
                           </button>
                           <MaterialDatePickerDialog
                             isOpen={startDatePickerOpen}
                             onClose={() => setStartDatePickerOpen(false)}
-                            value={
-                              scheduleStartTime
-                                ? scheduleStartTime.split("T")[0]
-                                : ""
-                            }
+                            value={parseBackendDateTime(scheduleStartTime).date}
                             onChange={(date) => {
-                              const time =
-                                scheduleStartTime && scheduleStartTime.includes("T")
-                                  ? scheduleStartTime.split("T")[1]
-                                  : "00:00";
-                              setScheduleStartTime(date ? `${date}T${time}` : "");
+                              const current = parseBackendDateTime(scheduleStartTime);
+                              setScheduleStartTime(date ? toBackendDateTime(date, current.time || "00:00") : "");
                             }}
                           />
                         </div>
@@ -3051,24 +3052,17 @@ export default function NewAdminTestEdit() {
                           >
                             <span className="flex items-center gap-2">
                               <Clock className="w-4 h-4 text-slate-400" />
-                              {scheduleStartTime && scheduleStartTime.includes("T")
-                                ? scheduleStartTime.split("T")[1].slice(0, 5)
-                                : "Select Time"}
+                              {parseBackendDateTime(scheduleStartTime).time || "Select Time"}
                             </span>
                           </button>
                           <MaterialTimePickerDialog
                             isOpen={startTimePickerOpen}
                             onClose={() => setStartTimePickerOpen(false)}
-                            value={
-                              scheduleStartTime && scheduleStartTime.includes("T")
-                                ? scheduleStartTime.split("T")[1].slice(0, 5)
-                                : ""
-                            }
+                            value={parseBackendDateTime(scheduleStartTime).time}
                             onChange={(time) => {
-                              const date = scheduleStartTime
-                                ? scheduleStartTime.split("T")[0]
-                                : new Date().toISOString().split("T")[0];
-                              setScheduleStartTime(date ? `${date}T${time}` : "");
+                              const current = parseBackendDateTime(scheduleStartTime);
+                              const date = current.date || new Date().toISOString().split("T")[0];
+                              setScheduleStartTime(toBackendDateTime(date, time));
                             }}
                           />
                         </div>
@@ -3090,23 +3084,16 @@ export default function NewAdminTestEdit() {
                           >
                             <span className="flex items-center gap-2">
                               <Calendar className="w-4 h-4 text-slate-400" />
-                              {scheduleEndTime
-                                ? scheduleEndTime.split("T")[0]
-                                : "Select Date"}
+                              {parseBackendDateTime(scheduleEndTime).date || "Select Date"}
                             </span>
                           </button>
                           <MaterialDatePickerDialog
                             isOpen={endDatePickerOpen}
                             onClose={() => setEndDatePickerOpen(false)}
-                            value={
-                              scheduleEndTime ? scheduleEndTime.split("T")[0] : ""
-                            }
+                            value={parseBackendDateTime(scheduleEndTime).date}
                             onChange={(date) => {
-                              const time =
-                                scheduleEndTime && scheduleEndTime.includes("T")
-                                  ? scheduleEndTime.split("T")[1]
-                                  : "00:00";
-                              setScheduleEndTime(date ? `${date}T${time}` : "");
+                              const current = parseBackendDateTime(scheduleEndTime);
+                              setScheduleEndTime(date ? toBackendDateTime(date, current.time || "00:00") : "");
                             }}
                           />
                         </div>
@@ -3118,24 +3105,17 @@ export default function NewAdminTestEdit() {
                           >
                             <span className="flex items-center gap-2">
                               <Clock className="w-4 h-4 text-slate-400" />
-                              {scheduleEndTime && scheduleEndTime.includes("T")
-                                ? scheduleEndTime.split("T")[1].slice(0, 5)
-                                : "Select Time"}
+                              {parseBackendDateTime(scheduleEndTime).time || "Select Time"}
                             </span>
                           </button>
                           <MaterialTimePickerDialog
                             isOpen={endTimePickerOpen}
                             onClose={() => setEndTimePickerOpen(false)}
-                            value={
-                              scheduleEndTime && scheduleEndTime.includes("T")
-                                ? scheduleEndTime.split("T")[1].slice(0, 5)
-                                : ""
-                            }
+                            value={parseBackendDateTime(scheduleEndTime).time}
                             onChange={(time) => {
-                              const date = scheduleEndTime
-                                ? scheduleEndTime.split("T")[0]
-                                : new Date().toISOString().split("T")[0];
-                              setScheduleEndTime(date ? `${date}T${time}` : "");
+                              const current = parseBackendDateTime(scheduleEndTime);
+                              const date = current.date || new Date().toISOString().split("T")[0];
+                              setScheduleEndTime(toBackendDateTime(date, time));
                             }}
                           />
                         </div>

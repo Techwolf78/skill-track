@@ -25,6 +25,7 @@ import NewCandidateOnboardingWizard from "./NewCandidateOnboardingWizard";
 import { apiClient } from "@/lib/api-client";
 import { GryphonLogo } from "@/components/ui/GryphonLogo";
 import { useToast } from "@/hooks/use-toast";
+import { formatDateTime } from "@/lib/date-utils";
 import {
   Card,
   CardContent,
@@ -566,17 +567,8 @@ export default function NewCandidateTestWelcome({
   const displayDuration = testData ? `${testData.durationMins} mins` : durationProp != null ? `${durationProp} mins` : "Not Available";
   const displayTotalProblems = testData?.questionCount || questionStats.total || problemsProp || "Not Available";
 
-  const formatDateTime = (dateStr?: string) => {
-    if (!dateStr) return null;
-    try {
-      return new Date(dateStr).toLocaleString("en-US", {
-        day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit",
-      });
-    } catch { return dateStr; }
-  };
-
-  const displayStartTime = formatDateTime(testData?.startTime) || startProp || "Not Available";
-  const displayEndTime = formatDateTime(testData?.endTime) || endProp || "Not Available";
+  const displayStartTime = (testData?.startTime ? formatDateTime(testData.startTime) : null) || startProp || "Not Available";
+  const displayEndTime = (testData?.endTime ? formatDateTime(testData.endTime) : null) || endProp || "Not Available";
 
   // Instructions extraction
   const resolvedInstructions = useMemo(() => {
@@ -671,7 +663,7 @@ export default function NewCandidateTestWelcome({
               <div className="flex items-center gap-3 rounded-xl bg-slate-50 border border-slate-200/80 px-4 py-3.5">
                 <Clock className="w-5 h-5 text-rose-500 shrink-0" />
                 <span className="text-xs text-slate-700">
-                  Ended at: <strong className="text-slate-900 font-semibold">{new Date(invitationStatus.endTime).toLocaleString()}</strong>
+                  Ended at: <strong className="text-slate-900 font-semibold">{formatDateTime(invitationStatus.endTime)}</strong>
                 </span>
               </div>
             )}

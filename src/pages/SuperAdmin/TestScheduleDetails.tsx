@@ -23,6 +23,7 @@ import { apiClient } from "@/lib/api-client";
 import { useAuth } from "@/lib/auth-context";
 import { organisationService } from "@/lib/organisation-service";
 import { candidateService, Candidate } from "@/lib/candidate-service";
+import { formatDateTime } from "@/lib/date-utils";
 
 interface Organisation {
   id: string;
@@ -158,16 +159,22 @@ export default function TestScheduleDetails() {
     }
   }, [id, fetchScheduleDetails]);
 
-  const getStatusBadge = (status: string) => {
+  const getScheduleStatusBadge = (status: string) => {
     const styles: Record<string, string> = {
-      SCHEDULED: "bg-yellow-500/10 text-yellow-500",
-      ACCEPTED: "bg-blue-500/10 text-blue-500",
-      LIVE: "bg-green-500/10 text-green-500",
-      COMPLETED: "bg-gray-500/10 text-gray-500",
-      EXPIRED: "bg-red-500/10 text-red-500",
-      PENDING: "bg-yellow-500/10 text-yellow-500",
+      SCHEDULED: "bg-amber-500/10 text-amber-600 border border-amber-500/30",
+      LIVE: "bg-emerald-500/10 text-emerald-600 border border-emerald-500/30",
+      COMPLETED: "bg-slate-500/10 text-slate-600 border border-slate-500/30",
     };
     return styles[status] || styles.SCHEDULED;
+  };
+
+  const getInvitationStatusBadge = (status: string) => {
+    const styles: Record<string, string> = {
+      PENDING: "bg-amber-500/10 text-amber-600 border border-amber-500/30",
+      ACCEPTED: "bg-emerald-500/10 text-emerald-600 border border-emerald-500/30",
+      EXPIRED: "bg-red-500/10 text-red-600 border border-red-500/30",
+    };
+    return styles[status] || styles.PENDING;
   };
 
   const getInvitationStatusIcon = (status: string) => {
@@ -179,11 +186,6 @@ export default function TestScheduleDetails() {
       default:
         return <ClockIcon className="w-4 h-4 text-yellow-500" />;
     }
-  };
-
-  const formatDateTime = (dateStr: string) => {
-    if (!dateStr) return "N/A";
-    return new Date(dateStr).toLocaleString();
   };
 
   if (loading) {
@@ -283,7 +285,7 @@ export default function TestScheduleDetails() {
           </CardHeader>
           <CardContent className="space-y-1">
             <div className="flex items-center gap-2">
-              <Badge className={getStatusBadge(schedule.status)}>
+              <Badge className={getScheduleStatusBadge(schedule.status)}>
                 {schedule.status}
               </Badge>
             </div>
@@ -363,7 +365,7 @@ export default function TestScheduleDetails() {
                   </div>
                   <div className="flex items-center gap-2">
                     {getInvitationStatusIcon(invitation.status)}
-                    <Badge className={getStatusBadge(invitation.status)}>
+                    <Badge className={getInvitationStatusBadge(invitation.status)}>
                       {invitation.status}
                     </Badge>
                     <span className="text-xs text-muted-foreground">

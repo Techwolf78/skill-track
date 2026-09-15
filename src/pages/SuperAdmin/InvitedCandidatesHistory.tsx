@@ -27,6 +27,7 @@ import { testService, TestSchedule } from "@/lib/test-service";
 import { candidateService, Candidate } from "@/lib/candidate-service";
 import { apiClient } from "@/lib/api-client";
 import { useNavigate } from "react-router-dom";
+import { formatDateTime, formatDate } from "@/lib/date-utils";
 
 import { useSearchParams } from "react-router-dom";
 import {
@@ -138,10 +139,6 @@ export default function InvitedCandidatesHistory() {
       default:
         return <ClockIcon className="w-3 h-3 text-yellow-500" />;
     }
-  };
-
-  const formatDateTime = (dateStr: string) => {
-    return new Date(dateStr).toLocaleString();
   };
 
   // Filter invitations by selected schedule (if specific schedule is selected)
@@ -278,7 +275,7 @@ export default function InvitedCandidatesHistory() {
                       </p>
                       <div className="flex items-center gap-1 text-xs text-muted-foreground mt-0.5">
                         <Calendar className="w-3 h-3" />
-                        <span>{inv.schedule ? new Date(inv.schedule.startTime).toLocaleDateString() : "N/A"}</span>
+                        <span>{inv.schedule ? formatDate(inv.schedule.startTime) : "N/A"}</span>
                       </div>
                     </div>
                   </TableCell>

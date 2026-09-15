@@ -1,5 +1,8 @@
 import { describe, it, expect } from "vitest";
 import {
+  isScheduleLive,
+  isScheduleScheduled,
+  isScheduleCompleted,
   isScheduleActive,
   isScheduleWithinWindow,
   buildSchedulePayload,
@@ -13,16 +16,26 @@ describe("Admin Schedule Logic", () => {
     startTime: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
     endTime: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
     maxCandidates: 50,
-    status: "ACTIVE",
+    status: "LIVE",
   };
 
-  describe("isScheduleActive", () => {
-    it("should return true for ACTIVE schedules", () => {
+  describe("Schedule Status Predicates", () => {
+    it("should correctly identify LIVE schedules", () => {
+      expect(isScheduleLive(baseSchedule)).toBe(true);
       expect(isScheduleActive(baseSchedule)).toBe(true);
+      expect(isScheduleScheduled(baseSchedule)).toBe(false);
+      expect(isScheduleCompleted(baseSchedule)).toBe(false);
     });
 
-    it("should return false for INACTIVE schedules", () => {
-      expect(isScheduleActive({ ...baseSchedule, status: "INACTIVE" })).toBe(false);
+    it("should correctly identify SCHEDULED and COMPLETED schedules", () => {
+      const scheduled: TestSchedule = { ...baseSchedule, status: "SCHEDULED" };
+      const completed: TestSchedule = { ...baseSchedule, status: "COMPLETED" };
+
+      expect(isScheduleScheduled(scheduled)).toBe(true);
+      expect(isScheduleLive(scheduled)).toBe(false);
+
+      expect(isScheduleCompleted(completed)).toBe(true);
+      expect(isScheduleLive(completed)).toBe(false);
     });
   });
 

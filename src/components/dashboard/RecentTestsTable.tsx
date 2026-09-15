@@ -16,6 +16,7 @@ import { testService, TestScheduleExtended, Test } from "@/lib/test-service";
 import { apiClient } from "@/lib/api-client";
 import { organisationService, OrganisationResponse } from "@/lib/organisation-service";
 import { getTimeframeCutoff } from "@/lib/utils";
+import { formatDate } from "@/lib/date-utils";
 
 interface MappedSchedule extends TestScheduleExtended {
   resolvedTestTitle: string;
@@ -210,7 +211,7 @@ export function RecentTestsTable({ timeframe = "7D" }: RecentTestsTableProps) {
                         <span className="text-foreground font-semibold text-xs">{sch.resolvedTestTitle}</span>
                         <span className="text-muted-foreground text-[10px] font-mono flex items-center gap-1 mt-0.5">
                           <Calendar className="w-3 h-3 text-muted-foreground/60" />
-                          {sch.startTime ? new Date(sch.startTime).toLocaleDateString() : "Scheduled"}
+                          {sch.startTime ? formatDate(sch.startTime) : "Scheduled"}
                         </span>
                       </div>
                     </TableCell>
@@ -227,23 +228,18 @@ export function RecentTestsTable({ timeframe = "7D" }: RecentTestsTableProps) {
                     </TableCell>
                     <TableCell>
                       {schStatus === "COMPLETED" && (
-                        <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-[10px] font-mono font-medium inline-flex items-center gap-1">
+                        <span className="px-2 py-0.5 rounded-full bg-slate-500/10 border border-slate-500/20 text-slate-600 dark:text-slate-400 text-[10px] font-mono font-medium inline-flex items-center gap-1">
                           <ShieldCheck className="w-3 h-3" /> COMPLETED
                         </span>
                       )}
-                      {(schStatus === "LIVE" || schStatus === "ACTIVE" || !sch.status) && (
-                        <span className="px-2 py-0.5 rounded-full bg-primary/10 border border-primary/20 text-primary text-[10px] font-mono font-medium inline-flex items-center gap-1">
-                          <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" /> LIVE ACTIVE
+                      {schStatus === "LIVE" && (
+                        <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 text-[10px] font-mono font-medium inline-flex items-center gap-1">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" /> LIVE
                         </span>
                       )}
-                      {(schStatus === "SCHEDULED" || schStatus === "UPCOMING") && (
-                        <span className="px-2 py-0.5 rounded-full bg-muted border border-border text-muted-foreground text-[10px] font-mono font-medium">
+                      {(schStatus === "SCHEDULED" || (!schStatus && !sch.status)) && (
+                        <span className="px-2 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-600 text-[10px] font-mono font-medium">
                           SCHEDULED
-                        </span>
-                      )}
-                      {schStatus === "EXPIRED" && (
-                        <span className="px-2 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400 text-[10px] font-mono font-medium">
-                          EXPIRED
                         </span>
                       )}
                     </TableCell>

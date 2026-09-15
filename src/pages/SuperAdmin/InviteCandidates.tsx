@@ -16,6 +16,7 @@ import { testService, TestSchedule } from "@/lib/test-service";
 import { candidateService, Candidate } from "@/lib/candidate-service";
 import { apiClient } from "@/lib/api-client";
 import { useNavigate } from "react-router-dom";
+import { formatDateTime } from "@/lib/date-utils";
 
 interface CandidateInvitation {
   id: string;
@@ -254,14 +255,8 @@ export default function InviteCandidates() {
   const getInvitationForCandidate = (candidateId: string, scheduleId: string) =>
     invitations.find((i) => i.candidateId === candidateId && i.scheduleId === scheduleId) || null;
 
-  const formatDateTime = (dateStr: string) => {
-    if (!dateStr) return "—";
-    return new Date(dateStr).toLocaleString([], { dateStyle: "medium", timeStyle: "short" });
-  };
-
   const selectedScheduleData = schedules.find((s) => s.id === selectedSchedule);
-  const isScheduleCompleted =
-    selectedScheduleData?.status === "COMPLETED" || selectedScheduleData?.status === "EXPIRED";
+  const isScheduleCompleted = selectedScheduleData?.status === "COMPLETED";
 
   const candidatesMatchingSearch = useMemo(
     () => candidates.filter((c) =>
@@ -348,8 +343,8 @@ export default function InviteCandidates() {
                 (selectedScheduleData.status === "LIVE"
                   ? "bg-emerald-500/10 text-emerald-600 border border-emerald-500/30"
                   : selectedScheduleData.status === "SCHEDULED"
-                    ? "bg-blue-500/10 text-blue-600 border border-blue-500/30"
-                    : "bg-muted text-muted-foreground border border-border")
+                    ? "bg-amber-500/10 text-amber-600 border border-amber-500/30"
+                    : "bg-slate-500/10 text-slate-600 border border-slate-500/30")
               }>
                 {selectedScheduleData.status === "LIVE" && (
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block mr-1.5 animate-pulse" />

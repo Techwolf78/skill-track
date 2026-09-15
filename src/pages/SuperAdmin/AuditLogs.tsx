@@ -38,6 +38,7 @@ import {
   Server,
   Database,
 } from "lucide-react";
+import { formatDateTime } from "@/lib/date-utils";
 import { useToast } from "@/hooks/use-toast";
 import { auditLogService, AuditLog } from "@/lib/audit-log-service";
 import { stripHtml } from "@/lib/utils";
@@ -379,25 +380,6 @@ export default function AuditLogs() {
         {action}
       </Badge>
     );
-  };
-
-  // Helper to format Date in Local Timezone (IST +5:30)
-  const formatDateTime = (dateStr: string) => {
-    if (!dateStr) return "N/A";
-    let date = new Date(dateStr);
-    // If backend returns ISO string without timezone info (e.g. "2026-08-07T12:03:02"), treat as UTC
-    if (typeof dateStr === "string" && !dateStr.endsWith("Z") && !dateStr.includes("+") && dateStr.includes("T")) {
-      date = new Date(`${dateStr}Z`);
-    }
-    return date.toLocaleString(undefined, {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-      second: "2-digit",
-      hour12: true,
-    });
   };
 
   // Export to Excel function
