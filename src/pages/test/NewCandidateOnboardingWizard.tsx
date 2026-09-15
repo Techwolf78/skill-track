@@ -1537,19 +1537,33 @@ export default function NewCandidateOnboardingWizard({
                     </ul>
                   </div>
 
-                  <div className="flex items-start gap-3 p-4 bg-indigo-50/50 border border-indigo-100 rounded-xs">
+                  <div
+                    onClick={() => setIsDeclarationAgreed(!isDeclarationAgreed)}
+                    className={`flex items-start gap-3 p-4 border rounded-sm transition-all cursor-pointer select-none ${
+                      isDeclarationAgreed
+                        ? "bg-indigo-50/70 border-indigo-200 ring-1 ring-indigo-200/50"
+                        : "bg-slate-50 border-slate-200 hover:border-indigo-300 hover:bg-indigo-50/30"
+                    }`}
+                  >
                     <Checkbox
                       id="declaration"
                       checked={isDeclarationAgreed}
                       onCheckedChange={(checked) => setIsDeclarationAgreed(Boolean(checked))}
                       className="mt-0.5"
                     />
-                    <label
-                      htmlFor="declaration"
-                      className="text-xs text-slate-700 font-medium cursor-pointer select-none leading-relaxed"
-                    >
-                      I confirm that I am the registered candidate, have reviewed the rules, and agree to abide by the assessment integrity guidelines.
-                    </label>
+                    <div className="space-y-0.5">
+                      <label
+                        htmlFor="declaration"
+                        className="text-xs text-slate-800 font-medium cursor-pointer select-none leading-relaxed block"
+                      >
+                        I confirm that I am the registered candidate, have reviewed the rules, and agree to abide by the assessment integrity guidelines.
+                      </label>
+                      {!isDeclarationAgreed && (
+                        <p className="text-[11px] text-amber-600 font-medium flex items-center gap-1">
+                          Please check this box to confirm and enable the start button.
+                        </p>
+                      )}
+                    </div>
                   </div>
                 </div>
               )}
@@ -1580,6 +1594,16 @@ export default function NewCandidateOnboardingWizard({
                   if (!isDeclarationAgreed) isStepValid = false;
                 }
 
+                const getButtonLabel = () => {
+                  if (isLastStep) {
+                    if (activeStep === "declaration" && !isDeclarationAgreed) {
+                      return "Agree & Start Test";
+                    }
+                    return "START TEST";
+                  }
+                  return "NEXT";
+                };
+
                 return (
                   <Button
                     onClick={handleNext}
@@ -1587,7 +1611,7 @@ export default function NewCandidateOnboardingWizard({
                     className="bg-[#5b6bbd] hover:bg-[#4a589e] disabled:opacity-50 disabled:cursor-not-allowed text-white px-8 py-2 text-xs font-bold uppercase tracking-wider rounded-xs shadow-xs transition-all cursor-pointer flex items-center gap-1.5"
                   >
                     {isLaunching && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-                    <span>{isLastStep ? "Start Test" : "NEXT"}</span>
+                    <span>{getButtonLabel()}</span>
                   </Button>
                 );
               })()}
