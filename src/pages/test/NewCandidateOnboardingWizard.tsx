@@ -1,4 +1,10 @@
-import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import React, {
+  useState,
+  useEffect,
+  useRef,
+  useCallback,
+  useMemo,
+} from "react";
 import * as tf from "@tensorflow/tfjs-core";
 import "@tensorflow/tfjs-backend-webgl";
 import "@tensorflow/tfjs-backend-cpu";
@@ -35,7 +41,11 @@ import { proctoringService } from "@/lib/proctoring-service";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 
-type OnboardingStep = "proctoring" | "system_checks" | "candidate_details" | "declaration";
+type OnboardingStep =
+  | "proctoring"
+  | "system_checks"
+  | "candidate_details"
+  | "declaration";
 
 interface CandidateOnboardingModalProps {
   isOpen?: boolean;
@@ -95,10 +105,12 @@ export default function NewCandidateOnboardingWizard({
   }, [isProctoringActive, isWebcamRequired]);
 
   const [activeStep, setActiveStep] = useState<OnboardingStep>(() =>
-    isProctoringActive ? "proctoring" : "system_checks"
+    isProctoringActive ? "proctoring" : "system_checks",
   );
   const [maxReachedIndex, setMaxReachedIndex] = useState(0);
-  const [completedSteps, setCompletedSteps] = useState<Set<OnboardingStep>>(new Set());
+  const [completedSteps, setCompletedSteps] = useState<Set<OnboardingStep>>(
+    new Set(),
+  );
   const [isDeclarationAgreed, setIsDeclarationAgreed] = useState(false);
 
   // Candidate Details Form State
@@ -106,11 +118,20 @@ export default function NewCandidateOnboardingWizard({
   const [candidateEmail, setCandidateEmail] = useState(user?.email || "");
 
   // Model & Real-time AI Face Detection State
-  const [blazeModel, setBlazeModel] = useState<blazeface.BlazeFaceModel | null>(null);
+  const [blazeModel, setBlazeModel] = useState<blazeface.BlazeFaceModel | null>(
+    null,
+  );
   const [isModelLoading, setIsModelLoading] = useState(false);
   const [faceCheck, setFaceCheck] = useState<{
     isValid: boolean;
-    status: "no_face" | "multiple_faces" | "face_turned" | "too_far" | "dark" | "low_confidence" | "ready";
+    status:
+      | "no_face"
+      | "multiple_faces"
+      | "face_turned"
+      | "too_far"
+      | "dark"
+      | "low_confidence"
+      | "ready";
     message: string;
   }>({
     isValid: false,
@@ -119,7 +140,9 @@ export default function NewCandidateOnboardingWizard({
   });
 
   // Snapshot Capture & S3 Direct Upload State
-  const [activeSessionId, setActiveSessionId] = useState<string | null>(sessionId || null);
+  const [activeSessionId, setActiveSessionId] = useState<string | null>(
+    sessionId || null,
+  );
   const capturedBlobRef = useRef<Blob | null>(null);
   const isEvidenceConfirmedRef = useRef<boolean>(false);
   const [snapshotImage, setSnapshotImage] = useState<string | null>(null);
@@ -129,10 +152,17 @@ export default function NewCandidateOnboardingWizard({
   const [captureError, setCaptureError] = useState<string | null>(null);
 
   // System Check Statuses
-  const [webcamStatus, setWebcamStatus] = useState<"idle" | "testing" | "success" | "error">("idle");
-  const [micStatus, setMicStatus] = useState<"idle" | "testing" | "success" | "error">("idle");
+  const [webcamStatus, setWebcamStatus] = useState<
+    "idle" | "testing" | "success" | "error"
+  >("idle");
+  const [micStatus, setMicStatus] = useState<
+    "idle" | "testing" | "success" | "error"
+  >("idle");
   const [micLevel, setMicLevel] = useState(0);
-  const [screenStatus, setScreenStatus] = useState<"idle" | "testing" | "success" | "error">("idle");
+  const [screenStatus, setScreenStatus] = useState<
+    "idle" | "testing" | "success" | "error"
+  >("idle");
+  const [screenErrorMsg, setScreenErrorMsg] = useState<string | null>(null);
 
   // Media Refs
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -148,7 +178,7 @@ export default function NewCandidateOnboardingWizard({
   }, [steps, activeStep]);
 
   // Stop camera, audio, and detection loops
-  const stopAllMedia = () => {
+  const stopAllMedia = useCallback(() => {
     if (detectionLoopRef.current) {
       cancelAnimationFrame(detectionLoopRef.current);
       detectionLoopRef.current = null;
@@ -165,13 +195,13 @@ export default function NewCandidateOnboardingWizard({
       audioContextRef.current.close().catch(() => {});
       audioContextRef.current = null;
     }
-  };
+  }, []);
 
   useEffect(() => {
     return () => {
       stopAllMedia();
     };
-  }, []);
+  }, [stopAllMedia]);
 
   // Initialize BlazeFace Model
   useEffect(() => {
@@ -206,20 +236,15 @@ export default function NewCandidateOnboardingWizard({
     };
   }, [activeStep, blazeModel]);
 
-  // Start/Stop camera for Candidate Details step
-  useEffect(() => {
-    if (activeStep === "candidate_details" && !snapshotImage) {
-      startCameraViewfinder();
-    } else if (activeStep !== "candidate_details") {
-      stopAllMedia();
-    }
-  }, [activeStep, snapshotImage]);
-
-  const startCameraViewfinder = async () => {
+  const startCameraViewfinder = useCallback(async () => {
     try {
       stopAllMedia();
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: "user" },
+        video: {
+          width: { ideal: 640 },
+          height: { ideal: 480 },
+          facingMode: "user",
+        },
       });
       streamRef.current = stream;
       if (videoRef.current) {
@@ -235,28 +260,48 @@ export default function NewCandidateOnboardingWizard({
         message: "Camera access blocked. Please allow permissions.",
       });
     }
-  };
+  }, [stopAllMedia]);
+
+  // Start/Stop camera for Candidate Details step
+  useEffect(() => {
+    if (activeStep === "candidate_details" && !snapshotImage) {
+      startCameraViewfinder();
+    } else if (activeStep !== "candidate_details") {
+      stopAllMedia();
+    }
+  }, [activeStep, snapshotImage, startCameraViewfinder, stopAllMedia]);
 
   // Strict Face Alignment & Quality Verification Algorithm
   const evaluateFaceGeometry = useCallback(
-    (prediction: blazeface.NormalizedFace, sourceEl: HTMLVideoElement | HTMLCanvasElement) => {
+    (
+      prediction: blazeface.NormalizedFace,
+      sourceEl: HTMLVideoElement | HTMLCanvasElement,
+    ) => {
       const rawProb = prediction.probability;
       const prob =
         typeof rawProb === "number"
           ? rawProb
           : Array.isArray(rawProb)
-          ? rawProb[0]
-          : 1.0;
+            ? rawProb[0]
+            : 1.0;
 
       // 1. High Confidence check (≥ 0.85 for clean un-obscured face recognition)
       if (prob < 0.85) {
-        return { isValid: false, status: "low_confidence" as const, message: "Position face inside oval" };
+        return {
+          isValid: false,
+          status: "low_confidence" as const,
+          message: "Position face inside oval",
+        };
       }
 
       // 2. Main facial landmarks must be clearly detected (eyes, nose, mouth)
       const landmarks = prediction.landmarks as Array<[number, number]>;
       if (!landmarks || landmarks.length < 4) {
-        return { isValid: false, status: "no_face" as const, message: "Position face inside oval" };
+        return {
+          isValid: false,
+          status: "no_face" as const,
+          message: "Position face inside oval",
+        };
       }
 
       const rightEye = landmarks[0];
@@ -265,9 +310,16 @@ export default function NewCandidateOnboardingWizard({
       const mouth = landmarks[3];
 
       // 3. Eye distance / Proximity Check
-      const eyeDist = Math.hypot(leftEye[0] - rightEye[0], leftEye[1] - rightEye[1]);
+      const eyeDist = Math.hypot(
+        leftEye[0] - rightEye[0],
+        leftEye[1] - rightEye[1],
+      );
       if (eyeDist < 25) {
-        return { isValid: false, status: "too_far" as const, message: "Move closer to the camera" };
+        return {
+          isValid: false,
+          status: "too_far" as const,
+          message: "Move closer to the camera",
+        };
       }
 
       // 4. Bounding Box & Face Size Check
@@ -277,13 +329,21 @@ export default function NewCandidateOnboardingWizard({
       const boxHeight = Math.abs(bottomRight[1] - topLeft[1]);
 
       if (boxWidth < 70 || boxHeight < 70) {
-        return { isValid: false, status: "too_far" as const, message: "Position face inside oval" };
+        return {
+          isValid: false,
+          status: "too_far" as const,
+          message: "Position face inside oval",
+        };
       }
 
       // Aspect ratio of normal frontal face bounding box
       const boxRatio = boxWidth / (boxHeight || 1);
-      if (boxRatio < 0.50 || boxRatio > 1.45) {
-        return { isValid: false, status: "face_turned" as const, message: "Position face inside oval" };
+      if (boxRatio < 0.5 || boxRatio > 1.45) {
+        return {
+          isValid: false,
+          status: "face_turned" as const,
+          message: "Position face inside oval",
+        };
       }
 
       // 5. Face Centering / Look-Straight Corridor Check
@@ -292,7 +352,11 @@ export default function NewCandidateOnboardingWizard({
       const mouthOffset = Math.abs(mouth[0] - eyeMidX);
 
       if (noseOffset > eyeDist * 0.35 || mouthOffset > eyeDist * 0.45) {
-        return { isValid: false, status: "face_turned" as const, message: "Position face inside oval" };
+        return {
+          isValid: false,
+          status: "face_turned" as const,
+          message: "Position face inside oval",
+        };
       }
 
       // 6. Vertical Symmetry Proportions (Detect chin/forehead occlusion)
@@ -301,7 +365,11 @@ export default function NewCandidateOnboardingWizard({
       const noseToMouthY = mouth[1] - nose[1];
 
       if (eyeToNoseY < eyeDist * 0.12 || noseToMouthY < eyeDist * 0.12) {
-        return { isValid: false, status: "face_turned" as const, message: "Position face inside oval" };
+        return {
+          isValid: false,
+          status: "face_turned" as const,
+          message: "Position face inside oval",
+        };
       }
 
       // 7. Hand / Large Object Occlusion Check (Carefully tuned so beards, glasses, and mustaches pass naturally)
@@ -311,14 +379,22 @@ export default function NewCandidateOnboardingWizard({
         const sH = 120;
         sampleCanvas.width = sW;
         sampleCanvas.height = sH;
-        const sCtx = sampleCanvas.getContext("2d", { willReadFrequently: true });
+        const sCtx = sampleCanvas.getContext("2d", {
+          willReadFrequently: true,
+        });
         if (sCtx) {
           sCtx.drawImage(sourceEl, 0, 0, sW, sH);
           const imgData = sCtx.getImageData(0, 0, sW, sH);
           const data = imgData.data;
 
-          const srcW = (sourceEl as HTMLVideoElement).videoWidth || (sourceEl as HTMLCanvasElement).width || 640;
-          const srcH = (sourceEl as HTMLVideoElement).videoHeight || (sourceEl as HTMLCanvasElement).height || 480;
+          const srcW =
+            (sourceEl as HTMLVideoElement).videoWidth ||
+            (sourceEl as HTMLCanvasElement).width ||
+            640;
+          const srcH =
+            (sourceEl as HTMLVideoElement).videoHeight ||
+            (sourceEl as HTMLCanvasElement).height ||
+            480;
           const scaleX = sW / (srcW || 1);
           const scaleY = sH / (srcH || 1);
 
@@ -332,7 +408,7 @@ export default function NewCandidateOnboardingWizard({
 
           if (fWidth > 15 && fHeight > 15) {
             // Mid-Face & Mouth Corridor (from nose level to upper lip)
-            const midTop = Math.floor(fTop + fHeight * 0.40);
+            const midTop = Math.floor(fTop + fHeight * 0.4);
             const midBottom = Math.floor(fTop + fHeight * 0.85);
             const midLeft = Math.floor(fLeft + fWidth * 0.15);
             const midRight = Math.floor(fRight - fWidth * 0.15);
@@ -345,23 +421,37 @@ export default function NewCandidateOnboardingWizard({
               for (let x = midLeft; x <= midRight; x++) {
                 const idx = (y * sW + x) * 4;
                 midTotalPixels++;
-                const lum = data[idx] * 0.299 + data[idx + 1] * 0.587 + data[idx + 2] * 0.114;
+                const lum =
+                  data[idx] * 0.299 +
+                  data[idx + 1] * 0.587 +
+                  data[idx + 2] * 0.114;
                 totalLuminance += lum;
 
                 // 3x3 Sobel Gradient magnitude (large fingers and hand overlays create strong sharp edges > 130)
                 const getLum = (px: number, py: number) => {
                   const pIdx = (py * sW + px) * 4;
-                  return data[pIdx] * 0.299 + data[pIdx + 1] * 0.587 + data[pIdx + 2] * 0.114;
+                  return (
+                    data[pIdx] * 0.299 +
+                    data[pIdx + 1] * 0.587 +
+                    data[pIdx + 2] * 0.114
+                  );
                 };
 
                 const gx =
-                  -1 * getLum(x - 1, y - 1) + 1 * getLum(x + 1, y - 1) +
-                  -2 * getLum(x - 1, y)     + 2 * getLum(x + 1, y) +
-                  -1 * getLum(x - 1, y + 1) + 1 * getLum(x + 1, y + 1);
+                  -1 * getLum(x - 1, y - 1) +
+                  1 * getLum(x + 1, y - 1) +
+                  -2 * getLum(x - 1, y) +
+                  2 * getLum(x + 1, y) +
+                  -1 * getLum(x - 1, y + 1) +
+                  1 * getLum(x + 1, y + 1);
 
                 const gy =
-                  -1 * getLum(x - 1, y - 1) - 2 * getLum(x, y - 1) - 1 * getLum(x + 1, y - 1) +
-                   1 * getLum(x - 1, y + 1) + 2 * getLum(x, y + 1) + 1 * getLum(x + 1, y + 1);
+                  -1 * getLum(x - 1, y - 1) -
+                  2 * getLum(x, y - 1) -
+                  1 * getLum(x + 1, y - 1) +
+                  1 * getLum(x - 1, y + 1) +
+                  2 * getLum(x, y + 1) +
+                  1 * getLum(x + 1, y + 1);
 
                 const mag = Math.hypot(gx, gy);
                 if (mag > 130) {
@@ -370,11 +460,13 @@ export default function NewCandidateOnboardingWizard({
               }
             }
 
-            const strongEdgeDensity = midTotalPixels > 0 ? strongEdgeCount / midTotalPixels : 0;
-            const avgMidLum = midTotalPixels > 0 ? totalLuminance / midTotalPixels : 0;
+            const strongEdgeDensity =
+              midTotalPixels > 0 ? strongEdgeCount / midTotalPixels : 0;
+            const avgMidLum =
+              midTotalPixels > 0 ? totalLuminance / midTotalPixels : 0;
 
             // Calibrated threshold to allow natural facial hair/glasses while flagging dense blockages
-            if (strongEdgeDensity > 0.50) {
+            if (strongEdgeDensity > 0.5) {
               return {
                 isValid: false,
                 status: "no_face" as const,
@@ -396,14 +488,24 @@ export default function NewCandidateOnboardingWizard({
         // Fallback gracefully
       }
 
-      return { isValid: true, status: "ready" as const, message: "Face aligned! Ready to capture" };
+      return {
+        isValid: true,
+        status: "ready" as const,
+        message: "Face aligned! Ready to capture",
+      };
     },
-    []
+    [],
   );
 
   // Real-time Detection Loop
   useEffect(() => {
-    if (!blazeModel || !videoRef.current || snapshotImage || activeStep !== "candidate_details") return;
+    if (
+      !blazeModel ||
+      !videoRef.current ||
+      snapshotImage ||
+      activeStep !== "candidate_details"
+    )
+      return;
 
     let isRunning = true;
     let lastCheckTime = 0;
@@ -414,7 +516,10 @@ export default function NewCandidateOnboardingWizard({
         lastCheckTime = now;
         if (videoRef.current && videoRef.current.readyState >= 2) {
           try {
-            const predictions = await blazeModel.estimateFaces(videoRef.current, false);
+            const predictions = await blazeModel.estimateFaces(
+              videoRef.current,
+              false,
+            );
             if (!isRunning) return;
 
             if (predictions.length === 0) {
@@ -430,7 +535,10 @@ export default function NewCandidateOnboardingWizard({
                 message: "Multiple people detected",
               });
             } else {
-              const res = evaluateFaceGeometry(predictions[0], videoRef.current);
+              const res = evaluateFaceGeometry(
+                predictions[0],
+                videoRef.current,
+              );
               setFaceCheck(res);
             }
           } catch {
@@ -468,7 +576,9 @@ export default function NewCandidateOnboardingWizard({
       const ctx = canvas.getContext("2d");
       if (!ctx) {
         setIsVerifyingCapture(false);
-        setCaptureError("Face not detected. Please position your face clearly and submit again.");
+        setCaptureError(
+          "Face not detected. Please position your face clearly and submit again.",
+        );
         return;
       }
 
@@ -476,29 +586,41 @@ export default function NewCandidateOnboardingWizard({
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
       // 2. Step 2 Verification: Run AI model strictly on the captured canvas frame
-      console.log("🔍 [Identity Verification] Running Step 2 frozen-frame face detection verification...");
+      console.log(
+        "🔍 [Identity Verification] Running Step 2 frozen-frame face detection verification...",
+      );
       if (blazeModel) {
         const predictions = await blazeModel.estimateFaces(canvas, false);
 
         if (!predictions || predictions.length === 0) {
-          console.warn("❌ [Identity Verification] Step 2 Failed: No face detected in captured frame.");
+          console.warn(
+            "❌ [Identity Verification] Step 2 Failed: No face detected in captured frame.",
+          );
           setIsVerifyingCapture(false);
-          setCaptureError("Face not detected or not visible. Please position your face inside the oval and submit again.");
+          setCaptureError(
+            "Face not detected or not visible. Please position your face inside the oval and submit again.",
+          );
           toast({
             title: "Verification Failed",
-            description: "Face not detected. Please position your face inside the oval and submit again.",
+            description:
+              "Face not detected. Please position your face inside the oval and submit again.",
             variant: "destructive",
           });
           return;
         }
 
         if (predictions.length > 1) {
-          console.warn(`❌ [Identity Verification] Step 2 Failed: Multiple faces (${predictions.length}) detected.`);
+          console.warn(
+            `❌ [Identity Verification] Step 2 Failed: Multiple faces (${predictions.length}) detected.`,
+          );
           setIsVerifyingCapture(false);
-          setCaptureError("Multiple faces detected. Please ensure you are alone in the frame and submit again.");
+          setCaptureError(
+            "Multiple faces detected. Please ensure you are alone in the frame and submit again.",
+          );
           toast({
             title: "Verification Failed",
-            description: "Multiple people detected. Please re-take your photo alone.",
+            description:
+              "Multiple people detected. Please re-take your photo alone.",
             variant: "destructive",
           });
           return;
@@ -507,29 +629,42 @@ export default function NewCandidateOnboardingWizard({
         // Evaluate captured face geometry strictly on the captured canvas frame
         const verifiedEval = evaluateFaceGeometry(predictions[0], canvas);
         if (!verifiedEval.isValid) {
-          console.warn("❌ [Identity Verification] Step 2 Failed: Face geometry/alignment check failed:", verifiedEval);
+          console.warn(
+            "❌ [Identity Verification] Step 2 Failed: Face geometry/alignment check failed:",
+            verifiedEval,
+          );
           setIsVerifyingCapture(false);
-          setCaptureError("Face not clearly visible. Please position your face inside the oval and submit again.");
+          setCaptureError(
+            "Face not clearly visible. Please position your face inside the oval and submit again.",
+          );
           toast({
             title: "Verification Failed",
-            description: "Face not clearly visible. Please align your face inside the oval and submit again.",
+            description:
+              "Face not clearly visible. Please align your face inside the oval and submit again.",
             variant: "destructive",
           });
           return;
         }
 
-        console.log("✅ [Identity Verification] Step 2 Passed: Single centered face confirmed with high confidence.", predictions[0]);
+        console.log(
+          "✅ [Identity Verification] Step 2 Passed: Single centered face confirmed with high confidence.",
+          predictions[0],
+        );
       }
 
       // 3. Convert verified canvas frame to Blob for S3 upload
       const blob = await new Promise<Blob | null>((resolve) =>
-        canvas.toBlob(resolve, "image/jpeg", 0.9)
+        canvas.toBlob(resolve, "image/jpeg", 0.9),
       );
 
       if (!blob) {
-        console.warn("❌ [Identity Verification] Failed to encode canvas to JPEG blob.");
+        console.warn(
+          "❌ [Identity Verification] Failed to encode canvas to JPEG blob.",
+        );
         setIsVerifyingCapture(false);
-        setCaptureError("Face not detected. Please position your face clearly and submit again.");
+        setCaptureError(
+          "Face not detected. Please position your face clearly and submit again.",
+        );
         return;
       }
 
@@ -539,14 +674,22 @@ export default function NewCandidateOnboardingWizard({
       let currentSessionId = activeSessionId || sessionId;
       if (!currentSessionId && invitationId) {
         try {
-          console.log(`🚀 [S3 Storage] Resolving active test session for invitation: ${invitationId}...`);
-          const session = await testService.startTestSession(invitationId, "0.0.0.0");
+          console.log(
+            `🚀 [S3 Storage] Resolving active test session for invitation: ${invitationId}...`,
+          );
+          const session = await testService.startTestSession(
+            invitationId,
+            "0.0.0.0",
+          );
           if (session && session.id) {
             currentSessionId = session.id;
             setActiveSessionId(session.id);
           }
         } catch (sessErr) {
-          console.warn("⚠️ [S3 Storage] Could not initialize test session for pre-upload:", sessErr);
+          console.warn(
+            "⚠️ [S3 Storage] Could not initialize test session for pre-upload:",
+            sessErr,
+          );
         }
       }
 
@@ -554,37 +697,62 @@ export default function NewCandidateOnboardingWizard({
         setIsUploading(true);
         try {
           const capturedAt = Date.now();
-          console.log(`🚀 [S3 Storage] Requesting presigned URL for CANDIDATE_PHOTO on session: ${currentSessionId}...`);
+          console.log(
+            `🚀 [S3 Storage] Requesting presigned URL for CANDIDATE_PHOTO on session: ${currentSessionId}...`,
+          );
           const { storagePath } = await proctoringService.presignEvidence(
             currentSessionId,
-            "CANDIDATE_PHOTO"
+            "CANDIDATE_PHOTO",
           );
           console.log(`📂 [S3 Storage] Target S3 Storage Key:\n${storagePath}`);
 
           // Upload image bytes via proxy endpoint (with fallback tolerance)
           try {
-            console.log(`📤 [S3 Storage] Uploading ${blob.size} bytes JPEG via backend proxy...`);
-            await proctoringService.proxyUpload(currentSessionId, storagePath, blob);
-            console.log(`✅ [S3 Storage] Proxy upload succeeded! Image stored at: ${storagePath}`);
+            console.log(
+              `📤 [S3 Storage] Uploading ${blob.size} bytes JPEG via backend proxy...`,
+            );
+            await proctoringService.proxyUpload(
+              currentSessionId,
+              storagePath,
+              blob,
+            );
+            console.log(
+              `✅ [S3 Storage] Proxy upload succeeded! Image stored at: ${storagePath}`,
+            );
           } catch (proxyErr) {
-            console.warn("⚠️ [S3 Storage] Proxy upload notice (proceeding with evidence confirmation):", proxyErr);
+            console.warn(
+              "⚠️ [S3 Storage] Proxy upload notice (proceeding with evidence confirmation):",
+              proxyErr,
+            );
           }
 
-          console.log(`📝 [S3 Storage] Confirming candidate photo evidence in database...`);
+          console.log(
+            `📝 [S3 Storage] Confirming candidate photo evidence in database...`,
+          );
           await proctoringService.confirmEvidence(
             currentSessionId,
             storagePath,
             "CANDIDATE_PHOTO",
             capturedAt,
-            blob.size
+            blob.size,
           );
           isEvidenceConfirmedRef.current = true;
-          console.log(`✅ [S3 Storage] Candidate reference photo confirmed in database.`);
-        } catch (err: any) {
+          console.log(
+            `✅ [S3 Storage] Candidate reference photo confirmed in database.`,
+          );
+        } catch (err: unknown) {
           console.error("Candidate photo confirmation error:", err);
           setIsUploading(false);
           setIsVerifyingCapture(false);
-          const errorMsg = err?.response?.data?.message || err?.message || "Failed to confirm identity photo with the server. Please try again.";
+          const errorMsg =
+            (
+              err as {
+                response?: { data?: { message?: string } };
+                message?: string;
+              }
+            )?.response?.data?.message ||
+            (err as Error)?.message ||
+            "Failed to confirm identity photo with the server. Please try again.";
           setCaptureError(errorMsg);
           toast({
             title: "Photo Upload Error",
@@ -609,12 +777,17 @@ export default function NewCandidateOnboardingWizard({
 
       toast({
         title: "Photo Verified & Submitted",
-        description: "Candidate identity photo verified and uploaded successfully.",
+        description:
+          "Candidate identity photo verified and uploaded successfully.",
       });
-    } catch (e: any) {
+    } catch (e: unknown) {
       console.error("Snapshot verification & submission error:", e);
       setIsVerifyingCapture(false);
-      const errText = e?.response?.data?.message || e?.message || "Face not detected. Please position your face inside the oval and submit again.";
+      const errText =
+        (e as { response?: { data?: { message?: string } }; message?: string })
+          ?.response?.data?.message ||
+        (e as Error)?.message ||
+        "Face not detected. Please position your face inside the oval and submit again.";
       setCaptureError(errText);
       toast({
         title: "Verification Error",
@@ -645,7 +818,8 @@ export default function NewCandidateOnboardingWizard({
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const AudioCtx =
         window.AudioContext ||
-        (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+        (window as unknown as { webkitAudioContext: typeof AudioContext })
+          .webkitAudioContext;
       const ctx = new AudioCtx();
       const source = ctx.createMediaStreamSource(stream);
       const analyser = ctx.createAnalyser();
@@ -679,12 +853,91 @@ export default function NewCandidateOnboardingWizard({
 
   const handleTestScreen = async () => {
     setScreenStatus("testing");
+    setScreenErrorMsg(null);
     try {
-      const stream = await navigator.mediaDevices.getDisplayMedia({ video: true });
-      setScreenStatus("success");
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
+        setScreenStatus("error");
+        setScreenErrorMsg("Browser does not support screen sharing.");
+        return;
+      }
+
+      // 1. Pre-check for multiple physical / extended monitors
+      const isExtended =
+        "isExtended" in window.screen
+          ? (window.screen as unknown as { isExtended?: boolean }).isExtended
+          : false;
+      if (isExtended) {
+        setScreenStatus("error");
+        setScreenErrorMsg(
+          "Multiple monitors detected. Disconnect secondary displays.",
+        );
+        return;
+      }
+
+      // 2. Request Entire Screen with Chromium hints
+      const stream = await navigator.mediaDevices.getDisplayMedia({
+        video: {
+          displaySurface: "monitor",
+        },
+        audio: false,
+        preferCurrentTab: false,
+        selfBrowserSurface: "exclude",
+        surfaceSwitching: "exclude",
+        systemAudio: "exclude",
+      } as MediaStreamConstraints);
+
+      const track = stream.getVideoTracks()[0];
+      const settings = track
+        ? (track.getSettings() as MediaTrackSettings & {
+            displaySurface?: string;
+          })
+        : {};
+      const displaySurface = settings.displaySurface;
+
+      // Always stop test stream tracks immediately
       stream.getTracks().forEach((t) => t.stop());
-    } catch {
+
+      // 3. Strict display surface validation
+      if (displaySurface && displaySurface !== "monitor") {
+        setScreenStatus("error");
+        setScreenErrorMsg(
+          "Entire screen required (tab or window sharing is blocked).",
+        );
+        return;
+      }
+
+      // 4. Post-capture multi-screen check
+      const isExtendedPost =
+        "isExtended" in window.screen
+          ? (window.screen as unknown as { isExtended?: boolean }).isExtended
+          : false;
+      if (isExtendedPost) {
+        setScreenStatus("error");
+        setScreenErrorMsg(
+          "Multiple monitors detected. Disconnect secondary displays.",
+        );
+        return;
+      }
+
+      setScreenStatus("success");
+      setScreenErrorMsg(null);
+    } catch (err: unknown) {
+      console.warn("Screen share test failed or rejected:", err);
       setScreenStatus("error");
+      const errName =
+        typeof err === "object" && err !== null && "name" in err
+          ? String((err as { name: string }).name)
+          : "";
+      if (
+        errName === "NotAllowedError" ||
+        errName === "PermissionDeniedError"
+      ) {
+        setScreenErrorMsg(
+          "Screen sharing permission denied. Please allow entire screen.",
+        );
+      } else {
+        setScreenErrorMsg("Screen sharing failed. Please try again.");
+      }
     }
   };
 
@@ -728,7 +981,10 @@ export default function NewCandidateOnboardingWizard({
 
         // 2. Start Backend Test Session
         const targetInvitationId = invitationId || "";
-        const session = await testService.startTestSession(targetInvitationId, "0.0.0.0");
+        const session = await testService.startTestSession(
+          targetInvitationId,
+          "0.0.0.0",
+        );
         const sessStatus = String(session.status);
 
         // If session was already completed/submitted, navigate to results
@@ -741,26 +997,52 @@ export default function NewCandidateOnboardingWizard({
           if (document.fullscreenElement) {
             await document.exitFullscreen().catch(() => {});
           }
-          navigate(`/test/${session.testId || testId}/results?session=${session.id}&submitted=true`);
+          navigate(
+            `/test/${session.testId || testId}/results?session=${session.id}&submitted=true`,
+          );
           return;
         }
 
         // 3. Confirm Candidate Reference Photo if webcam was required
-        if (isWebcamRequired && capturedBlobRef.current && (!isEvidenceConfirmedRef.current || session.id !== activeSessionId)) {
+        if (
+          isWebcamRequired &&
+          capturedBlobRef.current &&
+          (!isEvidenceConfirmedRef.current || session.id !== activeSessionId)
+        ) {
           try {
-            console.log(`📝 [Launch Guard] Finalizing candidate photo confirmation for session: ${session.id}...`);
+            console.log(
+              `📝 [Launch Guard] Finalizing candidate photo confirmation for session: ${session.id}...`,
+            );
             const capturedAt = Date.now();
-            const { storagePath } = await proctoringService.presignEvidence(session.id, "CANDIDATE_PHOTO");
+            const { storagePath } = await proctoringService.presignEvidence(
+              session.id,
+              "CANDIDATE_PHOTO",
+            );
             try {
-              await proctoringService.proxyUpload(session.id, storagePath, capturedBlobRef.current);
+              await proctoringService.proxyUpload(
+                session.id,
+                storagePath,
+                capturedBlobRef.current,
+              );
             } catch (pErr) {
               console.warn("⚠️ Proxy upload notice during launch:", pErr);
             }
-            await proctoringService.confirmEvidence(session.id, storagePath, "CANDIDATE_PHOTO", capturedAt, capturedBlobRef.current.size);
+            await proctoringService.confirmEvidence(
+              session.id,
+              storagePath,
+              "CANDIDATE_PHOTO",
+              capturedAt,
+              capturedBlobRef.current.size,
+            );
             isEvidenceConfirmedRef.current = true;
-            console.log(`✅ [Launch Guard] Candidate photo confirmed on session: ${session.id}`);
+            console.log(
+              `✅ [Launch Guard] Candidate photo confirmed on session: ${session.id}`,
+            );
           } catch (confErr) {
-            console.error("❌ Failed to confirm photo evidence before launching session:", confErr);
+            console.error(
+              "❌ Failed to confirm photo evidence before launching session:",
+              confErr,
+            );
           }
         }
 
@@ -771,15 +1053,25 @@ export default function NewCandidateOnboardingWizard({
         }
 
         // 5. Navigate to core assessment interface
-        navigate(`/test/${session.testId || testId || "assessment"}/session/${session.id}`);
-      } catch (err: any) {
+        navigate(
+          `/test/${session.testId || testId || "assessment"}/session/${session.id}`,
+        );
+      } catch (err: unknown) {
         if (document.fullscreenElement) {
           await document.exitFullscreen().catch(() => {});
         }
         console.error("Failed to launch test session:", err);
         toast({
           title: "Error Launching Assessment",
-          description: err?.response?.data?.message || err?.message || "Failed to start test session",
+          description:
+            (
+              err as {
+                response?: { data?: { message?: string } };
+                message?: string;
+              }
+            )?.response?.data?.message ||
+            (err as Error)?.message ||
+            "Failed to start test session",
           variant: "destructive",
         });
         setIsLaunching(false);
@@ -791,20 +1083,20 @@ export default function NewCandidateOnboardingWizard({
   const detectedOS = navigator.userAgent.includes("Windows")
     ? "Windows"
     : navigator.userAgent.includes("Mac")
-    ? "macOS"
-    : navigator.userAgent.includes("Linux")
-    ? "Linux"
-    : "Desktop OS";
+      ? "macOS"
+      : navigator.userAgent.includes("Linux")
+        ? "Linux"
+        : "Desktop OS";
 
   const detectedBrowser = navigator.userAgent.includes("Edg")
     ? "Microsoft Edge"
     : navigator.userAgent.includes("Chrome")
-    ? "Google Chrome"
-    : navigator.userAgent.includes("Firefox")
-    ? "Mozilla Firefox"
-    : navigator.userAgent.includes("Safari")
-    ? "Apple Safari"
-    : "Modern Browser";
+      ? "Google Chrome"
+      : navigator.userAgent.includes("Firefox")
+        ? "Mozilla Firefox"
+        : navigator.userAgent.includes("Safari")
+          ? "Apple Safari"
+          : "Modern Browser";
 
   if (!isOpen) return null;
 
@@ -872,8 +1164,8 @@ export default function NewCandidateOnboardingWizard({
                       isActive
                         ? "bg-[#5b6bbd] text-white shadow-xs font-bold cursor-default"
                         : isNavigable
-                        ? "text-slate-600 hover:bg-slate-50 hover:text-slate-900 cursor-pointer"
-                        : "text-slate-300 bg-slate-50/50 cursor-not-allowed"
+                          ? "text-slate-600 hover:bg-slate-50 hover:text-slate-900 cursor-pointer"
+                          : "text-slate-300 bg-slate-50/50 cursor-not-allowed"
                     }`}
                   >
                     <span>{step.label}</span>
@@ -907,7 +1199,9 @@ export default function NewCandidateOnboardingWizard({
                         <Camera className="w-3.5 h-3.5" />
                       </div>
                       <p>
-                        This assessment is going to be monitored via Webcam. Please make sure that your Webcam is functional throughout the assessment.
+                        This assessment is going to be monitored via Webcam.
+                        Please make sure that your Webcam is functional
+                        throughout the assessment.
                       </p>
                     </div>
                   )}
@@ -920,26 +1214,36 @@ export default function NewCandidateOnboardingWizard({
                         <div className="w-5 h-5 rounded-full bg-emerald-500 text-white flex items-center justify-center text-[10px] font-bold">
                           i
                         </div>
-                        <span>Points to keep in mind during this assessment:</span>
+                        <span>
+                          Points to keep in mind during this assessment:
+                        </span>
                       </div>
 
                       <ul className="space-y-3.5 pl-6 text-xs md:text-sm text-slate-700 font-medium">
                         {(test?.warnOnFullscreenExit ?? true) && (
                           <li className="flex items-start gap-2.5">
                             <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 mt-2 shrink-0"></div>
-                            <span>Stay on Fullscreen until the end of assessment.</span>
+                            <span>
+                              Stay on Fullscreen until the end of assessment.
+                            </span>
                           </li>
                         )}
                         {(test?.enableTabSwitchTracking ?? true) && (
                           <li className="flex items-start gap-2.5">
                             <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 mt-2 shrink-0"></div>
-                            <span>Do not move out of the Tab or switch Windows (monitored).</span>
+                            <span>
+                              Do not move out of the Tab or switch Windows
+                              (monitored).
+                            </span>
                           </li>
                         )}
                         {(test?.blockCopyPaste ?? true) && (
                           <li className="flex items-start gap-2.5">
                             <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 mt-2 shrink-0"></div>
-                            <span>Copying and pasting text is disabled during this test.</span>
+                            <span>
+                              Copying and pasting text is disabled during this
+                              test.
+                            </span>
                           </li>
                         )}
                         {(test?.blockRightClick ?? true) && (
@@ -951,18 +1255,25 @@ export default function NewCandidateOnboardingWizard({
                         {test?.requireMicrophone && (
                           <li className="flex items-start gap-2.5">
                             <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 mt-2 shrink-0"></div>
-                            <span>Microphone will monitor ambient room audio.</span>
+                            <span>
+                              Microphone will monitor ambient room audio.
+                            </span>
                           </li>
                         )}
                         {test?.requireScreenShare && (
                           <li className="flex items-start gap-2.5">
                             <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 mt-2 shrink-0"></div>
-                            <span>Entire screen sharing is required during the exam.</span>
+                            <span>
+                              Entire screen sharing is required during the exam.
+                            </span>
                           </li>
                         )}
                         <li className="flex items-start gap-2.5">
                           <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 mt-2 shrink-0"></div>
-                          <span>Disable system Notifications to prevent accidental popups.</span>
+                          <span>
+                            Disable system Notifications to prevent accidental
+                            popups.
+                          </span>
                         </li>
                       </ul>
                     </div>
@@ -986,8 +1297,13 @@ export default function NewCandidateOnboardingWizard({
                 <div className="space-y-6">
                   {/* Top Notice Banner */}
                   <div className="bg-[#4353a4] text-white px-5 py-2.5 rounded-none text-xs font-semibold shadow-xs flex items-center justify-between">
-                    <span>Perform diagnostics below to ensure your system meets requirements</span>
-                    <span className="text-[11px] text-indigo-100 font-normal">All checks are verified client-side</span>
+                    <span>
+                      Perform diagnostics below to ensure your system meets
+                      requirements
+                    </span>
+                    <span className="text-[11px] text-indigo-100 font-normal">
+                      All checks are verified client-side
+                    </span>
                   </div>
 
                   {/* Diagnostic Cards Grid */}
@@ -1001,7 +1317,9 @@ export default function NewCandidateOnboardingWizard({
                           </div>
                           <div>
                             <div className="flex items-center gap-1.5">
-                              <span className="text-xs font-bold text-slate-800">System Time</span>
+                              <span className="text-xs font-bold text-slate-800">
+                                System Time
+                              </span>
                               <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 fill-emerald-50" />
                             </div>
                             <p className="text-[11px] text-slate-500 font-medium mt-0.5">
@@ -1031,7 +1349,9 @@ export default function NewCandidateOnboardingWizard({
                           </div>
                           <div>
                             <div className="flex items-center gap-1.5">
-                              <span className="text-xs font-bold text-slate-800">Internet Connection</span>
+                              <span className="text-xs font-bold text-slate-800">
+                                Internet Connection
+                              </span>
                               <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 fill-emerald-50" />
                             </div>
                             <p className="text-[11px] text-slate-500 font-medium mt-0.5">
@@ -1055,7 +1375,9 @@ export default function NewCandidateOnboardingWizard({
                           </div>
                           <div>
                             <div className="flex items-center gap-1.5">
-                              <span className="text-xs font-bold text-slate-800">Operating System</span>
+                              <span className="text-xs font-bold text-slate-800">
+                                Operating System
+                              </span>
                               <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 fill-emerald-50" />
                             </div>
                             <p className="text-[11px] text-slate-500 font-medium mt-0.5">
@@ -1079,7 +1401,9 @@ export default function NewCandidateOnboardingWizard({
                           </div>
                           <div>
                             <div className="flex items-center gap-1.5">
-                              <span className="text-xs font-bold text-slate-800">Browser</span>
+                              <span className="text-xs font-bold text-slate-800">
+                                Browser
+                              </span>
                               <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 fill-emerald-50" />
                             </div>
                             <p className="text-[11px] text-slate-500 font-medium mt-0.5">
@@ -1104,7 +1428,9 @@ export default function NewCandidateOnboardingWizard({
                             </div>
                             <div>
                               <div className="flex items-center gap-1.5">
-                                <span className="text-xs font-bold text-slate-800">Webcam</span>
+                                <span className="text-xs font-bold text-slate-800">
+                                  Webcam
+                                </span>
                                 {webcamStatus === "success" ? (
                                   <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 fill-emerald-50" />
                                 ) : (
@@ -1115,10 +1441,10 @@ export default function NewCandidateOnboardingWizard({
                                 {webcamStatus === "success"
                                   ? "Verified"
                                   : webcamStatus === "error"
-                                  ? "Permission Denied"
-                                  : webcamStatus === "testing"
-                                  ? "Testing..."
-                                  : "Permission Required"}
+                                    ? "Permission Denied"
+                                    : webcamStatus === "testing"
+                                      ? "Testing..."
+                                      : "Permission Required"}
                               </p>
                             </div>
                           </div>
@@ -1154,7 +1480,9 @@ export default function NewCandidateOnboardingWizard({
                             </div>
                             <div>
                               <div className="flex items-center gap-1.5">
-                                <span className="text-xs font-bold text-slate-800">Microphone</span>
+                                <span className="text-xs font-bold text-slate-800">
+                                  Microphone
+                                </span>
                                 {micStatus === "success" ? (
                                   <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 fill-emerald-50" />
                                 ) : (
@@ -1165,10 +1493,10 @@ export default function NewCandidateOnboardingWizard({
                                 {micStatus === "success"
                                   ? `Verified (${micLevel}%)`
                                   : micStatus === "error"
-                                  ? "Permission Denied"
-                                  : micStatus === "testing"
-                                  ? "Testing..."
-                                  : "Permission Required"}
+                                    ? "Permission Denied"
+                                    : micStatus === "testing"
+                                      ? "Testing..."
+                                      : "Permission Required"}
                               </p>
                             </div>
                           </div>
@@ -1204,21 +1532,25 @@ export default function NewCandidateOnboardingWizard({
                             </div>
                             <div>
                               <div className="flex items-center gap-1.5">
-                                <span className="text-xs font-bold text-slate-800">Screen Share</span>
+                                <span className="text-xs font-bold text-slate-800">
+                                  Screen Share
+                                </span>
                                 {screenStatus === "success" ? (
                                   <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 fill-emerald-50" />
                                 ) : (
                                   <AlertCircle className="w-3.5 h-3.5 text-rose-500 fill-rose-50" />
                                 )}
                               </div>
-                              <p className="text-[11px] text-slate-500 font-medium mt-0.5">
+                              <p
+                                className={`text-[11px] font-medium mt-0.5 ${screenStatus === "error" ? "text-rose-600 font-semibold" : "text-slate-500"}`}
+                              >
                                 {screenStatus === "success"
-                                  ? "Verified"
+                                  ? "Verified (Entire Screen)"
                                   : screenStatus === "error"
-                                  ? "Permission Denied"
-                                  : screenStatus === "testing"
-                                  ? "Testing..."
-                                  : "Permission Required"}
+                                    ? screenErrorMsg || "Entire Screen Required"
+                                    : screenStatus === "testing"
+                                      ? "Verifying Screen..."
+                                      : "Entire Screen Required"}
                               </p>
                             </div>
                           </div>
@@ -1233,13 +1565,20 @@ export default function NewCandidateOnboardingWizard({
                               disabled={screenStatus === "testing"}
                               className="px-4 py-1.5 bg-[#4353a4] hover:bg-[#324080] text-white text-[11px] font-bold tracking-wider uppercase rounded-xs transition-colors cursor-pointer shadow-xs disabled:opacity-50"
                             >
-                              {screenStatus === "testing" ? "..." : "TEST"}
+                              {screenStatus === "testing"
+                                ? "..."
+                                : screenStatus === "error"
+                                  ? "RETRY"
+                                  : "TEST"}
                             </button>
                           )}
                         </div>
                         <div className="pt-3 flex items-center gap-1.5 text-[11px] text-slate-500">
                           <Info className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                          <span>Verifies desktop screen sharing.</span>
+                          <span>
+                            Must share entire monitor (single tab/window
+                            prohibited).
+                          </span>
                         </div>
                       </div>
                     )}
@@ -1258,7 +1597,8 @@ export default function NewCandidateOnboardingWizard({
                           Identity & Candidate Profile
                         </h3>
                         <p className="text-xs text-slate-400 italic">
-                          Confirm your details and take a verified photo before starting your assessment.
+                          Confirm your details and take a verified photo before
+                          starting your assessment.
                         </p>
                       </div>
 
@@ -1269,7 +1609,9 @@ export default function NewCandidateOnboardingWizard({
                             Candidate Name
                           </span>
                           <div className="text-sm font-semibold text-slate-800 bg-white border border-slate-200/80 px-3 py-2 rounded-xs flex items-center justify-between">
-                            <span className="truncate">{candidateName || "—"}</span>
+                            <span className="truncate">
+                              {candidateName || "—"}
+                            </span>
                             <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0 ml-1.5" />
                           </div>
                         </div>
@@ -1277,8 +1619,10 @@ export default function NewCandidateOnboardingWizard({
                           <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
                             Candidate Email
                           </span>
-                            <div className="text-sm font-semibold text-slate-800 bg-white border border-slate-200/80 px-3 py-2 rounded-xs flex items-center justify-between">
-                            <span className="truncate">{candidateEmail || "—"}</span>
+                          <div className="text-sm font-semibold text-slate-800 bg-white border border-slate-200/80 px-3 py-2 rounded-xs flex items-center justify-between">
+                            <span className="truncate">
+                              {candidateEmail || "—"}
+                            </span>
                             <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0 ml-1.5" />
                           </div>
                         </div>
@@ -1313,10 +1657,19 @@ export default function NewCandidateOnboardingWizard({
                           </div>
                           <ul className="text-[11px] text-slate-600 space-y-1.5 pl-4 leading-relaxed list-disc">
                             <li>
-                              <strong className="text-slate-700">Capture Positioning:</strong> Center your full face straight inside the oval guide at arm's length with eyes level to the camera.
+                              <strong className="text-slate-700">
+                                Capture Positioning:
+                              </strong>{" "}
+                              Center your full face straight inside the oval
+                              guide at arm's length with eyes level to the
+                              camera.
                             </li>
                             <li>
-                              <strong className="text-slate-700">Lighting Conditions:</strong> Ensure bright, even front lighting on your face (avoid dark shadows or strong backlight).
+                              <strong className="text-slate-700">
+                                Lighting Conditions:
+                              </strong>{" "}
+                              Ensure bright, even front lighting on your face
+                              (avoid dark shadows or strong backlight).
                             </li>
                           </ul>
                         </div>
@@ -1329,10 +1682,12 @@ export default function NewCandidateOnboardingWizard({
                           </div>
                           <ul className="text-[11px] text-slate-600 space-y-1.5 pl-4 leading-relaxed list-disc">
                             <li>
-                              Do not cover your face, nose, or mouth with hands or objects.
+                              Do not cover your face, nose, or mouth with hands
+                              or objects.
                             </li>
                             <li>
-                              Do not tilt your head away or have other individuals present in the frame.
+                              Do not tilt your head away or have other
+                              individuals present in the frame.
                             </li>
                           </ul>
                         </div>
@@ -1343,7 +1698,9 @@ export default function NewCandidateOnboardingWizard({
                         <div className="bg-rose-50 border border-rose-300 rounded-xs p-3.5 flex items-start gap-3 text-xs text-rose-800 animate-in fade-in">
                           <AlertCircle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
                           <div className="space-y-1">
-                            <span className="font-bold text-rose-900">Photo Verification Failed</span>
+                            <span className="font-bold text-rose-900">
+                              Photo Verification Failed
+                            </span>
                             <p className="text-rose-700">{captureError}</p>
                           </div>
                         </div>
@@ -1357,10 +1714,10 @@ export default function NewCandidateOnboardingWizard({
                           snapshotImage && isPhotoVerified
                             ? "border-emerald-500 shadow-emerald-50"
                             : snapshotImage
-                            ? "border-indigo-200"
-                            : faceCheck.isValid
-                            ? "border-emerald-500 shadow-emerald-50"
-                            : "border-rose-400 shadow-rose-50"
+                              ? "border-indigo-200"
+                              : faceCheck.isValid
+                                ? "border-emerald-500 shadow-emerald-50"
+                                : "border-rose-400 shadow-rose-50"
                         }`}
                       >
                         {/* Video Feed / Snapshot Preview Box with Dotted Oval Overlay */}
@@ -1403,7 +1760,9 @@ export default function NewCandidateOnboardingWizard({
                                     rx="75"
                                     ry="95"
                                     fill="none"
-                                    stroke={faceCheck.isValid ? "#10B981" : "#F43F5E"}
+                                    stroke={
+                                      faceCheck.isValid ? "#10B981" : "#F43F5E"
+                                    }
                                     strokeWidth="2.5"
                                     strokeDasharray="6 6"
                                     className="transition-colors duration-300"
@@ -1416,8 +1775,8 @@ export default function NewCandidateOnboardingWizard({
                                     isVerifyingCapture
                                       ? "bg-indigo-600/90 text-white"
                                       : faceCheck.isValid
-                                      ? "bg-emerald-600/90 text-white"
-                                      : "bg-rose-600/90 text-white"
+                                        ? "bg-emerald-600/90 text-white"
+                                        : "bg-rose-600/90 text-white"
                                   }`}
                                 >
                                   {isVerifyingCapture ? (
@@ -1447,7 +1806,9 @@ export default function NewCandidateOnboardingWizard({
                               {webcamStatus === "error" && (
                                 <div className="absolute inset-0 bg-slate-900/90 flex flex-col items-center justify-center p-4 text-center text-rose-400">
                                   <AlertCircle className="w-8 h-8 mb-2" />
-                                  <span className="text-xs font-medium">Camera blocked or not found.</span>
+                                  <span className="text-xs font-medium">
+                                    Camera blocked or not found.
+                                  </span>
                                 </div>
                               )}
                             </>
@@ -1471,7 +1832,8 @@ export default function NewCandidateOnboardingWizard({
                             </Button>
                             {isUploading && (
                               <span className="text-[11px] text-slate-500 flex items-center gap-1">
-                                <Loader2 className="w-3 h-3 animate-spin" /> Saving...
+                                <Loader2 className="w-3 h-3 animate-spin" />{" "}
+                                Saving...
                               </span>
                             )}
                           </div>
@@ -1479,13 +1841,17 @@ export default function NewCandidateOnboardingWizard({
                           <div className="flex flex-col items-center gap-1">
                             <Button
                               onClick={submitPhoto}
-                              disabled={!faceCheck.isValid || isModelLoading || isVerifyingCapture}
+                              disabled={
+                                !faceCheck.isValid ||
+                                isModelLoading ||
+                                isVerifyingCapture
+                              }
                               className={`px-8 py-2 text-xs font-bold rounded-full shadow-sm transition-all cursor-pointer ${
                                 isVerifyingCapture
                                   ? "bg-indigo-600 text-white cursor-wait"
                                   : faceCheck.isValid
-                                  ? "bg-emerald-600 hover:bg-emerald-700 text-white"
-                                  : "bg-slate-300 text-slate-500 cursor-not-allowed opacity-60"
+                                    ? "bg-emerald-600 hover:bg-emerald-700 text-white"
+                                    : "bg-slate-300 text-slate-500 cursor-not-allowed opacity-60"
                               }`}
                             >
                               {isVerifyingCapture ? (
@@ -1500,11 +1866,13 @@ export default function NewCandidateOnboardingWizard({
                                 </>
                               )}
                             </Button>
-                            {!faceCheck.isValid && !isModelLoading && !isVerifyingCapture && (
-                              <span className="text-[10px] text-slate-400">
-                                Position face inside oval to submit photo
-                              </span>
-                            )}
+                            {!faceCheck.isValid &&
+                              !isModelLoading &&
+                              !isVerifyingCapture && (
+                                <span className="text-[10px] text-slate-400">
+                                  Position face inside oval to submit photo
+                                </span>
+                              )}
                           </div>
                         )}
                       </div>
@@ -1521,19 +1889,33 @@ export default function NewCandidateOnboardingWizard({
                       Declaration & Code of Conduct
                     </h3>
                     <p className="text-xs text-slate-400 italic">
-                      Please read and acknowledge the assessment terms and conditions before proceeding.
+                      Please read and acknowledge the assessment terms and
+                      conditions before proceeding.
                     </p>
                   </div>
 
                   <div className="bg-slate-50 p-6 border border-slate-200 rounded-sm space-y-4 text-xs text-slate-700 leading-relaxed max-h-72 overflow-y-auto">
                     <p className="font-semibold text-slate-900">
-                      By taking this assessment, you agree to comply with all proctoring protocols:
+                      By taking this assessment, you agree to comply with all
+                      proctoring protocols:
                     </p>
                     <ul className="space-y-2 list-disc pl-5">
-                      <li>I will not attempt to leave fullscreen mode or switch browser tabs during the test.</li>
-                      <li>I will remain in full view of the webcam and will not use earphones, secondary devices, or external aids.</li>
-                      <li>I understand that automated violation detection logs navigation, audio anomalies, and webcam frame evidence.</li>
-                      <li>Any critical violations may result in immediate test termination and notification to administrators.</li>
+                      <li>
+                        I will not attempt to leave fullscreen mode or switch
+                        browser tabs during the test.
+                      </li>
+                      <li>
+                        I will remain in full view of the webcam and will not
+                        use earphones, secondary devices, or external aids.
+                      </li>
+                      <li>
+                        I understand that automated violation detection logs
+                        navigation, audio anomalies, and webcam frame evidence.
+                      </li>
+                      <li>
+                        Any critical violations may result in immediate test
+                        termination and notification to administrators.
+                      </li>
                     </ul>
                   </div>
 
@@ -1548,7 +1930,9 @@ export default function NewCandidateOnboardingWizard({
                     <Checkbox
                       id="declaration"
                       checked={isDeclarationAgreed}
-                      onCheckedChange={(checked) => setIsDeclarationAgreed(Boolean(checked))}
+                      onCheckedChange={(checked) =>
+                        setIsDeclarationAgreed(Boolean(checked))
+                      }
                       className="mt-0.5"
                     />
                     <div className="space-y-0.5">
@@ -1556,11 +1940,14 @@ export default function NewCandidateOnboardingWizard({
                         htmlFor="declaration"
                         className="text-xs text-slate-800 font-medium cursor-pointer select-none leading-relaxed block"
                       >
-                        I confirm that I am the registered candidate, have reviewed the rules, and agree to abide by the assessment integrity guidelines.
+                        I confirm that I am the registered candidate, have
+                        reviewed the rules, and agree to abide by the assessment
+                        integrity guidelines.
                       </label>
                       {!isDeclarationAgreed && (
                         <p className="text-[11px] text-amber-600 font-medium flex items-center gap-1">
-                          Please check this box to confirm and enable the start button.
+                          Please check this box to confirm and enable the start
+                          button.
                         </p>
                       )}
                     </div>
@@ -1584,12 +1971,17 @@ export default function NewCandidateOnboardingWizard({
               {(() => {
                 let isStepValid = true;
                 if (activeStep === "system_checks") {
-                  if (isWebcamRequired && webcamStatus !== "success") isStepValid = false;
-                  if (isMicRequired && micStatus !== "success") isStepValid = false;
-                  if (isScreenRequired && screenStatus !== "success") isStepValid = false;
+                  if (isWebcamRequired && webcamStatus !== "success")
+                    isStepValid = false;
+                  if (isMicRequired && micStatus !== "success")
+                    isStepValid = false;
+                  if (isScreenRequired && screenStatus !== "success")
+                    isStepValid = false;
                 } else if (activeStep === "candidate_details") {
-                  if (!candidateName.trim() || !candidateEmail.trim()) isStepValid = false;
-                  if (isWebcamRequired && (!snapshotImage || !isPhotoVerified)) isStepValid = false;
+                  if (!candidateName.trim() || !candidateEmail.trim())
+                    isStepValid = false;
+                  if (isWebcamRequired && (!snapshotImage || !isPhotoVerified))
+                    isStepValid = false;
                 } else if (activeStep === "declaration") {
                   if (!isDeclarationAgreed) isStepValid = false;
                 }
@@ -1610,7 +2002,9 @@ export default function NewCandidateOnboardingWizard({
                     disabled={!isStepValid || isLaunching}
                     className="bg-[#5b6bbd] hover:bg-[#4a589e] disabled:opacity-50 disabled:cursor-not-allowed text-white px-8 py-2 text-xs font-bold uppercase tracking-wider rounded-xs shadow-xs transition-all cursor-pointer flex items-center gap-1.5"
                   >
-                    {isLaunching && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                    {isLaunching && (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    )}
                     <span>{getButtonLabel()}</span>
                   </Button>
                 );
