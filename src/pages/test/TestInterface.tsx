@@ -90,6 +90,17 @@ type VendorDocument = Document & {
   msFullscreenElement?: Element | null;
 };
 
+interface TestCaseDisplayResult {
+  status: string;
+  passed: boolean;
+  input?: string;
+  output?: string;
+  expected?: string;
+  compileOutput?: string;
+  stderr?: string;
+  execTimeMs?: number;
+}
+
 interface TestCaseSampleItem {
   id?: string;
   input?: string | number | null;
@@ -567,7 +578,7 @@ function TestInterfaceContent({ testId, sessionId, navigate, toast, onRequireIde
   const [isRunning, setIsRunning] = useState(false);
   const [isSubmittingCode, setIsSubmittingCode] = useState(false);
   const [output, setOutput] = useState<{ type: 'success' | 'error', message: string } | null>(null);
-  const [testCaseResults, setTestCaseResults] = useState<TestCaseResult[]>([]);
+  const [testCaseResults, setTestCaseResults] = useState<TestCaseDisplayResult[]>([]);
   const [selectedTestCaseIdx, setSelectedTestCaseIdx] = useState<number | null>(null);
   const [submissionPhase, setSubmissionPhase] = useState<"idle" | "running" | "result">("idle");
   const [overallStatus, setOverallStatus] = useState<string | null>(null);
@@ -1432,16 +1443,19 @@ useEffect(() => {
         sourceCode: code,
       });
       
-      const mappedTestCases: TestCaseResult[] = (Array.isArray(resultsArray) ? resultsArray : []).map((tc: TestCaseResult & { expected?: string; actualOutput?: string; stdout?: string; executionTimeMs?: number }) => ({
-        status: tc.status || "ACCEPTED",
-        passed: tc.status === "ACCEPTED" || tc.passed === true,
-        input: tc.input || "",
-        output: tc.actualOutput || tc.output || tc.stdout || tc.stderr || tc.compileOutput || "",
-        expected: tc.expectedOutput || tc.expected || "",
-        compileOutput: tc.compileOutput || "",
-        stderr: tc.stderr || "",
-        execTimeMs: tc.execTimeMs || tc.executionTimeMs || 0,
-      }));
+      const mappedTestCases: TestCaseDisplayResult[] = (Array.isArray(resultsArray) ? resultsArray : []).map((raw) => {
+        const tc = raw as TestCaseResult & { expected?: string; output?: string; executionTimeMs?: number };
+        return {
+          status: tc.status || "ACCEPTED",
+          passed: tc.status === "ACCEPTED" || tc.passed === true,
+          input: tc.input || "",
+          output: tc.actualOutput || tc.output || tc.stdout || tc.stderr || tc.compileOutput || "",
+          expected: tc.expectedOutput || tc.expected || "",
+          compileOutput: tc.compileOutput || "",
+          stderr: tc.stderr || "",
+          execTimeMs: tc.execTimeMs || tc.executionTimeMs || 0,
+        };
+      });
 
       setTestCaseResults(mappedTestCases);
 
@@ -2281,7 +2295,7 @@ useEffect(() => {
                                 </div>
                               ) : (
                                 <>
-                                  {testCaseResults.map((tc: TestCaseResult, idx: number) => (
+                                  {testCaseResults.map((tc: TestCaseDisplayResult, idx: number) => (
                                     <div
                                       key={idx}
                                       className={`p-2.5 rounded border ${
