@@ -39,7 +39,6 @@ import { useAuth } from "@/lib/auth-context";
 import { testService, Test, TestQuestion } from "@/lib/test-service";
 import { proctoringService } from "@/lib/proctoring-service";
 import { useNavigate } from "react-router-dom";
-import { useToast } from "@/hooks/use-toast";
 
 type OnboardingStep =
   | "proctoring"
@@ -73,7 +72,6 @@ export default function NewCandidateOnboardingWizard({
   onProceedToTest,
 }: CandidateOnboardingModalProps) {
   const navigate = useNavigate();
-  const { toast } = useToast();
   const { user } = useAuth();
 
   const proctorMode = test?.proctoringMode || "NONE";
@@ -163,6 +161,31 @@ export default function NewCandidateOnboardingWizard({
     "idle" | "testing" | "success" | "error"
   >("idle");
   const [screenErrorMsg, setScreenErrorMsg] = useState<string | null>(null);
+
+  // Scoped Wizard Notification State (renders at top-right of wizard, avoiding bottom button overlap)
+  const [wizardNotification, setWizardNotification] = useState<{
+    title: string;
+    description: string;
+    variant?: "success" | "destructive";
+  } | null>(null);
+  const notificationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const showWizardNotification = useCallback(
+    (
+      title: string,
+      description: string,
+      variant: "success" | "destructive" = "success",
+    ) => {
+      if (notificationTimeoutRef.current) {
+        clearTimeout(notificationTimeoutRef.current);
+      }
+      setWizardNotification({ title, description, variant });
+      notificationTimeoutRef.current = setTimeout(() => {
+        setWizardNotification(null);
+      }, 4000);
+    },
+    [],
+  );
 
   // Media Refs
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -600,12 +623,11 @@ export default function NewCandidateOnboardingWizard({
           setCaptureError(
             "Face not detected or not visible. Please position your face inside the oval and submit again.",
           );
-          toast({
-            title: "Verification Failed",
-            description:
-              "Face not detected. Please position your face inside the oval and submit again.",
-            variant: "destructive",
-          });
+          showWizardNotification(
+            "Verification Failed",
+            "Face not detected. Please position your face inside the oval and submit again.",
+            "destructive",
+          );
           return;
         }
 
@@ -617,12 +639,11 @@ export default function NewCandidateOnboardingWizard({
           setCaptureError(
             "Multiple faces detected. Please ensure you are alone in the frame and submit again.",
           );
-          toast({
-            title: "Verification Failed",
-            description:
-              "Multiple people detected. Please re-take your photo alone.",
-            variant: "destructive",
-          });
+          showWizardNotification(
+            "Verification Failed",
+            "Multiple people detected. Please re-take your photo alone.",
+            "destructive",
+          );
           return;
         }
 
@@ -637,12 +658,11 @@ export default function NewCandidateOnboardingWizard({
           setCaptureError(
             "Face not clearly visible. Please position your face inside the oval and submit again.",
           );
-          toast({
-            title: "Verification Failed",
-            description:
-              "Face not clearly visible. Please align your face inside the oval and submit again.",
-            variant: "destructive",
-          });
+          showWizardNotification(
+            "Verification Failed",
+            "Face not clearly visible. Please align your face inside the oval and submit again.",
+            "destructive",
+          );
           return;
         }
 
@@ -754,11 +774,7 @@ export default function NewCandidateOnboardingWizard({
             (err as Error)?.message ||
             "Failed to confirm identity photo with the server. Please try again.";
           setCaptureError(errorMsg);
-          toast({
-            title: "Photo Upload Error",
-            description: errorMsg,
-            variant: "destructive",
-          });
+          showWizardNotification("Photo Upload Error", errorMsg, "destructive");
           return;
         } finally {
           setIsUploading(false);
@@ -775,11 +791,11 @@ export default function NewCandidateOnboardingWizard({
       // Stop live camera hardware
       stopAllMedia();
 
-      toast({
-        title: "Photo Verified & Submitted",
-        description:
-          "Candidate identity photo verified and uploaded successfully.",
-      });
+      showWizardNotification(
+        "Photo Verified & Submitted",
+        "Candidate identity photo verified and uploaded successfully.",
+        "success",
+      );
     } catch (e: unknown) {
       console.error("Snapshot verification & submission error:", e);
       setIsVerifyingCapture(false);
@@ -789,11 +805,7 @@ export default function NewCandidateOnboardingWizard({
         (e as Error)?.message ||
         "Face not detected. Please position your face inside the oval and submit again.";
       setCaptureError(errText);
-      toast({
-        title: "Verification Error",
-        description: errText,
-        variant: "destructive",
-      });
+      showWizardNotification("Verification Error", errText, "destructive");
     }
   };
 
@@ -1061,19 +1073,18 @@ export default function NewCandidateOnboardingWizard({
           await document.exitFullscreen().catch(() => {});
         }
         console.error("Failed to launch test session:", err);
-        toast({
-          title: "Error Launching Assessment",
-          description:
-            (
-              err as {
-                response?: { data?: { message?: string } };
-                message?: string;
-              }
-            )?.response?.data?.message ||
+        showWizardNotification(
+          "Error Launching Assessment",
+          (
+            err as {
+              response?: { data?: { message?: string } };
+              message?: string;
+            }
+          )?.response?.data?.message ||
             (err as Error)?.message ||
             "Failed to start test session",
-          variant: "destructive",
-        });
+          "destructive",
+        );
         setIsLaunching(false);
       }
     }
@@ -1102,6 +1113,39 @@ export default function NewCandidateOnboardingWizard({
 
   return (
     <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex flex-col font-sans text-slate-800 antialiased overflow-hidden">
+      {/* ── Scoped Wizard Top Alert Notification (Never blocks bottom-right NEXT button) ── */}
+      {wizardNotification && (
+        <div className="fixed top-16 right-6 z-[100] max-w-sm animate-in fade-in slide-in-from-top-3 duration-200">
+          <div
+            className={`flex items-start gap-2.5 p-3.5 rounded-lg border shadow-xl backdrop-blur-md ${
+              wizardNotification.variant === "destructive"
+                ? "bg-rose-50/95 border-rose-300 text-rose-950"
+                : "bg-white/95 border-emerald-300 text-slate-900 ring-1 ring-emerald-400/30"
+            }`}
+          >
+            {wizardNotification.variant === "destructive" ? (
+              <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+            ) : (
+              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+            )}
+            <div className="flex-1 space-y-0.5 pr-2">
+              <h4 className="text-xs font-bold leading-tight">
+                {wizardNotification.title}
+              </h4>
+              <p className="text-[11px] text-slate-600 leading-snug">
+                {wizardNotification.description}
+              </p>
+            </div>
+            <button
+              onClick={() => setWizardNotification(null)}
+              className="text-slate-400 hover:text-slate-600 p-0.5 rounded cursor-pointer"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* ── Top Header / Onboarding Navbar ── */}
       <header className="h-14 bg-white border-b border-slate-200 px-6 md:px-8 flex items-center justify-between shrink-0 shadow-xs">
         <div className="flex items-center gap-3">
