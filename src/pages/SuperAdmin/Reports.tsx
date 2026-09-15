@@ -10,6 +10,7 @@ import type {
 } from "@/lib/test-service";
 import { candidateService } from "@/lib/candidate-service";
 import type { Candidate } from "@/lib/candidate-service";
+import { getTodayDateString } from "@/lib/date-utils";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
@@ -545,7 +546,7 @@ export default function Reports() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    const dateStr = new Date().toISOString().slice(0, 10);
+    const dateStr = getTodayDateString();
     link.setAttribute("download", `candidate_session_report_${dateStr}.csv`);
     document.body.appendChild(link);
     link.click();

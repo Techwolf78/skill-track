@@ -57,8 +57,8 @@ import {
 } from "@/lib/organisation-service";
 import { useToast } from "@/hooks/use-toast";
 import * as XLSX from "xlsx";
-import { saveAs } from "file-saver";
 import { useOrganisationsQuery } from "@/hooks/use-query-hooks";
+import { formatDate, getTodayDateString } from "@/lib/date-utils";
 
 export default function Users() {
   const { toast } = useToast();
@@ -259,7 +259,7 @@ export default function Users() {
       Organisation: user.organisation?.name || "Global / None",
       Phone: user.phoneNumber || "N/A",
       Provider: user.provider || "LOCAL",
-      "Joined Date": new Date(user.createdAt).toISOString().split("T")[0],
+      "Joined Date": formatDate(user.createdAt),
     }));
 
     if (formattedData.length === 0) {
@@ -303,7 +303,7 @@ export default function Users() {
       type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     });
 
-    const date = new Date().toISOString().split("T")[0];
+    const date = getTodayDateString();
 
     saveAs(file, `Users_${date}.xlsx`);
   };

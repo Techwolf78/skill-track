@@ -38,7 +38,7 @@ import {
   Server,
   Database,
 } from "lucide-react";
-import { formatDateTime } from "@/lib/date-utils";
+import { formatDateTime, getTodayDateString } from "@/lib/date-utils";
 import { useToast } from "@/hooks/use-toast";
 import { auditLogService, AuditLog } from "@/lib/audit-log-service";
 import { stripHtml } from "@/lib/utils";
@@ -398,7 +398,7 @@ export default function AuditLogs() {
     }
 
     const formattedData = logsToExport.map((log) => ({
-      "Timestamp (UTC)": log.timestamp,
+      "Timestamp (IST)": log.timestamp,
       "Formatted Time": formatDateTime(log.timestamp),
       "Actor Email": log.actor,
       "Action Type": log.action,
@@ -433,7 +433,7 @@ export default function AuditLogs() {
       type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     });
 
-    const date = new Date().toISOString().split("T")[0];
+    const date = getTodayDateString();
     saveAs(file, `AuditLogs_${date}.xlsx`);
 
     toast({

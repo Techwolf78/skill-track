@@ -33,9 +33,16 @@ export function formatDateTime(
       hour: "2-digit",
       minute: "2-digit",
       hour12: true,
+      timeZone: "Asia/Kolkata",
     };
 
-    return date.toLocaleString("en-US", options || defaultOptions);
+    const finalOptions: Intl.DateTimeFormatOptions = {
+      timeZone: "Asia/Kolkata",
+      ...defaultOptions,
+      ...options,
+    };
+
+    return date.toLocaleString("en-US", finalOptions);
   } catch {
     return dateStr;
   }
@@ -121,4 +128,31 @@ export function toBackendDateTime(dateStr: string, timeStr?: string): string {
   }
 
   return `${cleanDate}T${cleanTime}`;
+}
+
+/**
+ * Returns today's date formatted as YYYY-MM-DD strictly in IST (Asia/Kolkata).
+ * Eliminates UTC midnight day-shift bugs when generating filenames or date inputs.
+ */
+export function getTodayDateString(): string {
+  const formatter = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Kolkata",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+  return formatter.format(new Date());
+}
+
+/**
+ * Returns the current time formatted as HH:mm strictly in IST (Asia/Kolkata).
+ */
+export function getNowTimeString(): string {
+  const formatter = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Asia/Kolkata",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+  return formatter.format(new Date());
 }

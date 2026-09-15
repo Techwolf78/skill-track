@@ -103,7 +103,7 @@ import autoTable from "jspdf-autotable";
 import * as XLSX from "xlsx";
 import { toast } from "sonner";
 import { GryphonLogo } from "@/components/ui/GryphonLogo";
-import { formatDateTime, toBackendDateTime, parseBackendDateTime } from "@/lib/date-utils";
+import { formatDateTime, toBackendDateTime, parseBackendDateTime, getTodayDateString } from "@/lib/date-utils";
 
 type JsPDFWithAutoTable = jsPDF & { lastAutoTable: { finalY: number } };
 
@@ -2318,7 +2318,7 @@ export default function NewAdminTestEdit() {
       XLSX.utils.book_append_sheet(wb, wsViolations, "Proctoring Violations");
 
       const testTitleSafe = (title || test?.title || "Assessment").replace(/[^a-zA-Z0-9_-]/g, "_");
-      const dateStr = new Date().toISOString().slice(0, 10);
+      const dateStr = getTodayDateString();
       XLSX.writeFile(wb, `${testTitleSafe}_Complete_Report_${dateStr}.xlsx`);
 
       toast.success(`Complete assessment report exported for ${candidatesToExport.length} candidate(s).`);
@@ -3061,7 +3061,7 @@ export default function NewAdminTestEdit() {
                             value={parseBackendDateTime(scheduleStartTime).time}
                             onChange={(time) => {
                               const current = parseBackendDateTime(scheduleStartTime);
-                              const date = current.date || new Date().toISOString().split("T")[0];
+                              const date = current.date || getTodayDateString();
                               setScheduleStartTime(toBackendDateTime(date, time));
                             }}
                           />
@@ -3114,7 +3114,7 @@ export default function NewAdminTestEdit() {
                             value={parseBackendDateTime(scheduleEndTime).time}
                             onChange={(time) => {
                               const current = parseBackendDateTime(scheduleEndTime);
-                              const date = current.date || new Date().toISOString().split("T")[0];
+                              const date = current.date || getTodayDateString();
                               setScheduleEndTime(toBackendDateTime(date, time));
                             }}
                           />

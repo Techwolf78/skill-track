@@ -1360,10 +1360,8 @@ export const testService = {
     return testService.getAllSessions({ scheduleId, size: 1000 });
   },
 
-  submitSession: async (id: string, _answers?: Record<string, unknown>): Promise<string> => {
-    const response = await apiClient.post<string>(`/test-sessions/${id}/submit`, {
-      submittedAt: new Date().toISOString(),
-    });
+  submitSession: async (id: string): Promise<string> => {
+    const response = await apiClient.post<string>(`/test-sessions/${id}/submit`);
     return unwrapResponse(response);
   },
 

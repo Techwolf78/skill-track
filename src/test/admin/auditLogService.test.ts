@@ -76,9 +76,7 @@ describe("auditLogService", () => {
       expect(response.content.length).toBe(1);
 
       const log = response.content[0];
-      // Expected date: Month is 0-indexed in JS Date constructor (6 -> June -> index 5), computed in UTC
-      const expectedDate = new Date(Date.UTC(2026, 5, 19, 17, 30, 0, 500)).toISOString();
-      expect(log.timestamp).toBe(expectedDate);
+      expect(log.timestamp).toBe("2026-06-19T17:30:00");
     });
 
     it("should dynamically build details from afterSnapshot if details is missing", async () => {

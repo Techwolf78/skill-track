@@ -96,6 +96,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiClient } from "@/lib/api-client";
 import { testService, TestSession } from "@/lib/test-service";
 import { candidateService } from "@/lib/candidate-service";
+import { getTodayDateString } from "@/lib/date-utils";
 import {
   ExtendTimeModal,
   ExtendTimeCandidateSession,
@@ -1088,7 +1089,7 @@ export default function ProctoringDashboard() {
       "Schedule";
     link.setAttribute(
       "download",
-      `Proctoring_Audit_${safeName}_${new Date().toISOString().slice(0, 10)}.csv`,
+      `Proctoring_Audit_${safeName}_${getTodayDateString()}.csv`,
     );
     document.body.appendChild(link);
     link.click();
