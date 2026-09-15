@@ -74,6 +74,10 @@ export default function InviteCandidates() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedSchedule, setSelectedSchedule] = useState<string>("");
   const [isInviteDialogOpen, setIsInviteDialogOpen] = useState(false);
+  const [isTestMailDialogOpen, setIsTestMailDialogOpen] = useState(false);
+  const [testMailRecipient, setTestMailRecipient] = useState("");
+  const [sendingTestMail, setSendingTestMail] = useState(false);
+  const [testMailResult, setTestMailResult] = useState<{ success: boolean; message: string } | null>(null);
   const [selectedCandidate, setSelectedCandidate] = useState<Candidate | null>(null);
   const [selectedCandidates, setSelectedCandidates] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
@@ -83,6 +87,44 @@ export default function InviteCandidates() {
   const { toast } = useToast();
   const navigate = useNavigate();
   const baseUrl = window.location.origin;
+
+  const handleSendTestEmail = async () => {
+    const trimmed = testMailRecipient.trim();
+    if (!trimmed || !trimmed.includes("@") || !trimmed.includes(".")) {
+      toast({
+        title: "Invalid email",
+        description: "Please enter a valid recipient email address.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setSendingTestMail(true);
+    setTestMailResult(null);
+    try {
+      const res = await apiClient.post("/candidate-invitations/test-email", { email: trimmed });
+      const msg = res.data?.data?.message || res.data?.message || `Test email successfully sent to ${trimmed}!`;
+      setTestMailResult({ success: true, message: msg });
+      toast({
+        title: "Test email sent!",
+        description: `AWS SES SMTP dispatched the test email to ${trimmed}.`,
+      });
+    } catch (error) {
+      const errObj = error as { response?: { data?: { message?: string } }; message?: string };
+      const msg =
+        errObj.response?.data?.message ||
+        errObj.message ||
+        "Failed to send test email. Please check SMTP credentials.";
+      setTestMailResult({ success: false, message: msg });
+      toast({
+        title: "Test email failed",
+        description: msg,
+        variant: "destructive",
+      });
+    } finally {
+      setSendingTestMail(false);
+    }
+  };
 
   const handleResendEmail = async (invitationId: string, candidateName: string) => {
     setResendingId(invitationId);
@@ -312,15 +354,31 @@ export default function InviteCandidates() {
               Select a schedule, then invite candidates individually or in bulk.
             </p>
           </div>
-          <Button
-            variant="ghost" size="sm"
-            onClick={() => navigate(`../invitations-history${selectedSchedule ? `?scheduleId=${selectedSchedule}` : ""}`)}
-            className="text-xs text-muted-foreground hover:text-foreground gap-1.5 h-8 border border-border/60 hover:border-border"
-          >
-            <Clock className="w-3.5 h-3.5" />
-            Invitation History
-            <ChevronRight className="w-3 h-3 opacity-50" />
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setTestMailResult(null);
+                setTestMailRecipient("");
+                setIsTestMailDialogOpen(true);
+              }}
+              className="text-xs gap-1.5 h-8 border-orange-500/40 text-orange-600 hover:bg-orange-500/10 hover:border-orange-500 font-medium"
+            >
+              <Send className="w-3.5 h-3.5" />
+              Send Test Mail
+            </Button>
+
+            <Button
+              variant="ghost" size="sm"
+              onClick={() => navigate(`../invitations-history${selectedSchedule ? `?scheduleId=${selectedSchedule}` : ""}`)}
+              className="text-xs text-muted-foreground hover:text-foreground gap-1.5 h-8 border border-border/60 hover:border-border"
+            >
+              <Clock className="w-3.5 h-3.5" />
+              Invitation History
+              <ChevronRight className="w-3 h-3 opacity-50" />
+            </Button>
+          </div>
         </div>
 
         {/* Schedule Selector */}
@@ -674,6 +732,110 @@ export default function InviteCandidates() {
             <Button onClick={handleInvite} disabled={submitting} className="gap-2 bg-primary hover:bg-primary/90 text-primary-foreground">
               {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
               Send Invitation
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Test Mail / AWS SES SMTP Health Check Dialog ── */}
+      <Dialog open={isTestMailDialogOpen} onOpenChange={setIsTestMailDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-foreground">
+              <Mail className="w-4 h-4 text-orange-500" /> Test Mail Server / AWS SES
+            </DialogTitle>
+            <DialogDescription className="text-xs text-muted-foreground">
+              Send an instant diagnostic email to verify that your AWS SES SMTP gateway is live, credentials are active, and emails are delivering properly.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3.5 py-2">
+            {/* Live Gateway Info Pill */}
+            <div className="p-3 bg-muted/40 border border-border rounded-lg text-xs space-y-1.5">
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground font-medium">Provider:</span>
+                <span className="font-semibold text-foreground flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block animate-pulse" />
+                  Amazon SES (ap-south-1 Mumbai)
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground font-medium">From Address:</span>
+                <span className="font-mono text-[11px] text-foreground">gryphon360@gryphonacademy.co.in</span>
+              </div>
+            </div>
+
+            {/* Recipient Input */}
+            <div className="space-y-1.5">
+              <label htmlFor="test-recipient-email" className="text-xs font-semibold text-foreground">
+                Recipient Email Address <span className="text-destructive">*</span>
+              </label>
+              <Input
+                id="test-recipient-email"
+                type="email"
+                placeholder="e.g. your-name@gmail.com"
+                value={testMailRecipient}
+                onChange={(e) => setTestMailRecipient(e.target.value)}
+                className="h-9 text-sm bg-background border-border"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !sendingTestMail) {
+                    handleSendTestEmail();
+                  }
+                }}
+              />
+              <p className="text-[11px] text-muted-foreground">
+                Enter your email address to receive the live test email.
+              </p>
+            </div>
+
+            {/* Inline Result Status Banner */}
+            {testMailResult && (
+              <div
+                className={`p-3 rounded-lg border text-xs flex items-start gap-2.5 animate-fade-in ${
+                  testMailResult.success
+                    ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-700 dark:text-emerald-400"
+                    : "bg-destructive/10 border-destructive/30 text-destructive"
+                }`}
+              >
+                {testMailResult.success ? (
+                  <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600 mt-0.5" />
+                ) : (
+                  <AlertCircle className="w-4 h-4 shrink-0 text-destructive mt-0.5" />
+                )}
+                <div className="space-y-0.5">
+                  <p className="font-semibold">
+                    {testMailResult.success ? "Email Dispatched Successfully" : "Delivery Failed"}
+                  </p>
+                  <p className="text-[11px] opacity-90">{testMailResult.message}</p>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              variant="outline"
+              onClick={() => setIsTestMailDialogOpen(false)}
+              disabled={sendingTestMail}
+            >
+              Close
+            </Button>
+            <Button
+              onClick={handleSendTestEmail}
+              disabled={sendingTestMail || !testMailRecipient.trim()}
+              className="gap-2 bg-orange-500 hover:bg-orange-600 text-white font-medium shadow-sm"
+            >
+              {sendingTestMail ? (
+                <>
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  Sending via SES…
+                </>
+              ) : (
+                <>
+                  <Send className="w-3.5 h-3.5" />
+                  Send Test Email
+                </>
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>
