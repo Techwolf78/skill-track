@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect, useRef } from "react";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import {
   Search,
@@ -135,7 +135,7 @@ export default function NewAdminTestAddProblems() {
 
   const [test, setTest] = useState<Test | null>(null);
   const [addedQuestionIds, setAddedQuestionIds] = useState<Set<string>>(new Set());
-  const [addingId, setAddingId] = useState<string | null>(null);
+  const [addingIds, setAddingIds] = useState<Set<string>>(new Set());
   const [loadingTest, setLoadingTest] = useState(Boolean(id));
 
   // Library Queries & States
@@ -151,6 +151,9 @@ export default function NewAdminTestAddProblems() {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
 
+  // Tracks the highest known orderIndex for collision-free adds
+  const maxOrderRef = useRef<number>(-1);
+
   // Fetch Test Details and Existing Mappings
   useEffect(() => {
     if (!id) return;
@@ -162,8 +165,29 @@ export default function NewAdminTestAddProblems() {
     ])
       .then(([testData, testQuestionsData]) => {
         setTest(testData);
-        const ids = new Set((testQuestionsData || []).map((tq) => tq.questionId));
+
+        // Collect all test questions from both getTestQuestions and testData.questions
+        const allQuestions: any[] = [
+          ...(testQuestionsData || []),
+          ...(testData?.questions || []),
+          ...(testData?.testQuestions || []),
+        ];
+
+        const ids = new Set<string>();
+        let highestOrder = -1;
+
+        allQuestions.forEach((tq) => {
+          const qId = tq.questionId || tq.question?.id || tq.id;
+          if (qId) ids.add(qId);
+
+          if (typeof tq.orderIndex === "number" && tq.orderIndex > highestOrder) {
+            highestOrder = tq.orderIndex;
+          }
+        });
+
         setAddedQuestionIds(ids);
+        // Seed the orderIndex counter from live data (backend uses 0-based indexing: 0, 1, 2, ...)
+        maxOrderRef.current = highestOrder;
       })
       .catch((err) => {
         console.error("[NewAdminTestAddProblems] Error loading test details:", err);
@@ -173,36 +197,79 @@ export default function NewAdminTestAddProblems() {
       });
   }, [id]);
 
-  // Handle Adding a Question to Test (Checkpoint 1: Surface warning if UNDER_REVIEW)
-  const handleAddQuestion = async (q: Question) => {
+  // Handle Adding a Question to Test.
+  // Uses a monotonically-incrementing local counter (maxOrderRef) so concurrent
+  // clicks on different questions each get a unique, collision-free orderIndex.
+  const handleAddQuestion = (q: Question) => {
     if (!id) return;
-    try {
-      setAddingId(q.id);
-      const existing = await testService.getTestQuestions(id);
-      const maxOrder = (existing || []).reduce((max, tq) => Math.max(max, tq.orderIndex ?? 0), 0);
-      const nextOrderIndex = maxOrder + 1;
-      const marks = q.marks ?? (q.questionType === "CODING" ? 100 : 10);
+    if (addedQuestionIds.has(q.id)) return; // already in test
+    if (addingIds.has(q.id)) return; // double-click guard
 
-      const res = await testService.addQuestionToTestWithWarnings(id, q.id, nextOrderIndex, marks, undefined, targetSection);
-      setAddedQuestionIds((prev) => new Set([...prev, q.id]));
-      toast.success(`"${q.title || 'Problem'}" added to test!`);
+    setAddingIds((prev) => new Set([...prev, q.id]));
 
-      // Checkpoint 1 Non-blocking Warning Toast
-      if (res.warnings && res.warnings.length > 0) {
-        res.warnings.forEach((warn) => toast.warning(warn, { duration: 7000 }));
-      } else if (q.status === "UNDER_REVIEW" || (q.questionType === "CODING" && (!q.verifiedLanguages || q.verifiedLanguages.length === 0))) {
-        toast.warning(
-          `Notice: Question "${q.title || 'Problem'}" is currently UNDER_REVIEW. Execution drivers have not been verified against reference solutions.`,
-          { duration: 7000 }
+    // Claim the next orderIndex immediately (atomic increment)
+    const nextOrderIndex = ++maxOrderRef.current;
+    const marks = q.marks ?? (q.questionType === "CODING" ? 100 : 10);
+
+    const doAdd = async (orderToUse: number, retryCount = 0) => {
+      try {
+        const res = await testService.addQuestionToTestWithWarnings(
+          id,
+          q.id,
+          orderToUse,
+          marks,
+          undefined,
+          targetSection
         );
+        setAddedQuestionIds((prev) => new Set([...prev, q.id]));
+        toast.success(`"${q.title || "Problem"}" added to test!`);
+
+        if (res.warnings && res.warnings.length > 0) {
+          res.warnings.forEach((warn) => toast.warning(warn, { duration: 7000 }));
+        } else if (
+          q.status === "UNDER_REVIEW" ||
+          (q.questionType === "CODING" && (!q.verifiedLanguages || q.verifiedLanguages.length === 0))
+        ) {
+          toast.warning(
+            `Notice: Question "${q.title || "Problem"}" is currently UNDER_REVIEW. Execution drivers have not been verified against reference solutions.`,
+            { duration: 7000 }
+          );
+        }
+      } catch (err: any) {
+        console.error("[NewAdminTestAddProblems] Failed to add question:", err);
+        const msg: string = err?.response?.data?.message || err.message || "Unknown error";
+
+        // 1. If it's an Order Index conflict: bump orderIndex and retry!
+        // (Do NOT check "already used" before this, because "Order index is already used in this test" contains "already used")
+        if (msg.includes("Order index") && retryCount < 3) {
+          maxOrderRef.current = Math.max(maxOrderRef.current + 1, orderToUse + 10);
+          const bumpedOrder = maxOrderRef.current;
+          console.warn(`[NewAdminTestAddProblems] Order index collision at ${orderToUse}. Retrying with orderIndex ${bumpedOrder}...`);
+          return doAdd(bumpedOrder, retryCount + 1);
+        }
+
+        // 2. If it's truly already linked to this test
+        if (msg.includes("already linked")) {
+          setAddedQuestionIds((prev) => new Set([...prev, q.id]));
+          toast.info(`"${q.title || "Problem"}" is already in this test.`);
+          return;
+        }
+
+        toast.error("Failed to add question to test: " + msg);
+      } finally {
+        if (retryCount === 0) {
+          setAddingIds((prev) => {
+            const next = new Set(prev);
+            next.delete(q.id);
+            return next;
+          });
+        }
       }
-    } catch (err: any) {
-      console.error("[NewAdminTestAddProblems] Failed to add question:", err);
-      toast.error("Failed to add question to test: " + (err?.response?.data?.message || err.message || "Unknown error"));
-    } finally {
-      setAddingId(null);
-    }
+    };
+
+    doAdd(nextOrderIndex);
   };
+
 
   const filteredQuestions = useMemo(() => {
     const list = dbQuestions.filter((q) => {
@@ -612,7 +679,7 @@ export default function NewAdminTestAddProblems() {
                   {paginatedQuestions.map((q) => {
                     const isCoding = (q.questionType ?? "").toUpperCase() === "CODING";
                     const isAlreadyAdded = addedQuestionIds.has(q.id);
-                    const isCurrentlyAdding = addingId === q.id;
+                    const isCurrentlyAdding = addingIds.has(q.id);
                     const time = fmtTime(q);
 
                     return (

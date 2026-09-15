@@ -1069,13 +1069,38 @@ export const testService = {
     testId?: string,
     questionId?: string,
   ): Promise<TestQuestion[]> => {
+    // When testId is provided and no single questionId filter is applied,
+    // use the dedicated /test-questions/test/{testId} endpoint which returns
+    // the complete unpaginated List<TestQuestionDetailResponse>.
+    if (testId && !questionId) {
+      try {
+        const response = await apiClient.get<any>(`/test-questions/test/${testId}`);
+        const list = unwrapArrayResponse<any>(response);
+        if (list && list.length > 0) {
+          return list.map((item: any) => ({
+            ...item,
+            questionId: item.questionId || item.question?.id || item.id,
+            question: item.question || item,
+          }));
+        }
+      } catch (e) {
+        console.warn("[testService] /test-questions/test/{testId} fallback to /test-questions query", e);
+      }
+    }
+
     const params = new URLSearchParams();
     if (testId) params.append("testId", testId);
     if (questionId) params.append("questionId", questionId);
+    params.append("size", "1000");
 
     const url = `/test-questions${params.toString() ? `?${params.toString()}` : ""}`;
     const response = await apiClient.get<TestQuestion[]>(url);
-    return unwrapArrayResponse<TestQuestion>(response);
+    const list = unwrapArrayResponse<any>(response);
+    return list.map((item: any) => ({
+      ...item,
+      questionId: item.questionId || item.question?.id || item.id,
+      question: item.question || item,
+    }));
   },
 
   getTestQuestionById: async (id: string): Promise<TestQuestion> => {

@@ -16,6 +16,9 @@ export interface SpringPage<T> {
 
 export interface Candidate {
   id: string;
+  name?: string;
+  email?: string;
+  phoneNumber?: string;
   user: {
     id: string;
     name: string;
@@ -43,6 +46,7 @@ export interface CandidateInvitation {
   id: string;
   scheduleId: string;
   candidateId: string;
+  sessionId?: string;
   candidate?: Candidate;
   candidateName?: string;
   candidateEmail?: string;

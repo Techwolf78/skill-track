@@ -56,14 +56,15 @@ export const resolveStarterCode = (
     if (typeof legacyMap[language] === "string" && legacyMap[language].trim()) return legacyMap[language];
     if (typeof legacyMap[langKey] === "string" && legacyMap[langKey].trim()) return legacyMap[langKey];
     if (legacyMap[language]?.code) return legacyMap[language].code;
-    if (legacyMap[langKey]?.code) return legacyMap[langKey].code;
-    // Fallback to first available language in legacyMap if requested language is absent
-    const firstKey = Object.keys(legacyMap)[0];
-    if (firstKey && legacyMap[firstKey]) {
-      const firstEntry = legacyMap[firstKey];
-      if (typeof firstEntry === "string" && firstEntry.trim()) return firstEntry;
-      if (firstEntry?.code && typeof firstEntry.code === "string" && firstEntry.code.trim()) return firstEntry.code;
-      if (firstEntry?.template && typeof firstEntry.template === "string" && firstEntry.template.trim()) return firstEntry.template;
+    if (legacyMap[language]?.template) return legacyMap[language].template;
+    if (legacyMap[langKey]?.template) return legacyMap[langKey].template;
+
+    // Fallback to first available language in template
+    const entries = Object.values(legacyMap) as any[];
+    for (const entry of entries) {
+      if (typeof entry === "string" && entry.trim()) return entry;
+      if (entry && typeof entry.code === "string" && entry.code.trim()) return entry.code;
+      if (entry && typeof entry.template === "string" && entry.template.trim()) return entry.template;
     }
   }
 

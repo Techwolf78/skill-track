@@ -37,3 +37,5 @@ dsapratice.js
 dsa*.js
 
 .vercel
+backend-src/
+rxone/
