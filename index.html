@@ -6,10 +6,10 @@
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
-    <!-- Dynamic adaptive favicon for Light & Dark mode browser tabs -->
-    <link rel="icon" type="image/png" href="/ga-icon-white.png" media="(prefers-color-scheme: dark)" />
-    <link rel="icon" type="image/png" href="/ga-icon-blue.png" media="(prefers-color-scheme: light)" />
-    <link rel="icon" type="image/png" href="/ga-icon-blue.png" />
+    <!-- Dynamic adaptive favicon: in dark mode use purple emblem, in light mode use white/silver emblem -->
+    <link rel="icon" type="image/png" href="/ga-icon-purple.png" media="(prefers-color-scheme: dark)" />
+    <link rel="icon" type="image/png" href="/ga-icon-white.png" media="(prefers-color-scheme: light)" />
+    <link rel="icon" type="image/png" href="/ga-icon-purple.png" />
     <script>
       (function() {
         function updateThemeFavicon() {
@@ -20,7 +20,7 @@
             link.rel = 'icon';
             document.head.appendChild(link);
           }
-          link.href = isDark ? '/ga-icon-white.png' : '/ga-icon-blue.png';
+          link.href = isDark ? '/ga-icon-purple.png' : '/ga-icon-white.png';
         }
         updateThemeFavicon();
         if (window.matchMedia) {
