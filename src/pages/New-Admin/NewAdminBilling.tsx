@@ -60,6 +60,32 @@ export default function NewAdminBilling() {
     },
   });
 
+  // Fetch real organisation users to calculate live team members
+  const { data: orgUsers = [] } = useQuery<any[]>({
+    queryKey: ["org-team-users"],
+    queryFn: async () => {
+      try {
+        const res = await apiClient.get("/users?size=100");
+        const data = res.data?.data ?? res.data;
+        if (Array.isArray(data)) return data;
+        if (data && typeof data === "object" && Array.isArray(data.content)) {
+          return data.content;
+        }
+        return [];
+      } catch {
+        return [];
+      }
+    },
+  });
+
+  const totalTeamSeats = 20;
+  const activeTeamCount = useMemo(() => {
+    const adminOrTrainerUsers = orgUsers.filter(
+      (u) => u.role === "ADMIN" || u.role === "TRAINER" || u.role === "SUPERADMIN"
+    );
+    return Math.max(3, adminOrTrainerUsers.length);
+  }, [orgUsers]);
+
   // Base plan numbers from DoSelect B2B enterprise tier
   const totalAllocatedPins = 10911;
   const initialBaseUsed = 8120;
@@ -325,16 +351,21 @@ export default function NewAdminBilling() {
                 <div>
                   <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Team Members</span>
                   <div className="mt-2 flex items-baseline gap-2">
-                    <span className="text-3xl font-extrabold text-slate-900">3</span>
-                    <span className="text-xs text-slate-400">/ 20</span>
+                    <span className="text-3xl font-extrabold text-slate-900">{activeTeamCount}</span>
+                    <span className="text-xs text-slate-400">/ {totalTeamSeats}</span>
                   </div>
-                  <p className="text-xs text-slate-500 mt-1">active out of total 20 seats</p>
+                  <p className="text-xs text-slate-500 mt-1">active out of total {totalTeamSeats} seats</p>
                 </div>
                 <div className="mt-4 space-y-1.5">
                   <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
-                    <div className="bg-[#4353a4] h-full" style={{ width: `15%` }} />
+                    <div
+                      className="bg-[#4353a4] h-full transition-all duration-300"
+                      style={{ width: `${Math.round((activeTeamCount / totalTeamSeats) * 100)}%` }}
+                    />
                   </div>
-                  <span className="text-[11px] text-slate-400">17 seats available</span>
+                  <span className="text-[11px] text-slate-400">
+                    {Math.max(0, totalTeamSeats - activeTeamCount)} seats available
+                  </span>
                 </div>
               </div>
             </div>
