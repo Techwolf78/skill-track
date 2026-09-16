@@ -27,12 +27,34 @@ import { useAuth } from "@/lib/auth-context";
 import { GryphonLogo } from "@/components/ui/GryphonLogo";
 import { useQuery } from "@tanstack/react-query";
 import { apiClient } from "@/lib/api-client";
+import { organisationService } from "@/lib/organisation-service";
+
+function formatDateRange(startDate?: string, endDate?: string) {
+  if (!startDate || !endDate) return "Nov 14, 2025 - Aug 26, 2027";
+  const formatSingle = (d: string) => {
+    try {
+      const parsed = new Date(d);
+      if (isNaN(parsed.getTime())) return d;
+      return parsed.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+    } catch {
+      return d;
+    }
+  };
+  return `${formatSingle(startDate)} - ${formatSingle(endDate)}`;
+}
 
 export default function NewAdminLayout() {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, logout } = useAuth();
   const [pinPopoverOpen, setPinPopoverOpen] = useState(false);
+
+  const userOrgId = user?.organisationData?.id || (user as any)?.organisation?.id || "default";
+
+  // Dynamic subscription config from SuperAdmin
+  const subConfig = useMemo(() => {
+    return organisationService.getSubscriptionConfig(userOrgId);
+  }, [userOrgId]);
 
   // Fetch real invitations to calculate live remaining PINs
   const { data: invitations = [] } = useQuery<any[]>({
@@ -52,7 +74,7 @@ export default function NewAdminLayout() {
     },
   });
 
-  const totalAllocatedPins = 10911;
+  const totalAllocatedPins = subConfig.allocatedPins || 10911;
   const initialBaseUsed = 8120;
 
   // Real dynamic live consumption:
@@ -159,7 +181,7 @@ export default function NewAdminLayout() {
               >
                 {/* Billing Period */}
                 <div className="text-[10.5px] text-slate-300 border-b border-slate-800 pb-1.5 leading-tight">
-                  <span className="text-slate-400">Billing Period:</span> Nov 14, 2025 - Aug 26, 2027.
+                  <span className="text-slate-400">Billing Period:</span> {formatDateRange(subConfig.billingCycleStartDate, subConfig.billingCycleEndDate)}.
                 </div>
 
                 {/* Deduction Logic */}

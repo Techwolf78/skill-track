@@ -34,14 +34,36 @@ import {
 import { useQuery } from "@tanstack/react-query";
 import { apiClient } from "@/lib/api-client";
 import { userService } from "@/lib/user-service";
+import { organisationService } from "@/lib/organisation-service";
 import { useAuth } from "@/lib/auth-context";
 import { formatDateTime } from "@/lib/date-utils";
+
+function formatDateRange(startDate?: string, endDate?: string) {
+  if (!startDate || !endDate) return "Nov 14, 2025 - Aug 26, 2027";
+  const formatSingle = (d: string) => {
+    try {
+      const parsed = new Date(d);
+      if (isNaN(parsed.getTime())) return d;
+      return parsed.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+    } catch {
+      return d;
+    }
+  };
+  return `${formatSingle(startDate)} - ${formatSingle(endDate)}`;
+}
 
 export default function NewAdminBilling() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [searchTerm, setSearchTerm] = useState("");
   const [activeTab, setActiveTab] = useState<"overview" | "statement">("overview");
+
+  const userOrgId = user?.organisationData?.id || (user as any)?.organisation?.id || "default";
+
+  // Dynamic subscription config from SuperAdmin
+  const subConfig = useMemo(() => {
+    return organisationService.getSubscriptionConfig(userOrgId);
+  }, [userOrgId]);
 
   // Fetch real invitations to calculate real live consumption
   const { data: invitations = [] } = useQuery<any[]>({
@@ -74,22 +96,21 @@ export default function NewAdminBilling() {
     },
   });
 
-  const totalTeamSeats = 20;
-  const userOrgId = user?.organisationData?.id || (user as any)?.organisation?.id;
+  const totalTeamSeats = subConfig.maxTeamSeats || 20;
   const activeTeamCount = useMemo(() => {
     if (!orgUsers || orgUsers.length === 0) return 1;
     const adminOrTrainerUsers = orgUsers.filter((u) => {
       const isStaffRole = u.role === "ADMIN" || u.role === "TRAINER" || u.role === "SUPERADMIN";
       if (!isStaffRole) return false;
-      if (!userOrgId) return true;
+      if (!userOrgId || userOrgId === "default") return true;
       const orgId = u.organisation?.id || (u as any).organisation_id || (u as any).organisationId;
       return !orgId || orgId === userOrgId;
     });
     return Math.max(1, adminOrTrainerUsers.length);
   }, [orgUsers, userOrgId]);
 
-  // Base plan numbers from DoSelect B2B enterprise tier
-  const totalAllocatedPins = 10911;
+  // Base plan numbers from DoSelect B2B enterprise tier / SuperAdmin config
+  const totalAllocatedPins = subConfig.allocatedPins || 10911;
   const initialBaseUsed = 8120;
   
   // Real dynamic live consumption:
@@ -260,7 +281,26 @@ export default function NewAdminBilling() {
     },
   ];
 
-  const filteredStatements = defaultStatements.filter((stmt) =>
+  const customAdjustments = useMemo(() => {
+    return (subConfig.statementAdjustments || []).map((adj) => ({
+      id: adj.id,
+      date: adj.date,
+      reason: adj.reason,
+      assessmentName: adj.assessmentName || "SuperAdmin Quota Adjustment",
+      assessmentLink: "/admin/billing",
+      type: adj.pinsChange > 0 ? "Credit Top-Up" : "Debit Adjustment",
+      initiatedBy: adj.initiatedBy || "SuperAdmin",
+      invitesCount: Math.abs(adj.pinsChange),
+      pinsChange: adj.pinsChange,
+      pinsRemaining: pinsRemaining,
+    }));
+  }, [subConfig.statementAdjustments, pinsRemaining]);
+
+  const allStatements = useMemo(() => {
+    return [...customAdjustments, ...defaultStatements];
+  }, [customAdjustments, defaultStatements]);
+
+  const filteredStatements = allStatements.filter((stmt) =>
     stmt.assessmentName.toLowerCase().includes(searchTerm.toLowerCase()) ||
     stmt.reason.toLowerCase().includes(searchTerm.toLowerCase()) ||
     stmt.date.includes(searchTerm)
@@ -306,21 +346,25 @@ export default function NewAdminBilling() {
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Current Plan</span>
                   <Badge className="bg-[#4353a4]/10 text-[#4353a4] border border-[#4353a4]/20 font-bold px-2 py-0.5 text-xs">
-                    Standard
+                    {subConfig.planTier || "Standard"}
                   </Badge>
                 </div>
                 <div className="mt-4 space-y-3 text-xs">
                   <div className="flex justify-between py-1.5 border-b border-slate-100">
                     <span className="text-slate-500">Billing mode</span>
-                    <span className="font-semibold text-slate-800">One-time Subscription</span>
+                    <span className="font-semibold text-slate-800">{subConfig.billingMode || "One-time Subscription"}</span>
                   </div>
                   <div className="flex justify-between py-1.5 border-b border-slate-100">
                     <span className="text-slate-500">Subscription validity</span>
-                    <span className="font-semibold text-slate-800">Nov 14, 2025 - Aug 26, 2027</span>
+                    <span className="font-semibold text-slate-800">
+                      {formatDateRange(subConfig.subscriptionStartDate, subConfig.subscriptionEndDate)}
+                    </span>
                   </div>
                   <div className="flex justify-between py-1.5">
                     <span className="text-slate-500">Current billing cycle</span>
-                    <span className="font-semibold text-slate-800">Nov 14, 2025 - Aug 26, 2027</span>
+                    <span className="font-semibold text-slate-800">
+                      {formatDateRange(subConfig.billingCycleStartDate, subConfig.billingCycleEndDate)}
+                    </span>
                   </div>
                 </div>
               </div>
@@ -397,29 +441,35 @@ export default function NewAdminBilling() {
               <div className="border border-slate-200 p-4 space-y-3 bg-slate-50/40">
                 <div className="flex items-center justify-between">
                   <span className="font-bold text-sm text-slate-900">Basic Proctoring</span>
-                  <Badge className="bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 text-[10px]">
-                    Enabled
-                  </Badge>
+                  {subConfig.enabledProctoringTiers?.basic ? (
+                    <Badge className="bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 text-[10px]">
+                      Enabled
+                    </Badge>
+                  ) : (
+                    <Badge variant="outline" className="bg-slate-100 text-slate-400 text-[10px]">
+                      Disabled
+                    </Badge>
+                  )}
                 </div>
                 <ul className="space-y-1.5 text-xs text-slate-600">
                   <li className="flex items-center gap-2">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                    <CheckCircle2 className={`w-3.5 h-3.5 shrink-0 ${subConfig.enabledProctoringTiers?.basic ? "text-emerald-600" : "text-slate-300"}`} />
                     <span>Enforce full-screen during test</span>
                   </li>
                   <li className="flex items-center gap-2">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                    <CheckCircle2 className={`w-3.5 h-3.5 shrink-0 ${subConfig.enabledProctoringTiers?.basic ? "text-emerald-600" : "text-slate-300"}`} />
                     <span>Track tab activity</span>
                   </li>
                   <li className="flex items-center gap-2">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                    <CheckCircle2 className={`w-3.5 h-3.5 shrink-0 ${subConfig.enabledProctoringTiers?.basic ? "text-emerald-600" : "text-slate-300"}`} />
                     <span>Disable copy-paste of solutions</span>
                   </li>
                   <li className="flex items-center gap-2">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                    <CheckCircle2 className={`w-3.5 h-3.5 shrink-0 ${subConfig.enabledProctoringTiers?.basic ? "text-emerald-600" : "text-slate-300"}`} />
                     <span>Prevent multi-window test sessions</span>
                   </li>
                   <li className="flex items-center gap-2">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                    <CheckCircle2 className={`w-3.5 h-3.5 shrink-0 ${subConfig.enabledProctoringTiers?.basic ? "text-emerald-600" : "text-slate-300"}`} />
                     <span>Capture browser fingerprint</span>
                   </li>
                 </ul>
@@ -430,9 +480,15 @@ export default function NewAdminBilling() {
                 <div>
                   <div className="flex items-center justify-between">
                     <span className="font-bold text-sm text-slate-900">Standard Proctoring</span>
-                    <Badge className="bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 text-[10px]">
-                      Enabled
-                    </Badge>
+                    {subConfig.enabledProctoringTiers?.standard ? (
+                      <Badge className="bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 text-[10px]">
+                        Enabled
+                      </Badge>
+                    ) : (
+                      <Badge variant="outline" className="bg-slate-100 text-slate-400 text-[10px]">
+                        Disabled
+                      </Badge>
+                    )}
                   </div>
                   <p className="text-xs text-slate-500 mt-3">
                     Periodic webcam snapshots and room acoustic verification:
@@ -441,7 +497,9 @@ export default function NewAdminBilling() {
                     1 Frame per 15 seconds
                   </p>
                 </div>
-                <div className="text-[11px] text-slate-400">Active across all standard assessments</div>
+                <div className="text-[11px] text-slate-400">
+                  {subConfig.enabledProctoringTiers?.standard ? "Active across all standard assessments" : "Disabled by SuperAdmin"}
+                </div>
               </div>
 
               {/* Advanced Proctoring */}
@@ -449,9 +507,15 @@ export default function NewAdminBilling() {
                 <div>
                   <div className="flex items-center justify-between">
                     <span className="font-bold text-sm text-slate-900">Advanced Proctoring</span>
-                    <Badge className="bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 text-[10px]">
-                      Enabled
-                    </Badge>
+                    {subConfig.enabledProctoringTiers?.advanced ? (
+                      <Badge className="bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 text-[10px]">
+                        Enabled
+                      </Badge>
+                    ) : (
+                      <Badge variant="outline" className="bg-slate-100 text-slate-400 text-[10px]">
+                        Disabled
+                      </Badge>
+                    )}
                   </div>
                   <p className="text-xs text-slate-500 mt-3">
                     Continuous real-time continuous video & neural gaze tracking:
@@ -460,7 +524,9 @@ export default function NewAdminBilling() {
                     1 Frame per second (Real-Time Video Stream)
                   </p>
                 </div>
-                <div className="text-[11px] text-slate-400">Active for high-stakes evaluations</div>
+                <div className="text-[11px] text-slate-400">
+                  {subConfig.enabledProctoringTiers?.advanced ? "Active for high-stakes evaluations" : "Disabled by SuperAdmin"}
+                </div>
               </div>
             </div>
           </div>
