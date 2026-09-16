@@ -153,6 +153,7 @@ export interface CreateQuestionRequest {
   shuffleOptions?: boolean;
   multipleCorrect?: boolean;
   imageUrl?: string;
+  image_url?: string;
   // Assertion-Reason specific
   assertion?: string;
   reason?: string;
@@ -203,6 +204,8 @@ export interface UpdateQuestionRequest {
   mcqOptions?: McqOption[];
   shuffleOptions?: boolean;
   multipleCorrect?: boolean;
+  imageUrl?: string;
+  image_url?: string;
   // Assertion-Reason specific
   assertion?: string;
   reason?: string;
@@ -363,6 +366,8 @@ export interface Question {
   mcqOptions?: McqOption[];
   shuffleOptions?: boolean;
   multipleCorrect?: boolean;
+  imageUrl?: string;
+  image_url?: string;
   // Assertion-Reason specific
   assertion?: string;
   reason?: string;

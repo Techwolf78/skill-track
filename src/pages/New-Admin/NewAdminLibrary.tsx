@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import {
   Search,
   ShoppingBag,
@@ -765,8 +765,30 @@ export default function NewAdminLibrary() {
   const [selectedLevel, setSelectedLevel] = useState<"ALL" | "EASY" | "MEDIUM" | "HARD">("ALL");
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
+  const location = useLocation();
+  const [currentPage, setCurrentPage] = useState<number>(() => {
+    const fromState = location.state?.page || location.state?.returnPage;
+    const fromSession = Number(sessionStorage.getItem("admin_library_page"));
+    if (fromState && fromState > 0) return fromState;
+    if (fromSession && fromSession > 0) return fromSession;
+    return 1;
+  });
+  const [pageSize, setPageSize] = useState<number>(() => {
+    const fromState = location.state?.pageSize || location.state?.returnPageSize;
+    const fromSession = Number(sessionStorage.getItem("admin_library_page_size"));
+    const valid = [10, 20, 50, 100];
+    if (fromState && valid.includes(fromState)) return fromState;
+    if (fromSession && valid.includes(fromSession)) return fromSession;
+    return 10;
+  });
+
+  useEffect(() => {
+    sessionStorage.setItem("admin_library_page", String(currentPage));
+  }, [currentPage]);
+
+  useEffect(() => {
+    sessionStorage.setItem("admin_library_page_size", String(pageSize));
+  }, [pageSize]);
 
   // Calculate counts per library
   const publicCount = useMemo(
@@ -1138,7 +1160,17 @@ export default function NewAdminLibrary() {
                         {/* Edit Button for ORG_OWNED / Company Questions */}
                         {(q.visibility === "ORG_OWNED" || selectedLibrary === "ORG_OWNED") && (
                           <button
-                            onClick={() => navigate(`/admin/questions/edit/${q.id}`, { state: q })}
+                            onClick={() => {
+                              sessionStorage.setItem("admin_library_page", String(currentPage));
+                              sessionStorage.setItem("admin_library_page_size", String(pageSize));
+                              navigate(`/admin/questions/edit/${q.id}`, {
+                                state: {
+                                  ...q,
+                                  returnPage: currentPage,
+                                  returnPageSize: pageSize,
+                                },
+                              });
+                            }}
                             className="p-0.5 hover:text-indigo-600 transition-colors cursor-pointer"
                             title="Edit Question"
                           >

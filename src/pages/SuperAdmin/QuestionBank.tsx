@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -37,6 +37,10 @@ import {
   AlertCircle,
   CheckCircle2,
   Sparkles,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
 } from "lucide-react";
 import * as XLSX from "xlsx";
 import {
@@ -118,8 +122,31 @@ export default function SuperAdminQuestionBank() {
   const [cognitiveFilter, setCognitiveFilter] = useState<CognitiveLevelType>("ALL");
   const [formatFilter, setFormatFilter] = useState<QuestionFormatType>("ALL");
 
-  const [currentPage, setCurrentPage] = useState(1);
-  const ITEMS_PER_PAGE = 8;
+  const location = useLocation();
+  const [pageSize, setPageSize] = useState<number>(() => {
+    const fromState = location.state?.pageSize || location.state?.returnPageSize;
+    const fromSession = Number(sessionStorage.getItem("superadmin_qb_page_size"));
+    const validSizes = [8, 10, 15, 20, 50, 100];
+    if (fromState && validSizes.includes(fromState)) return fromState;
+    if (fromSession && validSizes.includes(fromSession)) return fromSession;
+    return 10;
+  });
+
+  const [currentPage, setCurrentPage] = useState<number>(() => {
+    const fromState = location.state?.page || location.state?.returnPage;
+    const fromSession = Number(sessionStorage.getItem("superadmin_qb_page"));
+    if (fromState && fromState > 0) return fromState;
+    if (fromSession && fromSession > 0) return fromSession;
+    return 1;
+  });
+
+  useEffect(() => {
+    sessionStorage.setItem("superadmin_qb_page_size", String(pageSize));
+  }, [pageSize]);
+
+  useEffect(() => {
+    sessionStorage.setItem("superadmin_qb_page", String(currentPage));
+  }, [currentPage]);
 
   const [selectedAdvancedQuestion, setSelectedAdvancedQuestion] = useState<ExtendedQuestion | null>(null);
   const [importDialogOpen, setImportDialogOpen] = useState(false);
@@ -249,7 +276,15 @@ export default function SuperAdminQuestionBank() {
         description: "Editing mock questions is disabled in this dashboard layout.",
       });
     } else {
-      navigate(`/superadmin/questions/edit/${question.id}`);
+      sessionStorage.setItem("superadmin_qb_page", String(currentPage));
+      sessionStorage.setItem("superadmin_qb_page_size", String(pageSize));
+      navigate(`/superadmin/questions/edit/${question.id}`, {
+        state: {
+          returnPage: currentPage,
+          returnPageSize: pageSize,
+          returnActiveTab: activeTab,
+        },
+      });
     }
   };
 
@@ -288,11 +323,19 @@ export default function SuperAdminQuestionBank() {
     return matchesTab && matchesSearch && matchesDifficulty && matchesSubject && matchesDomain && matchesCognitive && matchesFormat;
   });
 
-  const totalPages = Math.ceil(filteredQuestions.length / ITEMS_PER_PAGE);
-  const paginatedQuestions = filteredQuestions.slice(
-    (currentPage - 1) * ITEMS_PER_PAGE,
-    currentPage * ITEMS_PER_PAGE
-  );
+  const totalQuestions = filteredQuestions.length;
+  const totalPages = Math.max(1, Math.ceil(totalQuestions / pageSize));
+  const safePage = Math.min(Math.max(1, currentPage), totalPages);
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [totalPages, currentPage]);
+
+  const startIndex = (safePage - 1) * pageSize;
+  const endIndex = Math.min(safePage * pageSize, totalQuestions);
+  const paginatedQuestions = filteredQuestions.slice(startIndex, startIndex + pageSize);
 
   const getSubjectName = (subjectId?: string) => {
     if (!subjectId) return "Core General";
@@ -658,45 +701,110 @@ export default function SuperAdminQuestionBank() {
               </TableBody>
             </Table>
 
-            {/* Pagination Controls */}
-            {totalPages > 1 && (
-              <div className="flex items-center justify-between px-6 py-4 border-t bg-muted/20">
-                <p className="text-xs text-muted-foreground font-medium">
-                  Showing <span className="font-semibold text-foreground">{(currentPage - 1) * ITEMS_PER_PAGE + 1}</span> to{" "}
-                  <span className="font-semibold text-foreground">{Math.min(currentPage * ITEMS_PER_PAGE, filteredQuestions.length)}</span> of{" "}
-                  <span className="font-semibold text-foreground">{filteredQuestions.length}</span> questions
-                </p>
-                <div className="flex items-center gap-2">
+            {/* Pagination Controls Footer */}
+            {totalQuestions > 0 && (
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-4 px-6 py-4 border-t bg-muted/20 text-xs">
+                <div className="flex flex-wrap items-center gap-3 text-muted-foreground">
+                  <p className="font-medium">
+                    Showing <span className="font-semibold text-foreground">{totalQuestions === 0 ? 0 : startIndex + 1}</span> to{" "}
+                    <span className="font-semibold text-foreground">{endIndex}</span> of{" "}
+                    <span className="font-semibold text-foreground">{totalQuestions}</span> questions
+                  </p>
+
+                  <div className="flex items-center gap-1.5 ml-0 sm:ml-4">
+                    <span className="text-muted-foreground font-medium">Rows per page:</span>
+                    <Select
+                      value={String(pageSize)}
+                      onValueChange={(val) => {
+                        const newSize = Number(val);
+                        setPageSize(newSize);
+                        setCurrentPage(1);
+                      }}
+                    >
+                      <SelectTrigger className="h-8 w-[76px] text-xs bg-background">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="8">8</SelectItem>
+                        <SelectItem value="10">10</SelectItem>
+                        <SelectItem value="15">15</SelectItem>
+                        <SelectItem value="20">20</SelectItem>
+                        <SelectItem value="50">50</SelectItem>
+                        <SelectItem value="100">100</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-1.5">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(1)}
+                    disabled={safePage <= 1}
+                    className="h-8 w-8 p-0"
+                    title="First page"
+                  >
+                    <ChevronsLeft className="w-4 h-4" />
+                  </Button>
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
-                    disabled={currentPage === 1}
-                    className="h-8 text-xs font-semibold"
+                    disabled={safePage <= 1}
+                    className="h-8 px-2.5 text-xs font-semibold"
                   >
+                    <ChevronLeft className="w-3.5 h-3.5 mr-1" />
                     Previous
                   </Button>
+
                   <div className="flex items-center gap-1">
-                    {Array.from({ length: totalPages }, (_, idx) => idx + 1).map((page) => (
-                      <Button
-                        key={page}
-                        variant={currentPage === page ? "default" : "outline"}
-                        size="sm"
-                        className="w-8 h-8 p-0 text-xs font-semibold"
-                        onClick={() => setCurrentPage(page)}
-                      >
-                        {page}
-                      </Button>
-                    ))}
+                    {Array.from({ length: totalPages }, (_, idx) => idx + 1)
+                      .filter((page) => {
+                        if (totalPages <= 7) return true;
+                        if (page === 1 || page === totalPages) return true;
+                        return Math.abs(page - safePage) <= 1;
+                      })
+                      .map((page, idx, arr) => {
+                        const prevPage = arr[idx - 1];
+                        const showEllipsis = prevPage && page - prevPage > 1;
+                        return (
+                          <div key={page} className="flex items-center gap-1">
+                            {showEllipsis && <span className="px-1 text-muted-foreground">...</span>}
+                            <Button
+                              variant={safePage === page ? "default" : "outline"}
+                              size="sm"
+                              className={`w-8 h-8 p-0 text-xs font-semibold ${
+                                safePage === page ? "bg-primary text-primary-foreground font-bold" : ""
+                              }`}
+                              onClick={() => setCurrentPage(page)}
+                            >
+                              {page}
+                            </Button>
+                          </div>
+                        );
+                      })}
                   </div>
+
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
-                    disabled={currentPage === totalPages}
-                    className="h-8 text-xs font-semibold"
+                    disabled={safePage >= totalPages}
+                    className="h-8 px-2.5 text-xs font-semibold"
                   >
                     Next
+                    <ChevronRight className="w-3.5 h-3.5 ml-1" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(totalPages)}
+                    disabled={safePage >= totalPages}
+                    className="h-8 w-8 p-0"
+                    title="Last page"
+                  >
+                    <ChevronsRight className="w-4 h-4" />
                   </Button>
                 </div>
               </div>

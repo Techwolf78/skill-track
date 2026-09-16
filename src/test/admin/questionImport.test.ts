@@ -166,18 +166,18 @@ describe("Question Import Taxonomy Resolver", () => {
     expect(parsed?.question.status).toBeUndefined();
   });
 
-  it("should respect explicit status column when provided and leave undefined otherwise", () => {
+  it("should respect explicit status column and exact title when provided and leave undefined otherwise", () => {
     const rowWithoutStatus = {
-      title: "Question Without Status",
       type: "MCQ",
       prompt: "What is 2 + 2?",
       marks: 1,
     };
     const parsedDefault = parseImportRow(rowWithoutStatus, 1, baseContext, "PUBLIC");
     expect(parsedDefault?.question.status).toBeUndefined();
+    expect(parsedDefault?.question.title).toBeUndefined();
 
     const rowWithStatus = {
-      title: "Question With Status",
+      title: "Custom Math Question Title",
       type: "MCQ",
       prompt: "What is 3 + 3?",
       marks: 1,
@@ -185,6 +185,7 @@ describe("Question Import Taxonomy Resolver", () => {
     };
     const parsedExplicit = parseImportRow(rowWithStatus, 2, baseContext, "PUBLIC");
     expect(parsedExplicit?.question.status).toBe("UNDER_REVIEW");
+    expect(parsedExplicit?.question.title).toBe("Custom Math Question Title");
   });
 
   it("should generate dynamic MCQ and Coding Excel templates containing active taxonomy reference sheet", () => {
