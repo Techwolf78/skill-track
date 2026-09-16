@@ -823,7 +823,7 @@ export default function NewAdminTestEdit() {
   const handleOpenSectionSettings = (section: string) => {
     setIsCreatingNewSection(false);
     setActiveModalSection(section);
-    setModalSectionName(section === "Ungrouped" ? "" : section);
+    setModalSectionName(section === "Ungrouped" ? "Ungrouped" : section);
     const currentSettings = sectionSettings[section] || {};
     setModalProblemShuffle(Boolean(currentSettings.shuffleProblems));
     const sectionQs = groupedQuestions[section] || [];
@@ -879,13 +879,13 @@ export default function NewAdminTestEdit() {
 
     if (!activeModalSection) return;
     const oldName = activeModalSection;
-    const newName = oldName === "Ungrouped" ? "Ungrouped" : modalSectionName.trim();
+    const newName = modalSectionName.trim() || (oldName === "Ungrouped" ? "Ungrouped" : "");
 
-    if (oldName !== "Ungrouped" && !newName) {
+    if (!newName) {
       toast.error("Section name cannot be empty");
       return;
     }
-    if (oldName !== "Ungrouped" && newName !== oldName && sectionOrder.includes(newName)) {
+    if (newName !== oldName && sectionOrder.includes(newName)) {
       toast.error(`Section "${newName}" already exists`);
       return;
     }
@@ -895,7 +895,7 @@ export default function NewAdminTestEdit() {
       const sectionQs = groupedQuestions[oldName] || [];
 
       // 1. If Rename happened or custom marks applied, update test_questions
-      const needRename = oldName !== "Ungrouped" && newName !== oldName;
+      const needRename = newName !== oldName;
       const newMarksValue = Number(modalMarksPerQuestion) >= 0 ? Number(modalMarksPerQuestion) : 0;
       const needMarksUpdate = modalMarksPerQuestion !== "" && sectionQs.some((tq) => tq.marks !== newMarksValue);
 
@@ -903,7 +903,7 @@ export default function NewAdminTestEdit() {
         await Promise.all(
           sectionQs.map((tq) => {
             const payload: any = {};
-            if (needRename) payload.sectionName = newName;
+            if (needRename) payload.sectionName = newName === "Ungrouped" ? "" : newName;
             if (needMarksUpdate) payload.marks = newMarksValue;
             return testService.updateTestQuestion(tq.id, payload);
           })
@@ -916,7 +916,7 @@ export default function NewAdminTestEdit() {
         const currentList = next[oldName] || [];
         const updatedList = currentList.map((tq) => ({
           ...tq,
-          sectionName: needRename ? newName : tq.sectionName,
+          sectionName: needRename ? (newName === "Ungrouped" ? undefined : newName) : tq.sectionName,
           marks: needMarksUpdate ? newMarksValue : tq.marks,
         }));
 
@@ -4154,20 +4154,18 @@ export default function NewAdminTestEdit() {
 
           <div className="px-6 py-5 space-y-6">
             {/* 1. Edit / Create Section Name */}
-            {(isCreatingNewSection || activeModalSection !== "Ungrouped") && (
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-slate-700">
-                  Section Name
-                </label>
-                <input
-                  type="text"
-                  value={modalSectionName}
-                  onChange={(e) => setModalSectionName(e.target.value)}
-                  placeholder="e.g. Coding 2, Quantitative Aptitude"
-                  className="w-full text-sm text-slate-800 border border-slate-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 bg-white"
-                />
-              </div>
-            )}
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-slate-700">
+                Section Name
+              </label>
+              <input
+                type="text"
+                value={modalSectionName}
+                onChange={(e) => setModalSectionName(e.target.value)}
+                placeholder="e.g. Coding, Quantitative Aptitude, Technical"
+                className="w-full text-sm text-slate-800 border border-slate-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 bg-white"
+              />
+            </div>
 
             {/* 2. Problem Shuffle */}
             <div className="space-y-2 pt-1 border-t border-slate-100">
