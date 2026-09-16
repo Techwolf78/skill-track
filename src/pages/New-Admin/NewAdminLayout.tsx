@@ -1,7 +1,6 @@
 import React, { useState, useMemo } from "react";
 import { Outlet, NavLink, useLocation, useNavigate } from "react-router-dom";
 import {
-  Search,
   GraduationCap,
   ClipboardList,
   BookOpen,
@@ -9,10 +8,6 @@ import {
   LogOut,
   User as UserIcon,
   CreditCard,
-  HelpCircle,
-  LayoutGrid,
-  ChevronDown,
-  Sparkles,
 } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
@@ -208,31 +203,6 @@ export default function NewAdminLayout() {
               </PopoverContent>
             </Popover>
 
-            {/* Quick Action Icons */}
-            <div className="hidden sm:flex items-center space-x-2 text-slate-400">
-              <button 
-                onClick={() => navigate("/admin/tests")} 
-                title="Search Tests"
-                className="p-1.5 hover:text-white hover:bg-white/10 rounded transition-colors cursor-pointer"
-              >
-                <Search className="w-4 h-4" />
-              </button>
-              <button 
-                onClick={() => navigate("/admin/library")} 
-                title="Question Bank Library"
-                className="p-1.5 hover:text-white hover:bg-white/10 rounded transition-colors cursor-pointer"
-              >
-                <LayoutGrid className="w-4 h-4" />
-              </button>
-              <button 
-                onClick={() => navigate("/admin/billing")} 
-                title="Help & Documentation"
-                className="p-1.5 hover:text-white hover:bg-white/10 rounded transition-colors cursor-pointer"
-              >
-                <HelpCircle className="w-4 h-4" />
-              </button>
-            </div>
-
             {/* Profile Avatar & Dropdown */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -276,15 +246,6 @@ export default function NewAdminLayout() {
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
-
-            {/* Talent Cloud Brand Pill Button */}
-            <button
-              onClick={() => navigate("/admin/billing")}
-              className="hidden lg:flex items-center gap-1.5 px-3 py-1 bg-[#1a2948] hover:bg-[#22365e] border border-slate-700 text-white text-[11px] font-semibold rounded-full transition-colors cursor-pointer"
-            >
-              <Sparkles className="w-3 h-3 text-amber-400" />
-              <span>talent cloud</span>
-            </button>
           </div>
         </header>
 
