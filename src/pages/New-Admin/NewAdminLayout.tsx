@@ -128,7 +128,6 @@ export default function NewAdminLayout() {
               <PopoverTrigger asChild>
                 <div 
                   className="flex flex-col items-end cursor-pointer group px-2 py-1 hover:bg-white/5 rounded transition-colors"
-                  title="View Billing & Quota Details"
                 >
                   <span className="text-[11px] font-medium text-slate-200 group-hover:text-white transition-colors">
                     {pinsRemaining.toLocaleString()}/{totalAllocatedPins.toLocaleString()} invite pins left ({remainingPercentage}%)
@@ -143,59 +142,42 @@ export default function NewAdminLayout() {
               </PopoverTrigger>
               <PopoverContent 
                 align="end" 
-                className="w-80 p-5 bg-[#171b26] border border-slate-700 text-slate-200 shadow-2xl rounded-none text-xs space-y-3.5"
+                className="w-72 p-3 bg-[#171b26] border border-slate-700 text-slate-200 shadow-2xl rounded-none text-xs space-y-2"
               >
-                {/* Header with Progress Bar */}
-                <div className="space-y-1.5">
-                  <div className="flex justify-between items-center text-xs">
-                    <span className="font-bold text-white tracking-tight">
-                      {pinsRemaining.toLocaleString()}/{totalAllocatedPins.toLocaleString()} invite pins left ({remainingPercentage}%)
-                    </span>
-                  </div>
-                  <div className="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden border border-slate-700">
-                    <div 
-                      className="h-full bg-[#EF4444]"
-                      style={{ width: `${Math.min(100, Math.max(5, 100 - remainingPercentage))}%` }}
-                    />
-                  </div>
-                </div>
-
                 {/* Billing Period */}
-                <div className="text-[11px] text-slate-300 border-b border-slate-800 pb-2.5">
+                <div className="text-[10.5px] text-slate-300 border-b border-slate-800 pb-1.5 leading-tight">
                   <span className="text-slate-400">Billing Period:</span> Nov 14, 2025 - Aug 26, 2027.
                 </div>
 
                 {/* Deduction Logic */}
-                <div className="text-[11px] space-y-1">
+                <div className="text-[10.5px] space-y-0.5">
                   <span className="font-semibold text-white">New Invite Deduction logic:</span>
-                  <ul className="list-disc pl-4 space-y-0.5 text-slate-300 text-[10.5px]">
+                  <ul className="list-disc pl-3.5 space-y-0.5 text-slate-300 text-[10px]">
                     <li>Project based / Speechprose : 2 pins per invite</li>
                     <li>Others : 1 pin per invite</li>
                   </ul>
                 </div>
 
-                {/* Historic Consumption */}
-                <div className="text-[11px] pt-1 text-slate-300">
-                  <span>Consumption Before Jul 24, 2025 : </span>
-                  <button 
-                    onClick={() => {
-                      setPinPopoverOpen(false);
-                      navigate("/admin/billing");
-                    }} 
-                    className="underline text-slate-100 hover:text-orange-400 font-medium cursor-pointer"
-                  >
-                    View Details
-                  </button>
-                </div>
-
-                {/* Bottom Know More button */}
-                <div className="pt-2 border-t border-slate-800 flex justify-end">
+                {/* Historic Consumption & Know More Row */}
+                <div className="text-[10px] pt-1.5 border-t border-slate-800 flex items-center justify-between text-slate-300">
+                  <div>
+                    <span>Consumption Before Jul 24, 2025 : </span>
+                    <button 
+                      onClick={() => {
+                        setPinPopoverOpen(false);
+                        navigate("/admin/billing");
+                      }} 
+                      className="underline text-slate-100 hover:text-orange-400 font-medium cursor-pointer"
+                    >
+                      View Details
+                    </button>
+                  </div>
                   <button
                     onClick={() => {
                       setPinPopoverOpen(false);
                       navigate("/admin/billing");
                     }}
-                    className="text-xs font-bold text-white hover:text-orange-400 hover:underline cursor-pointer transition-colors"
+                    className="text-[11px] font-bold text-white hover:text-orange-400 hover:underline cursor-pointer transition-colors shrink-0 ml-2"
                   >
                     Know More
                   </button>
