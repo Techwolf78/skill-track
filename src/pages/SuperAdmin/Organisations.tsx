@@ -351,15 +351,6 @@ export default function Organisations() {
                         {currentSub.allocatedPins.toLocaleString()} PINs
                       </span>
                     </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-slate-500 flex items-center gap-1.5">
-                        <UsersIcon className="w-3.5 h-3.5 text-blue-500" />
-                        Team Seats
-                      </span>
-                      <span className="font-semibold text-slate-800 font-mono">
-                        {currentSub.maxTeamSeats} seats
-                      </span>
-                    </div>
                     <div className="flex justify-between items-center text-[11px] text-slate-400 pt-1 border-t border-slate-200/60">
                       <span>Validity</span>
                       <span className="text-slate-600 font-medium">
@@ -528,20 +519,6 @@ export default function Organisations() {
                       value={subConfig.allocatedPins}
                       onChange={(e) => setSubConfig({ ...subConfig, allocatedPins: parseInt(e.target.value) || 0 })}
                       className="w-32 h-9 font-mono font-bold text-right text-sm"
-                    />
-                  </div>
-
-                  <div className="border-t border-slate-200/60 pt-3 flex justify-between items-center">
-                    <div>
-                      <Label className="text-xs font-bold text-slate-900">Team Member Seat Limit</Label>
-                      <p className="text-[11px] text-slate-500">Max allowed Admin / Trainer seats</p>
-                    </div>
-                    <Input
-                      type="number"
-                      min="1"
-                      value={subConfig.maxTeamSeats}
-                      onChange={(e) => setSubConfig({ ...subConfig, maxTeamSeats: parseInt(e.target.value) || 1 })}
-                      className="w-24 h-9 font-mono font-bold text-right text-sm"
                     />
                   </div>
                 </div>
