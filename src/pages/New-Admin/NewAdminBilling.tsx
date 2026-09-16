@@ -93,13 +93,13 @@ export default function NewAdminBilling() {
   const initialBaseUsed = 8120;
   
   // Real dynamic live consumption:
-  // 1. Upfront PIN reservation when invitations are initiated
-  // 2. Automatic PIN refund when schedules expire with unattended candidates
+  // 1. Upfront PIN reservation: 1 pin per candidate invitation
+  // 2. Automatic PIN refund: 1 pin refunded per unattended/expired candidate
   const { liveDeductedCount, liveRefundedCount } = useMemo(() => {
     let deducted = 0;
     let refunded = 0;
     invitations.forEach((i) => {
-      const weight = i.test?.isProjectBased || (i.test?.title || "").toLowerCase().includes("project") ? 2 : 1;
+      const weight = 1; // General assessment: strictly 1 pin per candidate
       if (i.status === "CANCELLED" || i.status === "REFUNDED" || i.status === "EXPIRED") {
         refunded += weight;
       } else {
@@ -136,7 +136,7 @@ export default function NewAdminBilling() {
     "Coding",
   ];
 
-  // Detailed ledger statements
+  // Detailed ledger statements (1 PIN per candidate invite)
   const defaultStatements = [
     {
       id: "stmt-1",
@@ -144,11 +144,11 @@ export default function NewAdminBilling() {
       reason: "Refund of pins",
       assessmentName: "P R Pote-CS/IT/AIDS",
       assessmentLink: "/admin/tests",
-      type: "Project Based Test",
+      type: "General Test",
       initiatedBy: user?.organisationData?.name || "GryphonAcademy",
       invitesCount: 15,
-      pinsChange: 30,
-      pinsRemaining: 69,
+      pinsChange: 15,
+      pinsRemaining: 2787,
     },
     {
       id: "stmt-2",
@@ -156,11 +156,11 @@ export default function NewAdminBilling() {
       reason: "Refund of pins",
       assessmentName: "KDK-CS",
       assessmentLink: "/admin/tests",
-      type: "Project Based Test",
+      type: "General Test",
       initiatedBy: user?.organisationData?.name || "GryphonAcademy",
       invitesCount: 10,
-      pinsChange: 20,
-      pinsRemaining: 362,
+      pinsChange: 10,
+      pinsRemaining: 2772,
     },
     {
       id: "stmt-3",
@@ -168,11 +168,11 @@ export default function NewAdminBilling() {
       reason: "Refund of pins",
       assessmentName: "BSIET-III-CSE",
       assessmentLink: "/admin/tests",
-      type: "Project Based Test",
+      type: "General Test",
       initiatedBy: user?.organisationData?.name || "GryphonAcademy",
       invitesCount: 48,
-      pinsChange: 96,
-      pinsRemaining: 762,
+      pinsChange: 48,
+      pinsRemaining: 2762,
     },
     {
       id: "stmt-4",
@@ -180,11 +180,11 @@ export default function NewAdminBilling() {
       reason: "Refund of pins",
       assessmentName: "BSIET-III-CSE",
       assessmentLink: "/admin/tests",
-      type: "Project Based Test",
+      type: "General Test",
       initiatedBy: user?.organisationData?.name || "GryphonAcademy",
       invitesCount: 5,
-      pinsChange: 10,
-      pinsRemaining: 581,
+      pinsChange: 5,
+      pinsRemaining: 2714,
     },
     {
       id: "stmt-5",
@@ -192,11 +192,11 @@ export default function NewAdminBilling() {
       reason: "Refund of pins",
       assessmentName: "BSIET-III-CSE",
       assessmentLink: "/admin/tests",
-      type: "Project Based Test",
+      type: "General Test",
       initiatedBy: user?.organisationData?.name || "GryphonAcademy",
       invitesCount: 15,
-      pinsChange: 30,
-      pinsRemaining: 571,
+      pinsChange: 15,
+      pinsRemaining: 2709,
     },
     {
       id: "stmt-6",
@@ -204,11 +204,11 @@ export default function NewAdminBilling() {
       reason: "Invites sent",
       assessmentName: "BSIET-III-CSE",
       assessmentLink: "/admin/tests",
-      type: "Project Based Test",
+      type: "General Test",
       initiatedBy: user?.organisationData?.name || "GryphonAcademy",
       invitesCount: 1,
-      pinsChange: -2,
-      pinsRemaining: 901,
+      pinsChange: -1,
+      pinsRemaining: 2694,
     },
     {
       id: "stmt-7",
@@ -216,11 +216,11 @@ export default function NewAdminBilling() {
       reason: "Invites sent",
       assessmentName: "BSIET-III-CSE",
       assessmentLink: "/admin/tests",
-      type: "Project Based Test",
+      type: "General Test",
       initiatedBy: user?.organisationData?.name || "GryphonAcademy",
       invitesCount: 40,
-      pinsChange: -80,
-      pinsRemaining: 903,
+      pinsChange: -40,
+      pinsRemaining: 2695,
     },
     {
       id: "stmt-8",
@@ -228,11 +228,11 @@ export default function NewAdminBilling() {
       reason: "Invites sent",
       assessmentName: "BSIET-III-CSE",
       assessmentLink: "/admin/tests",
-      type: "Project Based Test",
+      type: "General Test",
       initiatedBy: user?.organisationData?.name || "GryphonAcademy",
       invitesCount: 1,
-      pinsChange: -2,
-      pinsRemaining: 988,
+      pinsChange: -1,
+      pinsRemaining: 2735,
     },
     {
       id: "stmt-9",
@@ -240,11 +240,11 @@ export default function NewAdminBilling() {
       reason: "Invites sent",
       assessmentName: "BSIET-III-CSE",
       assessmentLink: "/admin/tests",
-      type: "Project Based Test",
+      type: "General Test",
       initiatedBy: user?.organisationData?.name || "GryphonAcademy",
       invitesCount: 21,
-      pinsChange: -42,
-      pinsRemaining: 990,
+      pinsChange: -21,
+      pinsRemaining: 2736,
     },
     {
       id: "stmt-10",
@@ -252,11 +252,11 @@ export default function NewAdminBilling() {
       reason: "Invites sent",
       assessmentName: "BSIET-III-CSE",
       assessmentLink: "/admin/tests",
-      type: "Project Based Test",
+      type: "General Test",
       initiatedBy: user?.organisationData?.name || "GryphonAcademy",
       invitesCount: 65,
-      pinsChange: -130,
-      pinsRemaining: 1032,
+      pinsChange: -65,
+      pinsRemaining: 2757,
     },
   ];
 
@@ -326,10 +326,9 @@ export default function NewAdminBilling() {
               </div>
 
               <div className="mt-6 pt-4 border-t border-slate-100 bg-slate-50 -mx-6 -mb-6 p-4 text-[11px] text-slate-500">
-                <span className="font-semibold text-slate-700">New Invite Deduction Logic:</span>
+                <span className="font-semibold text-slate-700">Invite Deduction Logic:</span>
                 <ul className="list-disc pl-4 mt-1 space-y-0.5">
-                  <li>Project based / Speechprose : 2 pins per invite</li>
-                  <li>Others : 1 pin per invite</li>
+                  <li>1 PIN per candidate invite</li>
                 </ul>
               </div>
             </div>

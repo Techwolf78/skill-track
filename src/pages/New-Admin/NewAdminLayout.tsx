@@ -56,13 +56,13 @@ export default function NewAdminLayout() {
   const initialBaseUsed = 8120;
 
   // Real dynamic live consumption:
-  // 1. Upfront PIN reservation when invitations are sent
-  // 2. Automatic PIN refund when schedules expire with unattended candidates
+  // 1. Upfront PIN reservation: 1 pin per candidate invitation
+  // 2. Automatic PIN refund: 1 pin refunded per unattended/expired candidate
   const { liveDeductedCount, liveRefundedCount } = useMemo(() => {
     let deducted = 0;
     let refunded = 0;
     invitations.forEach((i) => {
-      const weight = i.test?.isProjectBased || (i.test?.title || "").toLowerCase().includes("project") ? 2 : 1;
+      const weight = 1; // General assessment: strictly 1 pin per candidate
       if (i.status === "CANCELLED" || i.status === "REFUNDED" || i.status === "EXPIRED") {
         refunded += weight;
       } else {
@@ -164,10 +164,9 @@ export default function NewAdminLayout() {
 
                 {/* Deduction Logic */}
                 <div className="text-[10.5px] space-y-0.5">
-                  <span className="font-semibold text-white">New Invite Deduction logic:</span>
+                  <span className="font-semibold text-white">Invite Deduction logic:</span>
                   <ul className="list-disc pl-3.5 space-y-0.5 text-slate-300 text-[10px]">
-                    <li>Project based / Speechprose : 2 pins per invite</li>
-                    <li>Others : 1 pin per invite</li>
+                    <li>1 PIN per candidate invite</li>
                   </ul>
                 </div>
 
