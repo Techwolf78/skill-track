@@ -530,13 +530,9 @@ export default function Organisations() {
                       <Label className="text-xs font-bold text-slate-900">Total Base PINs Allocated</Label>
                       <p className="text-[11px] text-slate-500">Total invite credits assigned to this organization</p>
                     </div>
-                    <Input
-                      type="number"
-                      min="0"
-                      value={subConfig.allocatedPins}
-                      onChange={(e) => setSubConfig({ ...subConfig, allocatedPins: parseInt(e.target.value) || 0 })}
-                      className="w-32 h-9 font-mono font-bold text-right text-sm"
-                    />
+                    <div className="px-3 py-1.5 bg-white border border-slate-200 rounded text-right font-mono font-bold text-sm text-slate-900 select-none shadow-2xs">
+                      {subConfig.allocatedPins.toLocaleString()} PINs
+                    </div>
                   </div>
                 </div>
 
