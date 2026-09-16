@@ -129,123 +129,123 @@ export default function NewAdminBilling() {
   const defaultStatements = [
     {
       id: "stmt-1",
-      date: "15/09/2026, 15:04",
-      reason: "Invites sent",
-      assessmentName: "SAP-HR",
+      date: "22/08/2026, 13:38",
+      reason: "Refund of pins",
+      assessmentName: "P R Pote-CS/IT/AIDS",
       assessmentLink: "/admin/tests",
-      type: "General Test",
+      type: "Project Based Test",
       initiatedBy: user?.organisationData?.name || "GryphonAcademy",
-      invitesCount: 1,
-      pinsChange: -1,
-      pinsRemaining: 2791,
+      invitesCount: 15,
+      pinsChange: 30,
+      pinsRemaining: 69,
     },
     {
       id: "stmt-2",
-      date: "15/09/2026, 14:06",
-      reason: "Invites sent",
-      assessmentName: "SAP-HR",
+      date: "22/08/2026, 13:36",
+      reason: "Refund of pins",
+      assessmentName: "KDK-CS",
       assessmentLink: "/admin/tests",
-      type: "General Test",
+      type: "Project Based Test",
       initiatedBy: user?.organisationData?.name || "GryphonAcademy",
-      invitesCount: 1,
-      pinsChange: -1,
-      pinsRemaining: 2792,
+      invitesCount: 10,
+      pinsChange: 20,
+      pinsRemaining: 362,
     },
     {
       id: "stmt-3",
-      date: "15/09/2026, 14:06",
-      reason: "Invites sent",
-      assessmentName: "SAP-HR",
+      date: "17/08/2026, 18:32",
+      reason: "Refund of pins",
+      assessmentName: "BSIET-III-CSE",
       assessmentLink: "/admin/tests",
-      type: "General Test",
+      type: "Project Based Test",
       initiatedBy: user?.organisationData?.name || "GryphonAcademy",
-      invitesCount: 1,
-      pinsChange: -1,
-      pinsRemaining: 2793,
+      invitesCount: 48,
+      pinsChange: 96,
+      pinsRemaining: 762,
     },
     {
       id: "stmt-4",
-      date: "15/09/2026, 14:05",
-      reason: "Invites sent",
-      assessmentName: "SAP-HR",
+      date: "17/08/2026, 15:14",
+      reason: "Refund of pins",
+      assessmentName: "BSIET-III-CSE",
       assessmentLink: "/admin/tests",
-      type: "General Test",
+      type: "Project Based Test",
       initiatedBy: user?.organisationData?.name || "GryphonAcademy",
-      invitesCount: 1,
-      pinsChange: -1,
-      pinsRemaining: 2794,
+      invitesCount: 5,
+      pinsChange: 10,
+      pinsRemaining: 581,
     },
     {
       id: "stmt-5",
-      date: "15/09/2026, 14:04",
-      reason: "Invites sent",
-      assessmentName: "SAP-HR",
+      date: "17/08/2026, 12:07",
+      reason: "Refund of pins",
+      assessmentName: "BSIET-III-CSE",
       assessmentLink: "/admin/tests",
-      type: "General Test",
+      type: "Project Based Test",
       initiatedBy: user?.organisationData?.name || "GryphonAcademy",
-      invitesCount: 1,
-      pinsChange: -1,
-      pinsRemaining: 2795,
+      invitesCount: 15,
+      pinsChange: 30,
+      pinsRemaining: 571,
     },
     {
       id: "stmt-6",
-      date: "15/09/2026, 14:04",
+      date: "14/08/2026, 15:04",
       reason: "Invites sent",
-      assessmentName: "SAP-HR",
+      assessmentName: "BSIET-III-CSE",
       assessmentLink: "/admin/tests",
-      type: "General Test",
+      type: "Project Based Test",
       initiatedBy: user?.organisationData?.name || "GryphonAcademy",
       invitesCount: 1,
-      pinsChange: -1,
-      pinsRemaining: 2796,
+      pinsChange: -2,
+      pinsRemaining: 901,
     },
     {
       id: "stmt-7",
-      date: "15/09/2026, 14:03",
+      date: "14/08/2026, 14:35",
       reason: "Invites sent",
-      assessmentName: "SAP-HR",
+      assessmentName: "BSIET-III-CSE",
       assessmentLink: "/admin/tests",
-      type: "General Test",
+      type: "Project Based Test",
       initiatedBy: user?.organisationData?.name || "GryphonAcademy",
-      invitesCount: 1,
-      pinsChange: -1,
-      pinsRemaining: 2797,
+      invitesCount: 40,
+      pinsChange: -80,
+      pinsRemaining: 903,
     },
     {
       id: "stmt-8",
-      date: "15/09/2026, 14:03",
+      date: "14/08/2026, 14:07",
       reason: "Invites sent",
-      assessmentName: "SAP-HR",
+      assessmentName: "BSIET-III-CSE",
       assessmentLink: "/admin/tests",
-      type: "General Test",
+      type: "Project Based Test",
       initiatedBy: user?.organisationData?.name || "GryphonAcademy",
       invitesCount: 1,
-      pinsChange: -1,
-      pinsRemaining: 2798,
+      pinsChange: -2,
+      pinsRemaining: 988,
     },
     {
       id: "stmt-9",
-      date: "15/09/2026, 14:03",
+      date: "14/08/2026, 13:34",
       reason: "Invites sent",
-      assessmentName: "SAP-HR",
+      assessmentName: "BSIET-III-CSE",
       assessmentLink: "/admin/tests",
-      type: "General Test",
+      type: "Project Based Test",
       initiatedBy: user?.organisationData?.name || "GryphonAcademy",
-      invitesCount: 1,
-      pinsChange: -1,
-      pinsRemaining: 2799,
+      invitesCount: 21,
+      pinsChange: -42,
+      pinsRemaining: 990,
     },
     {
       id: "stmt-10",
-      date: "15/09/2026, 13:38",
+      date: "14/08/2026, 13:31",
       reason: "Invites sent",
-      assessmentName: "SAP-HR",
+      assessmentName: "BSIET-III-CSE",
       assessmentLink: "/admin/tests",
-      type: "General Test",
+      type: "Project Based Test",
       initiatedBy: user?.organisationData?.name || "GryphonAcademy",
-      invitesCount: 31,
-      pinsChange: -31,
-      pinsRemaining: 2800,
+      invitesCount: 65,
+      pinsChange: -130,
+      pinsRemaining: 1032,
     },
   ];
 
@@ -356,7 +356,9 @@ export default function NewAdminBilling() {
                     <span className="text-3xl font-extrabold text-slate-900">{activeTeamCount}</span>
                     <span className="text-xs text-slate-400">/ {totalTeamSeats}</span>
                   </div>
-                  <p className="text-xs text-slate-500 mt-1">active out of total {totalTeamSeats} seats</p>
+                  <p className="text-xs text-slate-500 mt-1">
+                    active out of total {totalTeamSeats}. There are no team invites pending, and no inactive members.
+                  </p>
                 </div>
                 <div className="mt-4 space-y-1.5">
                   <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
@@ -554,9 +556,15 @@ export default function NewAdminBilling() {
                     <TableCell className="text-slate-600">{row.initiatedBy}</TableCell>
                     <TableCell className="text-center font-mono font-medium">{row.invitesCount}</TableCell>
                     <TableCell className="text-center">
-                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-50 text-red-600 border border-red-200 font-mono">
-                        {row.pinsChange} Used
-                      </span>
+                      {row.pinsChange > 0 ? (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 font-mono">
+                          +{row.pinsChange} Added
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-50 text-red-600 border border-red-200 font-mono">
+                          {row.pinsChange} Used
+                        </span>
+                      )}
                     </TableCell>
                     <TableCell className="text-right px-6 font-mono font-bold text-slate-900">
                       {row.pinsRemaining}
