@@ -433,7 +433,7 @@ export default function Organisations() {
                   <div className="space-y-1.5">
                     <Label className="text-xs font-semibold text-slate-700">Plan Tier</Label>
                     <Select
-                      value={subConfig.planTier}
+                      value={subConfig.planTier || "Standard"}
                       onValueChange={(val: any) => setSubConfig({ ...subConfig, planTier: val })}
                     >
                       <SelectTrigger className="h-9 text-xs">
@@ -441,8 +441,6 @@ export default function Organisations() {
                       </SelectTrigger>
                       <SelectContent className="text-xs">
                         <SelectItem value="Standard">Standard</SelectItem>
-                        <SelectItem value="Pro">Pro</SelectItem>
-                        <SelectItem value="Enterprise">Enterprise</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -450,7 +448,7 @@ export default function Organisations() {
                   <div className="space-y-1.5">
                     <Label className="text-xs font-semibold text-slate-700">Billing Mode</Label>
                     <Select
-                      value={subConfig.billingMode}
+                      value={subConfig.billingMode || "One-time Subscription"}
                       onValueChange={(val: any) => setSubConfig({ ...subConfig, billingMode: val })}
                     >
                       <SelectTrigger className="h-9 text-xs">
@@ -458,8 +456,6 @@ export default function Organisations() {
                       </SelectTrigger>
                       <SelectContent className="text-xs">
                         <SelectItem value="One-time Subscription">One-time Subscription</SelectItem>
-                        <SelectItem value="Annual Recurring">Annual Recurring</SelectItem>
-                        <SelectItem value="Monthly">Monthly</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
