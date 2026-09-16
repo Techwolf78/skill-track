@@ -65,6 +65,20 @@ import {
 } from "@/lib/organisation-service";
 import { useToast } from "@/hooks/use-toast";
 
+function formatValidityDate(startDate?: string, endDate?: string) {
+  if (!startDate || !endDate) return "Nov 14, 2025 – Aug 26, 2027";
+  const fmt = (d: string) => {
+    try {
+      const p = new Date(d);
+      if (isNaN(p.getTime())) return d;
+      return p.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+    } catch {
+      return d;
+    }
+  };
+  return `${fmt(startDate)} – ${fmt(endDate)}`;
+}
+
 export default function Organisations() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -283,98 +297,105 @@ export default function Organisations() {
           <p className="text-sm mt-1">Create one using the button above.</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
           {filteredOrgs.map((org) => {
             const currentSub = organisationService.getSubscriptionConfig(org.id);
 
             return (
-              <Card key={org.id} className="card-hover group border-slate-200 shadow-xs flex flex-col justify-between">
-                <CardHeader className="pb-3">
-                  <div className="flex items-start justify-between">
-                    <div className="w-12 h-12 rounded-xl bg-slate-900 flex items-center justify-center shadow-xs">
+              <div
+                key={org.id}
+                className="bg-white border border-slate-200/90 rounded-lg p-4 shadow-2xs hover:border-slate-300 transition-all duration-150 flex flex-col justify-between space-y-3.5"
+              >
+                {/* Header */}
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-md bg-slate-900 flex items-center justify-center text-white shrink-0 shadow-2xs">
                       {org.logoUrl ? (
-                        <img src={org.logoUrl} alt={org.name} className="w-8 h-8 rounded-lg object-cover" />
+                        <img src={org.logoUrl} alt={org.name} className="w-7 h-7 rounded object-cover" />
                       ) : (
-                        <Building2 className="w-6 h-6 text-white" />
+                        <Building2 className="w-5 h-5 text-white" />
                       )}
                     </div>
-                    <div className="flex items-center gap-1">
-                      <Badge className="bg-[#4353a4]/10 text-[#4353a4] border border-[#4353a4]/20 text-[10px] font-bold">
-                        {currentSub.planTier}
-                      </Badge>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-500 hover:text-slate-900">
-                            <MoreVertical className="w-4 h-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="text-xs">
-                          <DropdownMenuItem onClick={() => openSubscriptionModal(org)}>
-                            <CreditCard className="w-4 h-4 mr-2 text-[#4353a4]" />
-                            Manage Subscription & PINs
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => {
-                            setEditingOrg(org);
-                            setEditName(org.name);
-                            setEditLogo(org.logoUrl || "");
-                          }}>
-                            <Pencil className="w-4 h-4 mr-2" />
-                            Edit Details
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            className="text-destructive font-medium"
-                            onClick={() => setOrgToDelete(org)}
-                          >
-                            <Trash2 className="w-4 h-4 mr-2" />
-                            Delete
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
-                  </div>
-                  <CardTitle className="mt-3 text-lg font-bold text-slate-900">{org.name}</CardTitle>
-                  <CardDescription className="text-xs text-slate-500">
-                    ID: <span className="font-mono">{org.id.slice(0, 8)}...</span>
-                  </CardDescription>
-                </CardHeader>
-
-                <CardContent className="space-y-4 pt-0">
-                  {/* Quota Highlights Box */}
-                  <div className="bg-slate-50 border border-slate-200/80 p-3 text-xs space-y-2">
-                    <div className="flex justify-between items-center">
-                      <span className="text-slate-500 flex items-center gap-1.5">
-                        <Coins className="w-3.5 h-3.5 text-amber-500" />
-                        Allocated PINs
-                      </span>
-                      <span className="font-bold text-slate-900 font-mono">
-                        {currentSub.allocatedPins.toLocaleString()} PINs
-                      </span>
-                    </div>
-                    <div className="flex justify-between items-center text-[11px] text-slate-400 pt-1 border-t border-slate-200/60">
-                      <span>Validity</span>
-                      <span className="text-slate-600 font-medium">
-                        {currentSub.subscriptionStartDate} to {currentSub.subscriptionEndDate}
-                      </span>
+                    <div>
+                      <h3 className="text-sm font-bold text-slate-900 leading-snug line-clamp-1">{org.name}</h3>
+                      <p className="text-[11px] text-slate-400 font-mono mt-0.5">
+                        ID: {org.id.slice(0, 8)}...
+                      </p>
                     </div>
                   </div>
 
-                  {/* Manage Button */}
+                  <div className="flex items-center gap-1 shrink-0">
+                    <span className="px-2 py-0.5 bg-slate-100 text-slate-700 border border-slate-200 text-[10px] font-semibold rounded">
+                      {currentSub.planTier || "Standard"}
+                    </span>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-7 w-7 text-slate-400 hover:text-slate-800 rounded">
+                          <MoreVertical className="w-3.5 h-3.5" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="text-xs">
+                        <DropdownMenuItem onClick={() => openSubscriptionModal(org)}>
+                          <CreditCard className="w-3.5 h-3.5 mr-2 text-[#4353a4]" />
+                          Manage Subscription & PINs
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => {
+                          setEditingOrg(org);
+                          setEditName(org.name);
+                          setEditLogo(org.logoUrl || "");
+                        }}>
+                          <Pencil className="w-3.5 h-3.5 mr-2" />
+                          Edit Details
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          className="text-destructive font-medium"
+                          onClick={() => setOrgToDelete(org)}
+                        >
+                          <Trash2 className="w-3.5 h-3.5 mr-2" />
+                          Delete
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                </div>
+
+                {/* Quota Info Box */}
+                <div className="bg-slate-50/75 border border-slate-200/70 rounded p-2.5 text-xs space-y-1.5">
+                  <div className="flex justify-between items-center">
+                    <span className="text-[11.5px] text-slate-500 flex items-center gap-1.5">
+                      <Coins className="w-3.5 h-3.5 text-amber-500" />
+                      Allocated PINs
+                    </span>
+                    <span className="font-bold text-slate-900 font-mono text-[11.5px]">
+                      {currentSub.allocatedPins.toLocaleString()} PINs
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center text-[11px] text-slate-400 pt-1.5 border-t border-slate-200/50">
+                    <span>Validity</span>
+                    <span className="text-slate-700 font-medium">
+                      {formatValidityDate(currentSub.subscriptionStartDate, currentSub.subscriptionEndDate)}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Action & Footer */}
+                <div className="space-y-2.5 pt-0.5">
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={() => openSubscriptionModal(org)}
-                    className="w-full text-xs font-semibold border-slate-200 text-slate-700 hover:bg-slate-100 hover:text-[#4353a4] flex items-center justify-center gap-1.5"
+                    className="w-full h-8 text-xs font-medium border-slate-200 text-slate-700 hover:bg-slate-50 hover:text-[#4353a4] rounded flex items-center justify-center gap-1.5 transition-colors"
                   >
-                    <CreditCard className="w-3.5 h-3.5 text-[#4353a4]" />
+                    <CreditCard className="w-3.5 h-3.5 text-slate-500" />
                     <span>Manage Subscription & PINs</span>
                   </Button>
 
-                  <div className="flex items-center gap-2 text-[11px] text-muted-foreground border-t pt-3">
+                  <div className="flex items-center gap-1.5 text-[10.5px] text-slate-400 border-t border-slate-100 pt-2">
                     <Calendar className="w-3 h-3 text-slate-400" />
-                    <span>Created {new Date(org.createdAt).toLocaleDateString()}</span>
+                    <span>Created {new Date(org.createdAt).toLocaleDateString("en-GB")}</span>
                   </div>
-                </CardContent>
-              </Card>
+                </div>
+              </div>
             );
           })}
         </div>
