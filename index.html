@@ -6,9 +6,9 @@
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
-    <!-- Dynamic adaptive favicon: in dark mode use purple emblem, in light mode use white/silver emblem -->
-    <link rel="icon" type="image/png" href="/ga-icon-purple.png" media="(prefers-color-scheme: dark)" />
-    <link rel="icon" type="image/png" href="/ga-icon-white.png" media="(prefers-color-scheme: light)" />
+    <!-- Dynamic adaptive favicon: Light mode uses #4758AA purple emblem, Dark mode uses crisp white emblem (like GitHub) -->
+    <link rel="icon" type="image/png" href="/ga-icon-white.png" media="(prefers-color-scheme: dark)" />
+    <link rel="icon" type="image/png" href="/ga-icon-purple.png" media="(prefers-color-scheme: light)" />
     <link rel="icon" type="image/png" href="/ga-icon-purple.png" />
     <script>
       (function() {
@@ -20,7 +20,7 @@
             link.rel = 'icon';
             document.head.appendChild(link);
           }
-          link.href = isDark ? '/ga-icon-purple.png' : '/ga-icon-white.png';
+          link.href = isDark ? '/ga-icon-white.png' : '/ga-icon-purple.png';
         }
         updateThemeFavicon();
         if (window.matchMedia) {
