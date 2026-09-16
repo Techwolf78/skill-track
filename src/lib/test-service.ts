@@ -19,6 +19,7 @@ export interface CreateTestRequest {
   durationMins: number;
   difficulty: "EASY" | "MEDIUM" | "HARD";
   instructions?: Record<string, unknown>;
+  sectionSettings?: Record<string, { shuffleProblems?: boolean; [key: string]: any }>;
   status: "DRAFT" | "PUBLISHED" | "ARCHIVED";
   passMark: number;
   isActive?: boolean;
@@ -434,6 +435,7 @@ export interface Test {
   durationMins: number;
   difficulty: "EASY" | "MEDIUM" | "HARD";
   instructions?: Record<string, unknown>;
+  sectionSettings?: Record<string, { shuffleProblems?: boolean; [key: string]: any }>;
   status: "DRAFT" | "PUBLISHED" | "ARCHIVED";
   passMark: number;
   totalMarks?: number;
@@ -988,6 +990,13 @@ export const testService = {
     const payload = testService.mapTestToBackend(test);
     const response = await apiClient.patch<Test>(`/tests/${id}`, payload);
     return testService.mapTestFromBackend(unwrapResponse(response));
+  },
+
+  patchTest: async (
+    id: string,
+    test: Partial<CreateTestRequest>,
+  ): Promise<Test> => {
+    return testService.updateTest(id, test);
   },
 
   mapTestFromBackend: (data: unknown): Test => {
