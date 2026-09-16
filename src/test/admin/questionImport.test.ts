@@ -163,6 +163,28 @@ describe("Question Import Taxonomy Resolver", () => {
     expect(parsed?.question.testCases?.length).toBe(2);
     expect(parsed?.question.testCases?.[0].sample).toBe(true);
     expect(parsed?.question.testCases?.[1].sample).toBe(false);
+    expect(parsed?.question.status).toBeUndefined();
+  });
+
+  it("should respect explicit status column when provided and leave undefined otherwise", () => {
+    const rowWithoutStatus = {
+      title: "Question Without Status",
+      type: "MCQ",
+      prompt: "What is 2 + 2?",
+      marks: 1,
+    };
+    const parsedDefault = parseImportRow(rowWithoutStatus, 1, baseContext, "PUBLIC");
+    expect(parsedDefault?.question.status).toBeUndefined();
+
+    const rowWithStatus = {
+      title: "Question With Status",
+      type: "MCQ",
+      prompt: "What is 3 + 3?",
+      marks: 1,
+      status: "under_review",
+    };
+    const parsedExplicit = parseImportRow(rowWithStatus, 2, baseContext, "PUBLIC");
+    expect(parsedExplicit?.question.status).toBe("UNDER_REVIEW");
   });
 
   it("should generate dynamic MCQ and Coding Excel templates containing active taxonomy reference sheet", () => {
