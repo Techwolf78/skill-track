@@ -54,13 +54,26 @@ export default function NewAdminLayout() {
 
   const totalAllocatedPins = 10911;
   const initialBaseUsed = 8120;
-  const liveUsedCount = useMemo(() => {
-    return invitations.filter(
-      (i) => i.status === "ACCEPTED" || i.sessionStatus === "IN_PROGRESS" || i.sessionStatus === "SUBMITTED"
-    ).length;
+
+  // Real dynamic live consumption:
+  // 1. Upfront PIN reservation when invitations are sent
+  // 2. Automatic PIN refund when schedules expire with unattended candidates
+  const { liveDeductedCount, liveRefundedCount } = useMemo(() => {
+    let deducted = 0;
+    let refunded = 0;
+    invitations.forEach((i) => {
+      const weight = i.test?.isProjectBased || (i.test?.title || "").toLowerCase().includes("project") ? 2 : 1;
+      if (i.status === "CANCELLED" || i.status === "REFUNDED" || i.status === "EXPIRED") {
+        refunded += weight;
+      } else {
+        deducted += weight;
+      }
+    });
+    return { liveDeductedCount: deducted, liveRefundedCount: refunded };
   }, [invitations]);
 
-  const totalInvitesUsed = Math.min(totalAllocatedPins, initialBaseUsed + liveUsedCount);
+  const netLiveUsed = Math.max(0, liveDeductedCount - liveRefundedCount);
+  const totalInvitesUsed = Math.min(totalAllocatedPins, initialBaseUsed + netLiveUsed);
   const pinsRemaining = Math.max(0, totalAllocatedPins - totalInvitesUsed);
   const remainingPercentage = Math.round((pinsRemaining / totalAllocatedPins) * 100);
 
