@@ -57,7 +57,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   organisationService,
@@ -403,15 +402,12 @@ export default function Organisations() {
 
           {subConfig && (
             <Tabs defaultValue="plan" className="pt-2">
-              <TabsList className="grid grid-cols-4 bg-slate-100 p-1 mb-4 text-xs">
+              <TabsList className="grid grid-cols-3 bg-slate-100 p-1 mb-4 text-xs">
                 <TabsTrigger value="plan" className="text-xs font-medium">
                   Plan & Dates
                 </TabsTrigger>
                 <TabsTrigger value="pins" className="text-xs font-medium">
                   PIN Allocation
-                </TabsTrigger>
-                <TabsTrigger value="proctoring" className="text-xs font-medium">
-                  Proctoring
                 </TabsTrigger>
                 <TabsTrigger value="ledger" className="text-xs font-medium">
                   Audit Ledger
@@ -587,60 +583,7 @@ export default function Organisations() {
                 </div>
               </TabsContent>
 
-              {/* Tab 3: Proctoring Policies */}
-              <TabsContent value="proctoring" className="space-y-3">
-                <div className="border border-slate-200 p-3.5 space-y-3 bg-slate-50/50">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <span className="text-xs font-bold text-slate-900 block">Basic Proctoring</span>
-                      <p className="text-[11px] text-slate-500">Full-screen enforcement, tab tracking, clipboard block</p>
-                    </div>
-                    <Switch
-                      checked={subConfig.enabledProctoringTiers.basic}
-                      onCheckedChange={(val) =>
-                        setSubConfig({
-                          ...subConfig,
-                          enabledProctoringTiers: { ...subConfig.enabledProctoringTiers, basic: val },
-                        })
-                      }
-                    />
-                  </div>
-
-                  <div className="flex items-center justify-between border-t border-slate-200 pt-3">
-                    <div>
-                      <span className="text-xs font-bold text-slate-900 block">Standard Proctoring</span>
-                      <p className="text-[11px] text-slate-500">Periodic webcam snapshot verification (1 frame / 15s)</p>
-                    </div>
-                    <Switch
-                      checked={subConfig.enabledProctoringTiers.standard}
-                      onCheckedChange={(val) =>
-                        setSubConfig({
-                          ...subConfig,
-                          enabledProctoringTiers: { ...subConfig.enabledProctoringTiers, standard: val },
-                        })
-                      }
-                    />
-                  </div>
-
-                  <div className="flex items-center justify-between border-t border-slate-200 pt-3">
-                    <div>
-                      <span className="text-xs font-bold text-slate-900 block">Advanced Proctoring</span>
-                      <p className="text-[11px] text-slate-500">Continuous real-time stream & neural gaze monitoring (1 frame / 1s)</p>
-                    </div>
-                    <Switch
-                      checked={subConfig.enabledProctoringTiers.advanced}
-                      onCheckedChange={(val) =>
-                        setSubConfig({
-                          ...subConfig,
-                          enabledProctoringTiers: { ...subConfig.enabledProctoringTiers, advanced: val },
-                        })
-                      }
-                    />
-                  </div>
-                </div>
-              </TabsContent>
-
-              {/* Tab 4: Audit Ledger */}
+              {/* Tab 3: Audit Ledger */}
               <TabsContent value="ledger" className="space-y-3">
                 <div className="border border-slate-200 p-3 bg-slate-50/50 space-y-2">
                   <span className="text-xs font-bold text-slate-900 block">
