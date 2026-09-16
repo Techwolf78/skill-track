@@ -296,7 +296,7 @@ export default function NewAdminBilling() {
             </div>
 
             {/* Quota Progress Cards (2 cols) */}
-            <div className="lg:col-span-2 grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="lg:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4">
               {/* Invites Used */}
               <div className="bg-white border border-slate-200 shadow-xs p-5 flex flex-col justify-between">
                 <div>
@@ -317,24 +317,6 @@ export default function NewAdminBilling() {
                     />
                   </div>
                   <span className="text-[11px] text-slate-400">{usagePercentage}% consumed</span>
-                </div>
-              </div>
-
-              {/* AI Interview Invites */}
-              <div className="bg-white border border-slate-200 shadow-xs p-5 flex flex-col justify-between">
-                <div>
-                  <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">AI Interview Invites</span>
-                  <div className="mt-2 flex items-baseline gap-2">
-                    <span className="text-3xl font-extrabold text-slate-900">0</span>
-                    <span className="text-xs text-slate-400">/ 20</span>
-                  </div>
-                  <p className="text-xs text-slate-500 mt-1">out of 20 in the current billing cycle</p>
-                </div>
-                <div className="mt-4 space-y-1.5">
-                  <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
-                    <div className="bg-emerald-500 h-full" style={{ width: `0%` }} />
-                  </div>
-                  <span className="text-[11px] text-slate-400">20 remaining</span>
                 </div>
               </div>
 
