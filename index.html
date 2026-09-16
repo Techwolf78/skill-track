@@ -6,7 +6,28 @@
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
-    <link rel="icon" type="image/png" href="/Gryphon360logoFavicon1.png" />
+    <!-- Dynamic adaptive favicon for Light & Dark mode browser tabs -->
+    <link rel="icon" type="image/png" href="/ga-icon-white.png" media="(prefers-color-scheme: dark)" />
+    <link rel="icon" type="image/png" href="/ga-icon-blue.png" media="(prefers-color-scheme: light)" />
+    <link rel="icon" type="image/png" href="/ga-icon-blue.png" />
+    <script>
+      (function() {
+        function updateThemeFavicon() {
+          var isDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+          var link = document.querySelector("link[rel~='icon']");
+          if (!link) {
+            link = document.createElement('link');
+            link.rel = 'icon';
+            document.head.appendChild(link);
+          }
+          link.href = isDark ? '/ga-icon-white.png' : '/ga-icon-blue.png';
+        }
+        updateThemeFavicon();
+        if (window.matchMedia) {
+          window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', updateThemeFavicon);
+        }
+      })();
+    </script>
     <title>Gryphon 360 | India's Leading Skill Assessment Platform</title>
     <meta name="description" content="Gryphon 360 is India's premier skill assessment platform, trusted by institutions nationwide." />
     <meta name="author" content="Gryphon 360" />
