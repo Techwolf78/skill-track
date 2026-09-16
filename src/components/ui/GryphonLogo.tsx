@@ -47,7 +47,7 @@ export const GryphonLogo: React.FC<GryphonLogoProps> = ({
       ? "text-slate-900"
       : "text-slate-900 dark:text-white";
 
-  const primaryBlueColor = "text-[#4959AB]";
+  const primaryBlueColor = "text-[#4758AA]";
 
   return (
     <div className={`inline-flex items-center select-none group ${sizeMap.gap} ${className}`}>
