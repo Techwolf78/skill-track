@@ -114,20 +114,36 @@ export function parseBackendDateTime(isoStr?: string | null): { date: string; ti
 
 /**
  * Combines date (YYYY-MM-DD) and time (HH:mm) into standard backend LocalDateTime string (YYYY-MM-DDTHH:mm:ss).
+ * Also safely handles strings that already contain 'T' (e.g. from <input type="datetime-local"> or ISO strings).
  */
 export function toBackendDateTime(dateStr: string, timeStr?: string): string {
-  if (!dateStr) return "";
-  const cleanDate = dateStr.trim();
-  let cleanTime = (timeStr || "00:00").trim();
+  if (!dateStr || dateStr.trim() === "") return "";
+  const clean = dateStr.trim();
 
-  // If time has only HH:mm, append :00
+  // If dateStr already contains "T" (e.g. "2028-09-13T14:45" or "2028-09-13T14:45:00")
+  if (clean.includes("T")) {
+    const [datePart, rawTimePart] = clean.split("T");
+    let effectiveTime = (timeStr || rawTimePart || "00:00").trim();
+    effectiveTime = effectiveTime.replace(/Z$/, "").split(".")[0];
+
+    if (/^\d{2}:\d{2}$/.test(effectiveTime)) {
+      effectiveTime = `${effectiveTime}:00`;
+    } else if (!/^\d{2}:\d{2}:\d{2}$/.test(effectiveTime)) {
+      effectiveTime = "00:00:00";
+    }
+
+    return `${datePart}T${effectiveTime}`;
+  }
+
+  // If dateStr is just a date (YYYY-MM-DD)
+  let cleanTime = (timeStr || "00:00").trim();
   if (/^\d{2}:\d{2}$/.test(cleanTime)) {
     cleanTime = `${cleanTime}:00`;
   } else if (!/^\d{2}:\d{2}:\d{2}$/.test(cleanTime)) {
     cleanTime = "00:00:00";
   }
 
-  return `${cleanDate}T${cleanTime}`;
+  return `${clean}T${cleanTime}`;
 }
 
 /**

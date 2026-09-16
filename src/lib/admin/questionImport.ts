@@ -1,5 +1,6 @@
 import * as XLSX from "xlsx";
 import { CreateQuestionRequest, McqOption, McqType, Subject, Topic, Subtopic } from "../test-service";
+import { QuestionBankStatus } from "../../types/question";
 
 export type ResolutionStatus = "MATCHED" | "FALLBACK" | "UNMATCHED" | "NONE";
 
@@ -245,7 +246,7 @@ export function parseImportRow(
     cognitiveLevel: ((norm.cognitivelevel || norm.cognitive || "APPLY").toUpperCase() as any) || "APPLY",
     p_value: Number(norm.pvalue) || 0.45,
     discrimination_index: Number(norm.discriminationindex) || 0.35,
-    status: defaultVisibility === "PUBLIC" ? "UNDER_REVIEW" : "ACTIVE",
+    status: norm.status ? (String(norm.status).trim().toUpperCase() as QuestionBankStatus) : undefined,
     tags: tags.length ? tags : undefined,
   };
 
