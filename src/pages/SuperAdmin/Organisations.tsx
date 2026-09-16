@@ -230,7 +230,7 @@ export default function Organisations() {
         </div>
         <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
           <DialogTrigger asChild>
-            <Button variant="hero" className="bg-[#4353a4] hover:bg-[#344287] text-white">
+            <Button variant="default" className="bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold h-9 px-4">
               <Plus className="w-4 h-4 mr-2" />
               Add Organisation
             </Button>
@@ -262,7 +262,7 @@ export default function Organisations() {
               </div>
               <DialogFooter>
                 <Button type="button" variant="outline" onClick={() => setIsAddOpen(false)}>Cancel</Button>
-                <Button type="submit" variant="hero" disabled={isSubmitting} className="bg-[#4353a4] text-white">
+                <Button type="submit" disabled={isSubmitting} className="bg-slate-900 hover:bg-slate-800 text-white">
                   {isSubmitting ? "Creating..." : "Create Organisation"}
                 </Button>
               </DialogFooter>
@@ -336,7 +336,7 @@ export default function Organisations() {
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end" className="text-xs">
                         <DropdownMenuItem onClick={() => openSubscriptionModal(org)}>
-                          <CreditCard className="w-3.5 h-3.5 mr-2 text-[#4353a4]" />
+                          <CreditCard className="w-3.5 h-3.5 mr-2 text-slate-600" />
                           Manage Subscription & PINs
                         </DropdownMenuItem>
                         <DropdownMenuItem onClick={() => {
@@ -363,7 +363,7 @@ export default function Organisations() {
                 <div className="bg-slate-50/75 border border-slate-200/70 rounded p-2.5 text-xs space-y-1.5">
                   <div className="flex justify-between items-center">
                     <span className="text-[11.5px] text-slate-500 flex items-center gap-1.5">
-                      <Coins className="w-3.5 h-3.5 text-amber-500" />
+                      <Coins className="w-3.5 h-3.5 text-slate-400" />
                       Allocated PINs
                     </span>
                     <span className="font-bold text-slate-900 font-mono text-[11.5px]">
@@ -384,7 +384,7 @@ export default function Organisations() {
                     variant="outline"
                     size="sm"
                     onClick={() => openSubscriptionModal(org)}
-                    className="w-full h-8 text-xs font-medium border-slate-200 text-slate-700 hover:bg-slate-50 hover:text-[#4353a4] rounded flex items-center justify-center gap-1.5 transition-colors"
+                    className="w-full h-8 text-xs font-medium border-slate-200 text-slate-700 hover:bg-slate-50 hover:text-slate-900 rounded flex items-center justify-center gap-1.5 transition-colors"
                   >
                     <CreditCard className="w-3.5 h-3.5 text-slate-500" />
                     <span>Manage Subscription & PINs</span>
@@ -408,14 +408,14 @@ export default function Organisations() {
             <div className="flex items-center justify-between">
               <div>
                 <DialogTitle className="text-lg font-bold text-slate-900 flex items-center gap-2">
-                  <CreditCard className="w-5 h-5 text-[#4353a4]" />
+                  <CreditCard className="w-5 h-5 text-slate-700" />
                   <span>Subscription & PIN Management</span>
                 </DialogTitle>
                 <DialogDescription className="text-xs text-slate-500 mt-1">
                   Configure plan package, PIN allocations, and billing dates for <strong>{subOrg?.name}</strong>
                 </DialogDescription>
               </div>
-              <Badge className="bg-[#4353a4] text-white text-xs font-bold px-2 py-0.5">
+              <Badge variant="outline" className="bg-slate-100 text-slate-800 border-slate-200 text-xs font-semibold px-2 py-0.5">
                 {subConfig?.planTier}
               </Badge>
             </div>
@@ -524,7 +524,7 @@ export default function Organisations() {
 
               {/* Tab 2: PIN Allocation & Top-up */}
               <TabsContent value="pins" className="space-y-4">
-                <div className="bg-slate-50 border border-slate-200 p-4 space-y-3">
+                <div className="bg-slate-50 border border-slate-200 p-4 space-y-3 rounded-md">
                   <div className="flex justify-between items-center">
                     <div>
                       <Label className="text-xs font-bold text-slate-900">Total Base PINs Allocated</Label>
@@ -540,13 +540,13 @@ export default function Organisations() {
                   </div>
                 </div>
 
-                {/* Instant Top-Up Credit Tool */}
-                <div className="border border-amber-200 bg-amber-50/50 p-4 space-y-3 rounded-none">
-                  <div className="flex items-center gap-1.5 text-xs font-bold text-amber-900">
-                    <Sparkles className="w-4 h-4 text-amber-600" />
+                {/* Instant Top-Up Credit Tool (Clean Neutral Theme) */}
+                <div className="border border-slate-200 bg-slate-50/70 p-4 space-y-3 rounded-md">
+                  <div className="flex items-center gap-1.5 text-xs font-bold text-slate-900">
+                    <Sparkles className="w-4 h-4 text-slate-600" />
                     <span>Instant PIN Top-Up / Adjustment</span>
                   </div>
-                  <p className="text-[11px] text-amber-800">
+                  <p className="text-[11px] text-slate-500">
                     Add or deduct PINs immediately. Positive adds bonus credits; negative deducts.
                   </p>
 
@@ -556,7 +556,7 @@ export default function Organisations() {
                       variant="outline"
                       size="sm"
                       onClick={() => setTopUpAmount(500)}
-                      className={`text-xs h-7 ${topUpAmount === 500 ? "bg-amber-600 text-white font-bold" : "bg-white"}`}
+                      className={`text-xs h-7 border-slate-200 transition-colors ${topUpAmount === 500 ? "bg-slate-900 text-white font-semibold hover:bg-slate-800 hover:text-white" : "bg-white text-slate-700 hover:bg-slate-50"}`}
                     >
                       +500 PINs
                     </Button>
@@ -565,7 +565,7 @@ export default function Organisations() {
                       variant="outline"
                       size="sm"
                       onClick={() => setTopUpAmount(1000)}
-                      className={`text-xs h-7 ${topUpAmount === 1000 ? "bg-amber-600 text-white font-bold" : "bg-white"}`}
+                      className={`text-xs h-7 border-slate-200 transition-colors ${topUpAmount === 1000 ? "bg-slate-900 text-white font-semibold hover:bg-slate-800 hover:text-white" : "bg-white text-slate-700 hover:bg-slate-50"}`}
                     >
                       +1,000 PINs
                     </Button>
@@ -574,7 +574,7 @@ export default function Organisations() {
                       variant="outline"
                       size="sm"
                       onClick={() => setTopUpAmount(5000)}
-                      className={`text-xs h-7 ${topUpAmount === 5000 ? "bg-amber-600 text-white font-bold" : "bg-white"}`}
+                      className={`text-xs h-7 border-slate-200 transition-colors ${topUpAmount === 5000 ? "bg-slate-900 text-white font-semibold hover:bg-slate-800 hover:text-white" : "bg-white text-slate-700 hover:bg-slate-50"}`}
                     >
                       +5,000 PINs
                     </Button>
@@ -606,7 +606,7 @@ export default function Organisations() {
 
               {/* Tab 3: Audit Ledger */}
               <TabsContent value="ledger" className="space-y-3">
-                <div className="border border-slate-200 p-3 bg-slate-50/50 space-y-2">
+                <div className="border border-slate-200 p-3 bg-slate-50/50 space-y-2 rounded-md">
                   <span className="text-xs font-bold text-slate-900 block">
                     PIN Quota Adjustments & Audit Trail
                   </span>
@@ -616,11 +616,11 @@ export default function Organisations() {
                 </div>
 
                 {(!subConfig.statementAdjustments || subConfig.statementAdjustments.length === 0) ? (
-                  <div className="text-center py-8 text-xs text-slate-400 border border-dashed border-slate-200">
+                  <div className="text-center py-8 text-xs text-slate-400 border border-dashed border-slate-200 rounded-md">
                     No custom PIN adjustments recorded yet for this organization.
                   </div>
                 ) : (
-                  <div className="max-h-48 overflow-y-auto border border-slate-200">
+                  <div className="max-h-48 overflow-y-auto border border-slate-200 rounded-md">
                     <table className="w-full text-[11px] text-left">
                       <thead className="bg-slate-100 text-slate-600 font-bold border-b border-slate-200">
                         <tr>
@@ -637,9 +637,9 @@ export default function Organisations() {
                             <td className="py-1.5 px-3 text-slate-800 font-medium">{adj.reason}</td>
                             <td className="py-1.5 px-3 text-center">
                               {adj.pinsChange > 0 ? (
-                                <span className="font-bold text-emerald-600 font-mono">+{adj.pinsChange}</span>
+                                <span className="font-bold text-slate-900 font-mono">+{adj.pinsChange}</span>
                               ) : (
-                                <span className="font-bold text-red-600 font-mono">{adj.pinsChange}</span>
+                                <span className="font-bold text-slate-600 font-mono">{adj.pinsChange}</span>
                               )}
                             </td>
                             <td className="py-1.5 px-3 text-right text-slate-500">{adj.initiatedBy}</td>
@@ -658,7 +658,7 @@ export default function Organisations() {
               type="button"
               variant="outline"
               onClick={() => setSubOrg(null)}
-              className="text-xs"
+              className="text-xs h-8 border-slate-200"
             >
               Cancel
             </Button>
@@ -666,7 +666,7 @@ export default function Organisations() {
               type="button"
               onClick={handleSaveSubscription}
               disabled={isSavingSub}
-              className="bg-[#4353a4] hover:bg-[#344287] text-white text-xs font-bold px-5"
+              className="bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold px-4 h-8 rounded"
             >
               {isSavingSub ? "Saving..." : "Save Subscription Changes"}
             </Button>
