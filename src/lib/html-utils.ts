@@ -41,7 +41,7 @@ export const formatMarkdownToHtml = (markdown: string): string => {
   let text = decodeHtmlIfNeeded(markdown).trim();
 
   // Strip redundant leading "### Problem Statement" or "# Problem Statement"
-  text = text.replace(/^\s*#{1,4}\s*Problem Statement\s*[:.]?\s*\n*/i, "");
+  text = text.replace(/^\s*#{1,4}\s*Problem Statement\s*[:.]?\s*/i, "");
 
   // Code blocks: ```lang ... ```
   text = text.replace(/```([a-z0-9_-]*)\n([\s\S]*?)```/gi, (_match, _lang, code) => {
@@ -51,6 +51,12 @@ export const formatMarkdownToHtml = (markdown: string): string => {
       .replace(/>/g, "&gt;");
     return `\n\n<pre class="bg-slate-900 text-slate-100 p-3 rounded font-mono text-xs overflow-x-auto my-2.5"><code>${escapedCode}</code></pre>\n\n`;
   });
+
+  // Inline section headers: "### Input Format", "### Output Format", "### Constraints", etc.
+  text = text.replace(
+    /(?:^|\s+)#{1,4}\s*(Input Format|Output Format|Constraints?|Examples?|Sample (?:Input|Output)|Explanation|Notes?|Task|Follow[ -]?up)\s*[:.]?\s*/gi,
+    '\n\n<h3 class="text-xs font-bold text-slate-900 uppercase tracking-wider mt-4 mb-1.5">$1</h3>\n\n'
+  );
 
   // Markdown headings:
   // ### Heading -> <h3>
@@ -126,4 +132,37 @@ export const renderFormattedContent = (content?: string): string => {
     return decoded;
   }
   return formatMarkdownToHtml(decoded);
+};
+
+/**
+ * Strips HTML tags and Markdown artifacts to generate a clean plain-text excerpt for cards and previews.
+ */
+export const formatPlainTextExcerpt = (content?: string, maxLength = 220): string => {
+  if (!content) return "Not available";
+  let text = decodeHtmlIfNeeded(content);
+
+  // Strip HTML tags
+  text = text.replace(/<[^>]*>/g, " ").replace(/&nbsp;/g, " ");
+
+  // Strip leading problem statement marker
+  text = text.replace(/^\s*#{1,4}\s*Problem Statement\s*[:.]?\s*/i, "");
+
+  // Strip inline markdown headers like ### Input Format, ### Output Format, etc.
+  text = text.replace(/#{1,4}\s*(?:Input Format|Output Format|Constraints?|Examples?|Sample (?:Input|Output)|Explanation|Notes?|Task|Follow[ -]?up)\s*[:.]?\s*/gi, " ");
+
+  // Strip general markdown headers (#, ##, ###)
+  text = text.replace(/^#{1,6}\s+/gm, "");
+
+  // Strip markdown formatting symbols: `code`, **bold**, *italic*, __bold__
+  text = text.replace(/`([^`]+)`/g, "$1");
+  text = text.replace(/\*\*([^*]+)\*\*/g, "$1");
+  text = text.replace(/__([^_]+)__/g, "$1");
+  text = text.replace(/\*([^*]+)\*/g, "$1");
+
+  // Collapse whitespaces
+  text = text.replace(/\s+/g, " ").trim();
+
+  if (!text) return "Not available";
+  if (text.length <= maxLength) return text;
+  return text.substring(0, maxLength).trim() + "...";
 };

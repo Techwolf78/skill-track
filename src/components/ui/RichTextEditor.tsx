@@ -36,6 +36,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
+import { renderFormattedContent } from "@/lib/html-utils";
 
 const CodeBlockComponent = ({ node, updateAttributes }: any) => {
   const [copied, setCopied] = useState(false);
@@ -162,9 +163,13 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
     [placeholder]
   );
 
+  const normalizedContent = React.useMemo(() => {
+    return renderFormattedContent(content || "");
+  }, [content]);
+
   const editor = useEditor({
     extensions,
-    content: content || "",
+    content: normalizedContent,
     editorProps: {
       attributes: {
         class: compact
@@ -181,13 +186,14 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
   React.useEffect(() => {
     if (!editor || editor.isDestroyed) return;
     try {
-      if (content !== editor.getHTML()) {
-        editor.commands.setContent(content || "", false);
+      const currentHtml = editor.getHTML();
+      if (content !== currentHtml && normalizedContent !== currentHtml) {
+        editor.commands.setContent(normalizedContent, false);
       }
     } catch {
       // Ignored if DOM serializer is temporarily detached
     }
-  }, [content, editor]);
+  }, [content, normalizedContent, editor]);
 
   const toggleSuperscript = useCallback(() => {
     if (!editor) return;
