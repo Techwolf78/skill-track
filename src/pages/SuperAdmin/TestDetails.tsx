@@ -38,6 +38,7 @@ import {
 } from "lucide-react";
 import { testService, Test, Question } from "@/lib/test-service";
 import { useToast } from "@/hooks/use-toast";
+import { renderFormattedContent } from "@/lib/html-utils";
 
 export default function TestDetails() {
   const { id } = useParams<{ id: string }>();
@@ -521,14 +522,10 @@ export default function TestDetails() {
                           </TableCell>
                           <TableCell>
                             <div>
-                              {/<[a-z][\s\S]*>/i.test(question.prompt || "") ? (
-                                <div
-                                  className="text-sm prose prose-sm max-w-none"
-                                  dangerouslySetInnerHTML={{ __html: question.prompt || "" }}
-                                />
-                              ) : (
-                                <p>{question.prompt}</p>
-                              )}
+                              <div
+                                className="text-sm prose prose-sm max-w-none"
+                                dangerouslySetInnerHTML={{ __html: renderFormattedContent(question.prompt) }}
+                              />
                               {question.mcqOptions &&
                                 question.mcqOptions.length > 0 && (
                                   <div className="text-xs text-muted-foreground mt-1">

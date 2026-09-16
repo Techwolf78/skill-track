@@ -53,7 +53,7 @@ import { IdentityVerification } from "@/proctoring/components/IdentityVerificati
 import { Shield, ShieldAlert, ShieldCheck as ShieldCheckIcon, Camera } from "lucide-react";
 import { AnswerStore, computeContentHash } from "@/lib/exam/answerStorage";
 import { detectTimeExtension } from "@/lib/exam/sessionLogic";
-import { decodeHtmlIfNeeded, isHtmlContent } from "@/lib/html-utils";
+import { decodeHtmlIfNeeded, isHtmlContent, renderFormattedContent } from "@/lib/html-utils";
 
 import { mapBackendToFrontendLang } from "../../types/question";
 
@@ -2055,23 +2055,13 @@ useEffect(() => {
                         {/* Problem Statement Title */}
                         <h2 className="text-sm font-bold text-slate-900">Problem Statement</h2>
 
-                        {/* Formatted HTML Problem Statement */}
-                        {(() => {
-                          const rawPrompt = currentQuestion.prompt || currentQuestion.title || "";
-                          const decodedPrompt = decodeHtmlIfNeeded(rawPrompt);
-                          return isHtmlContent(decodedPrompt) ? (
-                            <div
-                              className="text-[13px] md:text-sm text-slate-800 leading-relaxed font-sans prose prose-slate max-w-none [&_h3]:text-sm [&_h3]:font-bold [&_h3]:text-slate-900 [&_h3]:mt-4 [&_h3]:mb-1.5 [&_ol]:list-decimal [&_ol]:pl-5 [&_ul]:list-disc [&_ul]:pl-5 [&_li]:my-1 [&_p]:my-1.5 [&_pre]:bg-[#18181b] [&_pre]:text-amber-300 [&_pre]:p-3 [&_pre]:rounded-sm [&_pre]:font-mono [&_pre]:text-xs [&_pre]:overflow-x-auto [&_code]:font-mono [&_code]:text-xs [&_code]:bg-slate-100 [&_code]:text-pink-600 [&_code]:px-1 [&_code]:py-0.5 [&_code]:rounded-xs"
-                              dangerouslySetInnerHTML={{
-                                __html: decodedPrompt,
-                              }}
-                            />
-                          ) : (
-                            <div className="text-[13px] md:text-sm text-slate-800 leading-relaxed whitespace-pre-wrap font-normal">
-                              {decodedPrompt}
-                            </div>
-                          );
-                        })()}
+                        {/* Formatted HTML/Markdown Problem Statement */}
+                        <div
+                          className="text-[13px] md:text-sm text-slate-800 leading-relaxed font-sans prose prose-slate max-w-none [&_h3]:text-xs [&_h3]:font-bold [&_h3]:text-slate-900 [&_h3]:uppercase [&_h3]:tracking-wider [&_h3]:mt-4 [&_h3]:mb-1.5 [&_h2]:text-sm [&_h2]:font-bold [&_h2]:text-slate-900 [&_h2]:mt-4 [&_h2]:mb-1.5 [&_ol]:list-decimal [&_ol]:pl-5 [&_ul]:list-disc [&_ul]:pl-5 [&_li]:my-1 [&_p]:my-1.5 [&_pre]:bg-[#18181b] [&_pre]:text-amber-300 [&_pre]:p-3 [&_pre]:rounded-sm [&_pre]:font-mono [&_pre]:text-xs [&_pre]:overflow-x-auto [&_code]:font-mono [&_code]:text-xs [&_code]:bg-slate-100 [&_code]:text-pink-600 [&_code]:px-1 [&_code]:py-0.5 [&_code]:rounded-xs"
+                          dangerouslySetInnerHTML={{
+                            __html: renderFormattedContent(currentQuestion.prompt || currentQuestion.title || ""),
+                          }}
+                        />
 
                         {/* Question Image */}
                         {currentQuestion.imageUrl && (
@@ -2400,22 +2390,12 @@ useEffect(() => {
                               {currentQuestion.title}
                             </h2>
                           )}
-                        {(() => {
-                          const rawPrompt = currentQuestion.prompt || currentQuestion.title || "";
-                          const decodedPrompt = decodeHtmlIfNeeded(rawPrompt);
-                          return isHtmlContent(decodedPrompt) ? (
-                            <div
-                              className="text-base font-normal mt-3 prose prose-slate max-w-none [&_ol]:list-decimal [&_ol]:pl-5 [&_ul]:list-disc [&_ul]:pl-5 [&_pre]:bg-slate-900 [&_pre]:text-slate-100 [&_pre]:p-3 [&_pre]:rounded-sm [&_code]:bg-slate-100 [&_code]:text-pink-600 [&_code]:px-1 [&_code]:py-0.5"
-                              dangerouslySetInnerHTML={{
-                                __html: decodedPrompt,
-                              }}
-                            />
-                          ) : (
-                            <div className="text-base font-medium mt-3 whitespace-pre-wrap">
-                              {decodedPrompt}
-                            </div>
-                          );
-                        })()}
+                        <div
+                          className="text-base font-normal mt-3 prose prose-slate max-w-none [&_ol]:list-decimal [&_ol]:pl-5 [&_ul]:list-disc [&_ul]:pl-5 [&_pre]:bg-slate-900 [&_pre]:text-slate-100 [&_pre]:p-3 [&_pre]:rounded-sm [&_code]:bg-slate-100 [&_code]:text-pink-600 [&_code]:px-1 [&_code]:py-0.5"
+                          dangerouslySetInnerHTML={{
+                            __html: renderFormattedContent(currentQuestion.prompt || currentQuestion.title || ""),
+                          }}
+                        />
                         {currentQuestion.tags && currentQuestion.tags.length > 0 && (
                           <div className="flex flex-wrap gap-1 mt-2">
                             {currentQuestion.tags.map((tag, idx) => (
