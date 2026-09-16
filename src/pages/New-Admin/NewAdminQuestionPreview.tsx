@@ -38,6 +38,7 @@ import { useAuth } from "@/lib/auth-context";
 import { testService, Question, McqOption, McqType } from "@/lib/test-service";
 import { apiClient } from "@/lib/api-client";
 import { mapFrontendToBackendLang } from "@/types/question";
+import { renderFormattedContent, decodeHtmlIfNeeded } from "@/lib/html-utils";
 import { QuestionImage } from "@/components/ui/QuestionImage";
 import { toast } from "sonner";
 import { GryphonLogo } from "@/components/ui/GryphonLogo";
@@ -712,20 +713,14 @@ export default function NewAdminQuestionPreview() {
                       <p className="text-slate-700 text-xs">{reason || "No reason text provided."}</p>
                     </div>
                   </div>
-                ) : (() => {
-                    const promptHtml = decodeHtmlIfNeeded(question.prompt || "");
-                    const isHtml = /<[a-z][\s\S]*>/i.test(promptHtml);
-                    return isHtml ? (
-                      <div
-                        className="text-[13px] md:text-sm text-slate-800 leading-relaxed font-sans prose prose-slate max-w-none [&_h3]:text-sm [&_h3]:font-bold [&_h3]:text-slate-900 [&_h3]:mt-4 [&_h3]:mb-1.5 [&_ol]:list-decimal [&_ol]:pl-5 [&_ul]:list-disc [&_ul]:pl-5 [&_li]:my-1 [&_p]:my-1.5 [&_pre]:bg-[#18181b] [&_pre]:text-amber-300 [&_pre]:p-3 [&_pre]:rounded-sm [&_pre]:font-mono [&_pre]:text-xs [&_pre]:overflow-x-auto [&_code]:font-mono [&_code]:text-xs [&_code]:bg-slate-100 [&_code]:text-pink-600 [&_code]:px-1 [&_code]:py-0.5 [&_code]:rounded-xs [&_pre_code]:bg-transparent [&_pre_code]:text-inherit [&_pre_code]:p-0"
-                        dangerouslySetInnerHTML={{ __html: promptHtml }}
-                      />
-                    ) : (
-                      <div className="text-[13px] md:text-sm text-slate-800 leading-relaxed whitespace-pre-wrap font-normal">
-                        {promptHtml || "No description provided for this question."}
-                      </div>
-                    );
-                  })()}
+                ) : (
+                  <div
+                    className="text-[13px] md:text-sm text-slate-800 leading-relaxed font-sans prose prose-slate max-w-none [&_h3]:text-xs [&_h3]:font-bold [&_h3]:text-slate-900 [&_h3]:uppercase [&_h3]:tracking-wider [&_h3]:mt-4 [&_h3]:mb-1.5 [&_h2]:text-sm [&_h2]:font-bold [&_h2]:text-slate-900 [&_h2]:mt-4 [&_h2]:mb-1.5 [&_ol]:list-decimal [&_ol]:pl-5 [&_ul]:list-disc [&_ul]:pl-5 [&_li]:my-1 [&_p]:my-1.5 [&_pre]:bg-[#18181b] [&_pre]:text-amber-300 [&_pre]:p-3 [&_pre]:rounded-sm [&_pre]:font-mono [&_pre]:text-xs [&_pre]:overflow-x-auto [&_code]:font-mono [&_code]:text-xs [&_code]:bg-slate-100 [&_code]:text-pink-600 [&_code]:px-1 [&_code]:py-0.5 [&_code]:rounded-xs [&_pre_code]:bg-transparent [&_pre_code]:text-inherit [&_pre_code]:p-0"
+                    dangerouslySetInnerHTML={{
+                      __html: renderFormattedContent(question.prompt || "No description provided for this question."),
+                    }}
+                  />
+                )}
 
                 {/* Question Image */}
                 {question.imageUrl && (

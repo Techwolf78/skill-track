@@ -47,3 +47,90 @@ describe("API Response Envelope Parsing", () => {
     });
   });
 });
+
+describe("html-utils: Markdown and HTML Prompt Formatting", () => {
+  it("should preserve existing rich HTML content intact", async () => {
+    const { renderFormattedContent } = await import("../../lib/html-utils");
+    const html = "<p>This is a <strong>valid HTML</strong> question.</p><h3>Section</h3>";
+    const rendered = renderFormattedContent(html);
+    expect(rendered).toContain("<p>This is a <strong>valid HTML</strong> question.</p>");
+    expect(rendered).toContain("<h3>Section</h3>");
+  });
+
+  it("should convert markdown headings and inline code into styled HTML", async () => {
+    const { renderFormattedContent } = await import("../../lib/html-utils");
+    const md = `### Problem Statement
+Given an integer array \`arr\` and a non-negative integer \`k\`, rotate the array.
+
+### Input Format
+First line contains integer n.
+
+### Output Format
+Space-separated integers.`;
+
+    const rendered = renderFormattedContent(md);
+    
+    // Should strip the redundant first "Problem Statement" heading
+    expect(rendered).not.toContain("### Problem Statement");
+    expect(rendered).not.toContain("<h3 class=\"text-xs font-bold text-slate-900 uppercase tracking-wider mt-4 mb-1.5\">Problem Statement</h3>");
+    
+    // Should convert inline code
+    expect(rendered).toContain("<code class=\"px-1.5 py-0.5 bg-slate-100 text-slate-900 border border-slate-200 font-mono text-xs rounded\">arr</code>");
+    expect(rendered).toContain("<code class=\"px-1.5 py-0.5 bg-slate-100 text-slate-900 border border-slate-200 font-mono text-xs rounded\">k</code>");
+
+    // Should convert subheaders
+    expect(rendered).toContain("<h3 class=\"text-xs font-bold text-slate-900 uppercase tracking-wider mt-4 mb-1.5\">Input Format</h3>");
+    expect(rendered).toContain("<h3 class=\"text-xs font-bold text-slate-900 uppercase tracking-wider mt-4 mb-1.5\">Output Format</h3>");
+  });
+
+  it("should convert bold markdown text and bullet lists", async () => {
+    const { renderFormattedContent } = await import("../../lib/html-utils");
+    const md = `**Important Note:**
+- Item 1
+- Item 2`;
+
+    const rendered = renderFormattedContent(md);
+    expect(rendered).toContain("<strong class=\"font-semibold text-slate-900\">Important Note:</strong>");
+    expect(rendered).toContain("<ul class=\"list-disc pl-5 my-2 text-slate-800\">");
+    expect(rendered).toContain("<li class=\"my-0.5\">Item 1</li>");
+    expect(rendered).toContain("<li class=\"my-0.5\">Item 2</li>");
+  });
+
+  it("should convert code blocks", async () => {
+    const { renderFormattedContent } = await import("../../lib/html-utils");
+    const md = "```python\ndef solution(n):\n    return n * 2\n```";
+    const rendered = renderFormattedContent(md);
+    expect(rendered).toContain("<pre class=\"bg-slate-900 text-slate-100 p-3 rounded font-mono text-xs overflow-x-auto my-2.5\"><code>def solution(n):\n    return n * 2\n</code></pre>");
+  });
+
+  it("should handle inline section headers and strip inline Problem Statement", async () => {
+    const { renderFormattedContent } = await import("../../lib/html-utils");
+    const raw = "### Problem Statement Given an unsorted integer array `arr`, return the smallest missing positive integer. Your algorithm must run in O(n) time and use O(1) auxiliary space. ### Input Format First line contains integer n, the size of the array. Second line contains n space-separated integers. ### Output Format A single integer representing the smallest missing positive integer.";
+
+    const rendered = renderFormattedContent(raw);
+    expect(rendered).not.toContain("### Problem Statement");
+    expect(rendered).toContain("<code class=\"px-1.5 py-0.5 bg-slate-100 text-slate-900 border border-slate-200 font-mono text-xs rounded\">arr</code>");
+    expect(rendered).toContain("<h3 class=\"text-xs font-bold text-slate-900 uppercase tracking-wider mt-4 mb-1.5\">Input Format</h3>");
+    expect(rendered).toContain("<h3 class=\"text-xs font-bold text-slate-900 uppercase tracking-wider mt-4 mb-1.5\">Output Format</h3>");
+  });
+
+  it("should produce clean plain-text excerpts with formatPlainTextExcerpt", async () => {
+    const { formatPlainTextExcerpt } = await import("../../lib/html-utils");
+    const raw = "### Problem Statement Given an unsorted integer array `arr`, return the smallest missing positive integer. Your algorithm must run in O(n) time and use O(1) auxiliary space. ### Input Format First line contains integer n, the size of the array. Second line contains n space-separated integers. ### Output Format A single integer representing the smallest missing positive integer.";
+
+    const excerpt = formatPlainTextExcerpt(raw);
+    expect(excerpt).not.toContain("###");
+    expect(excerpt).not.toContain("Problem Statement");
+    expect(excerpt).not.toContain("Input Format");
+    expect(excerpt).toContain("Given an unsorted integer array arr, return the smallest missing positive integer");
+  });
+
+  it("should handle empty or null content gracefully", async () => {
+    const { renderFormattedContent, formatPlainTextExcerpt } = await import("../../lib/html-utils");
+    expect(renderFormattedContent("")).toBe("");
+    expect(renderFormattedContent(undefined)).toBe("");
+    expect(formatPlainTextExcerpt("")).toBe("Not available");
+    expect(formatPlainTextExcerpt(undefined)).toBe("Not available");
+  });
+});
+

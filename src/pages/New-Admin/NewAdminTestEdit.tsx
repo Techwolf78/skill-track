@@ -269,18 +269,28 @@ export default function NewAdminTestEdit() {
       setActiveTab("PROBLEMS");
     }
   }, [searchParams]);
+
   const [loading, setLoading] = useState(Boolean(id));
   const [test, setTest] = useState<Test | null>(null);
   const [questions, setQuestions] = useState<Array<TestQuestion & { question?: Question }>>([]);
   // Section UI state
   const [groupedQuestions, setGroupedQuestions] = useState<Record<string, Array<TestQuestion & { question?: Question }>>>({});
+  // Section Management & Drag States
   const [sectionOrder, setSectionOrder] = useState<string[]>([]);
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
-  const [addSectionOpen, setAddSectionOpen] = useState(false);
-  const [newSectionName, setNewSectionName] = useState("");
   const [editingSectionName, setEditingSectionName] = useState<string | null>(null);
   const [editingSectionValue, setEditingSectionValue] = useState("");
   const [movingSectionFor, setMovingSectionFor] = useState<string | null>(null); // tq.id being moved
+
+  // Section Settings Modal state (problem shuffle, custom marks, rename, create section)
+  const [sectionSettings, setSectionSettings] = useState<Record<string, { shuffleProblems?: boolean; [key: string]: any }>>({});
+  const [sectionSettingsModalOpen, setSectionSettingsModalOpen] = useState(false);
+  const [isCreatingNewSection, setIsCreatingNewSection] = useState(false);
+  const [activeModalSection, setActiveModalSection] = useState<string | null>(null);
+  const [modalSectionName, setModalSectionName] = useState("");
+  const [modalProblemShuffle, setModalProblemShuffle] = useState(false);
+  const [modalMarksPerQuestion, setModalMarksPerQuestion] = useState<number | string>(10);
+  const [savingSectionSettings, setSavingSectionSettings] = useState(false);
 
   // General Settings Form States
   const [title, setTitle] = useState("");
@@ -398,6 +408,8 @@ export default function NewAdminTestEdit() {
         } else {
           setInstructions("");
         }
+
+        setSectionSettings(testData.sectionSettings || {});
 
         // Populate Schedule - sort by recency (startTime / createdAt desc)
         const sortedSchedules = [...(testSchedules || [])].sort((a, b) => {
@@ -717,22 +729,6 @@ export default function NewAdminTestEdit() {
     }
   };
 
-  const handleConfirmNewSection = () => {
-    const name = newSectionName.trim();
-    if (!name) { toast.error("Section name cannot be empty"); return; }
-    if (sectionOrder.includes(name)) { toast.error(`Section "${name}" already exists`); return; }
-    setSectionOrder((prev) => {
-      // Insert before "Ungrouped" if it exists, otherwise append
-      const ungroupedIdx = prev.indexOf("Ungrouped");
-      if (ungroupedIdx === -1) return [...prev, name];
-      return [...prev.slice(0, ungroupedIdx), name, ...prev.slice(ungroupedIdx)];
-    });
-    setGroupedQuestions((prev) => ({ ...prev, [name]: [] }));
-    setNewSectionName("");
-    setAddSectionOpen(false);
-    toast.success(`Section "${name}" created`);
-  };
-
   const handleRenameSection = async (oldName: string, newName: string) => {
     const trimmed = newName.trim();
     if (!trimmed) {
@@ -812,6 +808,169 @@ export default function NewAdminTestEdit() {
         return next;
       });
       toast.success(`Section "${sectionName}" deleted`);
+    }
+  };
+
+  const handleOpenAddSectionModal = () => {
+    setIsCreatingNewSection(true);
+    setActiveModalSection(null);
+    setModalSectionName("");
+    setModalProblemShuffle(false);
+    setModalMarksPerQuestion(10);
+    setSectionSettingsModalOpen(true);
+  };
+
+  const handleOpenSectionSettings = (section: string) => {
+    setIsCreatingNewSection(false);
+    setActiveModalSection(section);
+    setModalSectionName(section === "Ungrouped" ? "" : section);
+    const currentSettings = sectionSettings[section] || {};
+    setModalProblemShuffle(Boolean(currentSettings.shuffleProblems));
+    const sectionQs = groupedQuestions[section] || [];
+    const firstMark = sectionQs.length > 0 && sectionQs[0].marks !== undefined ? sectionQs[0].marks : 10;
+    setModalMarksPerQuestion(firstMark);
+    setSectionSettingsModalOpen(true);
+  };
+
+  const handleSaveSectionSettings = async () => {
+    if (isCreatingNewSection) {
+      const name = modalSectionName.trim();
+      if (!name) {
+        toast.error("Section name cannot be empty");
+        return;
+      }
+      if (sectionOrder.includes(name)) {
+        toast.error(`Section "${name}" already exists`);
+        return;
+      }
+
+      setSavingSectionSettings(true);
+      try {
+        setSectionOrder((prev) => {
+          const ungroupedIdx = prev.indexOf("Ungrouped");
+          if (ungroupedIdx === -1) return [...prev, name];
+          return [...prev.slice(0, ungroupedIdx), name, ...prev.slice(ungroupedIdx)];
+        });
+        setGroupedQuestions((prev) => ({ ...prev, [name]: [] }));
+
+        const updatedSectionSettings = {
+          ...sectionSettings,
+          [name]: {
+            shuffleProblems: modalProblemShuffle,
+          },
+        };
+        setSectionSettings(updatedSectionSettings);
+
+        if (id) {
+          await testService.updateTest(id, { sectionSettings: updatedSectionSettings });
+        }
+
+        toast.success(`Section "${name}" created successfully`);
+        setSectionSettingsModalOpen(false);
+        setIsCreatingNewSection(false);
+      } catch (err: any) {
+        console.error("[NewAdminTestEdit] Failed to create section:", err);
+        toast.error("Failed to create section: " + (err.message || "Unknown error"));
+      } finally {
+        setSavingSectionSettings(false);
+      }
+      return;
+    }
+
+    if (!activeModalSection) return;
+    const oldName = activeModalSection;
+    const newName = oldName === "Ungrouped" ? "Ungrouped" : modalSectionName.trim();
+
+    if (oldName !== "Ungrouped" && !newName) {
+      toast.error("Section name cannot be empty");
+      return;
+    }
+    if (oldName !== "Ungrouped" && newName !== oldName && sectionOrder.includes(newName)) {
+      toast.error(`Section "${newName}" already exists`);
+      return;
+    }
+
+    setSavingSectionSettings(true);
+    try {
+      const sectionQs = groupedQuestions[oldName] || [];
+
+      // 1. If Rename happened or custom marks applied, update test_questions
+      const needRename = oldName !== "Ungrouped" && newName !== oldName;
+      const newMarksValue = Number(modalMarksPerQuestion) >= 0 ? Number(modalMarksPerQuestion) : 0;
+      const needMarksUpdate = modalMarksPerQuestion !== "" && sectionQs.some((tq) => tq.marks !== newMarksValue);
+
+      if (sectionQs.length > 0 && (needRename || needMarksUpdate)) {
+        await Promise.all(
+          sectionQs.map((tq) => {
+            const payload: any = {};
+            if (needRename) payload.sectionName = newName;
+            if (needMarksUpdate) payload.marks = newMarksValue;
+            return testService.updateTestQuestion(tq.id, payload);
+          })
+        );
+      }
+
+      // 2. Update local questions & groupedQuestions state
+      setGroupedQuestions((prev) => {
+        const next = { ...prev };
+        const currentList = next[oldName] || [];
+        const updatedList = currentList.map((tq) => ({
+          ...tq,
+          sectionName: needRename ? newName : tq.sectionName,
+          marks: needMarksUpdate ? newMarksValue : tq.marks,
+        }));
+
+        if (needRename) {
+          delete next[oldName];
+          next[newName] = updatedList;
+        } else {
+          next[oldName] = updatedList;
+        }
+        return next;
+      });
+
+      if (needRename) {
+        setSectionOrder((prev) => prev.map((s) => (s === oldName ? newName : s)));
+        setCollapsedSections((prev) => {
+          const next = new Set(prev);
+          if (next.has(oldName)) {
+            next.delete(oldName);
+            next.add(newName);
+          }
+          return next;
+        });
+      }
+
+      if (needMarksUpdate) {
+        setQuestions((prev) =>
+          prev.map((q) =>
+            sectionQs.some((sq) => sq.id === q.id) ? { ...q, marks: newMarksValue } : q
+          )
+        );
+      }
+
+      // 3. Update sectionSettings map on test
+      const updatedSectionSettings = { ...sectionSettings };
+      if (needRename && updatedSectionSettings[oldName]) {
+        delete updatedSectionSettings[oldName];
+      }
+      updatedSectionSettings[newName] = {
+        ...(updatedSectionSettings[newName] || {}),
+        shuffleProblems: modalProblemShuffle,
+      };
+      setSectionSettings(updatedSectionSettings);
+
+      if (id) {
+        await testService.updateTest(id, { sectionSettings: updatedSectionSettings });
+      }
+
+      toast.success("Section settings updated successfully");
+      setSectionSettingsModalOpen(false);
+    } catch (err: any) {
+      console.error("[NewAdminTestEdit] Failed to update section settings:", err);
+      toast.error("Failed to update section settings: " + (err.message || "Unknown error"));
+    } finally {
+      setSavingSectionSettings(false);
     }
   };
 
@@ -2516,41 +2675,6 @@ export default function NewAdminTestEdit() {
               <div className="p-4 bg-white border border-slate-200/90 shadow-sm flex items-center justify-between">
                 <span className="text-xs font-semibold text-slate-700">Problems</span>
                 <div className="flex items-center gap-2">
-                  {/* Inline Add Section input if active */}
-                  {addSectionOpen && (
-                    <div className="flex items-center gap-1.5 mr-2">
-                      <input
-                        autoFocus
-                        type="text"
-                        value={newSectionName}
-                        onChange={(e) => setNewSectionName(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") handleConfirmNewSection();
-                          if (e.key === "Escape") {
-                            setAddSectionOpen(false);
-                            setNewSectionName("");
-                          }
-                        }}
-                        placeholder="Section name…"
-                        className="text-xs border border-indigo-300 rounded px-2.5 py-1 focus:outline-none focus:border-indigo-500 w-44"
-                      />
-                      <button
-                        onClick={handleConfirmNewSection}
-                        className="text-xs px-2.5 py-1 bg-indigo-600 text-white rounded hover:bg-indigo-700 cursor-pointer font-medium"
-                      >
-                        Add
-                      </button>
-                      <button
-                        onClick={() => {
-                          setAddSectionOpen(false);
-                          setNewSectionName("");
-                        }}
-                        className="text-xs px-2 py-1 text-slate-500 hover:text-slate-800 cursor-pointer"
-                      >
-                        ✕
-                      </button>
-                    </div>
-                  )}
 
                   {/* Header Plus Action Dropdown */}
                   <DropdownMenu>
@@ -2568,10 +2692,10 @@ export default function NewAdminTestEdit() {
                         className="cursor-pointer py-2 px-3 flex items-center gap-2.5 text-slate-700 hover:bg-slate-50 font-medium"
                       >
                         <Plus className="w-4 h-4 text-slate-500" />
-                        <span>Add problems in this section</span>
+                        <span>Add problems to test</span>
                       </DropdownMenuItem>
                       <DropdownMenuItem
-                        onClick={() => setAddSectionOpen(true)}
+                        onClick={handleOpenAddSectionModal}
                         className="cursor-pointer py-2 px-3 flex items-center gap-2.5 text-slate-700 hover:bg-slate-50 font-medium"
                       >
                         <LayoutGrid className="w-4 h-4 text-slate-500" />
@@ -2653,9 +2777,17 @@ export default function NewAdminTestEdit() {
                                   </button>
                                 </div>
                               ) : (
-                                <span className="text-sm font-semibold text-slate-800 truncate">
-                                  {section}
-                                </span>
+                                <div className="flex items-center gap-2 min-w-0">
+                                  <span className="text-sm font-semibold text-slate-800 truncate">
+                                    {section}
+                                  </span>
+                                  {sectionSettings[section]?.shuffleProblems && (
+                                    <span className="text-[10px] font-medium bg-indigo-50 text-indigo-700 border border-indigo-200/60 px-2 py-0.5 rounded-full shrink-0 flex items-center gap-1">
+                                      <RefreshCw className="w-2.5 h-2.5" />
+                                      Shuffle on
+                                    </span>
+                                  )}
+                                </div>
                               )}
                             </div>
 
@@ -2666,21 +2798,18 @@ export default function NewAdminTestEdit() {
                                 <DropdownMenuTrigger asChild>
                                   <button
                                     className="p-1 text-[#3b4992] hover:text-indigo-900 transition-colors cursor-pointer"
-                                    title="Section options"
+                                    title="Section settings"
                                   >
                                     <Settings className="w-4 h-4" />
                                   </button>
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent align="end" className="w-48 bg-white border border-slate-200 shadow-xl p-1 text-xs">
                                   <DropdownMenuItem
-                                    onClick={() => {
-                                      setEditingSectionName(section);
-                                      setEditingSectionValue(section);
-                                    }}
+                                    onClick={() => handleOpenSectionSettings(section)}
                                     className="cursor-pointer py-1.5 px-2.5 flex items-center gap-2 text-slate-700 hover:bg-slate-50"
                                   >
-                                    <Edit className="w-3.5 h-3.5 text-slate-500" />
-                                    <span>Edit Section Name</span>
+                                    <Settings className="w-3.5 h-3.5 text-slate-500" />
+                                    <span>Section Settings</span>
                                   </DropdownMenuItem>
                                   {section !== "Ungrouped" && (
                                     <>
@@ -2697,14 +2826,33 @@ export default function NewAdminTestEdit() {
                                 </DropdownMenuContent>
                               </DropdownMenu>
 
-                              {/* Plus Icon: Add question to this section */}
-                              <button
-                                onClick={() => navigate(`/admin/tests/${id}/add-problems?section=${encodeURIComponent(section)}`)}
-                                className="p-1 text-[#3b4992] hover:text-indigo-900 transition-colors cursor-pointer"
-                                title={`Add problems to ${section}`}
-                              >
-                                <Plus className="w-4 h-4" />
-                              </button>
+                              {/* Plus Icon: Dropdown to Add question to this section OR Add new section */}
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <button
+                                    className="p-1 text-[#3b4992] hover:text-indigo-900 transition-colors cursor-pointer"
+                                    title="Add problems or section"
+                                  >
+                                    <Plus className="w-4 h-4" />
+                                  </button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end" className="w-56 bg-white border border-slate-200 shadow-xl p-1 text-xs">
+                                  <DropdownMenuItem
+                                    onClick={() => navigate(`/admin/tests/${id}/add-problems?section=${encodeURIComponent(section)}`)}
+                                    className="cursor-pointer py-2 px-3 flex items-center gap-2.5 text-slate-700 hover:bg-slate-50 font-medium"
+                                  >
+                                    <Plus className="w-4 h-4 text-slate-500" />
+                                    <span>Add problems in this section</span>
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem
+                                    onClick={handleOpenAddSectionModal}
+                                    className="cursor-pointer py-2 px-3 flex items-center gap-2.5 text-slate-700 hover:bg-slate-50 font-medium"
+                                  >
+                                    <LayoutGrid className="w-4 h-4 text-slate-500" />
+                                    <span>Add a new section in test</span>
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
 
                               {/* Collapse / Expand Toggle Button */}
                               <button
@@ -3982,6 +4130,125 @@ export default function NewAdminTestEdit() {
           loadCandidatesData();
         }}
       />
+
+      {/* Section Settings / Add Section Modal */}
+      <Dialog open={sectionSettingsModalOpen} onOpenChange={setSectionSettingsModalOpen}>
+        <DialogContent className="sm:max-w-[480px] bg-white text-slate-900 p-0 overflow-hidden border border-slate-200 shadow-2xl rounded-xl">
+          <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+            <div className="flex items-center gap-2.5">
+              <div className="p-2 rounded-lg bg-indigo-50 text-indigo-600">
+                {isCreatingNewSection ? <LayoutGrid className="w-5 h-5" /> : <Settings className="w-5 h-5" />}
+              </div>
+              <div>
+                <DialogTitle className="text-base font-semibold text-slate-900">
+                  {isCreatingNewSection ? "Add New Section" : "Section Settings"}
+                </DialogTitle>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  {isCreatingNewSection
+                    ? "Configure section name, problem shuffling, and scoring scheme for the new section."
+                    : "Configure section name, problem shuffling, and scoring scheme."}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="px-6 py-5 space-y-6">
+            {/* 1. Edit / Create Section Name */}
+            {(isCreatingNewSection || activeModalSection !== "Ungrouped") && (
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-slate-700">
+                  Section Name
+                </label>
+                <input
+                  type="text"
+                  value={modalSectionName}
+                  onChange={(e) => setModalSectionName(e.target.value)}
+                  placeholder="e.g. Coding 2, Quantitative Aptitude"
+                  className="w-full text-sm text-slate-800 border border-slate-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 bg-white"
+                />
+              </div>
+            )}
+
+            {/* 2. Problem Shuffle */}
+            <div className="space-y-2 pt-1 border-t border-slate-100">
+              <div>
+                <h4 className="text-sm font-semibold text-slate-800">Problem shuffle</h4>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Different candidates will see different ordering of problems in this section.
+                </p>
+              </div>
+              <label className="flex items-center gap-2.5 cursor-pointer select-none pt-1">
+                <input
+                  type="checkbox"
+                  checked={modalProblemShuffle}
+                  onChange={(e) => setModalProblemShuffle(e.target.checked)}
+                  className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                />
+                <span className="text-xs font-medium text-slate-700">
+                  Enable problem shuffle.
+                </span>
+              </label>
+            </div>
+
+            {/* 3. Custom Scoring */}
+            <div className="space-y-3 pt-4 border-t border-slate-100">
+              <div>
+                <h4 className="text-sm font-semibold text-slate-800">Custom Scoring</h4>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Set marks per question in this section.
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <div className="flex items-center gap-3">
+                  <label className="text-xs font-medium text-slate-600 whitespace-nowrap">
+                    Marks per question:
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={modalMarksPerQuestion}
+                    onChange={(e) => setModalMarksPerQuestion(e.target.value)}
+                    className="w-24 text-sm text-slate-800 border border-slate-300 rounded-md px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 bg-white"
+                  />
+                </div>
+                {!isCreatingNewSection && (
+                  <p className="text-[11px] text-slate-400">
+                    {groupedQuestions[activeModalSection || ""]?.length || 0} question(s) in this section will be allocated {modalMarksPerQuestion || 0} mark(s) each.
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Modal Footer */}
+          <div className="px-6 py-3.5 bg-slate-50 border-t border-slate-100 flex items-center justify-end gap-2.5">
+            <button
+              type="button"
+              disabled={savingSectionSettings}
+              onClick={() => setSectionSettingsModalOpen(false)}
+              className="px-3.5 py-1.5 text-xs font-medium text-slate-600 hover:text-slate-800 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors cursor-pointer"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              disabled={savingSectionSettings}
+              onClick={handleSaveSectionSettings}
+              className="px-4 py-1.5 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg shadow-sm transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+            >
+              {savingSectionSettings ? (
+                <>
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  <span>{isCreatingNewSection ? "Creating..." : "Saving..."}</span>
+                </>
+              ) : (
+                <span>{isCreatingNewSection ? "Create Section" : "Save Changes"}</span>
+              )}
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

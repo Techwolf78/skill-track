@@ -53,6 +53,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { CreateProblemModal } from "@/components/admin/CreateProblemModal";
+import { formatPlainTextExcerpt } from "@/lib/html-utils";
 
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -1256,13 +1257,7 @@ export default function NewAdminLibrary() {
 
                     {/* Problem Statement / Description */}
                     <p className="pt-0.5 text-xs text-slate-600 leading-relaxed font-normal line-clamp-3">
-                      {q.prompt
-                        ? q.prompt
-                            .replace(/<[^>]*>/g, " ")
-                            .replace(/&nbsp;/g, " ")
-                            .replace(/\s+/g, " ")
-                            .trim()
-                        : "Not available"}
+                      {formatPlainTextExcerpt(q.prompt)}
                     </p>
                   </div>
                 );

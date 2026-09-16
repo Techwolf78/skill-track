@@ -137,8 +137,8 @@ export default function TestSchedules() {
   const updateStatusMutation = useUpdateTestScheduleStatusMutation();
 
   const schedules = useMemo(() => {
-    const orgMap = new Map();
-    orgsData.forEach((org) => {
+    const orgMap = new Map<string, string>();
+    (orgsData || []).forEach((org) => {
       orgMap.set(org.id, org.name);
     });
 
@@ -146,12 +146,12 @@ export default function TestSchedules() {
       const test = testsData.find((t) => t.id === schedule.testId);
       let organisationName = "Unknown Organisation";
       if (test?.organisationId && orgMap.has(test.organisationId)) {
-        organisationName = orgMap.get(test.organisationId);
+        organisationName = orgMap.get(test.organisationId)!;
       } else {
         const scheduleOrgId = (schedule as { organisationId?: string })
           .organisationId;
         if (scheduleOrgId && orgMap.has(scheduleOrgId)) {
-          organisationName = orgMap.get(scheduleOrgId);
+          organisationName = orgMap.get(scheduleOrgId)!;
         }
       }
 
@@ -173,7 +173,7 @@ export default function TestSchedules() {
     () => testsData.filter((t) => t.status === "PUBLISHED"),
     [testsData],
   );
-  const organisations = orgsData;
+  const organisations = orgsData || [];
 
   const fetchData = useCallback(() => {
     refetchSchedules();
@@ -521,7 +521,14 @@ export default function TestSchedules() {
               <Label>Select Test *</Label>
               <Select
                 value={formData.testId}
-                onValueChange={(v) => setFormData({ ...formData, testId: v })}
+                onValueChange={(v) => {
+                  const selectedTest = tests.find((t) => t.id === v);
+                  setFormData((prev) => ({
+                    ...prev,
+                    testId: v,
+                    organisationId: selectedTest?.organisationId || prev.organisationId,
+                  }));
+                }}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Choose a test" />

@@ -23,7 +23,7 @@ import { organisationService, OrganisationResponse, CreateOrganisationRequest } 
 export function useSubjectsQuery() {
   return useQuery<Subject[]>({
     queryKey: ["subjects"],
-    queryFn: testService.getAllSubjects,
+    queryFn: () => testService.getAllSubjects(),
   });
 }
 
@@ -62,7 +62,7 @@ export function useDeleteSubjectMutation() {
 export function useTopicsQuery() {
   return useQuery<Topic[]>({
     queryKey: ["topics"],
-    queryFn: testService.getAllTopics,
+    queryFn: () => testService.getAllTopics(),
   });
 }
 
@@ -101,7 +101,7 @@ export function useDeleteTopicMutation() {
 export function useSubtopicsQuery() {
   return useQuery<Subtopic[]>({
     queryKey: ["subtopics"],
-    queryFn: testService.getAllSubtopics,
+    queryFn: () => testService.getAllSubtopics(),
   });
 }
 
@@ -140,7 +140,7 @@ export function useDeleteSubtopicMutation() {
 export function useCandidatesQuery() {
   return useQuery<Candidate[]>({
     queryKey: ["candidates"],
-    queryFn: candidateService.getCandidates,
+    queryFn: () => candidateService.getCandidates(),
   });
 }
 
@@ -180,6 +180,17 @@ export function useCreateCandidateMutation() {
   });
 }
 
+export function useUpdateCandidateMutation() {
+  const queryClient = useQueryClient();
+  return useMutation<Candidate, Error, { id: string; data: Partial<CreateCandidateRequest> }>({
+    mutationFn: ({ id, data }) => candidateService.updateCandidate(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["candidates"] });
+      queryClient.invalidateQueries({ queryKey: ["candidates-page"] });
+    },
+  });
+}
+
 export function useDeleteCandidateMutation() {
   const queryClient = useQueryClient();
   return useMutation<void, Error, string>({
@@ -194,10 +205,10 @@ export function useDeleteCandidateMutation() {
 
 // ==================== Organisations Hooks ====================
 
-export function useOrganisationsQuery() {
+export function useOrganisationsQuery(params?: { search?: string; page?: number; size?: number }) {
   return useQuery<OrganisationResponse[]>({
-    queryKey: ["organisations"],
-    queryFn: organisationService.getOrganisations,
+    queryKey: ["organisations", params],
+    queryFn: () => organisationService.getOrganisations(params),
   });
 }
 

@@ -6,13 +6,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useNavigate } from "react-router-dom";
 import {
-  GraduationCap,
-  BookOpen,
   CheckCircle2,
   Eye,
   EyeOff,
   Loader2,
-  Shield,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { authService } from "@/lib/auth-service";
@@ -42,7 +39,7 @@ export default function Login() {
     }
   }, [isAuthenticated, user, navigate]);
 
-  const [adminEmail, setAdminEmail] = useState("superadmin@gryphon360.com");
+  const [adminEmail, setAdminEmail] = useState("");
   const [adminPassword, setAdminPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
 
@@ -56,7 +53,6 @@ export default function Login() {
         password: adminPassword,
       });
 
-      console.log("Login response:", response);
       loginToContext(response.accessToken, response.user);
 
       toast({
@@ -68,15 +64,6 @@ export default function Login() {
       navigate(redirectPath);
     } catch (error: unknown) {
       console.error("Login failed:", error);
-      if (axios.isAxiosError(error)) {
-        console.error("Axios Error Details:", {
-          status: error.response?.status,
-          statusText: error.response?.statusText,
-          data: error.response?.data,
-          headers: error.response?.headers,
-        });
-      }
-
       let errorMessage = "Invalid credentials. Please try again.";
       let errorTitle = "Login Failed";
       if (axios.isAxiosError(error)) {
@@ -100,7 +87,6 @@ export default function Login() {
     }
   };
 
-
   return (
     <div className="min-h-screen flex">
       {/* Left Panel - Hero */}
@@ -116,14 +102,15 @@ export default function Login() {
           <div className="absolute bottom-20 right-10 w-96 h-96 bg-accent rounded-full blur-3xl" />
         </div>
 
+        {/* Top Left Logo Only */}
         <div className="relative z-10">
-          <div className="flex items-center gap-3 mb-2">
+          <div className="flex items-center gap-3">
             <GryphonLogo variant="dark" size="xl" />
           </div>
-          <p className="text-white/60 text-sm">Skill Assessment Platform</p>
         </div>
 
-        <div className="relative z-10 space-y-8">
+        {/* Main Brand Messaging */}
+        <div className="relative z-10 space-y-8 my-auto">
           <div>
             <h1 className="text-4xl lg:text-5xl font-heading font-bold text-white leading-tight">
               Assess Skills.
@@ -146,26 +133,14 @@ export default function Login() {
                 transition={{ delay: 0.3 + index * 0.1 }}
               >
                 <CheckCircle2 className="w-5 h-5 text-primary" />
-                <span className="text-sm">{feature}</span>
+                <span className="text-sm font-medium">{feature}</span>
               </motion.div>
             ))}
           </div>
         </div>
 
-        <div className="relative z-10 flex items-center gap-8 text-white/40 text-sm">
-          <div className="flex items-center gap-2">
-            <GraduationCap className="w-5 h-5" />
-            <span>12+ Colleges</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <BookOpen className="w-5 h-5" />
-            <span>2,500+ Students</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <Shield className="w-5 h-5" />
-            <span>Secure Platform</span>
-          </div>
-        </div>
+        {/* Minimalist Bottom Spacer */}
+        <div className="relative z-10" />
       </motion.div>
 
       {/* Right Panel - Admin Login Form */}
@@ -177,9 +152,9 @@ export default function Login() {
       >
         <div className="w-full max-w-md space-y-8">
           <div className="text-center lg:text-left">
-            <h2 className="text-2xl font-heading font-bold">Admin Login</h2>
-            <p className="text-muted-foreground mt-1">
-              Enter your credentials to access the admin portal
+            <h2 className="text-2xl font-heading font-bold text-foreground">Sign In</h2>
+            <p className="text-muted-foreground mt-1 text-sm">
+              Enter your credentials to access your account
             </p>
           </div>
 
@@ -190,7 +165,7 @@ export default function Login() {
                 <Input
                   id="adminEmail"
                   type="email"
-                  placeholder="admin@company.com"
+                  placeholder="name@company.com"
                   className={cn(
                     "h-12",
                     adminEmail && validateLoginForm({ email: adminEmail }).errors.email && "border-red-500 focus-visible:ring-red-500"
@@ -228,14 +203,11 @@ export default function Login() {
                   </button>
                 </div>
               </div>
-              <div className="flex items-center justify-between text-sm">
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input type="checkbox" className="rounded border-input" />
-                  <span className="text-muted-foreground">Remember me</span>
+              <div className="flex items-center justify-between text-sm pt-1">
+                <label className="flex items-center gap-2 cursor-pointer select-none">
+                  <input type="checkbox" className="rounded border-input text-primary focus:ring-primary" />
+                  <span className="text-muted-foreground text-sm">Remember me</span>
                 </label>
-                <a href="#" className="text-primary hover:underline">
-                  Forgot password?
-                </a>
               </div>
               <Button
                 type="submit"
@@ -250,7 +222,7 @@ export default function Login() {
                     Signing in...
                   </>
                 ) : (
-                  "Sign in as Admin"
+                  "Sign In"
                 )}
               </Button>
             </form>

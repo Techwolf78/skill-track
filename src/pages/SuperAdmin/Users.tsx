@@ -83,6 +83,8 @@ export default function Users() {
   // Edit User Form State
   const [editUser, setEditUser] = useState<UserResponse | null>(null);
   const [isUpdating, setIsUpdating] = useState(false);
+  const [editPassword, setEditPassword] = useState("");
+  const [showEditPassword, setShowEditPassword] = useState(false);
 
   const [editForm, setEditForm] = useState({
     name: "",
@@ -91,6 +93,8 @@ export default function Users() {
 
   useEffect(() => {
     if (editUser) {
+      setEditPassword("");
+      setShowEditPassword(false);
       setEditForm({
         name: editUser.name || "",
         phoneNumber: editUser.phoneNumber || "",
@@ -188,10 +192,15 @@ export default function Users() {
 
     setIsUpdating(true);
     try {
-      await userService.patchUser(editUser.id, {
+      const payload: { name: string; phoneNumber?: string; password?: string } = {
         name: editForm.name,
-        phoneNumber: editForm.phoneNumber,
-      });
+        phoneNumber: editForm.phoneNumber || undefined,
+      };
+      if (editPassword.trim()) {
+        payload.password = editPassword.trim();
+      }
+
+      await userService.patchUser(editUser.id, payload);
 
       toast({
         title: "User Updated",
@@ -734,6 +743,34 @@ export default function Users() {
                     }
                     placeholder="+91..."
                   />
+                </div>
+
+                {/* Password Reset */}
+                <div className="space-y-2 col-span-2">
+                  <Label>New Password (Optional)</Label>
+                  <div className="relative">
+                    <Input
+                      type={showEditPassword ? "text" : "password"}
+                      placeholder="Leave blank to keep existing password"
+                      value={editPassword}
+                      onChange={(e) => setEditPassword(e.target.value)}
+                      className="pr-10"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowEditPassword(!showEditPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      {showEditPassword ? (
+                        <EyeOff className="w-4 h-4" />
+                      ) : (
+                        <Eye className="w-4 h-4" />
+                      )}
+                    </button>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Enter a new password if you want to reset credentials for this user
+                  </p>
                 </div>
 
                 <div className="space-y-2 opacity-60 col-span-2">

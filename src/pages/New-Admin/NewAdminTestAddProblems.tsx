@@ -32,6 +32,7 @@ import { GryphonLogo } from "@/components/ui/GryphonLogo";
 import { useQuestionsQuery } from "@/hooks/use-query-hooks";
 import { testService, Question, Test } from "@/lib/test-service";
 import { toast } from "sonner";
+import { formatPlainTextExcerpt } from "@/lib/html-utils";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -775,7 +776,7 @@ export default function NewAdminTestAddProblems() {
 
                         {/* Problem Statement / Prompt */}
                         <p className="pt-0.5 text-xs text-slate-600 leading-relaxed font-normal line-clamp-3">
-                          {q.prompt ? q.prompt.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim() : "Not available"}
+                          {formatPlainTextExcerpt(q.prompt)}
                         </p>
                       </div>
                     );

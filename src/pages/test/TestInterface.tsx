@@ -53,7 +53,7 @@ import { IdentityVerification } from "@/proctoring/components/IdentityVerificati
 import { Shield, ShieldAlert, ShieldCheck as ShieldCheckIcon, Camera } from "lucide-react";
 import { AnswerStore, computeContentHash } from "@/lib/exam/answerStorage";
 import { detectTimeExtension } from "@/lib/exam/sessionLogic";
-import { decodeHtmlIfNeeded, isHtmlContent } from "@/lib/html-utils";
+import { decodeHtmlIfNeeded, isHtmlContent, renderFormattedContent } from "@/lib/html-utils";
 
 import { mapBackendToFrontendLang } from "../../types/question";
 
@@ -141,6 +141,7 @@ interface RawPaperQuestion {
   snapshotQuestionId?: string;
   sourceQuestionId: string;
   orderIndex: number;
+  displayOrderIndex?: number;
   marks: number;
   type: "MCQ" | "CODING";
   prompt: string;
@@ -730,7 +731,7 @@ function TestInterfaceContent({ testId, sessionId, navigate, toast, onRequireIde
             id: q.snapshotQuestionId || q.sourceQuestionId,
             testId: paper.testId,
             questionId: q.sourceQuestionId,
-            orderIndex: q.orderIndex,
+            orderIndex: q.displayOrderIndex !== undefined ? q.displayOrderIndex : q.orderIndex,
             marks: q.marks,
             sectionName: q.sectionName,
             timeLimitSecs: q.coding?.timeLimitSecs,
@@ -840,7 +841,6 @@ useEffect(() => {
     console.log("🔍 Test.questions:", test?.questions);
     
     const qs = test.questions
-      .sort((a, b) => a.orderIndex - b.orderIndex)
       .map(tq => {
         const rawStarterCode = tq.question?.coding?.starterCode || tq.question?.starterCode;
         const rawTemplates = (tq.question as { languageTemplates?: Record<string, unknown> } | undefined)?.languageTemplates || (tq.question?.coding as { languageTemplates?: Record<string, unknown> } | undefined)?.languageTemplates;
@@ -1891,12 +1891,14 @@ useEffect(() => {
     );
   }
 
+  const isFullscreenLocked = !isFullscreen && isProctoringActive;
+
   return (
     <div className="min-h-screen bg-background flex flex-col relative">
       {/* Fullscreen Enforcement Overlay on Reload & Tab Switch */}
-      {!isFullscreen && isProctoringActive && Boolean(config?.fullscreen || config?.fullscreenExitTracking || config?.tabSwitch) && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-md p-4">
-          <div className="bg-white p-8 rounded-2xl border border-slate-200 shadow-2xl text-center max-w-md w-full animate-in zoom-in duration-300">
+      {isFullscreenLocked && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/75 backdrop-blur-sm p-4 pointer-events-auto">
+          <div className="bg-white p-8 rounded-2xl border border-slate-200 shadow-2xl text-center max-w-md w-full animate-in zoom-in duration-200">
             <div className="mx-auto mb-5 w-16 h-16 rounded-full bg-orange-500/10 flex items-center justify-center animate-pulse">
               <Monitor className="w-8 h-8 text-orange-600" />
             </div>
@@ -1918,7 +1920,7 @@ useEffect(() => {
 
       <div className={cn(
         "flex-1 flex flex-col overflow-hidden",
-        !isFullscreen && isProctoringActive && "blur-md pointer-events-none"
+        isFullscreenLocked && "blur-md pointer-events-none select-none"
       )}>
         {/* Header */}
         <header className="sticky top-0 z-40 border-b bg-card/90 backdrop-blur px-6 py-4 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
@@ -2053,23 +2055,13 @@ useEffect(() => {
                         {/* Problem Statement Title */}
                         <h2 className="text-sm font-bold text-slate-900">Problem Statement</h2>
 
-                        {/* Formatted HTML Problem Statement */}
-                        {(() => {
-                          const rawPrompt = currentQuestion.prompt || currentQuestion.title || "";
-                          const decodedPrompt = decodeHtmlIfNeeded(rawPrompt);
-                          return isHtmlContent(decodedPrompt) ? (
-                            <div
-                              className="text-[13px] md:text-sm text-slate-800 leading-relaxed font-sans prose prose-slate max-w-none [&_h3]:text-sm [&_h3]:font-bold [&_h3]:text-slate-900 [&_h3]:mt-4 [&_h3]:mb-1.5 [&_ol]:list-decimal [&_ol]:pl-5 [&_ul]:list-disc [&_ul]:pl-5 [&_li]:my-1 [&_p]:my-1.5 [&_pre]:bg-[#18181b] [&_pre]:text-amber-300 [&_pre]:p-3 [&_pre]:rounded-sm [&_pre]:font-mono [&_pre]:text-xs [&_pre]:overflow-x-auto [&_code]:font-mono [&_code]:text-xs [&_code]:bg-slate-100 [&_code]:text-pink-600 [&_code]:px-1 [&_code]:py-0.5 [&_code]:rounded-xs"
-                              dangerouslySetInnerHTML={{
-                                __html: decodedPrompt,
-                              }}
-                            />
-                          ) : (
-                            <div className="text-[13px] md:text-sm text-slate-800 leading-relaxed whitespace-pre-wrap font-normal">
-                              {decodedPrompt}
-                            </div>
-                          );
-                        })()}
+                        {/* Formatted HTML/Markdown Problem Statement */}
+                        <div
+                          className="text-[13px] md:text-sm text-slate-800 leading-relaxed font-sans prose prose-slate max-w-none [&_h3]:text-xs [&_h3]:font-bold [&_h3]:text-slate-900 [&_h3]:uppercase [&_h3]:tracking-wider [&_h3]:mt-4 [&_h3]:mb-1.5 [&_h2]:text-sm [&_h2]:font-bold [&_h2]:text-slate-900 [&_h2]:mt-4 [&_h2]:mb-1.5 [&_ol]:list-decimal [&_ol]:pl-5 [&_ul]:list-disc [&_ul]:pl-5 [&_li]:my-1 [&_p]:my-1.5 [&_pre]:bg-[#18181b] [&_pre]:text-amber-300 [&_pre]:p-3 [&_pre]:rounded-sm [&_pre]:font-mono [&_pre]:text-xs [&_pre]:overflow-x-auto [&_code]:font-mono [&_code]:text-xs [&_code]:bg-slate-100 [&_code]:text-pink-600 [&_code]:px-1 [&_code]:py-0.5 [&_code]:rounded-xs"
+                          dangerouslySetInnerHTML={{
+                            __html: renderFormattedContent(currentQuestion.prompt || currentQuestion.title || ""),
+                          }}
+                        />
 
                         {/* Question Image */}
                         {currentQuestion.imageUrl && (
@@ -2398,22 +2390,12 @@ useEffect(() => {
                               {currentQuestion.title}
                             </h2>
                           )}
-                        {(() => {
-                          const rawPrompt = currentQuestion.prompt || currentQuestion.title || "";
-                          const decodedPrompt = decodeHtmlIfNeeded(rawPrompt);
-                          return isHtmlContent(decodedPrompt) ? (
-                            <div
-                              className="text-base font-normal mt-3 prose prose-slate max-w-none [&_ol]:list-decimal [&_ol]:pl-5 [&_ul]:list-disc [&_ul]:pl-5 [&_pre]:bg-slate-900 [&_pre]:text-slate-100 [&_pre]:p-3 [&_pre]:rounded-sm [&_code]:bg-slate-100 [&_code]:text-pink-600 [&_code]:px-1 [&_code]:py-0.5"
-                              dangerouslySetInnerHTML={{
-                                __html: decodedPrompt,
-                              }}
-                            />
-                          ) : (
-                            <div className="text-base font-medium mt-3 whitespace-pre-wrap">
-                              {decodedPrompt}
-                            </div>
-                          );
-                        })()}
+                        <div
+                          className="text-base font-normal mt-3 prose prose-slate max-w-none [&_ol]:list-decimal [&_ol]:pl-5 [&_ul]:list-disc [&_ul]:pl-5 [&_pre]:bg-slate-900 [&_pre]:text-slate-100 [&_pre]:p-3 [&_pre]:rounded-sm [&_code]:bg-slate-100 [&_code]:text-pink-600 [&_code]:px-1 [&_code]:py-0.5"
+                          dangerouslySetInnerHTML={{
+                            __html: renderFormattedContent(currentQuestion.prompt || currentQuestion.title || ""),
+                          }}
+                        />
                         {currentQuestion.tags && currentQuestion.tags.length > 0 && (
                           <div className="flex flex-wrap gap-1 mt-2">
                             {currentQuestion.tags.map((tag, idx) => (
