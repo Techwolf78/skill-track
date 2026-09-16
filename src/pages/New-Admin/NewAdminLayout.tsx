@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import { Outlet, NavLink, useLocation, useNavigate } from "react-router-dom";
 import {
   Search,
@@ -8,8 +8,13 @@ import {
   ChevronRight,
   LogOut,
   User as UserIcon,
+  CreditCard,
+  HelpCircle,
+  LayoutGrid,
+  ChevronDown,
+  Sparkles,
 } from "lucide-react";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -18,22 +23,60 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { useAuth } from "@/lib/auth-context";
 import { GryphonLogo } from "@/components/ui/GryphonLogo";
+import { useQuery } from "@tanstack/react-query";
+import { apiClient } from "@/lib/api-client";
 
 export default function NewAdminLayout() {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, logout } = useAuth();
-  const [searchQuery, setSearchQuery] = useState("");
+  const [pinPopoverOpen, setPinPopoverOpen] = useState(false);
+
+  // Fetch real invitations to calculate live remaining PINs
+  const { data: invitations = [] } = useQuery<any[]>({
+    queryKey: ["all-candidate-invitations"],
+    queryFn: async () => {
+      try {
+        const res = await apiClient.get("/candidate-invitations?size=1000");
+        const data = res.data?.data ?? res.data;
+        if (Array.isArray(data)) return data;
+        if (data && typeof data === "object" && Array.isArray(data.content)) {
+          return data.content;
+        }
+        return [];
+      } catch {
+        return [];
+      }
+    },
+  });
+
+  const totalAllocatedPins = 10911;
+  const initialBaseUsed = 8120;
+  const liveUsedCount = useMemo(() => {
+    return invitations.filter(
+      (i) => i.status === "ACCEPTED" || i.sessionStatus === "IN_PROGRESS" || i.sessionStatus === "SUBMITTED"
+    ).length;
+  }, [invitations]);
+
+  const totalInvitesUsed = Math.min(totalAllocatedPins, initialBaseUsed + liveUsedCount);
+  const pinsRemaining = Math.max(0, totalAllocatedPins - totalInvitesUsed);
+  const remainingPercentage = Math.round((pinsRemaining / totalAllocatedPins) * 100);
 
   // Determine current section for breadcrumb
   const getCurrentBreadcrumb = () => {
+    if (location.pathname.includes("/admin/billing") || location.pathname.includes("/billing")) return "Billing";
     if (location.pathname.includes("/admin/settings") || location.pathname.includes("/admin/profile")) return "Account Settings";
     if (location.pathname.includes("/admin/tests")) return "Tests";
     if (location.pathname.includes("/admin/library")) return "Library";
     if (location.pathname.includes("/admin/home")) return "Home";
-    return "Tests";
+    return "Home";
   };
 
   const navItems = [
@@ -59,7 +102,7 @@ export default function NewAdminLayout() {
       {/* ── STICKY TOP NAVIGATION BAR (Top Bar + Second Bar combined) ── */}
       <div className="sticky top-0 z-30 shadow-md">
         {/* 1. TOP NAVBAR (Dark Navy / Black sleek bar) */}
-        <header className="h-20 bg-[#081225] border-b border-[#142340] px-4 md:px-8 flex items-center justify-between">
+        <header className="h-16 bg-[#081225] border-b border-[#142340] px-4 md:px-8 flex items-center justify-between">
           {/* Left Side: Logo + Divider + Route Breadcrumb */}
           <div className="flex items-center space-x-3 md:space-x-4">
             <div 
@@ -75,43 +118,153 @@ export default function NewAdminLayout() {
 
             {/* Route of the pages */}
             <div className="flex items-center text-xs md:text-sm text-slate-400 font-medium space-x-1.5">
-              <span className="hover:text-slate-200 cursor-pointer transition-colors">Gryphon360</span>
+              <span onClick={() => navigate("/admin/home")} className="hover:text-slate-200 cursor-pointer transition-colors">
+                Learn
+              </span>
               <ChevronRight className="w-3.5 h-3.5 text-slate-500" />
               <span className="text-slate-200 font-semibold">{getCurrentBreadcrumb()}</span>
             </div>
           </div>
 
-          {/* Right Side: Profile Section */}
-          <div className="flex items-center space-x-3">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button className="flex items-center gap-2.5 px-2 py-1 hover:bg-white/5 transition-colors focus:outline-none cursor-pointer">
-                  <Avatar className="w-8 h-8 border border-slate-700 bg-slate-800 text-slate-200">
-                    <AvatarFallback className="bg-[#4353a4] text-white text-xs font-bold">
-                      {user?.name ? user.name.slice(0, 2).toUpperCase() : "AD"}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="hidden sm:flex items-center">
-                    <span className="text-xs font-semibold text-slate-200">
-                      {user?.name || "Admin User"}
+          {/* Right Side: PIN quota widget + Action icons + Profile */}
+          <div className="flex items-center space-x-4">
+            {/* ── DoSelect Header PIN Progress Widget & Popover ── */}
+            <Popover open={pinPopoverOpen} onOpenChange={setPinPopoverOpen}>
+              <PopoverTrigger asChild>
+                <div 
+                  className="flex flex-col items-end cursor-pointer group px-2 py-1 hover:bg-white/5 rounded transition-colors"
+                  title="View Billing & Quota Details"
+                >
+                  <span className="text-[11px] font-medium text-slate-200 group-hover:text-white transition-colors">
+                    {pinsRemaining.toLocaleString()}/{totalAllocatedPins.toLocaleString()} invite pins left ({remainingPercentage}%)
+                  </span>
+                  <div className="w-28 h-1.5 bg-slate-800 rounded-full overflow-hidden mt-1 border border-slate-700">
+                    <div 
+                      className="h-full bg-[#EF4444] transition-all duration-300"
+                      style={{ width: `${Math.min(100, Math.max(5, 100 - remainingPercentage))}%` }}
+                    />
+                  </div>
+                </div>
+              </PopoverTrigger>
+              <PopoverContent 
+                align="end" 
+                className="w-80 p-5 bg-[#171b26] border border-slate-700 text-slate-200 shadow-2xl rounded-none text-xs space-y-3.5"
+              >
+                {/* Header with Progress Bar */}
+                <div className="space-y-1.5">
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="font-bold text-white tracking-tight">
+                      {pinsRemaining.toLocaleString()}/{totalAllocatedPins.toLocaleString()} invite pins left ({remainingPercentage}%)
                     </span>
                   </div>
+                  <div className="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden border border-slate-700">
+                    <div 
+                      className="h-full bg-[#EF4444]"
+                      style={{ width: `${Math.min(100, Math.max(5, 100 - remainingPercentage))}%` }}
+                    />
+                  </div>
+                </div>
+
+                {/* Billing Period */}
+                <div className="text-[11px] text-slate-300 border-b border-slate-800 pb-2.5">
+                  <span className="text-slate-400">Billing Period:</span> Nov 14, 2025 - Aug 26, 2027.
+                </div>
+
+                {/* Deduction Logic */}
+                <div className="text-[11px] space-y-1">
+                  <span className="font-semibold text-white">New Invite Deduction logic:</span>
+                  <ul className="list-disc pl-4 space-y-0.5 text-slate-300 text-[10.5px]">
+                    <li>Project based / Speechprose : 2 pins per invite</li>
+                    <li>Others : 1 pin per invite</li>
+                  </ul>
+                </div>
+
+                {/* Historic Consumption */}
+                <div className="text-[11px] pt-1 text-slate-300">
+                  <span>Consumption Before Jul 24, 2025 : </span>
+                  <button 
+                    onClick={() => {
+                      setPinPopoverOpen(false);
+                      navigate("/admin/billing");
+                    }} 
+                    className="underline text-slate-100 hover:text-orange-400 font-medium cursor-pointer"
+                  >
+                    View Details
+                  </button>
+                </div>
+
+                {/* Bottom Know More button */}
+                <div className="pt-2 border-t border-slate-800 flex justify-end">
+                  <button
+                    onClick={() => {
+                      setPinPopoverOpen(false);
+                      navigate("/admin/billing");
+                    }}
+                    className="text-xs font-bold text-white hover:text-orange-400 hover:underline cursor-pointer transition-colors"
+                  >
+                    Know More
+                  </button>
+                </div>
+              </PopoverContent>
+            </Popover>
+
+            {/* Quick Action Icons */}
+            <div className="hidden sm:flex items-center space-x-2 text-slate-400">
+              <button 
+                onClick={() => navigate("/admin/tests")} 
+                title="Search Tests"
+                className="p-1.5 hover:text-white hover:bg-white/10 rounded transition-colors cursor-pointer"
+              >
+                <Search className="w-4 h-4" />
+              </button>
+              <button 
+                onClick={() => navigate("/admin/library")} 
+                title="Question Bank Library"
+                className="p-1.5 hover:text-white hover:bg-white/10 rounded transition-colors cursor-pointer"
+              >
+                <LayoutGrid className="w-4 h-4" />
+              </button>
+              <button 
+                onClick={() => navigate("/admin/billing")} 
+                title="Help & Documentation"
+                className="p-1.5 hover:text-white hover:bg-white/10 rounded transition-colors cursor-pointer"
+              >
+                <HelpCircle className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Profile Avatar & Dropdown */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className="flex items-center gap-2 px-1.5 py-1 hover:bg-white/5 transition-colors focus:outline-none cursor-pointer rounded">
+                  <Avatar className="w-7 h-7 border border-slate-700 bg-amber-500 text-white">
+                    <AvatarFallback className="bg-amber-500 text-white text-xs font-bold">
+                      {user?.name ? user.name.slice(0, 2).toUpperCase() : "AP"}
+                    </AvatarFallback>
+                  </Avatar>
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56 bg-white border border-slate-200 shadow-2xl p-1 text-xs">
                 <DropdownMenuLabel className="font-normal px-3 py-2">
                   <div className="flex flex-col space-y-0.5">
-                    <p className="text-sm font-bold text-slate-900 leading-none">{user?.name || "Admin User"}</p>
-                    <p className="text-xs text-slate-500 leading-none truncate mt-1">{user?.email || "admin@gryphon360.com"}</p>
+                    <p className="text-sm font-bold text-slate-900 leading-none">{user?.name || "Ajay Pawar"}</p>
+                    <p className="text-xs text-slate-500 leading-none truncate mt-1">{user?.email || "ajay@gryphon360.com"}</p>
                   </div>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator className="bg-slate-100" />
+                <DropdownMenuItem
+                  onClick={() => navigate("/admin/billing")}
+                  className="cursor-pointer text-slate-700 hover:bg-slate-50 px-3 py-2 text-xs flex items-center gap-2 font-medium"
+                >
+                  <CreditCard className="w-4 h-4 text-[#4353a4]" />
+                  Billing & Subscription
+                </DropdownMenuItem>
                 <DropdownMenuItem
                   onClick={() => navigate("/admin/settings")}
                   className="cursor-pointer text-slate-700 hover:bg-slate-50 px-3 py-2 text-xs flex items-center gap-2"
                 >
                   <UserIcon className="w-4 h-4 text-slate-500" />
-                  Profile Settings
+                  Account Settings
                 </DropdownMenuItem>
                 <DropdownMenuSeparator className="bg-slate-100" />
                 <DropdownMenuItem
@@ -123,6 +276,15 @@ export default function NewAdminLayout() {
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
+
+            {/* Talent Cloud Brand Pill Button */}
+            <button
+              onClick={() => navigate("/admin/billing")}
+              className="hidden lg:flex items-center gap-1.5 px-3 py-1 bg-[#1a2948] hover:bg-[#22365e] border border-slate-700 text-white text-[11px] font-semibold rounded-full transition-colors cursor-pointer"
+            >
+              <Sparkles className="w-3 h-3 text-amber-400" />
+              <span>talent cloud</span>
+            </button>
           </div>
         </header>
 

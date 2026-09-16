@@ -49,6 +49,7 @@ const NewAdminQuestionPreview = lazyWithRetry(() => import("./pages/New-Admin/Ne
 const NewAdminTestEdit = lazyWithRetry(() => import("./pages/New-Admin/NewAdminTestEdit"));
 const NewAdminTestAddProblems = lazyWithRetry(() => import("./pages/New-Admin/NewAdminTestAddProblems"));
 const NewAdminSettings = lazyWithRetry(() => import("./pages/New-Admin/NewAdminSettings"));
+const NewAdminBilling = lazyWithRetry(() => import("./pages/New-Admin/NewAdminBilling"));
 
 // Test Taking
 const TestInterface = lazyWithRetry(() => import("./pages/test/TestInterface"));
@@ -182,7 +183,9 @@ const App = () => (
                 <Route path="library" element={<NewAdminLibrary />} />
                 <Route path="settings" element={<NewAdminSettings />} />
                 <Route path="profile" element={<NewAdminSettings />} />
+                <Route path="billing" element={<NewAdminBilling />} />
               </Route>
+              <Route path="/billing" element={<Navigate to="/admin/billing" replace />} />
 
               {/* Standalone Full-Screen Question Create / Edit for Admin */}
               <Route

@@ -325,6 +325,82 @@ export default function TestScheduleDetails() {
         </CardContent>
       </Card>
 
+      {/* ── B2B Assessment Credits & Consumption Metering ── */}
+      <Card className="border-orange-200/80 bg-gradient-to-r from-orange-50/30 via-white to-slate-50/50 shadow-xs">
+        <CardHeader className="pb-3 border-b border-slate-100">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div className="flex items-center gap-2.5">
+              <span className="px-2 py-0.5 bg-orange-500/10 text-orange-600 font-bold text-[11px] tracking-wider uppercase rounded-xs">
+                B2B Metering
+              </span>
+              <div>
+                <CardTitle className="text-base font-bold text-slate-900">
+                  Pay-Per-Attempt Credit Metering
+                </CardTitle>
+                <CardDescription className="text-xs text-slate-500">
+                  Credits are deducted only when candidates verify their PIN and start the assessment
+                </CardDescription>
+              </div>
+            </div>
+            <Badge className="bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 text-xs px-2.5 py-0.5 self-start sm:self-auto">
+              Auto-Release Active
+            </Badge>
+          </div>
+        </CardHeader>
+        <CardContent className="pt-4 space-y-4">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="p-3.5 bg-white border border-slate-200/80 rounded-xl shadow-2xs">
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Total Invited</p>
+              <p className="text-2xl font-bold text-slate-900 mt-1">{invitations.length}</p>
+              <p className="text-[11px] text-slate-400 mt-0.5">Total PINs dispatched</p>
+            </div>
+            <div className="p-3.5 bg-white border border-emerald-200/80 rounded-xl shadow-2xs">
+              <p className="text-xs font-semibold text-emerald-700 uppercase tracking-wider">Attempted & Consumed</p>
+              <p className="text-2xl font-bold text-emerald-600 mt-1">
+                {invitations.filter((i) => i.status === "ACCEPTED").length}
+              </p>
+              <p className="text-[11px] text-emerald-600/80 mt-0.5">Credits deducted (Started)</p>
+            </div>
+            <div className="p-3.5 bg-white border border-amber-200/80 rounded-xl shadow-2xs">
+              <p className="text-xs font-semibold text-amber-700 uppercase tracking-wider">Pending Logins</p>
+              <p className="text-2xl font-bold text-amber-600 mt-1">
+                {invitations.filter((i) => i.status === "PENDING").length}
+              </p>
+              <p className="text-[11px] text-amber-600/80 mt-0.5">Reserved / Awaiting start</p>
+            </div>
+            <div className="p-3.5 bg-white border border-slate-200/80 rounded-xl shadow-2xs">
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Unused / Auto-Released</p>
+              <p className="text-2xl font-bold text-slate-600 mt-1">
+                {invitations.filter((i) => i.status === "EXPIRED").length}
+              </p>
+              <p className="text-[11px] text-slate-400 mt-0.5">Credits saved (0 charge)</p>
+            </div>
+          </div>
+
+          <div className="pt-2 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs text-slate-600">
+            <div className="flex items-center gap-2">
+              <span className="font-semibold text-slate-700">Consumption Rate:</span>
+              <div className="w-28 h-2 bg-slate-100 rounded-full overflow-hidden flex">
+                <div
+                  className="bg-emerald-500 h-full transition-all duration-500"
+                  style={{
+                    width: `${invitations.length > 0 ? (invitations.filter((i) => i.status === "ACCEPTED").length / invitations.length) * 100 : 0}%`,
+                  }}
+                />
+              </div>
+              <span className="font-bold text-slate-800">
+                {invitations.length > 0
+                  ? Math.round((invitations.filter((i) => i.status === "ACCEPTED").length / invitations.length) * 100)
+                  : 0}%
+              </span>
+            </div>
+            <p className="text-[11px] text-slate-500 italic">
+              💡 <strong>B2B Rule:</strong> If 200 candidates are invited and 150 start the test, exactly 150 credits are deducted. Unused PINs auto-release at schedule end.
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Invitations List */}
       <Card>
         <CardHeader>
@@ -358,17 +434,34 @@ export default function TestScheduleDetails() {
                 Total Invitations: {invitations.length}
               </div>
               {invitations.map((invitation) => (
-                <div key={invitation.id} className="flex items-center justify-between p-3 border rounded-lg">
+                <div key={invitation.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-slate-50/50 transition-colors">
                   <div>
-                    <p className="font-medium">{invitation.candidateName || "Unknown"}</p>
+                    <p className="font-medium text-slate-900">{invitation.candidateName || "Unknown"}</p>
                     <p className="text-sm text-muted-foreground">{invitation.candidateEmail}</p>
                   </div>
                   <div className="flex items-center gap-2">
+                    {/* B2B Credit Status Badge */}
+                    {invitation.status === "ACCEPTED" && (
+                      <Badge className="bg-emerald-500/10 text-emerald-700 border border-emerald-500/25 text-[10px] font-medium">
+                        1 Credit Deducted
+                      </Badge>
+                    )}
+                    {invitation.status === "PENDING" && (
+                      <Badge className="bg-amber-500/10 text-amber-700 border border-amber-500/25 text-[10px] font-medium">
+                        Reserved
+                      </Badge>
+                    )}
+                    {invitation.status === "EXPIRED" && (
+                      <Badge className="bg-slate-100 text-slate-600 border border-slate-200 text-[10px] font-medium">
+                        Auto-Released (0 Cost)
+                      </Badge>
+                    )}
+
                     {getInvitationStatusIcon(invitation.status)}
                     <Badge className={getInvitationStatusBadge(invitation.status)}>
                       {invitation.status}
                     </Badge>
-                    <span className="text-xs text-muted-foreground">
+                    <span className="text-xs text-muted-foreground hidden sm:inline">
                       {formatDateTime(invitation.sentAt)}
                     </span>
                   </div>

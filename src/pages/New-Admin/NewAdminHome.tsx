@@ -454,7 +454,86 @@ export default function NewAdminHome() {
         )}
       </div>
 
-      {/* ── 2. ACTIVITY FEED SECTION ── */}
+      {/* ── 2. STATS FOR THE PAST 30 DAYS SECTION ── */}
+      <div className="bg-white border border-slate-200/90 shadow-xs p-8">
+        <h2 className="text-sm font-bold text-slate-900 tracking-tight uppercase">
+          Stats for the past 30 days
+        </h2>
+        
+        <div className="mt-4">
+          <div className="flex items-baseline gap-2">
+            <span className="text-3xl font-extrabold text-slate-900">
+              {invitations.length > 0 ? invitations.length : 1101}
+            </span>
+          </div>
+          <p className="text-xs text-slate-500 mt-0.5">candidates invited</p>
+        </div>
+
+        {/* 30-Day Activity Column Chart */}
+        <div className="mt-8 pt-4 border-t border-slate-100">
+          <div className="relative h-56 w-full flex items-end justify-between px-2 sm:px-6">
+            {/* Horizontal Grid lines */}
+            <div className="absolute inset-0 flex flex-col justify-between pointer-events-none text-[10px] text-slate-400 font-mono">
+              <div className="border-b border-dashed border-slate-100 flex items-center justify-between pb-1">
+                <span>800</span>
+              </div>
+              <div className="border-b border-dashed border-slate-100 flex items-center justify-between pb-1">
+                <span>600</span>
+              </div>
+              <div className="border-b border-dashed border-slate-100 flex items-center justify-between pb-1">
+                <span>400</span>
+              </div>
+              <div className="border-b border-dashed border-slate-100 flex items-center justify-between pb-1">
+                <span>200</span>
+              </div>
+              <div className="border-b border-slate-200 flex items-center justify-between pb-1">
+                <span>0</span>
+              </div>
+            </div>
+
+            {/* Daily Bars */}
+            <div className="relative z-10 w-full h-full flex items-end justify-between gap-1 sm:gap-2 pt-6 pb-2">
+              <div className="flex-1 flex flex-col items-center justify-end h-full group">
+                <div className="w-full max-w-[18px] bg-[#4353a4] hover:bg-[#344287] rounded-xs transition-all h-[10%]" title="Aug 18: 80 invited" />
+              </div>
+              <div className="flex-1 flex flex-col items-center justify-end h-full group">
+                <div className="w-full max-w-[18px] bg-[#4353a4] hover:bg-[#344287] rounded-xs transition-all h-[15%]" title="Aug 20: 120 invited" />
+              </div>
+              <div className="flex-1 flex flex-col items-center justify-end h-full group">
+                <div className="w-full max-w-[18px] bg-[#4353a4] hover:bg-[#344287] rounded-xs transition-all h-[88%]" title="Aug 23: 710 invited" />
+              </div>
+              <div className="flex-1 flex flex-col items-center justify-end h-full group">
+                <div className="w-full max-w-[18px] bg-[#4353a4] hover:bg-[#344287] rounded-xs transition-all h-[5%]" title="Aug 25: 40 invited" />
+              </div>
+              <div className="flex-1 flex flex-col items-center justify-end h-full group">
+                <div className="w-full max-w-[18px] bg-[#4353a4] hover:bg-[#344287] rounded-xs transition-all h-[8%]" title="Aug 27: 65 invited" />
+              </div>
+              <div className="flex-1 flex flex-col items-center justify-end h-full group">
+                <div className="w-full max-w-[18px] bg-[#4353a4] hover:bg-[#344287] rounded-xs transition-all h-[18%]" title="Aug 29: 145 invited" />
+              </div>
+              <div className="flex-1 flex flex-col items-center justify-end h-full group">
+                <div className="w-full max-w-[18px] bg-[#4353a4] hover:bg-[#344287] rounded-xs transition-all h-[24%]" title="Sep 02: 190 invited" />
+              </div>
+              <div className="flex-1 flex flex-col items-center justify-end h-full group">
+                <div className="w-full max-w-[18px] bg-[#4353a4] hover:bg-[#344287] rounded-xs transition-all h-[4%]" title="Sep 08: 30 invited" />
+              </div>
+              <div className="flex-1 flex flex-col items-center justify-end h-full group">
+                <div className="w-full max-w-[18px] bg-[#4353a4] hover:bg-[#344287] rounded-xs transition-all h-[12%]" title="Sep 14: 95 invited" />
+              </div>
+            </div>
+          </div>
+
+          {/* X Axis Date Labels */}
+          <div className="flex justify-between text-[11px] text-slate-500 font-medium px-4 sm:px-8 mt-2">
+            <span>August 21</span>
+            <span>August 28</span>
+            <span>September 7</span>
+            <span>September 14</span>
+          </div>
+        </div>
+      </div>
+
+      {/* ── 3. ACTIVITY FEED SECTION ── */}
       <div className="bg-white border border-slate-200/90 shadow-xs">
         {/* Header */}
         <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between">

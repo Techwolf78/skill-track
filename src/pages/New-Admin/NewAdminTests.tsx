@@ -87,9 +87,10 @@ export default function NewAdminTests() {
 
   const isLoading = testsLoading || schedulesLoading || invitationsLoading;
 
-  // Map testId to candidates count
-  const testTakersCountMap = useMemo(() => {
+  // Map testId to candidates count and attempted count (B2B Pay-Per-Attempt)
+  const { testTakersCountMap, testAttemptedCountMap } = useMemo(() => {
     const counts: Record<string, number> = {};
+    const attemptedCounts: Record<string, number> = {};
 
     // Map scheduleId to testId
     const scheduleToTestMap: Record<string, string> = {};
@@ -99,18 +100,23 @@ export default function NewAdminTests() {
       }
     });
 
-    // Count invitations per test
+    // Count invitations & attempted test sessions per test
     invitations.forEach((invitation) => {
       const scheduleId = invitation.scheduleId || invitation.schedule?.id;
       if (scheduleId) {
         const testId = scheduleToTestMap[scheduleId];
         if (testId) {
           counts[testId] = (counts[testId] || 0) + 1;
+          const status = String(invitation.status || "").toUpperCase();
+          const sessStatus = String(invitation.sessionStatus || "").toUpperCase();
+          if (status === "ACCEPTED" || sessStatus === "IN_PROGRESS" || sessStatus === "SUBMITTED" || sessStatus === "EVALUATED") {
+            attemptedCounts[testId] = (attemptedCounts[testId] || 0) + 1;
+          }
         }
       }
     });
 
-    return counts;
+    return { testTakersCountMap: counts, testAttemptedCountMap: attemptedCounts };
   }, [schedules, invitations]);
 
   const createTestMutation = useCreateTestMutation();
@@ -363,10 +369,17 @@ export default function NewAdminTests() {
                       </div>
 
                       {/* Candidates */}
-                      <div className="flex items-center gap-1.5">
+                      <div className="flex items-center gap-1.5" title={`${testAttemptedCountMap[test.id] ?? 0} started exam (credits deducted) / ${candidateCount} total invited`}>
                         <Users className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                         <span>
-                          {candidateCount} {candidateCount === 1 ? "candidate" : "candidates"}
+                          {candidateCount > 0 ? (
+                            <>
+                              <span className="font-semibold text-emerald-700">{testAttemptedCountMap[test.id] ?? 0}</span>
+                              <span className="text-slate-400">/{candidateCount} attempted</span>
+                            </>
+                          ) : (
+                            "0 candidates"
+                          )}
                         </span>
                       </div>
 
