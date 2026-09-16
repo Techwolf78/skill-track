@@ -206,19 +206,28 @@ export default function NewAdminLayout() {
             {/* Profile Avatar & Dropdown */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <button className="flex items-center gap-2 px-1.5 py-1 hover:bg-white/5 transition-colors focus:outline-none cursor-pointer rounded">
-                  <Avatar className="w-7 h-7 border border-slate-700 bg-amber-500 text-white">
-                    <AvatarFallback className="bg-amber-500 text-white text-xs font-bold">
-                      {user?.name ? user.name.slice(0, 2).toUpperCase() : "AP"}
-                    </AvatarFallback>
-                  </Avatar>
+                <button className="flex items-center gap-2.5 px-2 py-1.5 hover:bg-white/10 transition-colors focus:outline-none cursor-pointer rounded">
+                  <div className="w-7 h-7 rounded-full bg-[#4d62b5] flex items-center justify-center text-white font-bold text-xs shrink-0 shadow-xs">
+                    {user?.name
+                      ? user.name
+                          .trim()
+                          .split(/\s+/)
+                          .map((p) => p[0]?.toUpperCase())
+                          .filter(Boolean)
+                          .slice(0, 2)
+                          .join("")
+                      : "DE"}
+                  </div>
+                  <span className="text-xs sm:text-sm font-semibold text-slate-100 whitespace-nowrap">
+                    {user?.name || "Dev admin GA"}
+                  </span>
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56 bg-white border border-slate-200 shadow-2xl p-1 text-xs">
                 <DropdownMenuLabel className="font-normal px-3 py-2">
                   <div className="flex flex-col space-y-0.5">
-                    <p className="text-sm font-bold text-slate-900 leading-none">{user?.name || "Ajay Pawar"}</p>
-                    <p className="text-xs text-slate-500 leading-none truncate mt-1">{user?.email || "ajay@gryphon360.com"}</p>
+                    <p className="text-sm font-bold text-slate-900 leading-none">{user?.name || "Dev admin GA"}</p>
+                    <p className="text-xs text-slate-500 leading-none truncate mt-1">{user?.email || "devadmin@gryphon360.com"}</p>
                   </div>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator className="bg-slate-100" />
