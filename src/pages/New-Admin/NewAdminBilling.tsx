@@ -33,6 +33,7 @@ import {
 } from "@/components/ui/table";
 import { useQuery } from "@tanstack/react-query";
 import { apiClient } from "@/lib/api-client";
+import { userService } from "@/lib/user-service";
 import { useAuth } from "@/lib/auth-context";
 import { formatDateTime } from "@/lib/date-utils";
 
@@ -65,13 +66,8 @@ export default function NewAdminBilling() {
     queryKey: ["org-team-users"],
     queryFn: async () => {
       try {
-        const res = await apiClient.get("/users?size=100");
-        const data = res.data?.data ?? res.data;
-        if (Array.isArray(data)) return data;
-        if (data && typeof data === "object" && Array.isArray(data.content)) {
-          return data.content;
-        }
-        return [];
+        const users = await userService.getUsers({ size: 1000 });
+        return users;
       } catch {
         return [];
       }
@@ -79,12 +75,18 @@ export default function NewAdminBilling() {
   });
 
   const totalTeamSeats = 20;
+  const userOrgId = user?.organisationData?.id || (user as any)?.organisation?.id;
   const activeTeamCount = useMemo(() => {
-    const adminOrTrainerUsers = orgUsers.filter(
-      (u) => u.role === "ADMIN" || u.role === "TRAINER" || u.role === "SUPERADMIN"
-    );
-    return Math.max(3, adminOrTrainerUsers.length);
-  }, [orgUsers]);
+    if (!orgUsers || orgUsers.length === 0) return 1;
+    const adminOrTrainerUsers = orgUsers.filter((u) => {
+      const isStaffRole = u.role === "ADMIN" || u.role === "TRAINER" || u.role === "SUPERADMIN";
+      if (!isStaffRole) return false;
+      if (!userOrgId) return true;
+      const orgId = u.organisation?.id || (u as any).organisation_id || (u as any).organisationId;
+      return !orgId || orgId === userOrgId;
+    });
+    return Math.max(1, adminOrTrainerUsers.length);
+  }, [orgUsers, userOrgId]);
 
   // Base plan numbers from DoSelect B2B enterprise tier
   const totalAllocatedPins = 10911;
