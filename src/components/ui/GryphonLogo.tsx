@@ -51,13 +51,34 @@ export const GryphonLogo: React.FC<GryphonLogoProps> = ({
 
   return (
     <div className={`inline-flex items-center select-none group ${sizeMap.gap} ${className}`}>
-      {/* 🦅 Authentic G+A Geometric Silver Emblem (Height-matched to cap height) */}
+      {/* 🦅 Authentic G+A Geometric Emblem (Crisp White in Dark mode, Silver in Light mode) */}
       <div className={`shrink-0 flex items-center justify-center transition-transform duration-300 group-hover:scale-105`}>
-        <img
-          src="/ga-icon-silver.png"
-          alt="Gryphon 360"
-          className={`${sizeMap.icon} object-contain drop-shadow-[0_2px_8px_rgba(255,255,255,0.25)]`}
-        />
+        {variant === "dark" ? (
+          <img
+            src="/ga-icon-white.png"
+            alt="Gryphon 360"
+            className={`${sizeMap.icon} object-contain brightness-110 drop-shadow-[0_2px_8px_rgba(255,255,255,0.3)]`}
+          />
+        ) : variant === "light" ? (
+          <img
+            src="/ga-icon-silver.png"
+            alt="Gryphon 360"
+            className={`${sizeMap.icon} object-contain`}
+          />
+        ) : (
+          <>
+            <img
+              src="/ga-icon-silver.png"
+              alt="Gryphon 360"
+              className={`${sizeMap.icon} object-contain dark:hidden`}
+            />
+            <img
+              src="/ga-icon-white.png"
+              alt="Gryphon 360"
+              className={`${sizeMap.icon} object-contain hidden dark:block brightness-110 drop-shadow-[0_2px_8px_rgba(255,255,255,0.3)]`}
+            />
+          </>
+        )}
       </div>
 
       {/* 🏛️ VISA-Inspired Bold Italic Wordmark (Rock-solid baseline & native degree) */}
