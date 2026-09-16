@@ -221,6 +221,16 @@ export default function NewAdminQuestionCreate() {
   const returnPath = isSuperAdminContext ? "/superadmin/questions" : "/admin/library";
   const libraryLabel = isSuperAdminContext ? "Question Bank" : "Library";
 
+  const handleReturn = () => {
+    navigate(returnPath, {
+      state: {
+        page: initialData.returnPage,
+        pageSize: initialData.returnPageSize,
+        activeTab: initialData.returnActiveTab,
+      },
+    });
+  };
+
   const [isCoding, setIsCoding] = useState(initialData.questionType === "CODING");
   const [isLoadingQuestion, setIsLoadingQuestion] = useState(Boolean(editQuestionId));
   const [isSaving, setIsSaving] = useState(false);
@@ -720,7 +730,7 @@ export default function NewAdminQuestionCreate() {
         setTitle(`${title.trim()} (Copy)`);
         toast.info("Cloned draft ready for editing");
       } else {
-        navigate(returnPath);
+        handleReturn();
       }
     } catch (err: any) {
       console.error("[NewAdminQuestionCreate] Failed to save:", err);
@@ -746,7 +756,7 @@ export default function NewAdminQuestionCreate() {
         {/* Left Side: Logo + Divider + Breadcrumb (Library/Question Bank > Problem Title) */}
         <div className="flex items-center space-x-3 md:space-x-4">
           <div
-            onClick={() => navigate(returnPath)}
+            onClick={handleReturn}
             className="flex items-center gap-2 cursor-pointer group"
           >
             <GryphonLogo variant="dark" size="md" />
@@ -756,7 +766,7 @@ export default function NewAdminQuestionCreate() {
 
           <div className="flex items-center text-xs md:text-sm text-slate-400 font-medium space-x-1.5">
             <button
-              onClick={() => navigate(returnPath)}
+              onClick={handleReturn}
               className="hover:text-slate-200 cursor-pointer transition-colors"
             >
               {libraryLabel}
@@ -1566,7 +1576,7 @@ export default function NewAdminQuestionCreate() {
 
               <button
                 type="button"
-                onClick={() => navigate(returnPath)}
+                onClick={handleReturn}
                 className="w-full py-2 text-xs font-semibold text-slate-500 hover:text-slate-700 transition-colors text-center cursor-pointer"
               >
                 Cancel

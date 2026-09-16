@@ -213,7 +213,7 @@ export function parseImportRow(
 
   const taxonomy = resolveTaxonomyForRow(norm, context);
 
-  const title = norm.title || (String(prompt).length > 50 ? String(prompt).slice(0, 50) + "..." : String(prompt));
+  const title = norm.title != null && String(norm.title).trim() ? String(norm.title).trim() : undefined;
   const marks = Math.max(1, Number(norm.marks || norm.points || norm.score) || 1);
   const rawDiff = (norm.difficulty || "MEDIUM").toString().toUpperCase();
   const difficulty: "EASY" | "MEDIUM" | "HARD" =
@@ -233,7 +233,7 @@ export function parseImportRow(
   const base: Partial<CreateQuestionRequest> = {
     questionType,
     prompt: String(prompt).trim(),
-    title: String(title).trim(),
+    title,
     imageUrl: imageUrl ? String(imageUrl).trim() : undefined,
     subject_id: taxonomy.subjectId,
     topic_id: taxonomy.topicId,
