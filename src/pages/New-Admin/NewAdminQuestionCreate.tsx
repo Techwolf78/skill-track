@@ -474,6 +474,16 @@ export default function NewAdminQuestionCreate() {
 
   // Driver change with automatic invalidation of verification status
   const handleDriverChange = (lang: typeof activeCodeLang, newDriver: string) => {
+    const prevDriver = codeTemplates[lang]?.driver || "";
+    const normPrev = prevDriver.replace(/\r\n/g, "\n").replace(/\r/g, "\n").trim();
+    const normNew = newDriver.replace(/\r\n/g, "\n").replace(/\r/g, "\n").trim();
+    if (normPrev === normNew) {
+      setCodeTemplates((prev) => ({
+        ...prev,
+        [lang]: { ...prev[lang], driver: newDriver },
+      }));
+      return;
+    }
     setCodeTemplates((prev) => ({
       ...prev,
       [lang]: { ...prev[lang], driver: newDriver },
@@ -514,9 +524,10 @@ export default function NewAdminQuestionCreate() {
     const validTestCases = testCases.filter((tc) => tc.input.trim() || tc.expectedOutput.trim());
     const cleanHints = hints.filter((h) => h.trim());
 
-    if (createdQuestionId) {
+    const targetId = editQuestionId || createdQuestionId;
+    if (targetId) {
       // Sync latest test cases and templates before running pre-flight verification
-      await testService.updateQuestion(createdQuestionId, {
+      await testService.updateQuestion(targetId, {
         title: title.trim(),
         prompt: prompt.trim(),
         subject_id: subjectId,
@@ -539,7 +550,7 @@ export default function NewAdminQuestionCreate() {
           params: signature.params,
         },
       });
-      return createdQuestionId;
+      return targetId;
     }
 
     const dto: CreateQuestionRequest = {
@@ -718,11 +729,13 @@ export default function NewAdminQuestionCreate() {
 
     setIsSaving(true);
     try {
-      if (editQuestionId) {
-        await apiClient.put(`/questions/${editQuestionId}`, dto);
+      const targetQuestionId = editQuestionId || createdQuestionId;
+      if (targetQuestionId) {
+        await apiClient.put(`/questions/${targetQuestionId}`, dto);
         toast.success("Problem updated successfully!");
       } else {
-        await createMutation.mutateAsync(dto);
+        const saved = await createMutation.mutateAsync(dto);
+        if (saved?.id) setCreatedQuestionId(saved.id);
         toast.success("Problem saved successfully!");
       }
 
@@ -1424,10 +1437,10 @@ export default function NewAdminQuestionCreate() {
 
                 {/* PreFlight Verification Test Run Panel inside Code Setup */}
                 <PreFlightVerificationPanel
-                  questionId={createdQuestionId || undefined}
+                  questionId={editQuestionId || createdQuestionId || undefined}
                   language={activeCodeLang}
                   driverCode={codeTemplates[activeCodeLang].driver}
-                  testCases={testCases.map((tc, idx) => ({ ...tc, id: `tc-${idx}`, codingQuestionId: createdQuestionId || "" }))}
+                  testCases={testCases.map((tc, idx) => ({ ...tc, id: `tc-${idx}`, codingQuestionId: editQuestionId || createdQuestionId || "" }))}
                   onSaveFirstRequired={handleSaveDraftForVerification}
                   onVerificationSuccess={(res) => {
                     const bLang = mapFrontendToBackendLang(activeCodeLang);
