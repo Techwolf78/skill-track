@@ -3,9 +3,30 @@ import * as tf from "@tensorflow/tfjs-core";
 import "@tensorflow/tfjs-backend-webgl";
 import * as blazeface from "@tensorflow-models/blazeface";
 
+function calculateBrightness(video: HTMLVideoElement): number {
+  try {
+    const canvas = document.createElement("canvas");
+    canvas.width = 64;
+    canvas.height = 48;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return 128;
+    ctx.drawImage(video, 0, 0, 64, 48);
+    const imgData = ctx.getImageData(0, 0, 64, 48);
+    const data = imgData.data;
+    let sum = 0;
+    for (let i = 0; i < data.length; i += 4) {
+      sum += 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+    }
+    return sum / (data.length / 4);
+  } catch {
+    return 128;
+  }
+}
+
 export function useCameraMonitor(
   isActive: boolean, 
-  onViolation: (type: "MULTI_FACE" | "LOOK_AWAY", metadata: Record<string, unknown>) => void
+  onViolation: (type: "MULTI_FACE" | "LOOK_AWAY" | "NO_FACE", metadata: Record<string, unknown>) => void,
+  onFaceStatusChange?: (status: { faceNotVisible: boolean; isCameraObscured: boolean }) => void
 ) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const [detector, setDetector] = useState<blazeface.BlazeFaceModel | null>(null);
@@ -75,32 +96,70 @@ export function useCameraMonitor(
     };
   }, [isActive, detector, isInitializing, initDetector]);
 
+  const onViolationRef = useRef(onViolation);
+  onViolationRef.current = onViolation;
+  const onFaceStatusChangeRef = useRef(onFaceStatusChange);
+  onFaceStatusChangeRef.current = onFaceStatusChange;
+
   useEffect(() => {
     if (!detector || !videoRef.current || !isActive) return;
 
     let timeoutId: NodeJS.Timeout;
     let lastViolationTime = 0;
+    let consecutiveMissingFaceCount = 0;
+    let consecutiveFacePresentCount = 0;
+    let isFaceMissing = false;
+
     const VIOLATION_COOLDOWN = 3000; // 3 seconds
-    const detectionInterval = 1000; // 1.0 second (locked for high frequency/immediate results)
+    const detectionInterval = 1000; // 1.0 second loop
 
     const detect = async () => {
-      if (!videoRef.current || videoRef.current.paused || videoRef.current.ended) {
+      const video = videoRef.current;
+      if (!video || video.paused || video.ended) {
         timeoutId = setTimeout(detect, detectionInterval);
         return;
       }
 
       try {
-        const predictions = await detector.estimateFaces(videoRef.current, false);
+        const brightness = calculateBrightness(video);
+        const isTooDark = brightness < 15;
+        const predictions = isTooDark ? [] : await detector.estimateFaces(video, false);
         const now = Date.now();
 
-        if (now - lastViolationTime > VIOLATION_COOLDOWN) {
-          if (predictions.length > 1) {
-            onViolation("MULTI_FACE", { count: predictions.length });
-            lastViolationTime = now;
-          } else if (predictions.length === 0) {
-            onViolation("LOOK_AWAY", { message: "No face detected" });
-            lastViolationTime = now;
-          } else if (predictions.length === 1) {
+        if (predictions.length === 0 || isTooDark) {
+          consecutiveMissingFaceCount++;
+          consecutiveFacePresentCount = 0;
+
+          // Require 3 consecutive missing seconds before engaging blocking modal and logging single violation
+          if (consecutiveMissingFaceCount >= 3) {
+            if (!isFaceMissing) {
+              isFaceMissing = true;
+              onViolationRef.current("NO_FACE", { 
+                reason: isTooDark ? "camera_obscured" : "no_face_detected",
+                brightness: Math.round(brightness)
+              });
+              lastViolationTime = now;
+              onFaceStatusChangeRef.current?.({ 
+                faceNotVisible: true, 
+                isCameraObscured: isTooDark 
+              });
+            }
+          }
+        } else if (predictions.length === 1) {
+          consecutiveFacePresentCount++;
+          consecutiveMissingFaceCount = 0;
+
+          // If face was previously missing and now stable for 2 cycles (2s), clear blocking modal
+          if (isFaceMissing && consecutiveFacePresentCount >= 2) {
+            isFaceMissing = false;
+            onFaceStatusChangeRef.current?.({ 
+              faceNotVisible: false, 
+              isCameraObscured: false 
+            });
+          }
+
+          // Check lateral head rotation if face is active and test is not blocked
+          if (!isFaceMissing && now - lastViolationTime > VIOLATION_COOLDOWN) {
             const pred = predictions[0];
             const landmarks = Array.isArray(pred.landmarks) ? (pred.landmarks as unknown as number[][]) : null;
             if (landmarks && landmarks.length >= 3) {
@@ -117,7 +176,7 @@ export function useCameraMonitor(
                   const ROTATION_THRESHOLD = 0.35; // Trigger threshold for lateral head rotation
 
                   if (Math.abs(noseOffsetRatio) > ROTATION_THRESHOLD) {
-                    onViolation("LOOK_AWAY", {
+                    onViolationRef.current("LOOK_AWAY", {
                       message: "Head rotation look-away detected",
                       offset: noseOffsetRatio.toFixed(3),
                     });
@@ -126,6 +185,13 @@ export function useCameraMonitor(
                 }
               }
             }
+          }
+        } else if (predictions.length > 1) {
+          consecutiveFacePresentCount = 0;
+          consecutiveMissingFaceCount = 0;
+          if (now - lastViolationTime > VIOLATION_COOLDOWN) {
+            onViolationRef.current("MULTI_FACE", { count: predictions.length });
+            lastViolationTime = now;
           }
         }
       } catch (err) {
@@ -138,8 +204,14 @@ export function useCameraMonitor(
     };
 
     timeoutId = setTimeout(detect, detectionInterval);
-    return () => clearTimeout(timeoutId);
-  }, [detector, isActive, onViolation]);
+    return () => {
+      clearTimeout(timeoutId);
+      if (isFaceMissing) {
+        onFaceStatusChangeRef.current?.({ faceNotVisible: false, isCameraObscured: false });
+      }
+    };
+  }, [detector, isActive]);
 
   return { videoRef, error, isInitializing };
 }
+

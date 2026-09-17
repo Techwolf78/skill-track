@@ -50,6 +50,7 @@ import { ProctoringProvider, useProctoring, ProctoringConfigDto } from "@/procto
 import { CameraPreview } from "@/proctoring/components/CameraPreview";
 import { EnvironmentCheck } from "@/proctoring/components/EnvironmentCheck";
 import { IdentityVerification } from "@/proctoring/components/IdentityVerification";
+import { FaceNotVisibleModal } from "@/proctoring/components/FaceNotVisibleModal";
 import { Shield, ShieldAlert, ShieldCheck as ShieldCheckIcon, Camera } from "lucide-react";
 import { AnswerStore, computeContentHash } from "@/lib/exam/answerStorage";
 import { detectTimeExtension } from "@/lib/exam/sessionLogic";
@@ -2656,6 +2657,7 @@ useEffect(() => {
       </AlertDialog>
 
       {config?.camera && <CameraPreview position="bottom-right" size="small" showOnHover />}
+      <FaceNotVisibleModal />
       </div>
     </div>
   );
