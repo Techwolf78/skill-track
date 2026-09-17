@@ -320,12 +320,51 @@ export function useQuestionsQuery() {
   });
 }
 
+export function useQuestionsPageQuery(params?: {
+  page?: number;
+  size?: number;
+  search?: string;
+  difficulty?: string;
+  type?: string;
+  visibility?: "PUBLIC" | "ORG_OWNED" | string;
+  mcqType?: string;
+  isLanguageSpecific?: boolean;
+  tag?: string;
+  subjectId?: string;
+  topicId?: string;
+  subtopicId?: string;
+  sort?: string;
+}) {
+  return useQuery<SpringPage<Question>>({
+    queryKey: [
+      "questions-page",
+      params?.page ?? 0,
+      params?.size ?? 20,
+      params?.search ?? "",
+      params?.difficulty ?? "ALL",
+      params?.type ?? "ALL",
+      params?.visibility ?? "ALL",
+      params?.mcqType ?? "ALL",
+      params?.isLanguageSpecific ?? null,
+      params?.tag ?? "",
+      params?.subjectId ?? "",
+      params?.topicId ?? "",
+      params?.subtopicId ?? "",
+      params?.sort ?? "",
+    ],
+    queryFn: () => testService.getQuestionsPage(params),
+    placeholderData: keepPreviousData,
+    staleTime: 30_000,
+  });
+}
+
 export function useCreateQuestionMutation() {
   const queryClient = useQueryClient();
   return useMutation<Question, Error, CreateQuestionRequest>({
     mutationFn: testService.createQuestion,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["questions"] });
+      queryClient.invalidateQueries({ queryKey: ["questions-page"] });
     },
   });
 }
@@ -336,6 +375,7 @@ export function useBulkCreateQuestionsMutation() {
     mutationFn: testService.bulkCreateQuestions,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["questions"] });
+      queryClient.invalidateQueries({ queryKey: ["questions-page"] });
     },
   });
 }
@@ -346,6 +386,7 @@ export function useUpdateQuestionMutation() {
     mutationFn: ({ id, dto }) => testService.updateQuestion(id, dto),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["questions"] });
+      queryClient.invalidateQueries({ queryKey: ["questions-page"] });
     },
   });
 }
@@ -356,6 +397,7 @@ export function useDeleteQuestionMutation() {
     mutationFn: testService.deleteQuestion,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["questions"] });
+      queryClient.invalidateQueries({ queryKey: ["questions-page"] });
     },
     throwOnError: false,
   });

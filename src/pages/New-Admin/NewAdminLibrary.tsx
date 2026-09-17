@@ -33,7 +33,7 @@ import {
 } from "lucide-react";
 import * as XLSX from "xlsx";
 import {
-  useQuestionsQuery,
+  useQuestionsPageQuery,
   useSubjectsQuery,
   useTopicsQuery,
   useSubtopicsQuery,
@@ -117,6 +117,12 @@ const DEFAULT_FORM: FormState = {
 
 const fmt = (s?: string) =>
   s ? s.charAt(0).toUpperCase() + s.slice(1).toLowerCase() : "—";
+
+const getQuestionVis = (q: any): "PUBLIC" | "ORG_OWNED" => {
+  if (q.visibility) return q.visibility;
+  if (q.organisationId || q.organisation_id) return "ORG_OWNED";
+  return "PUBLIC";
+};
 
 const getQuestionMcqType = (q: any): string => {
   if (q.mcqType) {
@@ -754,7 +760,6 @@ function ImportQuestionsDialog({
 
 export default function NewAdminLibrary() {
   const navigate = useNavigate();
-  const { data: dbQuestions = [], isLoading, isError, refetch } = useQuestionsQuery();
 
   const [selectedLibrary, setSelectedLibrary] = useState<LibraryType>("PUBLIC");
   const [problemType, setProblemType] = useState<ProblemType>("ALL");
@@ -790,111 +795,60 @@ export default function NewAdminLibrary() {
     sessionStorage.setItem("admin_library_page_size", String(pageSize));
   }, [pageSize]);
 
-  // Calculate counts per library
-  const publicCount = useMemo(
-    () => dbQuestions.filter((q) => (q.visibility ?? "PUBLIC") === "PUBLIC").length,
-    [dbQuestions]
-  );
-  const orgCount = useMemo(
-    () => dbQuestions.filter((q) => (q.visibility ?? "PUBLIC") === "ORG_OWNED").length,
-    [dbQuestions]
-  );
-
-  useEffect(() => {
-    if (dbQuestions && dbQuestions.length > 0) {
-      console.log("[NewAdminLibrary] Fetched questions from backend:", dbQuestions);
-      const orgQuestions = dbQuestions.filter((q) => q.visibility === "ORG_OWNED");
-      console.log("[NewAdminLibrary] Org Owned questions:", orgQuestions);
-      if (orgQuestions.length > 0) {
-        console.log("[NewAdminLibrary] Latest Org Owned question:", {
-          id: orgQuestions[0].id,
-          title: orgQuestions[0].title,
-          tags: orgQuestions[0].tags,
-          prompt: orgQuestions[0].prompt,
-          questionType: orgQuestions[0].questionType,
-          visibility: orgQuestions[0].visibility,
-        });
-      }
-    }
-  }, [dbQuestions]);
-
-  const filteredQuestions = useMemo(() => {
-    const list = dbQuestions.filter((q) => {
-      const vis = q.visibility ?? "PUBLIC";
-      if (vis !== selectedLibrary) return false;
-      if (problemType !== "ALL") {
-        const qt = (q.questionType ?? "").toUpperCase();
-        if (problemType === "CODING") {
-          if (qt !== "CODING" || q.isLanguageSpecific) return false;
-        } else if (problemType === "LANGUAGE_SPECIFIC_CODING") {
-          if (qt !== "CODING" || !q.isLanguageSpecific) return false;
-        } else {
-          // Specific MCQ Subtype filter (SINGLE_CORRECT, MULTIPLE_CORRECT, TRUE_FALSE, ASSERTION_REASON, FILL_IN_THE_BLANK)
-          if (qt !== "MCQ") return false;
-          const mt = getQuestionMcqType(q);
-          if (mt !== problemType) return false;
-        }
-      }
-      if (selectedLevel !== "ALL") {
-        const diff = (q.difficulty ?? "").toUpperCase();
-        if (diff !== selectedLevel) return false;
-      }
-      if (techSearch.trim()) {
-        const ts = techSearch.trim().toLowerCase();
-        const hit =
-          (q.subject?.name ?? "").toLowerCase().includes(ts) ||
-          (q.topic?.name ?? "").toLowerCase().includes(ts) ||
-          (q.subtopic?.name ?? "").toLowerCase().includes(ts) ||
-          (q.tags ?? []).some((t) => t.toLowerCase().includes(ts)) ||
-          (q.title ?? "").toLowerCase().includes(ts);
-        if (!hit) return false;
-      }
-      if (tagSearch.trim()) {
-        const ts = tagSearch.trim().toLowerCase();
-        const hasTag = (q.tags ?? []).some((t) => t.toLowerCase().includes(ts));
-        if (!hasTag) return false;
-      }
-      if (searchQuery.trim()) {
-        const s = searchQuery.toLowerCase();
-        const hit =
-          (q.title ?? "").toLowerCase().includes(s) ||
-          (q.prompt ?? "").toLowerCase().includes(s) ||
-          (q.tags ?? []).some((t) => t.toLowerCase().includes(s)) ||
-          (q.questionType ?? "").toLowerCase().includes(s);
-        if (!hit) return false;
-      }
-      return true;
-    });
-
-    return [...list].sort((a, b) => {
-      if (sortBy === "NEWEST") {
-        const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-        const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-        if (dateA !== dateB) return dateB - dateA;
-        return (b.id || "").localeCompare(a.id || "");
-      }
-      if (sortBy === "OLDEST") {
-        const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-        const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-        if (dateA !== dateB) return dateA - dateB;
-        return (a.id || "").localeCompare(b.id || "");
-      }
-      return 0;
-    });
-  }, [dbQuestions, selectedLibrary, problemType, selectedLevel, techSearch, tagSearch, searchQuery, sortBy]);
-
   // Reset page when filters change
   useEffect(() => {
     setCurrentPage(1);
   }, [selectedLibrary, problemType, selectedLevel, techSearch, tagSearch, searchQuery, sortBy, pageSize]);
 
-  const totalQuestions = filteredQuestions.length;
-  const totalPages = Math.ceil(totalQuestions / pageSize) || 1;
+  // Map UI filters to backend query params
+  const queryParams = useMemo(() => {
+    let typeParam: string | undefined = undefined;
+    let mcqTypeParam: string | undefined = undefined;
+    let isLangSpecParam: boolean | undefined = undefined;
 
-  const paginatedQuestions = useMemo(() => {
-    const startIndex = (currentPage - 1) * pageSize;
-    return filteredQuestions.slice(startIndex, startIndex + pageSize);
-  }, [filteredQuestions, currentPage, pageSize]);
+    if (problemType === "CODING") {
+      typeParam = "CODING";
+      isLangSpecParam = false;
+    } else if (problemType === "LANGUAGE_SPECIFIC_CODING") {
+      typeParam = "CODING";
+      isLangSpecParam = true;
+    } else if (problemType !== "ALL") {
+      typeParam = "MCQ";
+      mcqTypeParam = problemType;
+    }
+
+    const sortParam = sortBy === "NEWEST" ? "createdAt,desc" : "createdAt,asc";
+    const searchCombined = searchQuery.trim() || techSearch.trim() || undefined;
+
+    return {
+      page: currentPage - 1,
+      size: pageSize,
+      visibility: selectedLibrary,
+      type: typeParam,
+      mcqType: mcqTypeParam,
+      isLanguageSpecific: isLangSpecParam,
+      difficulty: selectedLevel !== "ALL" ? selectedLevel : undefined,
+      search: searchCombined,
+      tag: tagSearch.trim() || undefined,
+      sort: sortParam,
+    };
+  }, [
+    currentPage,
+    pageSize,
+    selectedLibrary,
+    problemType,
+    selectedLevel,
+    searchQuery,
+    techSearch,
+    tagSearch,
+    sortBy,
+  ]);
+
+  const { data: pageData, isLoading, isError, refetch } = useQuestionsPageQuery(queryParams);
+
+  const paginatedQuestions = pageData?.content || [];
+  const totalQuestions = pageData?.totalElements ?? 0;
+  const totalPages = pageData?.totalPages ?? 1;
 
   const startRecord = totalQuestions === 0 ? 0 : (currentPage - 1) * pageSize + 1;
   const endRecord = Math.min(currentPage * pageSize, totalQuestions);
@@ -1134,7 +1088,7 @@ export default function NewAdminLibrary() {
                 Retry
               </button>
             </div>
-          ) : filteredQuestions.length === 0 ? (
+          ) : paginatedQuestions.length === 0 ? (
             <div className="py-14 text-center text-slate-400 text-xs space-y-3">
               <p>No questions match the current filters.</p>
               <button
@@ -1158,7 +1112,7 @@ export default function NewAdminLibrary() {
                       </h3>
                       <div className="flex items-center gap-3 shrink-0 text-slate-400">
                         {/* Edit Button for ORG_OWNED / Company Questions */}
-                        {(q.visibility === "ORG_OWNED" || selectedLibrary === "ORG_OWNED") && (
+                        {(getQuestionVis(q) === "ORG_OWNED" || selectedLibrary === "ORG_OWNED") && (
                           <button
                             onClick={() => {
                               sessionStorage.setItem("admin_library_page", String(currentPage));

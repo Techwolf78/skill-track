@@ -31,6 +31,7 @@ import {
 } from "@/hooks/use-query-hooks";
 import { useQuery } from "@tanstack/react-query";
 import { apiClient } from "@/lib/api-client";
+import { candidateService, CandidateInvitation } from "@/lib/candidate-service";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -65,24 +66,43 @@ export default function NewAdminTests() {
   const [isCreating, setIsCreating] = useState(false);
 
   const { data: tests = [], isLoading: testsLoading } = useTestsQuery();
-  const { data: schedules = [], isLoading: schedulesLoading } = useTestSchedulesQuery();
-  const { data: invitations = [], isLoading: invitationsLoading } = useQuery<any[]>({
-    queryKey: ["all-candidate-invitations"],
+  const { data: schedules = [], isLoading: schedulesLoading } = useTestSchedulesQuery({ size: 1000 });
+
+  // Collect all unique schedule IDs across standalone schedules and embedded test schedules
+  const allScheduleIds = useMemo(() => {
+    const ids = new Set<string>();
+    schedules.forEach((s) => {
+      if (s.id) ids.add(s.id);
+    });
+    tests.forEach((t: any) => {
+      (t.testSchedules || []).forEach((s: any) => {
+        if (s.id) ids.add(s.id);
+      });
+    });
+    return Array.from(ids);
+  }, [schedules, tests]);
+
+  const { data: invitations = [], isLoading: invitationsLoading } = useQuery<CandidateInvitation[]>({
+    queryKey: ["all-candidate-invitations", allScheduleIds.sort().join(",")],
     queryFn: async () => {
+      if (allScheduleIds.length === 0) return [];
       try {
-        const res = await apiClient.get("/candidate-invitations?size=1000");
-        const data = res.data?.data ?? res.data;
-        if (Array.isArray(data)) return data;
-        if (data && typeof data === "object" && Array.isArray(data.content)) {
-          return data.content;
-        }
-        return [];
+        const invsLists = await Promise.all(
+          allScheduleIds.map(async (sId) => {
+            try {
+              return await candidateService.getInvitationsBySchedule(sId);
+            } catch {
+              return [];
+            }
+          })
+        );
+        return invsLists.flat();
       } catch (err) {
         console.warn("Failed to fetch candidate invitations:", err);
         return [];
       }
-
     },
+    enabled: allScheduleIds.length > 0,
   });
 
   const isLoading = testsLoading || schedulesLoading || invitationsLoading;
@@ -98,10 +118,17 @@ export default function NewAdminTests() {
         scheduleToTestMap[schedule.id] = schedule.testId;
       }
     });
+    tests.forEach((test: any) => {
+      (test.testSchedules || []).forEach((schedule: any) => {
+        if (schedule.id) {
+          scheduleToTestMap[schedule.id] = test.id;
+        }
+      });
+    });
 
     // Count invitations per test
     invitations.forEach((invitation) => {
-      const scheduleId = invitation.scheduleId || invitation.schedule?.id;
+      const scheduleId = invitation.scheduleId || (invitation as any).schedule?.id;
       if (scheduleId) {
         const testId = scheduleToTestMap[scheduleId];
         if (testId) {
@@ -111,7 +138,7 @@ export default function NewAdminTests() {
     });
 
     return counts;
-  }, [schedules, invitations]);
+  }, [schedules, tests, invitations]);
 
   const createTestMutation = useCreateTestMutation();
   const deleteTestMutation = useDeleteTestMutation();

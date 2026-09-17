@@ -696,21 +696,31 @@ export const testService = {
     search?: string;
     difficulty?: string;
     type?: string;
+    visibility?: "PUBLIC" | "ORG_OWNED" | string;
+    mcqType?: string;
+    isLanguageSpecific?: boolean;
     tag?: string;
     subjectId?: string;
     topicId?: string;
     subtopicId?: string;
     page?: number;
     size?: number;
+    sort?: string;
   }): Promise<SpringPage<Question>> => {
     const queryParams = new URLSearchParams();
     if (params?.search && params.search.trim()) queryParams.append("search", params.search.trim());
     if (params?.difficulty && params.difficulty !== "ALL") queryParams.append("difficulty", params.difficulty);
     if (params?.type && params.type !== "ALL") queryParams.append("type", params.type);
+    if (params?.visibility && params.visibility !== "ALL") queryParams.append("visibility", params.visibility);
+    if (params?.mcqType && params.mcqType !== "ALL") queryParams.append("mcqType", params.mcqType);
+    if (params?.isLanguageSpecific !== undefined && params.isLanguageSpecific !== null) {
+      queryParams.append("isLanguageSpecific", String(params.isLanguageSpecific));
+    }
     if (params?.tag && params.tag.trim()) queryParams.append("tag", params.tag.trim());
     if (params?.subjectId && params.subjectId !== "all") queryParams.append("subjectId", params.subjectId);
     if (params?.topicId && params.topicId !== "all") queryParams.append("topicId", params.topicId);
     if (params?.subtopicId && params.subtopicId !== "all") queryParams.append("subtopicId", params.subtopicId);
+    if (params?.sort) queryParams.append("sort", params.sort);
     queryParams.append("page", String(params?.page ?? 0));
     queryParams.append("size", String(params?.size ?? 20));
 
@@ -725,20 +735,61 @@ export const testService = {
     tag?: string,
     options?: { search?: string; difficulty?: string; type?: string }
   ): Promise<Question[]> => {
-    const params = new URLSearchParams();
-    if (subjectId && subjectId !== "all") params.append("subjectId", subjectId);
-    if (topicId && topicId !== "all") params.append("topicId", topicId);
-    if (subtopicId && subtopicId !== "all") params.append("subtopicId", subtopicId);
-    if (tag && tag.trim()) params.append("tag", tag.trim());
-    if (options?.search && options.search.trim()) params.append("search", options.search.trim());
-    if (options?.difficulty && options.difficulty !== "ALL") params.append("difficulty", options.difficulty);
-    if (options?.type && options.type !== "ALL") params.append("type", options.type);
-    params.append("page", "0");
-    params.append("size", "1000");
+    try {
+      const firstPage = await testService.getQuestionsPage({
+        subjectId,
+        topicId,
+        subtopicId,
+        tag,
+        search: options?.search,
+        difficulty: options?.difficulty,
+        type: options?.type,
+        page: 0,
+        size: 100,
+      });
 
-    const url = `/questions?${params.toString()}`;
-    const response = await apiClient.get<Question[]>(url);
-    return unwrapArrayResponse<Question>(response);
+      let allContent: Question[] = [...(firstPage.content || [])];
+
+      if (firstPage.totalPages > 1) {
+        const remainingPromises: Promise<SpringPage<Question>>[] = [];
+        for (let p = 1; p < firstPage.totalPages; p++) {
+          remainingPromises.push(
+            testService.getQuestionsPage({
+              subjectId,
+              topicId,
+              subtopicId,
+              tag,
+              search: options?.search,
+              difficulty: options?.difficulty,
+              type: options?.type,
+              page: p,
+              size: 100,
+            })
+          );
+        }
+        const remainingPages = await Promise.all(remainingPromises);
+        for (const pg of remainingPages) {
+          allContent = allContent.concat(pg.content || []);
+        }
+      }
+
+      return allContent;
+    } catch {
+      const params = new URLSearchParams();
+      if (subjectId && subjectId !== "all") params.append("subjectId", subjectId);
+      if (topicId && topicId !== "all") params.append("topicId", topicId);
+      if (subtopicId && subtopicId !== "all") params.append("subtopicId", subtopicId);
+      if (tag && tag.trim()) params.append("tag", tag.trim());
+      if (options?.search && options.search.trim()) params.append("search", options.search.trim());
+      if (options?.difficulty && options.difficulty !== "ALL") params.append("difficulty", options.difficulty);
+      if (options?.type && options.type !== "ALL") params.append("type", options.type);
+      params.append("page", "0");
+      params.append("size", "1000");
+
+      const url = `/questions?${params.toString()}`;
+      const response = await apiClient.get<Question[]>(url);
+      return unwrapArrayResponse<Question>(response);
+    }
   },
 
   getQuestionById: async (id: string): Promise<Question> => {

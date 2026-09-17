@@ -97,7 +97,7 @@ const CodeBlockComponent = ({ node, updateAttributes }: any) => {
 
       {/* Code Area */}
       <pre className="p-3.5 text-[#d4d4d4] bg-[#1e1e1e] overflow-x-auto leading-relaxed text-[12px] font-mono focus:outline-none selection:bg-[#264f78]">
-        <NodeViewContent as="code" className={`language-${language} focus:outline-none`} />
+        <NodeViewContent<'code'> as="code" className={`language-${language} focus:outline-none`} />
       </pre>
     </NodeViewWrapper>
   );
@@ -188,7 +188,7 @@ export const RichTextEditor: React.FC<RichTextEditorProps> = ({
     try {
       const currentHtml = editor.getHTML();
       if (content !== currentHtml && normalizedContent !== currentHtml) {
-        editor.commands.setContent(normalizedContent, false);
+        editor.commands.setContent(normalizedContent, { emitUpdate: false });
       }
     } catch {
       // Ignored if DOM serializer is temporarily detached

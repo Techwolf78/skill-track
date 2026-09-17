@@ -29,7 +29,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useAuth } from "@/lib/auth-context";
 import { GryphonLogo } from "@/components/ui/GryphonLogo";
-import { useQuestionsQuery } from "@/hooks/use-query-hooks";
+import { useQuestionsPageQuery } from "@/hooks/use-query-hooks";
 import { testService, Question, Test } from "@/lib/test-service";
 import { toast } from "sonner";
 import { formatPlainTextExcerpt } from "@/lib/html-utils";
@@ -139,8 +139,7 @@ export default function NewAdminTestAddProblems() {
   const [addingIds, setAddingIds] = useState<Set<string>>(new Set());
   const [loadingTest, setLoadingTest] = useState(Boolean(id));
 
-  // Library Queries & States
-  const { data: dbQuestions = [], isLoading: isLoadingQuestions, isError, refetch } = useQuestionsQuery();
+  // Library States
 
   const [selectedLibrary, setSelectedLibrary] = useState<LibraryType>("PUBLIC");
   const [problemType, setProblemType] = useState<ProblemType>("ALL");
@@ -271,84 +270,60 @@ export default function NewAdminTestAddProblems() {
     doAdd(nextOrderIndex);
   };
 
-
-  const filteredQuestions = useMemo(() => {
-    const list = dbQuestions.filter((q) => {
-      const vis = q.visibility ?? "PUBLIC";
-      if (vis !== selectedLibrary) return false;
-      if (problemType !== "ALL") {
-        const qt = (q.questionType ?? "").toUpperCase();
-        if (problemType === "CODING") {
-          if (qt !== "CODING" || q.isLanguageSpecific) return false;
-        } else if (problemType === "LANGUAGE_SPECIFIC_CODING") {
-          if (qt !== "CODING" || !q.isLanguageSpecific) return false;
-        } else {
-          // Specific MCQ Subtype filter (SINGLE_CORRECT, MULTIPLE_CORRECT, TRUE_FALSE, ASSERTION_REASON, FILL_IN_THE_BLANK)
-          if (qt !== "MCQ") return false;
-          const mt = getQuestionMcqType(q);
-          if (mt !== problemType) return false;
-        }
-      }
-      if (selectedLevel !== "ALL") {
-        const diff = (q.difficulty ?? "").toUpperCase();
-        if (diff !== selectedLevel) return false;
-      }
-      if (techSearch.trim()) {
-        const ts = techSearch.trim().toLowerCase();
-        const hit =
-          (q.subject?.name ?? "").toLowerCase().includes(ts) ||
-          (q.topic?.name ?? "").toLowerCase().includes(ts) ||
-          (q.subtopic?.name ?? "").toLowerCase().includes(ts) ||
-          (q.tags ?? []).some((t) => t.toLowerCase().includes(ts)) ||
-          (q.title ?? "").toLowerCase().includes(ts);
-        if (!hit) return false;
-      }
-      if (tagSearch.trim()) {
-        const ts = tagSearch.trim().toLowerCase();
-        const hasTag = (q.tags ?? []).some((t) => t.toLowerCase().includes(ts));
-        if (!hasTag) return false;
-      }
-      if (searchQuery.trim()) {
-        const s = searchQuery.toLowerCase();
-        const hit =
-          (q.title ?? "").toLowerCase().includes(s) ||
-          (q.prompt ?? "").toLowerCase().includes(s) ||
-          (q.tags ?? []).some((t) => t.toLowerCase().includes(s)) ||
-          (q.questionType ?? "").toLowerCase().includes(s);
-        if (!hit) return false;
-      }
-      return true;
-    });
-
-    return [...list].sort((a, b) => {
-      if (sortBy === "NEWEST") {
-        const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-        const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-        if (dateA !== dateB) return dateB - dateA;
-        return (b.id || "").localeCompare(a.id || "");
-      }
-      if (sortBy === "OLDEST") {
-        const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-        const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-        if (dateA !== dateB) return dateA - dateB;
-        return (a.id || "").localeCompare(b.id || "");
-      }
-      return 0;
-    });
-  }, [dbQuestions, selectedLibrary, problemType, selectedLevel, techSearch, tagSearch, searchQuery, sortBy]);
-
   // Reset page when filters change
   useEffect(() => {
     setCurrentPage(1);
   }, [selectedLibrary, problemType, selectedLevel, techSearch, tagSearch, searchQuery, sortBy, pageSize]);
 
-  const totalQuestions = filteredQuestions.length;
-  const totalPages = Math.ceil(totalQuestions / pageSize) || 1;
+  // Map UI filters to backend query params
+  const queryParams = useMemo(() => {
+    let typeParam: string | undefined = undefined;
+    let mcqTypeParam: string | undefined = undefined;
+    let isLangSpecParam: boolean | undefined = undefined;
 
-  const paginatedQuestions = useMemo(() => {
-    const startIndex = (currentPage - 1) * pageSize;
-    return filteredQuestions.slice(startIndex, startIndex + pageSize);
-  }, [filteredQuestions, currentPage, pageSize]);
+    if (problemType === "CODING") {
+      typeParam = "CODING";
+      isLangSpecParam = false;
+    } else if (problemType === "LANGUAGE_SPECIFIC_CODING") {
+      typeParam = "CODING";
+      isLangSpecParam = true;
+    } else if (problemType !== "ALL") {
+      typeParam = "MCQ";
+      mcqTypeParam = problemType;
+    }
+
+    const sortParam = sortBy === "NEWEST" ? "createdAt,desc" : "createdAt,asc";
+    const searchCombined = searchQuery.trim() || techSearch.trim() || undefined;
+
+    return {
+      page: currentPage - 1,
+      size: pageSize,
+      visibility: selectedLibrary,
+      type: typeParam,
+      mcqType: mcqTypeParam,
+      isLanguageSpecific: isLangSpecParam,
+      difficulty: selectedLevel !== "ALL" ? selectedLevel : undefined,
+      search: searchCombined,
+      tag: tagSearch.trim() || undefined,
+      sort: sortParam,
+    };
+  }, [
+    currentPage,
+    pageSize,
+    selectedLibrary,
+    problemType,
+    selectedLevel,
+    searchQuery,
+    techSearch,
+    tagSearch,
+    sortBy,
+  ]);
+
+  const { data: pageData, isLoading: isLoadingQuestions, isError, refetch } = useQuestionsPageQuery(queryParams);
+
+  const paginatedQuestions = pageData?.content || [];
+  const totalQuestions = pageData?.totalElements ?? 0;
+  const totalPages = pageData?.totalPages ?? 1;
 
   const startRecord = totalQuestions === 0 ? 0 : (currentPage - 1) * pageSize + 1;
   const endRecord = Math.min(currentPage * pageSize, totalQuestions);
@@ -665,7 +640,7 @@ export default function NewAdminTestAddProblems() {
                     Retry
                   </button>
                 </div>
-              ) : filteredQuestions.length === 0 ? (
+              ) : paginatedQuestions.length === 0 ? (
                 <div className="py-14 text-center text-slate-400 text-xs space-y-3">
                   <p>No questions match the current filters.</p>
                   <button
