@@ -999,7 +999,7 @@ export default function NewAdminLibrary() {
         </div>
 
         {/* Technologies Card (DoSelect Style) */}
-        <div className="bg-white border border-slate-200/80 shadow-[0_1px_3px_rgba(0,0,0,0.03)] p-4 space-y-2.5">
+        <div className="bg-white border border-slate-200/80 shadow-[0_1px_3px_rgba(0,0,0,0.03)] p-3 space-y-2">
           <p className="text-xs font-semibold text-slate-700">Technologies</p>
           <div className="relative">
             <input
@@ -1007,7 +1007,7 @@ export default function NewAdminLibrary() {
               placeholder="Search for a technology..."
               value={techSearch}
               onChange={(e) => setTechSearch(e.target.value)}
-              className="w-full border-b border-slate-200 focus:border-[#4353a4] text-xs text-slate-800 placeholder-slate-400 py-1.5 focus:outline-none bg-transparent"
+              className="w-full border-b border-slate-200 focus:border-indigo-600 text-xs text-slate-800 placeholder-slate-400 py-1 focus:outline-none bg-transparent"
             />
             {techSearch && (
               <button
@@ -1021,7 +1021,7 @@ export default function NewAdminLibrary() {
         </div>
 
         {/* Tags Card (DoSelect Style) */}
-        <div className="bg-white border border-slate-200/80 shadow-[0_1px_3px_rgba(0,0,0,0.03)] p-4 space-y-2.5">
+        <div className="bg-white border border-slate-200/80 shadow-[0_1px_3px_rgba(0,0,0,0.03)] p-3 space-y-2">
           <p className="text-xs font-semibold text-slate-700">Tags</p>
           <div className="relative">
             <input
@@ -1029,7 +1029,7 @@ export default function NewAdminLibrary() {
               placeholder="Search for a tag..."
               value={tagSearch}
               onChange={(e) => setTagSearch(e.target.value)}
-              className="w-full border-b border-slate-200 focus:border-[#4353a4] text-xs text-slate-800 placeholder-slate-400 py-1.5 focus:outline-none bg-transparent"
+              className="w-full border-b border-slate-200 focus:border-indigo-600 text-xs text-slate-800 placeholder-slate-400 py-1 focus:outline-none bg-transparent"
             />
             {tagSearch && (
               <button
@@ -1043,7 +1043,7 @@ export default function NewAdminLibrary() {
         </div>
 
         {/* Other Filters Card (Level Dropdown) */}
-        <div className="bg-white border border-slate-200/80 shadow-[0_1px_3px_rgba(0,0,0,0.03)] p-4 space-y-3">
+        <div className="bg-white border border-slate-200/80 shadow-[0_1px_3px_rgba(0,0,0,0.03)] p-3 space-y-2">
           <p className="text-xs font-semibold text-slate-700">Other filters</p>
           <div className="flex items-center justify-between">
             <span className="text-xs text-slate-600 font-medium">Level</span>
@@ -1051,7 +1051,7 @@ export default function NewAdminLibrary() {
               <select
                 value={selectedLevel}
                 onChange={(e) => setSelectedLevel(e.target.value as any)}
-                className="appearance-none bg-transparent pr-5 pl-1 py-1 text-xs font-medium text-slate-700 focus:outline-none cursor-pointer"
+                className="appearance-none bg-transparent pr-5 pl-1 py-0.5 text-xs font-medium text-slate-700 focus:outline-none cursor-pointer"
               >
                 <option value="ALL">All</option>
                 <option value="EASY">Easy</option>
@@ -1065,12 +1065,12 @@ export default function NewAdminLibrary() {
       </aside>
 
       {/* ── Right Main Area ── */}
-      <main className="flex-1 w-full space-y-4 min-w-0">
+      <main className="flex-1 w-full space-y-3 min-w-0">
         {/* Search + Sort + Create Button (DoSelect Style) */}
-        <div className="bg-white border border-slate-200/80 shadow-[0_1px_3px_rgba(0,0,0,0.03)] p-3 flex flex-wrap items-center gap-3">
+        <div className="bg-white border border-slate-200/80 shadow-[0_1px_3px_rgba(0,0,0,0.03)] p-2.5 flex flex-wrap items-center gap-2.5">
           {/* Search Input */}
-          <div className="flex-1 min-w-[240px] flex items-center gap-2.5 border border-slate-200/90 px-3.5 py-2.5 bg-white text-xs">
-            <Search className="w-4 h-4 text-slate-400 shrink-0" />
+          <div className="flex-1 min-w-[240px] flex items-center gap-2 border border-slate-200/90 px-3 py-1.5 bg-white text-xs">
+            <Search className="w-3.5 h-3.5 text-slate-400 shrink-0" />
             <input
               type="text"
               placeholder="Search questions by title, tag or type..."
@@ -1086,7 +1086,7 @@ export default function NewAdminLibrary() {
           </div>
 
           {/* Sort Dropdown Button */}
-          <div className="relative flex items-center border border-slate-200/90 px-3.5 py-2.5 bg-white text-xs text-slate-700 font-normal hover:bg-slate-50/50 transition-colors">
+          <div className="relative flex items-center border border-slate-200/90 px-3 py-1.5 bg-white text-xs text-slate-700 font-normal hover:bg-slate-50/50 transition-colors">
             <ArrowUpDown className="w-3.5 h-3.5 text-slate-500 mr-2 shrink-0" />
             <select
               value={sortBy}
@@ -1101,7 +1101,7 @@ export default function NewAdminLibrary() {
           {/* Import Questions Button */}
           <button
             onClick={() => setImportOpen(true)}
-            className="shrink-0 flex items-center gap-1.5 px-3.5 py-2.5 text-xs font-semibold border border-slate-200/90 text-slate-700 bg-white hover:bg-slate-50 transition-all shadow-none cursor-pointer"
+            className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold border border-slate-200/90 text-slate-700 bg-white hover:bg-slate-50 transition-all shadow-none cursor-pointer"
           >
             <Upload className="w-3.5 h-3.5 text-slate-500" />
             <span>Import Questions</span>
@@ -1110,7 +1110,7 @@ export default function NewAdminLibrary() {
           {/* Create Question Button */}
           <button
             onClick={() => setCreateModalOpen(true)}
-            className="shrink-0 flex items-center gap-1.5 px-4 py-2.5 text-xs font-semibold shadow-sm bg-[#6366F1] hover:bg-[#4F46E5] text-white transition-all cursor-pointer"
+            className="shrink-0 flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold shadow-xs bg-indigo-600 hover:bg-indigo-700 text-white transition-all cursor-pointer"
           >
             <Plus className="w-3.5 h-3.5" />
             <span>Create Question</span>
@@ -1118,14 +1118,14 @@ export default function NewAdminLibrary() {
         </div>
 
         {/* Questions List */}
-        <div className="bg-white border border-slate-200 overflow-hidden">
+        <div className="bg-white border border-slate-200 overflow-hidden shadow-xs">
           {isLoading ? (
-            <div className="py-16 flex justify-center items-center gap-2 text-slate-400 text-xs">
+            <div className="py-14 flex justify-center items-center gap-2 text-slate-400 text-xs">
               <Loader2 className="w-4 h-4 animate-spin text-indigo-500" />
               Loading questions...
             </div>
           ) : isError ? (
-            <div className="py-14 text-center text-slate-500 text-xs space-y-3">
+            <div className="py-12 text-center text-slate-500 text-xs space-y-2.5">
               <p className="text-slate-600 font-medium">Failed to load questions from server.</p>
               <button
                 onClick={() => refetch()}
@@ -1135,7 +1135,7 @@ export default function NewAdminLibrary() {
               </button>
             </div>
           ) : filteredQuestions.length === 0 ? (
-            <div className="py-14 text-center text-slate-400 text-xs space-y-3">
+            <div className="py-12 text-center text-slate-400 text-xs space-y-2.5">
               <p>No questions match the current filters.</p>
               <button
                 onClick={() => { setProblemType("ALL"); setSearchQuery(""); }}
@@ -1150,10 +1150,10 @@ export default function NewAdminLibrary() {
                 const isCoding = (q.questionType ?? "").toUpperCase() === "CODING";
                 const time = fmtTime(q);
                 return (
-                  <div key={q.id} className="p-6 space-y-2.5 hover:bg-slate-50/50 transition-colors">
+                  <div key={q.id} className="px-5 py-3 space-y-1.5 hover:bg-slate-50/50 transition-colors">
                     {/* Header Row: Title & Action Icons */}
                     <div className="flex items-start justify-between gap-4">
-                      <h3 className="font-bold text-slate-900 text-[15px] leading-snug">
+                      <h3 className="font-bold text-slate-900 text-sm leading-snug">
                         {q.title || "Not available"}
                       </h3>
                       <div className="flex items-center gap-3 shrink-0 text-slate-400">
@@ -1199,7 +1199,7 @@ export default function NewAdminLibrary() {
                     </div>
 
                     {/* Metadata Row (DoSelect Style: ≡ MCQ, ⊙ Single, BarChart2 Hard, Clock 10 mins.) */}
-                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-slate-500 font-medium">
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-500 font-medium">
                       <div className="flex items-center gap-1">
                         <span className="text-slate-400 font-mono text-[13px] leading-none">≡</span>
                         <span>{isCoding ? (q.isLanguageSpecific ? "Language Specific" : "Coding") : "MCQ"}</span>
@@ -1209,7 +1209,7 @@ export default function NewAdminLibrary() {
                       {isCoding && (
                         <div className="flex items-center gap-1.5 flex-wrap">
                           <span
-                            className="inline-flex items-center text-[11px] font-medium text-slate-600 bg-slate-100 px-2 py-0.5 rounded border border-slate-200"
+                            className="inline-flex items-center text-[10px] font-medium text-slate-600 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200"
                             title={q.status === "UNDER_REVIEW" ? "Driver verification pending" : "All drivers verified"}
                           >
                             {q.status === "UNDER_REVIEW" ? "Under Review" : "Active"}
@@ -1240,23 +1240,23 @@ export default function NewAdminLibrary() {
                     </div>
 
                     {/* Tags Row */}
-                    <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+                    <div className="flex flex-wrap items-center gap-1.5">
                       {q.tags && q.tags.length > 0 ? (
                         q.tags.map((t, idx) => (
                           <span
                             key={idx}
-                            className="text-[11px] px-2 py-0.5 bg-slate-100/90 text-slate-600 font-normal border border-slate-200"
+                            className="text-[10px] px-1.5 py-0.5 bg-slate-100/90 text-slate-600 font-normal border border-slate-200"
                           >
                             {t}
                           </span>
                         ))
                       ) : (
-                        <span className="text-xs text-slate-400 italic">Not available</span>
+                        <span className="text-[11px] text-slate-400 italic">Not available</span>
                       )}
                     </div>
 
                     {/* Problem Statement / Description */}
-                    <p className="pt-0.5 text-xs text-slate-600 leading-relaxed font-normal line-clamp-3">
+                    <p className="text-xs text-slate-500 leading-normal font-normal line-clamp-1">
                       {formatPlainTextExcerpt(q.prompt)}
                     </p>
                   </div>
@@ -1268,7 +1268,7 @@ export default function NewAdminLibrary() {
 
         {/* Pagination Card (DoSelect Style) */}
         {!isLoading && !isError && totalQuestions > 0 && (
-          <div className="bg-white border border-slate-200/80 shadow-[0_1px_3px_rgba(0,0,0,0.04)] p-3 flex flex-wrap items-center justify-end gap-5 text-xs text-slate-600">
+          <div className="bg-white border border-slate-200/80 shadow-[0_1px_3px_rgba(0,0,0,0.04)] p-2.5 flex flex-wrap items-center justify-end gap-4 text-xs text-slate-600">
             {/* Page Selector */}
             <div className="flex items-center gap-1.5">
               <span className="px-1.5 py-0.5 bg-slate-100 text-[10px] font-semibold text-slate-500 tracking-wider">

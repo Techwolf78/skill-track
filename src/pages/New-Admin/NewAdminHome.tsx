@@ -284,17 +284,17 @@ export default function NewAdminHome() {
   };
 
   return (
-    <div className="space-y-6 pb-20 font-sans antialiased text-slate-800">
+    <div className="space-y-4 pb-6 font-sans antialiased text-slate-800">
       {/* ── 1. RECENT TESTS SECTION ── */}
       <div className="bg-white border border-slate-200/90 shadow-xs">
         {/* Header Bar */}
-        <div className="px-8 py-5 border-b border-slate-200 flex items-center justify-between">
+        <div className="px-6 py-3.5 border-b border-slate-200 flex items-center justify-between">
           <h2 className="text-sm font-bold text-slate-900 tracking-tight uppercase">
             Recent tests
           </h2>
           <button
             onClick={() => navigate("/admin/tests")}
-            className="text-xs font-bold text-[#4353a4] hover:text-[#334182] uppercase tracking-wider transition-colors cursor-pointer"
+            className="text-xs font-bold text-indigo-600 hover:text-indigo-800 uppercase tracking-wider transition-colors cursor-pointer"
           >
             All tests
           </button>
@@ -302,16 +302,16 @@ export default function NewAdminHome() {
 
         {/* Tests List Content */}
         {isLoadingTests ? (
-          <div className="py-16 flex justify-center items-center text-slate-400 gap-2 text-xs">
-            <Loader2 className="w-5 h-5 animate-spin text-[#4353a4]" />
+          <div className="py-14 flex justify-center items-center text-slate-400 gap-2 text-xs">
+            <Loader2 className="w-5 h-5 animate-spin text-indigo-600" />
             <span>Loading recent tests...</span>
           </div>
         ) : recentTests.length === 0 ? (
-          <div className="py-16 text-center text-slate-400 text-sm space-y-3">
+          <div className="py-14 text-center text-slate-400 text-sm space-y-3">
             <p>No tests found in this organisation.</p>
             <button
               onClick={() => setIsCreateDialogOpen(true)}
-              className="inline-flex items-center gap-1.5 px-4 py-2 bg-[#4353a4] text-white text-xs font-bold uppercase tracking-wider hover:bg-[#334182] transition-colors cursor-pointer"
+              className="inline-flex items-center gap-1.5 px-4 py-2 bg-indigo-600 text-white text-xs font-bold uppercase tracking-wider hover:bg-indigo-700 transition-colors cursor-pointer"
             >
               <PlusCircle className="w-4 h-4" />
               <span>Create First Test</span>
@@ -345,15 +345,15 @@ export default function NewAdminHome() {
               return (
                 <div
                   key={test.id}
-                  className="px-8 py-5 flex items-center justify-between gap-4 hover:bg-slate-50/60 transition-colors group"
+                  className="px-6 py-3.5 flex items-center justify-between gap-4 hover:bg-slate-50/60 transition-colors group"
                 >
                   {/* Left Side: Test Info & Metadata */}
-                  <div className="space-y-2 min-w-0 flex-1">
+                  <div className="space-y-1 min-w-0 flex-1">
                     {/* Title + Green Check Badge */}
                     <div className="flex items-center gap-2">
                       <h3
                         onClick={() => navigate(`/admin/tests/edit/${test.id}`)}
-                        className="font-bold text-slate-900 text-base hover:text-[#4353a4] transition-colors truncate cursor-pointer tracking-tight"
+                        className="font-bold text-slate-900 text-sm hover:text-indigo-600 transition-colors truncate cursor-pointer tracking-tight"
                       >
                         {test.title}
                       </h3>
@@ -457,7 +457,7 @@ export default function NewAdminHome() {
       {/* ── 2. ACTIVITY FEED SECTION ── */}
       <div className="bg-white border border-slate-200/90 shadow-xs">
         {/* Header */}
-        <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
+        <div className="px-6 py-3 border-b border-slate-200 flex items-center justify-between">
           <div>
             <h3 className="text-sm font-bold text-slate-900 uppercase tracking-tight">
               Activity feed
@@ -484,7 +484,7 @@ export default function NewAdminHome() {
         <div className="divide-y divide-slate-200">
           {isLoadingLogs ? (
             <div className="py-14 flex justify-center items-center text-slate-400 gap-2 text-xs">
-              <Loader2 className="w-5 h-5 animate-spin text-[#4353a4]" />
+              <Loader2 className="w-5 h-5 animate-spin text-indigo-600" />
               <span>Loading activities...</span>
             </div>
           ) : logsError || logs.length === 0 ? (
@@ -503,7 +503,7 @@ export default function NewAdminHome() {
         </div>
       </div>
 
-      {/* ── 3. Create Test Modal (Flat Square DoSelect / New-Admin Theme) ── */}
+      {/* ── 3. Create Test Modal ── */}
       <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
         <DialogContent className="sm:max-w-[440px] rounded-none border border-slate-300 bg-white p-6 shadow-xl">
           <DialogHeader className="space-y-1">
@@ -524,7 +524,7 @@ export default function NewAdminHome() {
                 placeholder="e.g. Fullstack Developer Assessment"
                 value={newTestName}
                 onChange={(e) => setNewTestName(e.target.value)}
-                className="rounded-none border-slate-300 focus-visible:ring-1 focus-visible:ring-[#4353a4] text-sm"
+                className="rounded-none border-slate-300 focus-visible:ring-1 focus-visible:ring-indigo-600 text-sm"
               />
             </div>
             <div className="grid gap-1.5">
@@ -537,7 +537,7 @@ export default function NewAdminHome() {
                 min="1"
                 value={newTestDuration}
                 onChange={(e) => setNewTestDuration(parseInt(e.target.value) || 0)}
-                className="rounded-none border-slate-300 focus-visible:ring-1 focus-visible:ring-[#4353a4] text-sm"
+                className="rounded-none border-slate-300 focus-visible:ring-1 focus-visible:ring-indigo-600 text-sm"
               />
             </div>
           </div>
@@ -552,7 +552,7 @@ export default function NewAdminHome() {
             <Button
               onClick={handleCreateTestSubmit}
               disabled={isCreating}
-              className="rounded-none bg-[#4353a4] hover:bg-[#344285] text-white text-xs font-bold uppercase tracking-wider px-5"
+              className="rounded-none bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold uppercase tracking-wider px-5"
             >
               {isCreating ? "Creating..." : "Create Test"}
             </Button>
@@ -598,8 +598,8 @@ function ActivityFeedItem({
     .join("") || "A";
 
   return (
-    <div className="px-6 py-4 flex items-start gap-3.5 hover:bg-slate-50/60 transition-colors">
-      <Avatar className="w-8 h-8 mt-0.5 border border-amber-300 bg-amber-500 text-white font-bold text-xs shrink-0 rounded-none">
+    <div className="px-6 py-3 flex items-start gap-3.5 hover:bg-slate-50/60 transition-colors">
+      <Avatar className="w-7 h-7 mt-0.5 border border-amber-300 bg-amber-500 text-white font-bold text-xs shrink-0 rounded-none">
         <AvatarFallback className="bg-amber-500 text-white font-semibold rounded-none">
           {initials}
         </AvatarFallback>

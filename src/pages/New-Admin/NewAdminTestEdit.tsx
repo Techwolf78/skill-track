@@ -2647,20 +2647,27 @@ export default function NewAdminTestEdit() {
 
   return (
     <div className="min-h-screen bg-[#F6F8FA] flex flex-col font-sans text-slate-800 antialiased selection:bg-indigo-500 selection:text-white">
-      {/* ── 1. Top Navbar (Dark Gryphon360 Navbar) ── */}
-      <header className="h-20 bg-[#081225] border-b border-[#142340] px-4 md:px-8 flex items-center justify-between z-30 sticky top-0 shadow-md">
+      {/* ── 1. Top Navbar (Sleek Slate Header with Breadcrumbs) ── */}
+      <header className="h-14 bg-[#0f172a] border-b border-slate-800/90 px-4 md:px-8 flex items-center justify-between z-30 sticky top-0 shadow-xs">
         {/* Left Side: Logo + Divider + Breadcrumb */}
         <div className="flex items-center space-x-3 md:space-x-4 min-w-0">
           <div
-            onClick={() => navigate("/admin/tests")}
+            onClick={() => navigate("/admin/home")}
             className="flex items-center gap-2 cursor-pointer group shrink-0"
           >
-            <GryphonLogo variant="dark" size="md" />
+            <GryphonLogo variant="dark" size="sm" />
           </div>
 
           <div className="h-5 w-[1px] bg-slate-700 mx-1 shrink-0" />
 
           <div className="flex items-center text-xs md:text-sm text-slate-400 font-medium space-x-1.5 truncate">
+            <span
+              onClick={() => navigate("/admin/home")}
+              className="hover:text-slate-200 cursor-pointer transition-colors shrink-0"
+            >
+              Dashboard
+            </span>
+            <ChevronRight className="w-3.5 h-3.5 text-slate-500 shrink-0" />
             <button
               onClick={() => navigate("/admin/tests")}
               className="hover:text-slate-200 cursor-pointer transition-colors shrink-0"
@@ -2678,14 +2685,14 @@ export default function NewAdminTestEdit() {
         <div className="flex items-center space-x-3 shrink-0">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <button className="flex items-center gap-2.5 px-2 py-1 hover:bg-white/5 transition-colors focus:outline-none cursor-pointer">
-                <Avatar className="w-8 h-8 border border-slate-700 bg-slate-800 text-slate-200">
-                  <AvatarFallback className="bg-[#4353a4] text-white text-xs font-bold">
+              <button className="flex items-center gap-2.5 px-2.5 py-1.5 hover:bg-slate-800/70 transition-colors focus:outline-none cursor-pointer rounded-md">
+                <Avatar className="w-7 h-7 border border-slate-700 bg-slate-800 text-slate-200">
+                  <AvatarFallback className="bg-indigo-600 text-white text-[11px] font-bold">
                     {user?.name ? user.name.slice(0, 2).toUpperCase() : "AD"}
                   </AvatarFallback>
                 </Avatar>
                 <div className="hidden sm:flex items-center">
-                  <span className="text-xs font-semibold text-slate-200">
+                  <span className="text-xs font-medium text-slate-200">
                     {user?.name || "Admin User"}
                   </span>
                 </div>
@@ -2720,141 +2727,140 @@ export default function NewAdminTestEdit() {
       </header>
 
       {/* ── 2. Main Content Workspace ── */}
-      <main className="max-w-7xl mx-auto px-4 md:px-8 py-8 w-full space-y-6">
+      <main className="max-w-7xl mx-auto px-4 md:px-8 py-3.5 w-full space-y-3">
         {/* Top Header Row: Test Name + Duration */}
-        <div className="space-y-1">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2.5">
-            <h1 className="text-xl md:text-2xl font-bold tracking-tight text-slate-900">
+            <h1 className="text-lg md:text-xl font-bold tracking-tight text-slate-900">
               {testTitle}
             </h1>
             <span
-              className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-[#10B981] text-white shrink-0 shadow-xs"
+              className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-[#10B981] text-white shrink-0 shadow-xs"
               title="Active & Verified"
             >
-              <Check className="w-3 h-3 stroke-[3]" />
+              <Check className="w-2.5 h-2.5 stroke-[3]" />
             </span>
-          </div>
-
-          <div className="flex items-center gap-4 text-xs text-slate-500 font-medium">
-            <span className="flex items-center gap-1.5">
+            <span className="text-slate-300">|</span>
+            <div className="flex items-center gap-1.5 text-xs text-slate-500 font-medium">
               <Clock className="w-3.5 h-3.5 text-slate-400" />
               <span>{durationStr}</span>
-            </span>
+            </div>
           </div>
         </div>
 
-        {/* ── 3. Tab Navigations (4 Standalone Tabs) ── */}
-        <div className="bg-white border border-slate-200/90 shadow-sm px-6 flex items-center overflow-x-auto scrollbar-none">
-          {/* PROBLEMS TAB */}
-          <button
-            onClick={() => setActiveTab("PROBLEMS")}
-            className={`py-3.5 px-4 text-xs font-bold tracking-wider uppercase flex items-center gap-2 transition-all cursor-pointer border-b-2 -mb-[1px] ${
-              activeTab === "PROBLEMS"
-                ? "border-[#10B981] text-[#0d9488]"
-                : "border-transparent text-slate-500 hover:text-slate-800"
-            }`}
-          >
-            <span>PROBLEMS</span>
-            <span
-              className={`w-5 h-5 rounded-full text-[11px] font-bold flex items-center justify-center ${
+        {/* ── 3. Tab Navigations (4 Standalone Tabs + Actions) ── */}
+        <div className="bg-white border border-slate-200/90 shadow-xs px-4 flex items-center justify-between overflow-x-auto scrollbar-none">
+          <div className="flex items-center">
+            {/* PROBLEMS TAB */}
+            <button
+              onClick={() => setActiveTab("PROBLEMS")}
+              className={`py-2.5 px-3.5 text-xs font-bold tracking-wider uppercase flex items-center gap-2 transition-all cursor-pointer border-b-2 -mb-[1px] ${
                 activeTab === "PROBLEMS"
-                  ? "bg-[#081225] text-white"
-                  : "bg-slate-100 text-slate-600"
+                  ? "border-indigo-600 text-indigo-600"
+                  : "border-transparent text-slate-500 hover:text-slate-800"
               }`}
             >
-              {questions.length}
-            </span>
-          </button>
+              <span>PROBLEMS</span>
+              <span
+                className={`min-w-[20px] h-5 px-1.5 rounded-full text-[11px] font-bold inline-flex items-center justify-center leading-none ${
+                  activeTab === "PROBLEMS"
+                    ? "bg-slate-900 text-white"
+                    : "bg-slate-100 text-slate-600"
+                }`}
+              >
+                {questions.length}
+              </span>
+            </button>
 
-          {/* GENERAL SETTINGS TAB */}
-          <button
-            onClick={() => setActiveTab("GENERAL_SETTINGS")}
-            className={`py-3.5 px-4 text-xs font-bold tracking-wider uppercase transition-all cursor-pointer border-b-2 -mb-[1px] ${
-              activeTab === "GENERAL_SETTINGS"
-                ? "border-[#10B981] text-[#0d9488]"
-                : "border-transparent text-slate-500 hover:text-slate-800"
-            }`}
-          >
-            <span>GENERAL SETTINGS</span>
-          </button>
+            {/* GENERAL SETTINGS TAB */}
+            <button
+              onClick={() => setActiveTab("GENERAL_SETTINGS")}
+              className={`py-2.5 px-3.5 text-xs font-bold tracking-wider uppercase transition-all cursor-pointer border-b-2 -mb-[1px] ${
+                activeTab === "GENERAL_SETTINGS"
+                  ? "border-indigo-600 text-indigo-600"
+                  : "border-transparent text-slate-500 hover:text-slate-800"
+              }`}
+            >
+              <span>GENERAL SETTINGS</span>
+            </button>
 
-          {/* ADVANCED SETTINGS TAB */}
-          <button
-            onClick={() => setActiveTab("ADVANCED_SETTINGS")}
-            className={`py-3.5 px-4 text-xs font-bold tracking-wider uppercase transition-all cursor-pointer border-b-2 -mb-[1px] ${
-              activeTab === "ADVANCED_SETTINGS"
-                ? "border-[#10B981] text-[#0d9488]"
-                : "border-transparent text-slate-500 hover:text-slate-800"
-            }`}
-          >
-            <span>ADVANCED SETTINGS</span>
-          </button>
+            {/* ADVANCED SETTINGS TAB */}
+            <button
+              onClick={() => setActiveTab("ADVANCED_SETTINGS")}
+              className={`py-2.5 px-3.5 text-xs font-bold tracking-wider uppercase transition-all cursor-pointer border-b-2 -mb-[1px] ${
+                activeTab === "ADVANCED_SETTINGS"
+                  ? "border-indigo-600 text-indigo-600"
+                  : "border-transparent text-slate-500 hover:text-slate-800"
+              }`}
+            >
+              <span>ADVANCED SETTINGS</span>
+            </button>
 
-          {/* CANDIDATES TAB */}
-          <button
-            onClick={() => setActiveTab("CANDIDATES")}
-            className={`py-3.5 px-4 text-xs font-bold tracking-wider uppercase flex items-center gap-2 transition-all cursor-pointer border-b-2 -mb-[1px] ${
-              activeTab === "CANDIDATES"
-                ? "border-[#10B981] text-[#0d9488]"
-                : "border-transparent text-slate-500 hover:text-slate-800"
-            }`}
-          >
-            <span>CANDIDATES</span>
-            <span
-              className={`w-5 h-5 rounded-full text-[11px] font-bold flex items-center justify-center ${
+            {/* CANDIDATES TAB */}
+            <button
+              onClick={() => setActiveTab("CANDIDATES")}
+              className={`py-2.5 px-3.5 text-xs font-bold tracking-wider uppercase flex items-center gap-2 transition-all cursor-pointer border-b-2 -mb-[1px] ${
                 activeTab === "CANDIDATES"
-                  ? "bg-[#081225] text-white"
-                  : "bg-slate-100 text-slate-600"
+                  ? "border-indigo-600 text-indigo-600"
+                  : "border-transparent text-slate-500 hover:text-slate-800"
               }`}
             >
-              {invitations.length}
-            </span>
-          </button>
+              <span>CANDIDATES</span>
+              <span
+                className={`min-w-[20px] h-5 px-1.5 rounded-full text-[11px] font-bold inline-flex items-center justify-center leading-none ${
+                  activeTab === "CANDIDATES"
+                    ? "bg-slate-900 text-white"
+                    : "bg-slate-100 text-slate-600"
+                }`}
+              >
+                {invitations.length}
+              </span>
+            </button>
+          </div>
+
+          {/* Right Action: Add Problems / Section dropdown button */}
+          {activeTab === "PROBLEMS" && (
+            <div className="flex items-center gap-2 shrink-0 py-1.5">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    className="px-2.5 py-1 text-xs font-semibold text-indigo-600 hover:text-white hover:bg-indigo-600 border border-indigo-200 hover:border-indigo-600 transition-colors cursor-pointer flex items-center gap-1 shadow-xs rounded-none"
+                    title="Add problems or section"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Add Problems / Section</span>
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56 bg-white border border-slate-200 shadow-xl p-1 text-xs">
+                  <DropdownMenuItem
+                    onClick={() => navigate(id ? `/admin/tests/${id}/add-problems` : "/admin/library")}
+                    className="cursor-pointer py-1.5 px-2.5 flex items-center gap-2 text-slate-700 hover:bg-slate-50 font-medium"
+                  >
+                    <Plus className="w-3.5 h-3.5 text-slate-500" />
+                    <span>Add problems to test</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={handleOpenAddSectionModal}
+                    className="cursor-pointer py-1.5 px-2.5 flex items-center gap-2 text-slate-700 hover:bg-slate-50 font-medium"
+                  >
+                    <LayoutGrid className="w-3.5 h-3.5 text-slate-500" />
+                    <span>Add a new section in test</span>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          )}
         </div>
 
         {/* ── 4. Tab Content Body ── */}
         <div>
           {/* ── PROBLEMS TAB ── */}
           {activeTab === "PROBLEMS" && (
-            <div className="space-y-4">
-              {/* Header Bar */}
-              <div className="p-4 bg-white border border-slate-200/90 shadow-sm flex items-center justify-between">
-                <span className="text-xs font-semibold text-slate-700">Problems</span>
-                <div className="flex items-center gap-2">
-
-                  {/* Header Plus Action Dropdown */}
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <button
-                        className="p-1.5 text-indigo-700 hover:text-indigo-900 hover:bg-indigo-50/80 rounded transition-colors cursor-pointer flex items-center justify-center border border-indigo-200/60"
-                        title="Add problems or section"
-                      >
-                        <Plus className="w-4 h-4" />
-                      </button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-56 bg-white border border-slate-200 shadow-xl p-1 text-xs">
-                      <DropdownMenuItem
-                        onClick={() => navigate(id ? `/admin/tests/${id}/add-problems` : "/admin/library")}
-                        className="cursor-pointer py-2 px-3 flex items-center gap-2.5 text-slate-700 hover:bg-slate-50 font-medium"
-                      >
-                        <Plus className="w-4 h-4 text-slate-500" />
-                        <span>Add problems to test</span>
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        onClick={handleOpenAddSectionModal}
-                        className="cursor-pointer py-2 px-3 flex items-center gap-2.5 text-slate-700 hover:bg-slate-50 font-medium"
-                      >
-                        <LayoutGrid className="w-4 h-4 text-slate-500" />
-                        <span>Add a new section in test</span>
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
-              </div>
+            <div className="space-y-3">
 
               {/* Problems — section-grouped list */}
               {questions.length === 0 && sectionOrder.length === 0 ? (
-                <div className="bg-white border border-slate-200/90 shadow-sm py-12 px-4 text-center text-slate-400 text-xs space-y-2">
+                <div className="bg-white border border-slate-200/90 shadow-xs py-10 px-4 text-center text-slate-400 text-xs space-y-2">
                   <p>No problems added to this test yet.</p>
                   <button
                     onClick={() => navigate(id ? `/admin/tests/${id}/add-problems` : "/admin/library")}
@@ -2865,7 +2871,7 @@ export default function NewAdminTestEdit() {
                   </button>
                 </div>
               ) : (
-                <div className="space-y-4">
+                <div className="space-y-3">
                   {sectionOrder
                     .filter((section) => {
                       if (section === "Ungrouped") {
@@ -2884,12 +2890,12 @@ export default function NewAdminTestEdit() {
                       return (
                         <div
                           key={section}
-                          className="bg-white border border-slate-200/90 shadow-sm overflow-hidden"
+                          className="bg-white border border-slate-200/90 shadow-xs overflow-hidden"
                         >
                           {/* 1. Section Header Bar */}
-                          <div className="flex items-center justify-between px-5 py-3.5 bg-white border-b border-slate-100">
+                          <div className="flex items-center justify-between px-4 py-2 bg-slate-50/80 border-b border-slate-200">
                             {/* Left: Section Title */}
-                            <div className="flex items-center gap-2.5 flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-1 min-w-0">
                               {isEditingThisSection ? (
                                 <div className="flex items-center gap-1.5">
                                   <input
@@ -2904,11 +2910,11 @@ export default function NewAdminTestEdit() {
                                         setEditingSectionValue("");
                                       }
                                     }}
-                                    className="text-sm font-semibold text-slate-800 border border-indigo-400 rounded px-2 py-0.5 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                                    className="text-xs font-semibold text-slate-800 border border-indigo-400 rounded px-2 py-0.5 focus:outline-none focus:ring-1 focus:ring-indigo-500"
                                   />
                                   <button
                                     onClick={() => handleRenameSection(section, editingSectionValue)}
-                                    className="text-xs px-2 py-1 bg-indigo-600 text-white rounded hover:bg-indigo-700 cursor-pointer font-medium"
+                                    className="text-xs px-2 py-0.5 bg-indigo-600 text-white rounded hover:bg-indigo-700 cursor-pointer font-medium"
                                   >
                                     Save
                                   </button>
@@ -2917,18 +2923,18 @@ export default function NewAdminTestEdit() {
                                       setEditingSectionName(null);
                                       setEditingSectionValue("");
                                     }}
-                                    className="text-xs px-1.5 py-1 text-slate-500 hover:text-slate-800 cursor-pointer"
+                                    className="text-xs px-1.5 py-0.5 text-slate-500 hover:text-slate-800 cursor-pointer"
                                   >
                                     ✕
                                   </button>
                                 </div>
                               ) : (
                                 <div className="flex items-center gap-2 min-w-0">
-                                  <span className="text-sm font-semibold text-slate-800 truncate">
+                                  <span className="text-xs font-bold text-slate-800 truncate">
                                     {section}
                                   </span>
                                   {sectionSettings[section]?.shuffleProblems && (
-                                    <span className="text-[10px] font-medium bg-indigo-50 text-indigo-700 border border-indigo-200/60 px-2 py-0.5 rounded-full shrink-0 flex items-center gap-1">
+                                    <span className="text-[10px] font-medium bg-indigo-50 text-indigo-700 border border-indigo-200/60 px-1.5 py-0.5 rounded-full shrink-0 flex items-center gap-1">
                                       <RefreshCw className="w-2.5 h-2.5" />
                                       Shuffle on
                                     </span>
@@ -2938,15 +2944,15 @@ export default function NewAdminTestEdit() {
                             </div>
 
                             {/* Right Actions: Settings Dropdown, Plus, Collapse/Expand Toggle */}
-                            <div className="flex items-center gap-3 shrink-0 ml-3">
+                            <div className="flex items-center gap-2 shrink-0 ml-3">
                               {/* Settings Menu */}
                               <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
                                   <button
-                                    className="p-1 text-[#3b4992] hover:text-indigo-900 transition-colors cursor-pointer"
+                                    className="p-1 text-slate-500 hover:text-indigo-600 transition-colors cursor-pointer"
                                     title="Section settings"
                                   >
-                                    <Settings className="w-4 h-4" />
+                                    <Settings className="w-3.5 h-3.5" />
                                   </button>
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent align="end" className="w-48 bg-white border border-slate-200 shadow-xl p-1 text-xs">
@@ -2976,10 +2982,10 @@ export default function NewAdminTestEdit() {
                               <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
                                   <button
-                                    className="p-1 text-[#3b4992] hover:text-indigo-900 transition-colors cursor-pointer"
+                                    className="p-1 text-slate-500 hover:text-indigo-600 transition-colors cursor-pointer"
                                     title="Add problems or section"
                                   >
-                                    <Plus className="w-4 h-4" />
+                                    <Plus className="w-3.5 h-3.5" />
                                   </button>
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent align="end" className="w-56 bg-white border border-slate-200 shadow-xl p-1 text-xs">
@@ -3010,21 +3016,21 @@ export default function NewAdminTestEdit() {
                                     return next;
                                   })
                                 }
-                                className="p-1 text-[#3b4992] hover:text-indigo-900 transition-colors cursor-pointer"
+                                className="p-1 text-slate-500 hover:text-indigo-600 transition-colors cursor-pointer"
                                 title={isCollapsed ? "Expand section" : "Collapse section"}
                               >
                                 {isCollapsed ? (
-                                  <ChevronDown className="w-4 h-4" />
+                                  <ChevronDown className="w-3.5 h-3.5" />
                                 ) : (
-                                  <ChevronUp className="w-4 h-4" />
+                                  <ChevronUp className="w-3.5 h-3.5" />
                                 )}
                               </button>
                             </div>
                           </div>
 
                           {/* 2. Sub-Header: Using X of X problems banner */}
-                          <div className="px-5 py-2.5 bg-slate-50/50 border-b border-slate-100 flex items-center gap-2 text-xs text-slate-600">
-                            <span className="text-slate-400 font-serif italic text-sm">ⓘ</span>
+                          <div className="px-4 py-1.5 bg-slate-50/40 border-b border-slate-100 flex items-center gap-2 text-xs text-slate-500">
+                            <span className="text-slate-400 font-serif italic text-xs">ⓘ</span>
                             <span>
                               Using {totalSectionCount} of {totalSectionCount} problems in this section.
                             </span>
@@ -3034,11 +3040,11 @@ export default function NewAdminTestEdit() {
                           {!isCollapsed && (
                             <div>
                               {sectionQs.length === 0 ? (
-                                <div className="py-12 px-4 text-center space-y-3">
+                                <div className="py-8 px-4 text-center space-y-2">
                                   <p className="text-xs text-slate-500 font-medium">No problems added yet.</p>
                                   <button
                                     onClick={() => navigate(`/admin/tests/${id}/add-problems?section=${encodeURIComponent(section)}`)}
-                                    className="text-xs font-bold tracking-wider text-[#3b4992] hover:text-indigo-800 transition-colors cursor-pointer uppercase underline underline-offset-4"
+                                    className="text-xs font-bold tracking-wider text-indigo-600 hover:text-indigo-800 transition-colors cursor-pointer uppercase underline underline-offset-4"
                                   >
                                     ADD PROBLEMS
                                   </button>
@@ -3059,15 +3065,15 @@ export default function NewAdminTestEdit() {
                                     return (
                                       <div
                                         key={tq.id || index}
-                                        className="pl-9 pr-5 py-4 hover:bg-slate-50/60 transition-colors space-y-1.5"
+                                        className="px-4 py-2.5 hover:bg-slate-50/60 transition-colors space-y-1"
                                       >
                                         <div className="flex items-start justify-between gap-4">
-                                          <h3 className="font-bold text-slate-900 text-sm leading-snug">{qTitle}</h3>
+                                          <h3 className="font-bold text-slate-900 text-xs md:text-sm leading-snug">{qTitle}</h3>
 
                                           <DropdownMenu>
                                             <DropdownMenuTrigger asChild>
-                                              <button className="p-1 text-slate-400 hover:text-slate-700 transition-colors cursor-pointer">
-                                                <MoreVertical className="w-4 h-4" />
+                                              <button className="p-0.5 text-slate-400 hover:text-slate-700 transition-colors cursor-pointer">
+                                                <MoreVertical className="w-3.5 h-3.5" />
                                               </button>
                                             </DropdownMenuTrigger>
                                             <DropdownMenuContent align="end" className="w-52 bg-white border border-slate-200 shadow-xl p-1 text-xs">
@@ -3113,7 +3119,7 @@ export default function NewAdminTestEdit() {
                                         </div>
 
                                         {/* Metadata row */}
-                                        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-500 font-medium">
+                                        <div className="flex flex-wrap items-center gap-x-3.5 gap-y-0.5 text-[11px] text-slate-500 font-medium">
                                           <div className="flex items-center gap-1 font-mono text-slate-400">
                                             <span>=</span>
                                             <span className="text-slate-600 font-sans">
@@ -3122,13 +3128,13 @@ export default function NewAdminTestEdit() {
                                           </div>
                                           {!isCoding && mcqSubtype && (
                                             <div className="flex items-center gap-1">
-                                              <span className="text-slate-400 text-[11px]">⊙</span>
+                                              <span className="text-slate-400 text-[10px]">⊙</span>
                                               <span>{mcqSubtype}</span>
                                             </div>
                                           )}
                                           {difficulty && (
                                             <div className="flex items-center gap-1">
-                                              <span className="text-slate-400 text-[10px]">❖</span>
+                                              <span className="text-slate-400 text-[9px]">❖</span>
                                               <span>{fmt(difficulty)}</span>
                                             </div>
                                           )}
@@ -3140,7 +3146,7 @@ export default function NewAdminTestEdit() {
                                           )}
                                           {testCasesCount && (
                                             <div className="flex items-center gap-1">
-                                              <span className="text-slate-400 font-mono text-[11px]">⊘</span>
+                                              <span className="text-slate-400 font-mono text-[10px]">⊘</span>
                                               <span>{testCasesCount}</span>
                                             </div>
                                           )}
@@ -3173,7 +3179,7 @@ export default function NewAdminTestEdit() {
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
                   placeholder="e.g., Full Stack Developer Assessment"
-                  className="w-full border-b border-slate-200 focus:border-[#4353a4] py-1.5 text-sm text-slate-800 focus:outline-none bg-transparent"
+                  className="w-full border-b border-slate-200 focus:border-indigo-600 py-1.5 text-sm text-slate-800 focus:outline-none bg-transparent"
                 />
                 <p className="text-[11px] text-slate-400">A clear, descriptive name helps candidates identify the assessment.</p>
               </div>
@@ -3192,7 +3198,7 @@ export default function NewAdminTestEdit() {
                     value={durationMins}
                     onChange={(e) => setDurationMins(e.target.value)}
                     placeholder="60"
-                    className="w-full border-b border-slate-200 focus:border-[#4353a4] py-1.5 text-sm text-slate-800 focus:outline-none bg-transparent"
+                    className="w-full border-b border-slate-200 focus:border-indigo-600 py-1.5 text-sm text-slate-800 focus:outline-none bg-transparent"
                   />
                 </div>
 
@@ -3209,7 +3215,7 @@ export default function NewAdminTestEdit() {
                     value={passMark}
                     onChange={(e) => setPassMark(e.target.value)}
                     placeholder="40"
-                    className="w-full border-b border-slate-200 focus:border-[#4353a4] py-1.5 text-sm text-slate-800 focus:outline-none bg-transparent"
+                    className="w-full border-b border-slate-200 focus:border-indigo-600 py-1.5 text-sm text-slate-800 focus:outline-none bg-transparent"
                   />
                 </div>
               </div>
@@ -3229,7 +3235,7 @@ export default function NewAdminTestEdit() {
                         value={lvl}
                         checked={difficulty === lvl}
                         onChange={() => setDifficulty(lvl)}
-                        className="w-5 h-5 text-[#4353a4] focus:ring-[#4353a4] border-slate-300 cursor-pointer"
+                        className="w-5 h-5 text-indigo-600 focus:ring-indigo-600 border-slate-300 cursor-pointer"
                       />
                       <span>{fmt(lvl)}</span>
                     </label>
@@ -3247,7 +3253,7 @@ export default function NewAdminTestEdit() {
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   placeholder="Provide an overview, target skills, or objectives for this test..."
-                  className="w-full border border-slate-200 p-3.5 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#4353a4] leading-relaxed"
+                  className="w-full border border-slate-200 p-3.5 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-indigo-600 leading-relaxed"
                 />
                 <p className="text-[11px] text-slate-400">Brief summary of the test curriculum and intended evaluation areas.</p>
               </div>
@@ -3271,7 +3277,7 @@ export default function NewAdminTestEdit() {
                 <button
                   onClick={handleSaveGeneralSettings}
                   disabled={savingGeneralSettings}
-                  className="px-6 py-2.5 bg-[#4353a4] hover:bg-[#344285] disabled:opacity-50 text-white text-xs font-bold tracking-wider uppercase shadow-xs transition-colors rounded-none cursor-pointer inline-flex items-center gap-2"
+                  className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-xs font-bold tracking-wider uppercase shadow-xs transition-colors rounded-none cursor-pointer inline-flex items-center gap-2"
                 >
                   {savingGeneralSettings ? (
                     <>
@@ -3428,7 +3434,7 @@ export default function NewAdminTestEdit() {
                     onClick={handleSaveSchedule}
                     disabled={savingSchedule || !isScheduleDirty}
                     size="sm"
-                    className="bg-[#4353a4] hover:bg-[#344285] text-white"
+                    className="bg-indigo-600 hover:bg-indigo-700 text-white"
                   >
                     {savingSchedule ? (
                       <>
@@ -3540,7 +3546,7 @@ export default function NewAdminTestEdit() {
                     onClick={handleSaveProctoring}
                     disabled={savingProctoring || !isProctoringDirty}
                     size="sm"
-                    className="bg-[#4353a4] hover:bg-[#344285] text-white"
+                    className="bg-indigo-600 hover:bg-indigo-700 text-white"
                   >
                     {savingProctoring ? (
                       <>
@@ -3597,7 +3603,7 @@ export default function NewAdminTestEdit() {
                   </div>
                   <button
                     onClick={() => setActiveTab("ADVANCED_SETTINGS")}
-                    className="text-xs font-semibold text-[#4353a4] hover:text-[#324080] inline-flex items-center gap-1 cursor-pointer self-start sm:self-auto"
+                    className="text-xs font-semibold text-indigo-600 hover:text-indigo-800 inline-flex items-center gap-1 cursor-pointer self-start sm:self-auto"
                   >
                     <span>Edit Schedule Window</span>
                     <ChevronRight className="w-3.5 h-3.5" />
@@ -3620,7 +3626,7 @@ export default function NewAdminTestEdit() {
                         setCandidateSortOrder(null);
                         setCandidatePage(1);
                       }}
-                      className="text-xs font-semibold text-[#4353a4] hover:text-[#324080] cursor-pointer"
+                      className="text-xs font-semibold text-indigo-600 hover:text-indigo-800 cursor-pointer"
                     >
                       Clear
                     </button>
@@ -3658,7 +3664,7 @@ export default function NewAdminTestEdit() {
                               name="candidateStatus"
                               checked={candidateStatusFilter === st.key}
                               onChange={() => setCandidateStatusFilter(st.key)}
-                              className="text-[#4353a4] focus:ring-0 w-3.5 h-3.5 cursor-pointer"
+                              className="text-indigo-600 focus:ring-0 w-3.5 h-3.5 cursor-pointer"
                             />
                             <span>{st.label}</span>
                           </label>
@@ -3682,7 +3688,7 @@ export default function NewAdminTestEdit() {
                           setCandidatePage(1);
                         }}
                         placeholder="Search for a candidate..."
-                        className="w-full pl-9 pr-4 py-2 text-xs border border-slate-200 rounded-none focus:outline-none focus:border-[#4353a4] bg-white text-slate-800 placeholder-slate-400"
+                        className="w-full pl-9 pr-4 py-2 text-xs border border-slate-200 rounded-none focus:outline-none focus:border-indigo-600 bg-white text-slate-800 placeholder-slate-400"
                       />
                     </div>
 
@@ -3696,7 +3702,7 @@ export default function NewAdminTestEdit() {
                           }
                           setIsAddCandidatesOpen(true);
                         }}
-                        className="px-4 py-2 bg-[#4353a4] hover:bg-[#344285] text-white text-xs font-bold tracking-wider uppercase inline-flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs"
+                        className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold tracking-wider uppercase inline-flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs"
                       >
                         <Plus className="w-3.5 h-3.5" />
                         <span>Add Candidates</span>
@@ -3706,7 +3712,7 @@ export default function NewAdminTestEdit() {
                         onClick={handleDownloadReport}
                         className="px-4 py-2 border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 hover:text-slate-900 text-xs font-bold tracking-wider uppercase inline-flex items-center gap-2 transition-colors cursor-pointer shadow-xs"
                       >
-                        <CloudDownload className="w-4 h-4 text-[#4353a4]" />
+                        <CloudDownload className="w-4 h-4 text-indigo-600" />
                         <span>Download Report</span>
                       </button>
                     </div>
@@ -4103,7 +4109,7 @@ export default function NewAdminTestEdit() {
                                         }}
                                         className="cursor-pointer py-2 px-2.5 flex items-center gap-2 text-slate-700 hover:bg-slate-50"
                                       >
-                                        <Send className="w-3.5 h-3.5 text-[#4353a4]" />
+                                        <Send className="w-3.5 h-3.5 text-indigo-600" />
                                         <span>Resend Invitation</span>
                                       </DropdownMenuItem>
 
@@ -4297,7 +4303,7 @@ export default function NewAdminTestEdit() {
             <Button
               disabled={resending}
               onClick={handleConfirmSingleResend}
-              className="bg-[#4353a4] hover:bg-[#344285] text-white text-xs font-semibold"
+              className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold"
             >
               {resending ? (
                 <>

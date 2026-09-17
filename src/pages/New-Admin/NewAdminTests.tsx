@@ -254,27 +254,27 @@ export default function NewAdminTests() {
   };
 
   return (
-    <div className="pb-20 bg-white border border-slate-200/90 shadow-xs font-sans antialiased text-slate-800">
+    <div className="pb-4 bg-white border border-slate-200/90 shadow-xs font-sans antialiased text-slate-800">
       {/* ── 1. Top Search & Create Bar ── */}
-      <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between gap-4">
+      <div className="px-5 py-2.5 border-b border-slate-200 flex items-center justify-between gap-4">
         {/* Search Input */}
-        <div className="flex items-center gap-3 flex-1 max-w-md">
-          <Search className="w-4 h-4 text-slate-400 shrink-0" />
+        <div className="flex items-center gap-2.5 flex-1 max-w-md">
+          <Search className="w-3.5 h-3.5 text-slate-400 shrink-0" />
           <input
             type="text"
             placeholder="Search for a test..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full text-sm text-slate-800 placeholder-slate-400 focus:outline-none bg-transparent"
+            className="w-full text-xs text-slate-800 placeholder-slate-400 focus:outline-none bg-transparent"
           />
         </div>
 
         {/* Create New Test Button */}
         <button
           onClick={() => setIsCreateDialogOpen(true)}
-          className="flex items-center gap-1.5 text-xs font-bold text-[#4353a4] hover:text-[#334182] uppercase tracking-wider transition-colors cursor-pointer"
+          className="flex items-center gap-1.5 text-xs font-bold text-indigo-600 hover:text-indigo-700 uppercase tracking-wider transition-colors cursor-pointer"
         >
-          <PlusCircle className="w-4 h-4 fill-[#4353a4] text-white" />
+          <PlusCircle className="w-4 h-4 fill-indigo-600 text-white" />
           <span>CREATE NEW TEST</span>
         </button>
       </div>
@@ -282,16 +282,16 @@ export default function NewAdminTests() {
       {/* ── 2. Test List ── */}
       <div>
         {isLoading ? (
-          <div className="py-20 flex flex-col justify-center items-center text-slate-400 gap-2 text-xs">
-            <Loader2 className="w-5 h-5 animate-spin text-[#4353a4]" />
+          <div className="py-14 flex flex-col justify-center items-center text-slate-400 gap-2 text-xs">
+            <Loader2 className="w-5 h-5 animate-spin text-indigo-600" />
             <span>Loading tests...</span>
           </div>
         ) : sortedAndFilteredTests.length === 0 ? (
-          <div className="py-20 text-center text-slate-400 text-sm space-y-3">
+          <div className="py-14 text-center text-slate-400 text-sm space-y-3">
             <p>No tests found.</p>
             <button
               onClick={() => setIsCreateDialogOpen(true)}
-              className="inline-flex items-center gap-1.5 px-4 py-2 bg-[#4353a4] text-white text-xs font-bold uppercase tracking-wider hover:bg-[#334182] transition-colors cursor-pointer"
+              className="inline-flex items-center gap-1.5 px-4 py-2 bg-indigo-600 text-white text-xs font-bold uppercase tracking-wider hover:bg-indigo-700 transition-colors cursor-pointer"
             >
               <PlusCircle className="w-4 h-4" />
               <span>Create First Test</span>
@@ -326,15 +326,15 @@ export default function NewAdminTests() {
               return (
                 <div
                   key={test.id}
-                  className="px-6 py-5 flex items-center justify-between gap-4 hover:bg-slate-50/60 transition-colors group"
+                  className="px-5 py-2.5 flex items-center justify-between gap-4 hover:bg-slate-50/60 transition-colors group"
                 >
                   {/* Left Side: Title & Metadata */}
-                  <div className="space-y-1.5 min-w-0 flex-1">
+                  <div className="space-y-0.5 min-w-0 flex-1">
                     {/* Title + Green Check Badge */}
                     <div className="flex items-center gap-2">
                       <h3
                         onClick={() => navigate(`/admin/tests/edit/${test.id}`)}
-                        className="font-bold text-slate-900 text-base hover:text-[#4353a4] transition-colors truncate cursor-pointer tracking-tight"
+                        className="font-bold text-slate-900 text-sm hover:text-indigo-600 transition-colors truncate cursor-pointer tracking-tight"
                       >
                         {test.title}
                       </h3>
@@ -536,7 +536,7 @@ export default function NewAdminTests() {
                 placeholder="e.g. Fullstack Developer Assessment"
                 value={newTestName}
                 onChange={(e) => setNewTestName(e.target.value)}
-                className="rounded-none border-slate-300 focus-visible:ring-1 focus-visible:ring-[#4353a4] text-sm"
+                className="rounded-none border-slate-300 focus-visible:ring-1 focus-visible:ring-indigo-600 text-sm"
               />
             </div>
             <div className="grid gap-1.5">
@@ -549,7 +549,7 @@ export default function NewAdminTests() {
                 min="1"
                 value={newTestDuration}
                 onChange={(e) => setNewTestDuration(parseInt(e.target.value) || 0)}
-                className="rounded-none border-slate-300 focus-visible:ring-1 focus-visible:ring-[#4353a4] text-sm"
+                className="rounded-none border-slate-300 focus-visible:ring-1 focus-visible:ring-indigo-600 text-sm"
               />
             </div>
           </div>
@@ -564,7 +564,7 @@ export default function NewAdminTests() {
             <Button
               onClick={handleCreateTestSubmit}
               disabled={isCreating}
-              className="rounded-none bg-[#4353a4] hover:bg-[#344285] text-white text-xs font-bold uppercase tracking-wider px-5"
+              className="rounded-none bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold uppercase tracking-wider px-5"
             >
               {isCreating ? "Creating..." : "Create Test"}
             </Button>
