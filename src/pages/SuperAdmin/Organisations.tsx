@@ -325,7 +325,7 @@ export default function Organisations() {
                   </div>
 
                   <div className="flex items-center gap-1.5 shrink-0">
-                    <span className="px-2 py-0.5 bg-[#4152A4]/10 text-[#4152A4] border border-[#4152A4]/25 text-[10px] font-semibold rounded shadow-2xs">
+                    <span className="px-2 py-0.5 bg-indigo-50 text-indigo-700 border border-indigo-200 text-[10px] font-semibold rounded shadow-2xs">
                       {currentSub.planTier || "Standard"}
                     </span>
                     <DropdownMenu>
@@ -363,7 +363,7 @@ export default function Organisations() {
                 <div className="bg-slate-50/80 border border-slate-200/70 rounded-md p-2.5 text-xs space-y-1.5">
                   <div className="flex justify-between items-center">
                     <span className="text-[11.5px] text-slate-500 flex items-center gap-1.5">
-                      <Coins className="w-3.5 h-3.5 text-[#4152A4]" />
+                      <Coins className="w-3.5 h-3.5 text-indigo-600" />
                       Allocated PINs
                     </span>
                     <span className="font-bold text-slate-900 font-mono text-[11.5px]">
@@ -415,7 +415,7 @@ export default function Organisations() {
                   Configure plan package, PIN allocations, and billing dates for <strong>{subOrg?.name}</strong>
                 </DialogDescription>
               </div>
-              <Badge variant="outline" className="bg-[#4152A4]/10 text-[#4152A4] border-[#4152A4]/25 text-xs font-semibold px-2.5 py-0.5">
+              <Badge variant="outline" className="bg-indigo-50 text-indigo-700 border-indigo-200 text-xs font-semibold px-2.5 py-0.5">
                 {subConfig?.planTier}
               </Badge>
             </div>
@@ -637,7 +637,7 @@ export default function Organisations() {
                             <td className="py-1.5 px-3 text-slate-800 font-medium">{adj.reason}</td>
                             <td className="py-1.5 px-3 text-center">
                               {adj.pinsChange > 0 ? (
-                                <span className="px-1.5 py-0.5 bg-[#4152A4]/10 text-[#4152A4] border border-[#4152A4]/25 rounded font-bold font-mono text-[10px]">
+                                <span className="px-1.5 py-0.5 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded font-bold font-mono text-[10px]">
                                   +{adj.pinsChange}
                                 </span>
                               ) : (
@@ -697,7 +697,7 @@ export default function Organisations() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setEditingOrg(null)}>Cancel</Button>
-            <Button variant="hero" onClick={handleUpdate} disabled={isUpdating} className="bg-[#4152A4] hover:bg-[#344287] text-white">
+            <Button variant="hero" onClick={handleUpdate} disabled={isUpdating} className="bg-indigo-600 hover:bg-indigo-700 text-white">
               {isUpdating ? "Saving..." : "Save Changes"}
             </Button>
           </DialogFooter>

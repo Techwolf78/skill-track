@@ -506,12 +506,12 @@ export function AddCandidatesModal({
         hideDefaultClose
         className="w-[85vw] max-w-[1360px] h-[85vh] max-h-[85vh] flex flex-col p-0 overflow-hidden bg-white border border-slate-200 shadow-2xl rounded-2xl text-slate-900 font-sans"
       >
-        {/* Top Header Banner matching reference design */}
-        <div className="bg-[#3b50a6] text-white px-6 py-3.5 flex items-center justify-between shrink-0 select-none shadow-sm">
+        {/* Top Header Banner matching New-Admin theme */}
+        <div className="bg-[#0f172a] text-white px-6 py-3.5 flex items-center justify-between shrink-0 select-none shadow-xs border-b border-slate-800">
           <div className="flex items-center gap-2">
             <h2 className="text-sm md:text-base font-semibold tracking-tight text-white flex items-center gap-1.5">
-              <span>Invite candidates for</span>
-              <span className="font-bold text-white underline decoration-white/40 underline-offset-2">
+              <span className="text-slate-300">Invite candidates for</span>
+              <span className="font-bold text-white underline decoration-indigo-400 underline-offset-2">
                 {testTitle}
               </span>
             </h2>
@@ -519,7 +519,7 @@ export function AddCandidatesModal({
           <button
             type="button"
             onClick={() => onOpenChange(false)}
-            className="w-8 h-8 rounded-full flex items-center justify-center text-white/80 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+            className="w-8 h-8 rounded-full flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
             aria-label="Close dialog"
           >
             <X className="w-4 h-4" />
@@ -606,7 +606,7 @@ export function AddCandidatesModal({
                     placeholder="Search candidates by name, email, or phone..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-9 h-9 text-xs bg-white border border-slate-200 rounded-lg text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-[#3b50a6] focus:border-[#3b50a6]"
+                    className="pl-9 h-9 text-xs bg-white border border-slate-200 rounded-lg text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
                   />
                 </div>
 
@@ -620,7 +620,7 @@ export function AddCandidatesModal({
                             checked={isAllSelectableChecked}
                             onCheckedChange={(c) => toggleSelectAll(Boolean(c))}
                             disabled={selectableOnPage.length === 0}
-                            className="data-[state=checked]:bg-[#10B981] data-[state=checked]:border-[#10B981] border-slate-300"
+                            className="data-[state=checked]:bg-indigo-600 data-[state=checked]:border-indigo-600 border-slate-300"
                           />
                         </TableHead>
                         <TableHead className="text-xs font-semibold text-slate-600 py-2">Candidate</TableHead>
@@ -632,7 +632,7 @@ export function AddCandidatesModal({
                       {loadingCandidates ? (
                         <TableRow>
                           <TableCell colSpan={4} className="text-center py-16">
-                            <Loader2 className="w-6 h-6 animate-spin mx-auto text-[#3b50a6] mb-2" />
+                            <Loader2 className="w-6 h-6 animate-spin mx-auto text-indigo-600 mb-2" />
                             <p className="text-xs text-slate-500">Loading candidates from server...</p>
                           </TableCell>
                         </TableRow>
@@ -670,7 +670,7 @@ export function AddCandidatesModal({
                                   checked={isChecked}
                                   onCheckedChange={(checked) => toggleCandidate(c.id, Boolean(checked))}
                                   disabled={isAlreadyInvited}
-                                  className="data-[state=checked]:bg-[#10B981] data-[state=checked]:border-[#10B981] border-slate-300"
+                                  className="data-[state=checked]:bg-indigo-600 data-[state=checked]:border-indigo-600 border-slate-300"
                                 />
                               </TableCell>
                               <TableCell className="py-2.5">
@@ -791,7 +791,7 @@ export function AddCandidatesModal({
                       "text-xs font-semibold rounded-lg px-5 py-2 shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed",
                       lastFailedCount > 0
                         ? "bg-red-600 hover:bg-red-700 text-white"
-                        : "bg-[#4353a4] hover:bg-[#344285] text-white"
+                        : "bg-indigo-600 hover:bg-indigo-700 text-white"
                     )}
                   >
                     {inviting ? (
@@ -830,7 +830,7 @@ export function AddCandidatesModal({
                         value={createForm.name}
                         onChange={(e) => setCreateForm((prev) => ({ ...prev, name: e.target.value }))}
                         required
-                        className="h-10 text-xs bg-white border border-slate-200 rounded-xl text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-[#3b50a6] focus:border-[#3b50a6]"
+                        className="h-10 text-xs bg-white border border-slate-200 rounded-xl text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
                       />
                     </div>
 
@@ -845,7 +845,7 @@ export function AddCandidatesModal({
                         value={createForm.email}
                         onChange={(e) => setCreateForm((prev) => ({ ...prev, email: e.target.value }))}
                         required
-                        className="h-10 text-xs bg-white border border-slate-200 rounded-xl text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-[#3b50a6] focus:border-[#3b50a6]"
+                        className="h-10 text-xs bg-white border border-slate-200 rounded-xl text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
                       />
                     </div>
                   </div>
@@ -872,7 +872,7 @@ export function AddCandidatesModal({
                         value={createForm.password}
                         onChange={(e) => setCreateForm((prev) => ({ ...prev, password: e.target.value }))}
                         required
-                        className="h-10 text-xs font-mono bg-white border border-slate-200 rounded-xl text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-[#3b50a6] focus:border-[#3b50a6]"
+                        className="h-10 text-xs font-mono bg-white border border-slate-200 rounded-xl text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
                       />
                     </div>
 
@@ -887,7 +887,7 @@ export function AddCandidatesModal({
                         placeholder="e.g. +91 9876543210"
                         value={createForm.phoneNumber}
                         onChange={(e) => setCreateForm((prev) => ({ ...prev, phoneNumber: e.target.value }))}
-                        className="h-10 text-xs bg-white border border-slate-200 rounded-xl text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-[#3b50a6] focus:border-[#3b50a6]"
+                        className="h-10 text-xs bg-white border border-slate-200 rounded-xl text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
                       />
                     </div>
                   </div>
@@ -921,13 +921,13 @@ export function AddCandidatesModal({
                               placeholder="Field name (e.g. College)"
                               value={field.key}
                               onChange={(e) => updateCustomField(idx, "key", e.target.value)}
-                              className="h-8 text-xs flex-1 bg-white border border-slate-200 rounded-lg text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-[#3b50a6] focus:border-[#3b50a6]"
+                              className="h-8 text-xs flex-1 bg-white border border-slate-200 rounded-lg text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
                             />
                             <Input
                               placeholder="Value (e.g. MIT)"
                               value={field.value}
                               onChange={(e) => updateCustomField(idx, "value", e.target.value)}
-                              className="h-8 text-xs flex-1 bg-white border border-slate-200 rounded-lg text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-[#3b50a6] focus:border-[#3b50a6]"
+                              className="h-8 text-xs flex-1 bg-white border border-slate-200 rounded-lg text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
                             />
                             <Button
                               type="button"
@@ -958,7 +958,7 @@ export function AddCandidatesModal({
                     <Button
                       type="submit"
                       disabled={creating}
-                      className="text-xs font-semibold bg-[#4353a4] hover:bg-[#344285] text-white rounded-lg px-5 py-2 shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                      className="text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg px-5 py-2 shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
                     >
                       {creating ? (
                         <>
@@ -1123,7 +1123,7 @@ export function AddCandidatesModal({
                       </div>
 
                       {/* Unified connected field name + Required checkbox container */}
-                      <div className="flex items-center bg-slate-50 border border-slate-200 rounded-lg overflow-hidden focus-within:ring-1 focus-within:ring-[#3b50a6] focus-within:border-[#3b50a6] transition-all">
+                      <div className="flex items-center bg-slate-50 border border-slate-200 rounded-lg overflow-hidden focus-within:ring-1 focus-within:ring-indigo-500 focus-within:border-indigo-500 transition-all">
                         <input
                           type="text"
                           placeholder="Field name"
@@ -1227,7 +1227,7 @@ export function AddCandidatesModal({
                       type="button"
                       onClick={handleProcessBulkFile}
                       disabled={!bulkFile || processingBulkFile}
-                      className="text-xs font-semibold bg-orange-400 hover:bg-orange-500 text-white rounded-lg px-5 py-2 shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                      className="text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg px-5 py-2 shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
                     >
                       {processingBulkFile ? (
                         <>
@@ -1246,7 +1246,7 @@ export function AddCandidatesModal({
                       type="button"
                       onClick={handleSendBulkInvitations}
                       disabled={inviting || parsedBulkCandidates.length === 0}
-                      className="text-xs font-semibold bg-[#4353a4] hover:bg-[#344285] text-white rounded-lg px-5 py-2 shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                      className="text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg px-5 py-2 shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
                     >
                       {inviting ? (
                         <>
@@ -1268,12 +1268,13 @@ export function AddCandidatesModal({
 
           {/* ──── RIGHT COLUMN: Actual Email Template Preview (5 cols) ──── */}
           <div className="lg:col-span-5 bg-slate-50/70 p-6 flex flex-col h-full overflow-y-auto">
-            {/* Exact Actual Email Template Card (White & Blue Theme: Assessment Invitation) */}
+            {/* Exact Actual Email Template Card (White & Indigo Theme: Assessment Invitation) */}
             <div className="flex-1 bg-white border border-slate-200 text-slate-800 rounded-2xl shadow-sm flex flex-col overflow-hidden font-sans">
               {/* Header: Assessment Invitation Banner */}
-              <div className="bg-[#4353a4] px-6 py-4">
-                <h3 className="text-xs font-bold tracking-wider text-white uppercase font-sans">
-                  Assessment Invitation
+              <div className="bg-[#0f172a] px-6 py-4 border-b border-slate-800">
+                <h3 className="text-xs font-bold tracking-wider text-white uppercase font-sans flex items-center justify-between">
+                  <span>Assessment Invitation</span>
+                  <span className="text-[10px] text-indigo-400 font-mono font-normal">Preview</span>
                 </h3>
               </div>
 
@@ -1289,7 +1290,7 @@ export function AddCandidatesModal({
 
                 {/* Action Button: Start Assessment */}
                 <div className="py-2 flex justify-center">
-                  <div className="px-8 py-2.5 bg-[#4353a4] hover:bg-[#344285] text-white font-semibold text-xs rounded-md shadow-xs tracking-wide cursor-default transition-all">
+                  <div className="px-8 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs rounded-md shadow-xs tracking-wide cursor-default transition-all">
                     Start Assessment
                   </div>
                 </div>
@@ -1299,7 +1300,7 @@ export function AddCandidatesModal({
                   <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
                     Fallback Access Code
                   </p>
-                  <p className="text-2xl font-mono font-bold tracking-widest text-[#4353a4]">
+                  <p className="text-2xl font-mono font-bold tracking-widest text-indigo-600">
                     660822
                   </p>
                   <p className="text-[11px] text-slate-400 pt-0.5">

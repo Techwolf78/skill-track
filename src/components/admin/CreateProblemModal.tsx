@@ -56,11 +56,11 @@ export function CreateProblemModal({
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 animate-in fade-in duration-150">
       <div className="w-full max-w-xl bg-white shadow-2xl overflow-hidden border border-slate-200">
         {/* Header Bar */}
-        <div className="bg-[#4353a4] text-white px-6 py-4 flex items-center justify-between">
+        <div className="bg-[#0f172a] text-white px-6 py-4 flex items-center justify-between border-b border-slate-800">
           <h2 className="text-base font-semibold tracking-wide">Create new problem</h2>
           <button
             onClick={onClose}
-            className="text-white/80 hover:text-white transition-colors p-1 hover:bg-white/10"
+            className="text-slate-400 hover:text-white transition-colors p-1 hover:bg-slate-800 rounded-md cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
@@ -80,7 +80,7 @@ export function CreateProblemModal({
               onChange={(e) => setName(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleCreate()}
               autoFocus
-              className="w-full border-b-2 border-slate-200 focus:border-[#4353a4] px-1 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none transition-colors"
+              className="w-full border-b-2 border-slate-200 focus:border-indigo-600 px-1 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none transition-colors"
             />
             <p className="text-[11px] text-slate-400">A descriptive name helps organize your question library.</p>
           </div>
@@ -88,10 +88,10 @@ export function CreateProblemModal({
           {/* Type & Level Dropdowns */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
             <div className="space-y-1">
-              <label className="block text-xs font-semibold text-[#4353a4]">
+              <label className="block text-xs font-semibold text-indigo-600">
                 Problem type
               </label>
-              <div className="relative border-b-2 border-[#4353a4]">
+              <div className="relative border-b-2 border-indigo-600">
                 <select
                   value={problemCategory}
                   onChange={(e) => setProblemCategory(e.target.value)}
@@ -105,7 +105,7 @@ export function CreateProblemModal({
                   <option value="ASSERTION_REASON">Assertion Reason</option>
                   <option value="FILL_IN_THE_BLANK">Fill in the blanks</option>
                 </select>
-                <ChevronDown className="pointer-events-none absolute right-1 top-1/2 -translate-y-1/2 w-4 h-4 text-[#4353a4]" />
+                <ChevronDown className="pointer-events-none absolute right-1 top-1/2 -translate-y-1/2 w-4 h-4 text-indigo-600" />
               </div>
             </div>
 
@@ -113,7 +113,7 @@ export function CreateProblemModal({
               <label className="block text-xs font-semibold text-slate-500">
                 Level
               </label>
-              <div className="relative border-b-2 border-slate-200 focus-within:border-[#4353a4]">
+              <div className="relative border-b-2 border-slate-200 focus-within:border-indigo-600">
                 <select
                   value={level}
                   onChange={(e) => setLevel(e.target.value as any)}
@@ -137,7 +137,7 @@ export function CreateProblemModal({
                   onClose();
                   onOpenBulkUploader();
                 }}
-                className="text-xs text-[#4353a4] hover:underline font-medium cursor-pointer"
+                className="text-xs text-indigo-600 hover:underline font-medium cursor-pointer"
               >
                 Or upload questions in bulk via Excel
               </button>
@@ -154,7 +154,7 @@ export function CreateProblemModal({
               <button
                 type="button"
                 onClick={handleCreate}
-                className="px-6 py-2 bg-[#4353a4] hover:bg-[#344287] text-white text-xs font-semibold shadow-sm transition-colors cursor-pointer"
+                className="px-6 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold shadow-xs transition-colors cursor-pointer"
               >
                 Create
               </button>

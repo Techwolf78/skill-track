@@ -124,12 +124,12 @@ const getQuestionVis = (q: any): "PUBLIC" | "ORG_OWNED" => {
   return "PUBLIC";
 };
 
-const getQuestionMcqType = (q: any): string => {
+const getQuestionMcqType = (q: Partial<Question> & { options?: Array<string | { text?: string }> }): string => {
   if (q.mcqType) {
     const raw = String(q.mcqType).toUpperCase();
     if (raw !== "SINGLE_CORRECT" && raw !== "MCQ") return raw;
   }
-  const opts = (q.mcqOptions || q.options || []).map((o: any) =>
+  const opts = (q.mcqOptions || q.options || []).map((o: string | { text?: string }) =>
     (typeof o === "string" ? o : o.text || "").toLowerCase().trim()
   );
   if (
@@ -176,7 +176,7 @@ const fmtMcqType = (t?: string) => {
 };
 
 const fmtTime = (q: Question) => {
-  const avgSeconds = q.avg_time_seconds ?? (q as any).avgTimeSeconds;
+  const avgSeconds = q.avg_time_seconds ?? (q as unknown as { avgTimeSeconds?: number }).avgTimeSeconds;
   if (avgSeconds && avgSeconds > 0) {
     const mins = Math.round(avgSeconds / 60);
     if (mins < 1) {
@@ -257,7 +257,7 @@ function ImportQuestionsDialog({
 
   const [jsonText, setJsonText] = useState("");
   const [parsedRows, setParsedRows] = useState<ParsedQuestionRow[]>([]);
-  const [rawFileRows, setRawFileRows] = useState<any[] | null>(null);
+  const [rawFileRows, setRawFileRows] = useState<Record<string, unknown>[] | null>(null);
   const [parseError, setParseError] = useState<string | null>(null);
   const [fileName, setFileName] = useState<string | null>(null);
 
@@ -283,7 +283,7 @@ function ImportQuestionsDialog({
     subId: string,
     topId: string,
     subtopId: string,
-    sourceRows: any[]
+    sourceRows: Record<string, unknown>[]
   ) => {
     const context: TaxonomyContext = {
       subjects,
@@ -344,8 +344,9 @@ function ImportQuestionsDialog({
           const list = Array.isArray(raw) ? raw : [raw];
           setRawFileRows(list);
           reparseRowsWithContext(defaultSubjectId, defaultTopicId, defaultSubtopicId, list);
-        } catch (err: any) {
-          setParseError("Invalid JSON file: " + err.message);
+        } catch (err: unknown) {
+          const msg = err instanceof Error ? err.message : String(err);
+          setParseError("Invalid JSON file: " + msg);
         }
       };
       reader.readAsText(file);
@@ -355,7 +356,7 @@ function ImportQuestionsDialog({
           const data = new Uint8Array(evt.target?.result as ArrayBuffer);
           const workbook = XLSX.read(data, { type: "array" });
           const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-          const rows: any[] = XLSX.utils.sheet_to_json(firstSheet);
+          const rows: Record<string, unknown>[] = XLSX.utils.sheet_to_json(firstSheet);
 
           if (!rows.length) {
             setParseError("The uploaded Excel sheet contains no rows.");
@@ -364,8 +365,9 @@ function ImportQuestionsDialog({
 
           setRawFileRows(rows);
           reparseRowsWithContext(defaultSubjectId, defaultTopicId, defaultSubtopicId, rows);
-        } catch (err: any) {
-          setParseError("Failed to parse Excel file: " + err.message);
+        } catch (err: unknown) {
+          const msg = err instanceof Error ? err.message : String(err);
+          setParseError("Failed to parse Excel file: " + msg);
         }
       };
       reader.readAsArrayBuffer(file);
@@ -485,9 +487,10 @@ function ImportQuestionsDialog({
       toast.success(`Successfully imported ${payload.length} questions.`);
       onImportSuccess();
       onClose();
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("[NewAdminLibrary] Bulk import error:", err);
-      toast.error("Bulk import failed: " + (err.response?.data?.message || err.message || "Please check question parameters"));
+      const apiErr = err as { response?: { data?: { message?: string } }; message?: string };
+      toast.error("Bulk import failed: " + (apiErr.response?.data?.message || apiErr.message || "Please check question parameters"));
     }
   };
 
@@ -518,7 +521,7 @@ function ImportQuestionsDialog({
               className="flex items-center gap-1.5 px-3 py-1.5 border border-slate-200 text-xs font-medium text-slate-700 hover:bg-slate-50 hover:text-slate-900 transition-colors cursor-pointer rounded"
               title="Download Coding Questions Excel Template"
             >
-              <FileSpreadsheet className="w-3.5 h-3.5 text-[#3b4992]" />
+              <FileSpreadsheet className="w-3.5 h-3.5 text-indigo-600" />
               <span>Coding Template</span>
             </button>
           </div>
@@ -531,7 +534,7 @@ function ImportQuestionsDialog({
         <div className="p-3.5 bg-slate-50/70 border border-slate-200 rounded space-y-2.5">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold text-slate-800 flex items-center gap-1.5">
-              <FolderTree className="w-3.5 h-3.5 text-[#3b4992]" />
+              <FolderTree className="w-3.5 h-3.5 text-indigo-600" />
               Default Hierarchy
             </span>
           </div>
@@ -602,7 +605,7 @@ function ImportQuestionsDialog({
         {/* Upload File Zone */}
         <div className="w-full">
           <label className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-slate-200 hover:border-indigo-400 bg-slate-50/50 hover:bg-slate-50 cursor-pointer transition-colors w-full rounded">
-            <Upload className="w-6 h-6 text-[#3b4992] mb-1.5" />
+            <Upload className="w-6 h-6 text-indigo-600 mb-1.5" />
             <p className="text-xs font-semibold text-slate-700 text-center truncate max-w-full px-2">
               {fileName ? fileName : "Click to browse or drag & drop question spreadsheet"}
             </p>
@@ -738,7 +741,7 @@ function ImportQuestionsDialog({
           <button
             onClick={handleBulkSubmit}
             disabled={bulkCreateMutation.isPending || parsedRows.length === 0}
-            className="px-4 py-2 bg-[#3b4992] hover:bg-[#2f3b75] disabled:opacity-50 text-white text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-sm cursor-pointer rounded"
+            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-sm cursor-pointer rounded"
           >
             {bulkCreateMutation.isPending ? (
               <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Importing...</>
@@ -1004,7 +1007,7 @@ export default function NewAdminLibrary() {
             <div className="relative flex items-center">
               <select
                 value={selectedLevel}
-                onChange={(e) => setSelectedLevel(e.target.value as any)}
+                onChange={(e) => setSelectedLevel(e.target.value as "ALL" | "EASY" | "MEDIUM" | "HARD")}
                 className="appearance-none bg-transparent pr-5 pl-1 py-0.5 text-xs font-medium text-slate-700 focus:outline-none cursor-pointer"
               >
                 <option value="ALL">All</option>

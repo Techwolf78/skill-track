@@ -307,9 +307,10 @@ export const IdentityVerification: React.FC<IdentityVerificationProps> = ({ sess
 
       toast.success("Identity Photo Verified & Uploaded!");
       onComplete();
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Identity Photo Upload Error:", err);
-      const msg = err?.response?.data?.message || err?.message || "Failed to upload identity photo. Please try again.";
+      const apiErr = err as { response?: { data?: { message?: string } }; message?: string };
+      const msg = apiErr?.response?.data?.message || apiErr?.message || "Failed to upload identity photo. Please try again.";
       toast.error(msg);
     } finally {
       setIsUploading(false);
@@ -439,7 +440,7 @@ export const IdentityVerification: React.FC<IdentityVerificationProps> = ({ sess
                 Retake Photo
               </Button>
               <Button
-                className="flex-1 bg-[#4353a4] hover:bg-[#344285] text-white gap-2 shadow-md"
+                className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white gap-2 shadow-md"
                 onClick={handleConfirmAndUpload}
                 disabled={isUploading}
               >
