@@ -1033,27 +1033,39 @@ export default function NationalLandingPage() {
             <BentoCard
               index={3}
               borderRadiusClass="rounded-[28px]"
-              className="md:col-span-1 overflow-hidden flex flex-col justify-between p-0 bg-slate-50/60 border-slate-200/80 hover:shadow-xl transition-all duration-300 relative group"
+              className="md:col-span-1"
             >
-              {/* Full width 3D art taking top space */}
-              <div className="w-full h-64 sm:h-72 overflow-hidden flex items-center justify-center bg-slate-100/40">
-                <img
-                  src="/skill-track-card-circle.png"
-                  alt="Custom Test Builder Graphic"
-                  className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
-                />
-              </div>
-
-              {/* Overlapping text box overlaying the bottom part of the card */}
-              <div className="-mt-12 relative z-10 mx-3 mb-3 p-5 bg-white/95 backdrop-blur-md rounded-[20px] shadow-lg border border-slate-200/70 flex flex-col justify-between">
+              <div className="flex flex-col justify-between h-full">
                 <div>
-                  <h3 className="font-heading font-bold text-lg text-slate-900 mb-1.5 tracking-tight group-hover:text-indigo-600 transition-colors">
+                  <div className="relative w-14 h-14 rounded-xl bg-gradient-to-br from-indigo-50 to-indigo-100/60 border border-indigo-200/60 flex items-center justify-center mb-6 overflow-hidden transition-transform duration-300 group-hover:scale-110 group-hover:rotate-3 shadow-sm">
+                    <div className="absolute inset-0 bg-indigo-600/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                    <Code2 className="w-7 h-7 text-indigo-600" />
+                  </div>
+                  <h3 className="font-heading font-bold text-xl text-slate-900 mb-3 tracking-tight group-hover:text-indigo-600 transition-colors">
                     Custom Test Builder
                   </h3>
-                  <p className="text-slate-600 leading-relaxed text-xs">
+                  <p className="text-slate-600 leading-relaxed text-sm group-hover:text-slate-700 transition-colors">
                     Create assessments with multiple question types, coding
                     challenges, and adaptive difficulty.
                   </p>
+                </div>
+
+                {/* Visual Mock: 3D Glass Engine Mock */}
+                <div className="mt-6 relative rounded-2xl overflow-hidden border border-indigo-100/80 bg-gradient-to-b from-indigo-50/40 via-white to-slate-50/60 p-3 flex flex-col items-center justify-between shadow-inner group/node">
+                  <div className="w-full h-32 flex items-center justify-center relative">
+                    <img
+                      src="/custom-test-builder-3d.png"
+                      alt="Custom Test Builder 3D Engine"
+                      className="w-full h-full object-contain filter drop-shadow-md transition-transform duration-500 group-hover/node:scale-105"
+                    />
+                  </div>
+                  <div className="w-full flex items-center justify-between pt-2 border-t border-indigo-100/60 text-[10px] font-mono">
+                    <span className="flex items-center gap-1 text-indigo-600 font-semibold bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-200/60">
+                      <Sparkles className="w-2.5 h-2.5" />
+                      Adaptive Engine
+                    </span>
+                    <span className="text-slate-500 font-medium">Multi-Type IDE</span>
+                  </div>
                 </div>
               </div>
             </BentoCard>
