@@ -138,7 +138,7 @@ export function QuestionImage({
       <div
         className={cn(
           "relative inline-block group max-w-full rounded-lg overflow-hidden border border-slate-200/80 bg-white transition-all",
-          enableZoom && "cursor-zoom-in hover:border-[#4353a4]/50 hover:shadow-sm",
+          enableZoom && "cursor-zoom-in hover:border-indigo-400 hover:shadow-sm",
           containerClassName
         )}
         onClick={handleImageClick}
@@ -146,7 +146,7 @@ export function QuestionImage({
         {/* Loading placeholder skeleton */}
         {isLoading && (
           <div className="absolute inset-0 bg-slate-100 animate-pulse flex items-center justify-center min-h-[100px] min-w-[160px]">
-            <div className="w-5 h-5 border-2 border-slate-300 border-t-[#4353a4] rounded-full animate-spin" />
+            <div className="w-5 h-5 border-2 border-slate-300 border-t-indigo-600 rounded-full animate-spin" />
           </div>
         )}
 

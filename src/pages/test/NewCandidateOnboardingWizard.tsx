@@ -1160,7 +1160,7 @@ export default function NewCandidateOnboardingWizard({
         <div className="flex items-center gap-3">
           {/* Proctor Mode Badge */}
           {isProctoringActive ? (
-            <div className="bg-[#4353a4] text-white text-[10px] md:text-[11px] font-bold px-3 py-1 rounded-full uppercase tracking-wider flex items-center gap-1.5 shadow-xs">
+            <div className="bg-indigo-600 text-white text-[10px] md:text-[11px] font-bold px-3 py-1 rounded-full uppercase tracking-wider flex items-center gap-1.5 shadow-xs">
               <span>PROCTOR MODE</span>
             </div>
           ) : (
@@ -1206,7 +1206,7 @@ export default function NewCandidateOnboardingWizard({
                     disabled={!isNavigable}
                     className={`w-full text-left px-5 py-3.5 text-xs md:text-sm font-semibold transition-all flex items-center justify-between ${
                       isActive
-                        ? "bg-[#5b6bbd] text-white shadow-xs font-bold cursor-default"
+                        ? "bg-indigo-600 text-white shadow-xs font-bold cursor-default"
                         : isNavigable
                           ? "text-slate-600 hover:bg-slate-50 hover:text-slate-900 cursor-pointer"
                           : "text-slate-300 bg-slate-50/50 cursor-not-allowed"
@@ -1340,7 +1340,7 @@ export default function NewCandidateOnboardingWizard({
               {activeStep === "system_checks" && (
                 <div className="space-y-6">
                   {/* Top Notice Banner */}
-                  <div className="bg-[#4353a4] text-white px-5 py-2.5 rounded-none text-xs font-semibold shadow-xs flex items-center justify-between">
+                  <div className="bg-indigo-600 text-white px-5 py-2.5 rounded-none text-xs font-semibold shadow-xs flex items-center justify-between">
                     <span>
                       Perform diagnostics below to ensure your system meets
                       requirements
@@ -1501,7 +1501,7 @@ export default function NewCandidateOnboardingWizard({
                             <button
                               onClick={handleTestWebcam}
                               disabled={webcamStatus === "testing"}
-                              className="px-4 py-1.5 bg-[#4353a4] hover:bg-[#324080] text-white text-[11px] font-bold tracking-wider uppercase rounded-xs transition-colors cursor-pointer shadow-xs disabled:opacity-50"
+                              className="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-[11px] font-bold tracking-wider uppercase rounded-xs transition-colors cursor-pointer shadow-xs disabled:opacity-50"
                             >
                               {webcamStatus === "testing" ? "..." : "TEST"}
                             </button>
@@ -1553,7 +1553,7 @@ export default function NewCandidateOnboardingWizard({
                             <button
                               onClick={handleTestMic}
                               disabled={micStatus === "testing"}
-                              className="px-4 py-1.5 bg-[#4353a4] hover:bg-[#324080] text-white text-[11px] font-bold tracking-wider uppercase rounded-xs transition-colors cursor-pointer shadow-xs disabled:opacity-50"
+                              className="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-[11px] font-bold tracking-wider uppercase rounded-xs transition-colors cursor-pointer shadow-xs disabled:opacity-50"
                             >
                               {micStatus === "testing" ? "..." : "TEST"}
                             </button>
@@ -1607,7 +1607,7 @@ export default function NewCandidateOnboardingWizard({
                             <button
                               onClick={handleTestScreen}
                               disabled={screenStatus === "testing"}
-                              className="px-4 py-1.5 bg-[#4353a4] hover:bg-[#324080] text-white text-[11px] font-bold tracking-wider uppercase rounded-xs transition-colors cursor-pointer shadow-xs disabled:opacity-50"
+                              className="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-[11px] font-bold tracking-wider uppercase rounded-xs transition-colors cursor-pointer shadow-xs disabled:opacity-50"
                             >
                               {screenStatus === "testing"
                                 ? "..."
@@ -1637,7 +1637,7 @@ export default function NewCandidateOnboardingWizard({
                     {/* Left Column: Form & Guidelines */}
                     <div className="lg:col-span-7 space-y-6">
                       <div className="space-y-1">
-                        <h3 className="text-xl md:text-2xl font-extrabold text-[#5b6bbd] tracking-tight">
+                        <h3 className="text-xl md:text-2xl font-extrabold text-indigo-600 tracking-tight">
                           Identity & Candidate Profile
                         </h3>
                         <p className="text-xs text-slate-400 italic">
@@ -1924,7 +1924,7 @@ export default function NewCandidateOnboardingWizard({
               {activeStep === "declaration" && (
                 <div className="space-y-6 w-full py-2">
                   <div className="space-y-1">
-                    <h3 className="text-xl md:text-2xl font-extrabold text-[#5b6bbd] tracking-tight">
+                    <h3 className="text-xl md:text-2xl font-extrabold text-indigo-600 tracking-tight">
                       Declaration & Code of Conduct
                     </h3>
                     <p className="text-xs text-slate-400 italic">
@@ -2037,7 +2037,7 @@ export default function NewCandidateOnboardingWizard({
                   <Button
                     onClick={handleNext}
                     disabled={!isStepValid || isLaunching}
-                    className="bg-[#5b6bbd] hover:bg-[#4a589e] disabled:opacity-50 disabled:cursor-not-allowed text-white px-8 py-2 text-xs font-bold uppercase tracking-wider rounded-xs shadow-xs transition-all cursor-pointer flex items-center gap-1.5"
+                    className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed text-white px-8 py-2 text-xs font-bold uppercase tracking-wider rounded-xs shadow-xs transition-all cursor-pointer flex items-center gap-1.5"
                   >
                     {isLaunching && (
                       <Loader2 className="w-3.5 h-3.5 animate-spin" />

@@ -306,7 +306,7 @@ export const EnvironmentCheck: React.FC<{
             </Button>
           ) : (
             <Button
-              className="w-full bg-[#4353a4] hover:bg-[#344285] text-white gap-2"
+              className="w-full bg-indigo-600 hover:bg-indigo-700 text-white gap-2"
               onClick={handleStart}
             >
               <Play className="w-4 h-4" />

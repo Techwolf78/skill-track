@@ -83,7 +83,7 @@ export default function TestResults() {
                 <span className="text-xs text-slate-700 text-left font-medium">All responses are securely stored and cannot be modified.</span>
               </div>
               <div className="flex items-center gap-3 rounded-xl bg-slate-50 border border-slate-200/80 px-4 py-3.5">
-                <Clock className="w-5 h-5 text-[#4353a4] shrink-0" />
+                <Clock className="w-5 h-5 text-indigo-600 shrink-0" />
                 <span className="text-xs text-slate-700 text-left font-medium">Results will be shared by your administrator once evaluation is complete.</span>
               </div>
             </motion.div>

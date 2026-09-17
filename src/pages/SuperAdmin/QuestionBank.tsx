@@ -374,7 +374,7 @@ export default function SuperAdminQuestionBank() {
             Import Questions
           </Button>
           <Button
-            className="gap-2 bg-[#6366F1] hover:bg-[#4F46E5] text-white shadow-sm font-semibold"
+            className="gap-2 bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm font-semibold"
             onClick={() => setCreateModalOpen(true)}
           >
             <Plus className="w-4 h-4" />
@@ -1430,7 +1430,7 @@ function SuperAdminImportQuestionsDialog({
               className="flex items-center gap-1 h-7 px-2.5 text-xs font-medium border-slate-200"
               title="Download Coding Questions Excel Template"
             >
-              <FileSpreadsheet className="w-3.5 h-3.5 text-[#3b4992]" />
+              <FileSpreadsheet className="w-3.5 h-3.5 text-indigo-600" />
               <span>Coding Template</span>
             </Button>
           </div>
@@ -1442,7 +1442,7 @@ function SuperAdminImportQuestionsDialog({
         <div className="p-3.5 bg-slate-50/70 rounded-lg border border-slate-200 space-y-2.5">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold text-slate-800 flex items-center gap-1.5">
-              <FolderTree className="w-3.5 h-3.5 text-[#3b4992]" />
+              <FolderTree className="w-3.5 h-3.5 text-indigo-600" />
               Default Hierarchy
             </span>
           </div>

@@ -299,8 +299,8 @@ export default function Users() {
         );
       case "ADMIN":
         return (
-          <span className="px-2.5 py-0.5 bg-[#4152A4]/10 text-[#4152A4] border border-[#4152A4]/25 text-[10px] font-semibold rounded inline-flex items-center gap-1.5">
-            <Shield className="w-3 h-3 text-[#4152A4]" />
+          <span className="px-2.5 py-0.5 bg-indigo-50 text-indigo-700 border border-indigo-200 text-[10px] font-semibold rounded inline-flex items-center gap-1.5">
+            <Shield className="w-3 h-3 text-indigo-600" />
             Admin
           </span>
         );

@@ -2187,7 +2187,7 @@ useEffect(() => {
                             isLoading={isSubmittingCode}
                             loadingText="SUBMITTING..."
                             disabled={isRunning}
-                            className="px-3.5 py-1.5 bg-[#4353a4] hover:bg-[#344287] text-white text-xs font-semibold rounded shadow-xs flex items-center gap-1.5 transition-colors cursor-pointer"
+                            className="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded shadow-xs flex items-center gap-1.5 transition-colors cursor-pointer"
                           >
                             <Save className="w-3.5 h-3.5" />
                             <span>SUBMIT</span>

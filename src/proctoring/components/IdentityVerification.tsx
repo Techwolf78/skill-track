@@ -439,7 +439,7 @@ export const IdentityVerification: React.FC<IdentityVerificationProps> = ({ sess
                 Retake Photo
               </Button>
               <Button
-                className="flex-1 bg-[#4353a4] hover:bg-[#344285] text-white gap-2 shadow-md"
+                className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white gap-2 shadow-md"
                 onClick={handleConfirmAndUpload}
                 disabled={isUploading}
               >

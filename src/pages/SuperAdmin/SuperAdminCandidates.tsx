@@ -151,7 +151,7 @@ function CandidateInsightsSection({ candidateId, onInsightsLoaded }: { candidate
   return (
     <div className="mt-5 pt-5 border-t border-slate-200 space-y-3">
       <div className="flex items-center gap-2 mb-2">
-        <Brain className="w-4 h-4 text-[#4152A4]" />
+        <Brain className="w-4 h-4 text-indigo-600" />
         <h4 className="text-xs font-bold uppercase tracking-wider text-slate-900">Talent & Cognitive Analytics</h4>
       </div>
 
@@ -193,7 +193,7 @@ function CandidateInsightsSection({ candidateId, onInsightsLoaded }: { candidate
             <div className="flex flex-wrap gap-1">
               {strongList.length > 0 ? (
                 strongList.map((topic, i) => (
-                  <span key={i} className="px-1.5 py-0.5 bg-[#4152A4]/10 text-[#4152A4] border border-[#4152A4]/25 text-[9px] font-semibold rounded">
+                  <span key={i} className="px-1.5 py-0.5 bg-indigo-50 text-indigo-700 border border-indigo-200 text-[9px] font-semibold rounded">
                     {topic}
                   </span>
                 ))
@@ -632,7 +632,7 @@ export default function Students() {
                   </TableCell>
                   <TableCell className="text-center">
                     {(testsCountMap[candidate.id] ?? 0) > 0 ? (
-                      <span className="px-2 py-0.5 bg-[#4152A4]/10 text-[#4152A4] border border-[#4152A4]/25 rounded font-mono font-bold text-xs inline-block">
+                      <span className="px-2 py-0.5 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded font-mono font-bold text-xs inline-block">
                         {testsCountMap[candidate.id]}
                       </span>
                     ) : (
