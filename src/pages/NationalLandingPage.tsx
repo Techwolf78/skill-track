@@ -990,7 +990,7 @@ export default function NationalLandingPage() {
             <BentoCard
               index={3}
               borderRadiusClass="rounded-[28px]"
-              className="md:col-span-1 overflow-hidden flex flex-col justify-between p-0 bg-[#fff1ec] border-orange-100/60 hover:shadow-xl transition-all duration-300 relative group"
+              className="md:col-span-1 overflow-hidden flex flex-col justify-between p-0 bg-indigo-50/40 border-indigo-100/60 hover:shadow-xl transition-all duration-300 relative group"
             >
               {/* Full width image taking top space without padding */}
               <div className="w-full h-64 sm:h-72 overflow-hidden flex items-center justify-center">
@@ -1004,7 +1004,7 @@ export default function NationalLandingPage() {
               {/* Overlapping text box overlaying the bottom part of the card */}
               <div className="-mt-12 relative z-10 mx-3 mb-3 p-5 bg-white/95 backdrop-blur-md rounded-[20px] shadow-lg border border-white/60 flex flex-col justify-between">
                 <div>
-                  <h3 className="font-heading font-bold text-lg text-slate-900 mb-1.5 tracking-tight group-hover:text-orange-600 transition-colors">
+                  <h3 className="font-heading font-bold text-lg text-slate-900 mb-1.5 tracking-tight group-hover:text-indigo-600 transition-colors">
                     Custom Test Builder
                   </h3>
                   <p className="text-slate-600 leading-relaxed text-xs">
@@ -1151,8 +1151,8 @@ export default function NationalLandingPage() {
               >
                 <h2 className="text-3xl md:text-4xl font-heading font-extrabold text-slate-900 leading-[1.1] tracking-tight">
                   Find the best <br className="hidden sm:inline" />
-                  candidate. <span className="text-[#FF5733]">No</span>{" "}
-                  <span className="text-[#0EA5E9]">fuss.</span>
+                  candidate. <span className="text-indigo-600">No</span>{" "}
+                  <span className="text-indigo-400">fuss.</span>
                 </h2>
 
                 <p className="text-base md:text-lg text-slate-600 leading-relaxed">
@@ -1169,7 +1169,7 @@ export default function NationalLandingPage() {
                 <div className="flex items-center gap-4 pt-2">
                   <Button
                     onClick={() => setIsVideoModalOpen(true)}
-                    className="px-6 py-3 rounded-lg bg-[#FF5733] hover:bg-[#E04F2E] text-white font-semibold text-sm transition-all shadow-sm border-0 h-auto flex items-center gap-2 group"
+                    className="px-6 py-3 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-sm transition-all shadow-sm border-0 h-auto flex items-center gap-2 group"
                   >
                     <Play className="w-4 h-4 fill-white group-hover:scale-110 transition-transform" />
                     Watch video
@@ -1653,7 +1653,7 @@ export default function NationalLandingPage() {
             {/* Overlaid Content positioned precisely over the light top section of the image */}
             <div className="absolute inset-0 z-10 flex flex-col items-center justify-start pt-10 sm:pt-14 md:pt-16 px-6">
               <h2 className="text-3xl sm:text-4xl md:text-5xl font-heading font-bold text-slate-900 mb-4 tracking-tight leading-tight max-w-2xl">
-                Ready to <span className="text-orange-600">Transform</span> Your
+                Ready to <span className="text-indigo-600">Transform</span> Your
                 Assessment Process?
               </h2>
 
@@ -1910,7 +1910,7 @@ export default function NationalLandingPage() {
       <footer className="bg-slate-950 text-slate-400 py-16 relative overflow-hidden">
         {/* Aesthetic Flowing Gradient Line */}
         <div
-          className="absolute top-0 left-0 right-0 h-[2.5px] bg-gradient-to-r from-[#FF7A00] via-[#FF5733] to-[#C82A00]"
+          className="absolute top-0 left-0 right-0 h-[2.5px] bg-gradient-to-r from-indigo-500 via-indigo-600 to-violet-600"
           style={{
             backgroundSize: "200% auto",
             animation: "gradientFlow 5s linear infinite",
