@@ -1309,14 +1309,20 @@ export default function NewAdminTestEdit() {
       }
 
       const result = scoreEntry?.result;
-      const pass = result?.passed;
-      const status = inv.status;
+      const isPassed = result?.passed === true;
+      const isFailed = result && result.passed === false;
+      const isSubmitted = inv.status === "SUBMITTED" || inv.sessionStatus === "SUBMITTED" || inv.sessionStatus === "AUTO_SUBMITTED";
+      const isInProgress =
+        (inv.status === "ACCEPTED" || inv.sessionStatus === "IN_PROGRESS" || scoreEntry?.session?.status === "IN_PROGRESS") &&
+        !isPassed &&
+        !isFailed &&
+        !isSubmitted;
 
-      if (candidateStatusFilter === "PASSED" && !pass) return false;
-      if (candidateStatusFilter === "FAILED" && (pass === undefined || pass === true)) return false;
-      if (candidateStatusFilter === "INVITED" && status !== "PENDING") return false;
-      if (candidateStatusFilter === "IN_PROGRESS" && status !== "ACCEPTED") return false;
-      if (candidateStatusFilter === "SUBMITTED" && status !== "SUBMITTED") return false;
+      if (candidateStatusFilter === "PASSED" && !isPassed) return false;
+      if (candidateStatusFilter === "FAILED" && !isFailed) return false;
+      if (candidateStatusFilter === "IN_PROGRESS" && !isInProgress) return false;
+      if (candidateStatusFilter === "SUBMITTED" && !isSubmitted) return false;
+      if (candidateStatusFilter === "INVITED" && inv.status !== "PENDING") return false;
 
       return true;
     });
@@ -3640,6 +3646,7 @@ export default function NewAdminTestEdit() {
                           { key: "ALL", label: `All (${invitations.length})` },
                           { key: "PASSED", label: "Passed" },
                           { key: "FAILED", label: "Failed" },
+                          { key: "IN_PROGRESS", label: "In Progress" },
                           { key: "INVITED", label: "Invited (Pending)" },
                         ].map((st) => (
                           <label
