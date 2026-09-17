@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import {
@@ -360,6 +361,8 @@ export default function NewAdminTestEdit() {
   const [candidateRowsPerPage, setCandidateRowsPerPage] = useState(15);
   const [statusAccordionOpen, setStatusAccordionOpen] = useState(true);
   const [invitedOnAccordionOpen, setInvitedOnAccordionOpen] = useState(true);
+  const [candidateSortField, setCandidateSortField] = useState<"totalScore" | "percentScore" | "time" | null>(null);
+  const [candidateSortOrder, setCandidateSortOrder] = useState<"asc" | "desc" | null>(null);
 
   // ── Modals for 3-dots actions ──
   const [selectedCandidateForReport, setSelectedCandidateForReport] = useState<CandidateInvitation | null>(null);
@@ -603,7 +606,7 @@ export default function NewAdminTestEdit() {
     } finally {
       setLoadingCandidatesData(false);
     }
-  }, [id, selectedScheduleId]);
+  }, [id]);
 
   useEffect(() => {
     if (activeTab === "CANDIDATES") {
@@ -1175,9 +1178,113 @@ export default function NewAdminTestEdit() {
     }
   };
 
+  // ── Candidate Sorting Helpers ──
+  const getTimeTakenSeconds = useCallback((inv: CandidateInvitation): number | null => {
+    const scoreEntry = candidateResults[inv.id];
+    const result = scoreEntry?.result;
+    if (result?.timeTakenSeconds !== undefined && result?.timeTakenSeconds !== null && !isNaN(Number(result.timeTakenSeconds))) {
+      return Number(result.timeTakenSeconds);
+    }
+    const startedAt =
+      scoreEntry?.session?.startedAt ||
+      scoreEntry?.session?.startTime ||
+      scoreEntry?.session?.createdAt ||
+      scoreEntry?.detail?.systemInfo?.startedAt ||
+      scoreEntry?.detail?.startedAt ||
+      scoreEntry?.detail?.createdAt;
+    const endedAt =
+      scoreEntry?.session?.endedAt ||
+      scoreEntry?.session?.endTime ||
+      scoreEntry?.session?.updatedAt ||
+      scoreEntry?.detail?.systemInfo?.endedAt ||
+      scoreEntry?.detail?.systemInfo?.submittedAt ||
+      scoreEntry?.detail?.submittedAt ||
+      scoreEntry?.detail?.endedAt ||
+      result?.evaluatedAt ||
+      result?.createdAt;
+    if (startedAt && endedAt) {
+      const diff = (new Date(endedAt).getTime() - new Date(startedAt).getTime()) / 1000;
+      return isNaN(diff) ? null : Math.max(0, Math.floor(diff));
+    }
+    const rawTime = result?.timeTaken ?? (inv as any)?.timeTaken;
+    if (rawTime !== undefined && rawTime !== null && rawTime !== "") {
+      const str = String(rawTime).trim().toLowerCase();
+      let total = 0;
+      let matched = false;
+      const hoursMatch = str.match(/(\d+)\s*h/);
+      if (hoursMatch) {
+        total += parseInt(hoursMatch[1], 10) * 3600;
+        matched = true;
+      }
+      const minsMatch = str.match(/(\d+)\s*m/);
+      if (minsMatch) {
+        total += parseInt(minsMatch[1], 10) * 60;
+        matched = true;
+      }
+      const secsMatch = str.match(/(\d+)\s*s/);
+      if (secsMatch) {
+        total += parseInt(secsMatch[1], 10);
+        matched = true;
+      }
+      if (matched) return total;
+      const num = Number(str);
+      if (!isNaN(num)) return num;
+    }
+    return null;
+  }, [candidateResults]);
+
+  const getTotalScoreNumber = useCallback((inv: CandidateInvitation): number | null => {
+    const scoreEntry = candidateResults[inv.id];
+    const r = scoreEntry?.result;
+    const d = scoreEntry?.detail;
+    const val = r?.score ?? r?.totalScore ?? d?.score ?? d?.totalScore ?? (inv as any)?.score ?? (inv as any)?.totalScore;
+    return val !== undefined && val !== null && val !== "" && !isNaN(Number(val)) ? Number(val) : null;
+  }, [candidateResults]);
+
+  const getPercentageNumber = useCallback((inv: CandidateInvitation): number | null => {
+    const scoreEntry = candidateResults[inv.id];
+    const r = scoreEntry?.result;
+    const d = scoreEntry?.detail;
+    const val = r?.percentage ?? r?.scorePercentage ?? d?.percentage ?? d?.scorePercentage ?? (inv as any)?.percentage ?? (inv as any)?.scorePercentage;
+    return val !== undefined && val !== null && val !== "" && !isNaN(Number(val)) ? Number(val) : null;
+  }, [candidateResults]);
+
+  const handleSort = (field: "totalScore" | "percentScore" | "time") => {
+    if (candidateSortField === field) {
+      if (candidateSortOrder === "desc") {
+        setCandidateSortOrder("asc");
+      } else if (candidateSortOrder === "asc") {
+        setCandidateSortField(null);
+        setCandidateSortOrder(null);
+      } else {
+        setCandidateSortOrder("desc");
+      }
+    } else {
+      setCandidateSortField(field);
+      setCandidateSortOrder(field === "time" ? "asc" : "desc");
+    }
+    setCandidatePage(1);
+  };
+
+  const handleExplicitSort = (
+    field: "totalScore" | "percentScore" | "time",
+    order: "asc" | "desc",
+    e?: React.MouseEvent
+  ) => {
+    if (e) e.stopPropagation();
+    if (candidateSortField === field && candidateSortOrder === order) {
+      setCandidateSortField(null);
+      setCandidateSortOrder(null);
+    } else {
+      setCandidateSortField(field);
+      setCandidateSortOrder(order);
+    }
+    setCandidatePage(1);
+  };
+
   // ── Filtered Candidates for the CANDIDATES Tab ──
   const filteredCandidates = useMemo(() => {
-    return invitations.filter((inv) => {
+    const list = invitations.filter((inv) => {
       const scoreEntry = candidateResults[inv.id];
       const detailCand = scoreEntry?.detail?.candidate;
       const name = (
@@ -1213,7 +1320,40 @@ export default function NewAdminTestEdit() {
 
       return true;
     });
-  }, [invitations, candidateSearchQuery, candidateStatusFilter, candidateResults]);
+
+    if (!candidateSortField || !candidateSortOrder) return list;
+
+    return [...list].sort((a, b) => {
+      let numA: number | null = null;
+      let numB: number | null = null;
+
+      if (candidateSortField === "totalScore") {
+        numA = getTotalScoreNumber(a);
+        numB = getTotalScoreNumber(b);
+      } else if (candidateSortField === "percentScore") {
+        numA = getPercentageNumber(a);
+        numB = getPercentageNumber(b);
+      } else if (candidateSortField === "time") {
+        numA = getTimeTakenSeconds(a);
+        numB = getTimeTakenSeconds(b);
+      }
+
+      if (numA === null && numB === null) return 0;
+      if (numA === null) return 1;
+      if (numB === null) return -1;
+      return candidateSortOrder === "asc" ? numA - numB : numB - numA;
+    });
+  }, [
+    invitations,
+    candidateSearchQuery,
+    candidateStatusFilter,
+    candidateResults,
+    candidateSortField,
+    candidateSortOrder,
+    getTotalScoreNumber,
+    getPercentageNumber,
+    getTimeTakenSeconds,
+  ]);
 
   const totalCandidatePages = Math.max(
     1,
@@ -1419,7 +1559,7 @@ export default function NewAdminTestEdit() {
     }
     // Convert basic HTML break / paragraph / list elements to clean text formatting
     text = text
-      .replace(/<br\s*[\/]?>/gi, "\n")
+      .replace(/<br\s*\/?>/gi, "\n")
       .replace(/<\/p>/gi, "\n\n")
       .replace(/<p[^>]*>/gi, "")
       .replace(/<\/li>/gi, "\n")
@@ -1494,14 +1634,14 @@ export default function NewAdminTestEdit() {
             fallbackQuestions = [];
           }
         }
-        rawQuestionsList = fallbackQuestions.map((tq) => ({
+        rawQuestionsList = fallbackQuestions.map((tq: any) => ({
           id: tq.question?.id || tq.questionId || tq.id,
           sourceQuestionId: tq.question?.id || tq.questionId,
-          prompt: tq.question?.prompt || tq.prompt,
-          type: tq.question?.type || tq.type,
-          coding: tq.question?.coding || tq.coding,
-          options: tq.question?.mcqOptions || tq.question?.options || tq.mcqOptions || (tq as any).options || [],
-          mcqOptions: tq.question?.mcqOptions || tq.question?.options || tq.mcqOptions || (tq as any).options || [],
+          prompt: tq.question?.prompt || (tq as any).prompt,
+          type: (tq.question as any)?.type || (tq as any).type,
+          coding: (tq.question as any)?.coding || (tq as any).coding,
+          options: (tq.question as any)?.mcqOptions || (tq.question as any)?.options || tq.mcqOptions || (tq as any).options || [],
+          mcqOptions: (tq.question as any)?.mcqOptions || (tq.question as any)?.options || tq.mcqOptions || (tq as any).options || [],
         }));
       }
       const questionsList = rawQuestionsList;
@@ -1865,7 +2005,7 @@ export default function NewAdminTestEdit() {
           );
           const isCoding =
             String(q.type || "").toUpperCase() === "CODING" ||
-            String(enrichedQuestion?.type || "").toUpperCase() === "CODING" ||
+            String((enrichedQuestion as any)?.type || "").toUpperCase() === "CODING" ||
             Boolean(q.coding || (enrichedQuestion as any)?.coding) ||
             String(sub?.questionType || "").toUpperCase() === "CODING";
 
@@ -2180,36 +2320,36 @@ export default function NewAdminTestEdit() {
 
         const name =
           inv.candidateName ||
-          inv.candidate?.user?.name ||
-          inv.candidate?.name ||
-          inv.candidate?.candidateName ||
+          (inv.candidate as any)?.user?.name ||
+          (inv.candidate as any)?.name ||
+          (inv.candidate as any)?.candidateName ||
           detail?.candidate?.candidateName ||
           detail?.candidate?.name ||
           detail?.candidateName ||
           "Candidate";
         const email =
           inv.candidateEmail ||
-          inv.candidate?.user?.email ||
-          inv.candidate?.email ||
+          (inv.candidate as any)?.user?.email ||
+          (inv.candidate as any)?.email ||
           detail?.candidate?.email ||
           detail?.candidateEmail ||
           "—";
         const phone =
-          inv.candidatePhone ||
-          inv.candidate?.user?.phoneNumber ||
-          inv.candidate?.phoneNumber ||
-          inv.candidate?.phone ||
+          (inv as any).candidatePhone ||
+          (inv.candidate as any)?.user?.phoneNumber ||
+          (inv.candidate as any)?.phoneNumber ||
+          (inv.candidate as any)?.phone ||
           detail?.candidate?.phoneNumber ||
           "—";
         const college =
-          inv.candidate?.organisation?.name ||
-          (inv.candidate?.extraFields?.collegeName as string) ||
-          (inv.candidate?.extraFields?.college as string) ||
+          (inv.candidate as any)?.organisation?.name ||
+          ((inv.candidate as any)?.extraFields?.collegeName as string) ||
+          ((inv.candidate as any)?.extraFields?.college as string) ||
           "—";
         const domain =
-          (inv.candidate?.extraFields?.domain as string) ||
-          (inv.candidate?.extraFields?.department as string) ||
-          (inv.candidate?.extraFields?.branch as string) ||
+          ((inv.candidate as any)?.extraFields?.domain as string) ||
+          ((inv.candidate as any)?.extraFields?.department as string) ||
+          ((inv.candidate as any)?.extraFields?.branch as string) ||
           "—";
 
         const status =
@@ -2366,17 +2506,17 @@ export default function NewAdminTestEdit() {
         const detail = scoreEntry?.detail;
         const name =
           inv.candidateName ||
-          inv.candidate?.user?.name ||
-          inv.candidate?.name ||
-          inv.candidate?.candidateName ||
+          (inv.candidate as any)?.user?.name ||
+          (inv.candidate as any)?.name ||
+          (inv.candidate as any)?.candidateName ||
           detail?.candidate?.candidateName ||
           detail?.candidate?.name ||
           detail?.candidateName ||
           "Candidate";
         const email =
           inv.candidateEmail ||
-          inv.candidate?.user?.email ||
-          inv.candidate?.email ||
+          (inv.candidate as any)?.user?.email ||
+          (inv.candidate as any)?.email ||
           detail?.candidate?.email ||
           detail?.candidateEmail ||
           "—";
@@ -2408,17 +2548,17 @@ export default function NewAdminTestEdit() {
         const detail = scoreEntry?.detail;
         const name =
           inv.candidateName ||
-          inv.candidate?.user?.name ||
-          inv.candidate?.name ||
-          inv.candidate?.candidateName ||
+          (inv.candidate as any)?.user?.name ||
+          (inv.candidate as any)?.name ||
+          (inv.candidate as any)?.candidateName ||
           detail?.candidate?.candidateName ||
           detail?.candidate?.name ||
           detail?.candidateName ||
           "Candidate";
         const email =
           inv.candidateEmail ||
-          inv.candidate?.user?.email ||
-          inv.candidate?.email ||
+          (inv.candidate as any)?.user?.email ||
+          (inv.candidate as any)?.email ||
           detail?.candidate?.email ||
           detail?.candidateEmail ||
           "—";
@@ -3470,6 +3610,9 @@ export default function NewAdminTestEdit() {
                         setCandidateStatusFilter("ALL");
                         setCandidateSearchQuery("");
                         setInvitedByMe(false);
+                        setCandidateSortField(null);
+                        setCandidateSortOrder(null);
+                        setCandidatePage(1);
                       }}
                       className="text-xs font-semibold text-[#4353a4] hover:text-[#324080] cursor-pointer"
                     >
@@ -3603,13 +3746,137 @@ export default function NewAdminTestEdit() {
                   <div className="overflow-x-auto">
                     <table className="w-full text-left border-collapse">
                       <thead>
-                        <tr className="border-b border-slate-100 bg-white text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                        <tr className="border-b border-slate-100 bg-white text-[11px] font-bold text-slate-400 uppercase tracking-wider select-none">
                           <th className="py-3 px-4 w-10"></th>
                           <th className="py-3 px-4">Candidate</th>
                           <th className="py-3 px-4">Status</th>
-                          <th className="py-3 px-4">Time</th>
-                          <th className="py-3 px-4">Total Score</th>
-                          <th className="py-3 px-4">% Score</th>
+
+                          {/* Time Column with Up and Down Sort Arrows */}
+                          <th className="py-3 px-4">
+                            <button
+                              type="button"
+                              onClick={() => handleSort("time")}
+                              className="group inline-flex items-center gap-1.5 uppercase font-bold text-slate-500 hover:text-slate-900 transition-colors cursor-pointer select-none"
+                              title="Click to sort by Time"
+                            >
+                              <span className={candidateSortField === "time" ? "text-slate-900 font-bold" : ""}>
+                                Time
+                              </span>
+                              <div className="inline-flex flex-col items-center">
+                                <span
+                                  onClick={(e) => handleExplicitSort("time", "asc", e)}
+                                  title="Sort Time Ascending (Fastest first)"
+                                  className="cursor-pointer -mb-1 inline-flex"
+                                >
+                                  <ChevronUp
+                                    className={`w-3.5 h-3.5 transition-all ${
+                                      candidateSortField === "time" && candidateSortOrder === "asc"
+                                        ? "text-orange-600 font-bold stroke-[3] scale-110"
+                                        : "text-slate-300 group-hover:text-slate-400"
+                                    }`}
+                                  />
+                                </span>
+                                <span
+                                  onClick={(e) => handleExplicitSort("time", "desc", e)}
+                                  title="Sort Time Descending (Slowest first)"
+                                  className="cursor-pointer inline-flex"
+                                >
+                                  <ChevronDown
+                                    className={`w-3.5 h-3.5 transition-all ${
+                                      candidateSortField === "time" && candidateSortOrder === "desc"
+                                        ? "text-orange-600 font-bold stroke-[3] scale-110"
+                                        : "text-slate-300 group-hover:text-slate-400"
+                                    }`}
+                                  />
+                                </span>
+                              </div>
+                            </button>
+                          </th>
+
+                          {/* Total Score Column with Up and Down Sort Arrows */}
+                          <th className="py-3 px-4">
+                            <button
+                              type="button"
+                              onClick={() => handleSort("totalScore")}
+                              className="group inline-flex items-center gap-1.5 uppercase font-bold text-slate-500 hover:text-slate-900 transition-colors cursor-pointer select-none"
+                              title="Click to sort by Total Score"
+                            >
+                              <span className={candidateSortField === "totalScore" ? "text-slate-900 font-bold" : ""}>
+                                Total Score
+                              </span>
+                              <div className="inline-flex flex-col items-center">
+                                <span
+                                  onClick={(e) => handleExplicitSort("totalScore", "asc", e)}
+                                  title="Sort Total Score Ascending (Lowest to Highest)"
+                                  className="cursor-pointer -mb-1 inline-flex"
+                                >
+                                  <ChevronUp
+                                    className={`w-3.5 h-3.5 transition-all ${
+                                      candidateSortField === "totalScore" && candidateSortOrder === "asc"
+                                        ? "text-orange-600 font-bold stroke-[3] scale-110"
+                                        : "text-slate-300 group-hover:text-slate-400"
+                                    }`}
+                                  />
+                                </span>
+                                <span
+                                  onClick={(e) => handleExplicitSort("totalScore", "desc", e)}
+                                  title="Sort Total Score Descending (Highest to Lowest)"
+                                  className="cursor-pointer inline-flex"
+                                >
+                                  <ChevronDown
+                                    className={`w-3.5 h-3.5 transition-all ${
+                                      candidateSortField === "totalScore" && candidateSortOrder === "desc"
+                                        ? "text-orange-600 font-bold stroke-[3] scale-110"
+                                        : "text-slate-300 group-hover:text-slate-400"
+                                    }`}
+                                  />
+                                </span>
+                              </div>
+                            </button>
+                          </th>
+
+                          {/* % Score Column with Up and Down Sort Arrows */}
+                          <th className="py-3 px-4">
+                            <button
+                              type="button"
+                              onClick={() => handleSort("percentScore")}
+                              className="group inline-flex items-center gap-1.5 uppercase font-bold text-slate-500 hover:text-slate-900 transition-colors cursor-pointer select-none"
+                              title="Click to sort by % Score"
+                            >
+                              <span className={candidateSortField === "percentScore" ? "text-slate-900 font-bold" : ""}>
+                                % Score
+                              </span>
+                              <div className="inline-flex flex-col items-center">
+                                <span
+                                  onClick={(e) => handleExplicitSort("percentScore", "asc", e)}
+                                  title="Sort % Score Ascending (Lowest to Highest)"
+                                  className="cursor-pointer -mb-1 inline-flex"
+                                >
+                                  <ChevronUp
+                                    className={`w-3.5 h-3.5 transition-all ${
+                                      candidateSortField === "percentScore" && candidateSortOrder === "asc"
+                                        ? "text-orange-600 font-bold stroke-[3] scale-110"
+                                        : "text-slate-300 group-hover:text-slate-400"
+                                    }`}
+                                  />
+                                </span>
+                                <span
+                                  onClick={(e) => handleExplicitSort("percentScore", "desc", e)}
+                                  title="Sort % Score Descending (Highest to Lowest)"
+                                  className="cursor-pointer inline-flex"
+                                >
+                                  <ChevronDown
+                                    className={`w-3.5 h-3.5 transition-all ${
+                                      candidateSortField === "percentScore" && candidateSortOrder === "desc"
+                                        ? "text-orange-600 font-bold stroke-[3] scale-110"
+                                        : "text-slate-300 group-hover:text-slate-400"
+                                    }`}
+                                  />
+                                </span>
+                              </div>
+                            </button>
+                          </th>
+
                           <th className="py-3 px-4 text-right">More Actions</th>
                         </tr>
                       </thead>
