@@ -1038,7 +1038,7 @@ function SuperAdminImportQuestionsDialog({
 
   const [jsonText, setJsonText] = useState("");
   const [parsedRows, setParsedRows] = useState<ParsedQuestionRow[]>([]);
-  const [rawFileRows, setRawFileRows] = useState<any[] | null>(null);
+  const [rawFileRows, setRawFileRows] = useState<Record<string, unknown>[] | null>(null);
   const [parseError, setParseError] = useState<string | null>(null);
   const [fileName, setFileName] = useState<string | null>(null);
 
@@ -1064,7 +1064,7 @@ function SuperAdminImportQuestionsDialog({
     subId: string,
     topId: string,
     subtopId: string,
-    sourceRows: any[]
+    sourceRows: Record<string, unknown>[]
   ) => {
     const context: TaxonomyContext = {
       subjects,
@@ -1125,8 +1125,9 @@ function SuperAdminImportQuestionsDialog({
           const list = Array.isArray(raw) ? raw : [raw];
           setRawFileRows(list);
           reparseRowsWithContext(defaultSubjectId, defaultTopicId, defaultSubtopicId, list);
-        } catch (err: any) {
-          setParseError("Invalid JSON file: " + err.message);
+        } catch (err: unknown) {
+          const msg = err instanceof Error ? err.message : String(err);
+          setParseError("Invalid JSON file: " + msg);
         }
       };
       reader.readAsText(file);
@@ -1136,7 +1137,7 @@ function SuperAdminImportQuestionsDialog({
           const data = new Uint8Array(evt.target?.result as ArrayBuffer);
           const workbook = XLSX.read(data, { type: "array" });
           const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-          const rows: any[] = XLSX.utils.sheet_to_json(firstSheet);
+          const rows: Record<string, unknown>[] = XLSX.utils.sheet_to_json(firstSheet);
 
           if (!rows.length) {
             setParseError("The uploaded Excel sheet contains no rows.");
@@ -1145,8 +1146,9 @@ function SuperAdminImportQuestionsDialog({
 
           setRawFileRows(rows);
           reparseRowsWithContext(defaultSubjectId, defaultTopicId, defaultSubtopicId, rows);
-        } catch (err: any) {
-          setParseError("Failed to parse Excel file: " + err.message);
+        } catch (err: unknown) {
+          const msg = err instanceof Error ? err.message : String(err);
+          setParseError("Failed to parse Excel file: " + msg);
         }
       };
       reader.readAsArrayBuffer(file);
@@ -1385,11 +1387,12 @@ function SuperAdminImportQuestionsDialog({
       });
       onImportSuccess();
       onClose();
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("[SuperAdminQuestionBank] Bulk import error:", err);
+      const apiErr = err as { response?: { data?: { message?: string } }; message?: string };
       toast({
         title: "Bulk import failed",
-        description: err.response?.data?.message || err.message || "Please check question parameters",
+        description: apiErr.response?.data?.message || apiErr.message || "Please check question parameters",
         variant: "destructive",
       });
     }

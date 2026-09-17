@@ -12,7 +12,7 @@ import {
   Inbox, Mail, AlertCircle, X, RefreshCw,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { testService, TestSchedule } from "@/lib/test-service";
+import { testService, TestSchedule, Test } from "@/lib/test-service";
 import { candidateService, Candidate } from "@/lib/candidate-service";
 import { apiClient } from "@/lib/api-client";
 import { useNavigate } from "react-router-dom";
