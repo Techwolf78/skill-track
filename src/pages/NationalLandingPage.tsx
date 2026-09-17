@@ -37,6 +37,9 @@ import {
   Sparkles,
   Check,
   Loader2,
+  FileText,
+  ShieldCheck,
+  Download,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { GryphonLogo } from "@/components/ui/GryphonLogo";
@@ -837,72 +840,55 @@ export default function NationalLandingPage() {
               borderRadiusClass="rounded-tl-[32px] rounded-br-[32px] rounded-tr-lg rounded-bl-lg"
               className="md:col-span-2"
             >
-              <div className="grid md:grid-cols-2 gap-6 h-full items-center">
-                <div className="flex flex-col justify-between h-full">
+              <div className="grid md:grid-cols-2 gap-8 h-full items-center">
+                <div className="flex flex-col justify-between h-full py-1">
                   <div>
-                    <div className="relative w-14 h-14 rounded-xl bg-gradient-to-br from-indigo-50 to-indigo-100/60 border border-indigo-200/60 flex items-center justify-center mb-6 overflow-hidden transition-transform duration-300 group-hover:scale-110 group-hover:rotate-3 shadow-sm">
-                      <div className="absolute inset-0 bg-indigo-600/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                      <Shield className="w-7 h-7 text-indigo-600" />
+                    <div className="w-12 h-12 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center mb-5 text-indigo-600 shadow-sm transition-transform duration-300 group-hover:scale-105">
+                      <Shield className="w-6 h-6" />
                     </div>
-                    <h3 className="font-heading font-bold text-xl text-slate-900 mb-3 tracking-tight group-hover:text-indigo-600 transition-colors">
+                    <h3 className="font-heading font-bold text-xl text-slate-900 mb-2.5 tracking-tight group-hover:text-indigo-600 transition-colors">
                       Advanced Anti-Cheating
                     </h3>
-                    <p className="text-slate-600 leading-relaxed text-sm group-hover:text-slate-700 transition-colors">
-                      AI-powered proctoring with real-time monitoring and
-                      automated violation detection. Maintain the highest exam
-                      integrity.
+                    <p className="text-slate-600 leading-relaxed text-sm">
+                      AI proctoring with live gaze monitoring, tab-switch lockouts, and automated integrity validation. Maintain total exam integrity.
                     </p>
                   </div>
                   <div className="mt-6 flex items-center gap-2 text-xs font-semibold text-indigo-600">
-                    <span>Proctoring Suite</span>
+                    <span>Live AI Integrity</span>
                     <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
                   </div>
                 </div>
 
-                {/* Visual Mock: Live Proctoring Cockpit */}
-                <div className="relative border border-slate-800 bg-slate-950 rounded-2xl p-4 overflow-hidden shadow-2xl h-52 flex flex-col justify-between">
-                  {/* Neon laser scan line */}
-                  <div
-                    className="absolute top-0 left-0 w-full h-[2px] bg-gradient-to-r from-transparent via-indigo-500 to-transparent animate-pulse"
-                    style={{ animationDuration: "2s" }}
+                {/* Visual Mock: Clean Minimalist Live Proctor Stream */}
+                <div className="relative border border-slate-200/80 bg-slate-900 rounded-2xl overflow-hidden shadow-lg h-52 flex flex-col justify-between p-3 group/cam">
+                  {/* Candidate Live Webcam Image Feed */}
+                  <img
+                    src="/live-proctor-feed.jpg"
+                    alt="Live Candidate Assessment Feed"
+                    className="absolute inset-0 w-full h-full object-cover object-top opacity-90 filter contrast-105 brightness-95 transition-transform duration-700 ease-out group-hover/cam:scale-105"
                   />
+                  {/* Smooth subtle vignette */}
+                  <div className="absolute inset-0 bg-gradient-to-t from-slate-950/70 via-transparent to-slate-950/30 pointer-events-none" />
 
-                  {/* Face bounding box grid */}
-                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-25">
-                    <div className="w-28 h-28 rounded-2xl border border-indigo-500/50 flex items-center justify-center relative">
-                      <span className="absolute -top-1 -left-1 w-2.5 h-2.5 border-t-2 border-l-2 border-indigo-400" />
-                      <span className="absolute -top-1 -right-1 w-2.5 h-2.5 border-t-2 border-r-2 border-indigo-400" />
-                      <span className="absolute -bottom-1 -left-1 w-2.5 h-2.5 border-b-2 border-l-2 border-indigo-400" />
-                      <span className="absolute -bottom-1 -right-1 w-2.5 h-2.5 border-b-2 border-r-2 border-indigo-400" />
-                      <div className="w-16 h-16 rounded-full bg-indigo-950/80 border border-emerald-400/60 animate-pulse flex items-center justify-center">
-                        <span className="text-[8px] text-emerald-300 font-mono font-bold">LOCKED</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="relative z-10 flex justify-between items-start w-full">
-                    <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/15 backdrop-blur-md border border-emerald-500/30 text-[10px] text-emerald-400 font-semibold uppercase tracking-wider">
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
-                      Live Proctor
+                  {/* Top Bar: Clean status pill */}
+                  <div className="relative z-10 flex justify-between items-center w-full">
+                    <span className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-950/80 backdrop-blur-md border border-white/10 text-[10px] text-emerald-400 font-medium tracking-wide shadow-sm font-mono">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                      Live Proctoring
                     </span>
-                    <span className="px-2.5 py-1 rounded-md bg-slate-900/90 border border-slate-800 backdrop-blur-md text-[10px] text-slate-300 font-mono">
+                    <span className="px-2.5 py-0.5 rounded-full bg-slate-950/80 border border-white/10 backdrop-blur-md text-[9px] text-slate-300 font-mono">
                       Cam-01
                     </span>
                   </div>
 
-                  <div className="relative z-10 grid grid-cols-3 gap-2 w-full bg-slate-900/90 backdrop-blur-md p-2.5 rounded-xl border border-slate-800 font-mono text-[10px] text-slate-300">
-                    <div className="flex flex-col">
-                      <span className="text-[8px] text-slate-400 uppercase">Gaze Focus:</span>
-                      <span className="text-emerald-400 font-bold">98% Secure</span>
-                    </div>
-                    <div className="flex flex-col border-x border-slate-800 px-1.5">
-                      <span className="text-[8px] text-slate-400 uppercase">Audio Level:</span>
-                      <span className="text-emerald-400 font-bold">Normal</span>
-                    </div>
-                    <div className="flex flex-col">
-                      <span className="text-[8px] text-slate-400 uppercase">Tab Switches:</span>
-                      <span className="text-emerald-400 font-bold">0 Detect</span>
-                    </div>
+                  {/* Bottom: Clean Single Floating Pill */}
+                  <div className="relative z-10 w-full flex items-center justify-between px-3.5 py-2 bg-slate-950/80 backdrop-blur-md rounded-xl border border-white/10 text-[10px] font-mono text-slate-200 shadow-xl">
+                    <span className="flex items-center gap-1.5">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                      <span>Gaze: <strong className="text-white font-semibold">98% Locked</strong></span>
+                    </span>
+                    <span className="text-slate-500">•</span>
+                    <span className="text-slate-300">0 Violations</span>
                   </div>
                 </div>
               </div>
@@ -912,28 +898,37 @@ export default function NationalLandingPage() {
             <BentoCard
               index={1}
               borderRadiusClass="rounded-tr-[32px] rounded-bl-[32px] rounded-tl-lg rounded-br-lg"
-              className="md:col-span-1 md:row-span-2"
+              className="md:col-span-1 md:row-span-2 p-0 overflow-hidden relative group"
             >
-              <div className="flex flex-col justify-between h-full">
+              {/* Full Bleed 3D Vertical Artwork */}
+              <div className="absolute inset-0 w-full h-full overflow-hidden pointer-events-none bg-white">
+                <img
+                  src="/analytics-3d-vertical.png"
+                  alt="Comprehensive Analytics 3D Glass Towers"
+                  className="w-full h-full object-cover object-center scale-100 opacity-90 transition-transform duration-700 ease-out group-hover:scale-105"
+                />
+                {/* Seamless ambient gradient veil */}
+                <div className="absolute inset-0 bg-gradient-to-b from-white/95 via-white/40 to-white/90 pointer-events-none" />
+              </div>
+
+              {/* Foreground Content with internal padding */}
+              <div className="relative z-10 flex flex-col justify-between h-full p-6 sm:p-7">
                 <div>
-                  <div className="relative w-14 h-14 rounded-xl bg-gradient-to-br from-indigo-50 to-indigo-100/60 border border-indigo-200/60 flex items-center justify-center mb-6 overflow-hidden transition-transform duration-300 group-hover:scale-110 group-hover:rotate-3 shadow-sm">
-                    <div className="absolute inset-0 bg-indigo-600/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                    <BarChart3 className="w-7 h-7 text-indigo-600" />
+                  <div className="w-12 h-12 rounded-xl bg-white/95 backdrop-blur-md border border-slate-200/80 flex items-center justify-center mb-5 text-indigo-600 shadow-sm transition-transform duration-300 group-hover:scale-105">
+                    <BarChart3 className="w-6 h-6" />
                   </div>
-                  <h3 className="font-heading font-bold text-xl text-slate-900 mb-3 tracking-tight group-hover:text-indigo-600 transition-colors">
+                  <h3 className="font-heading font-bold text-xl text-slate-900 mb-2.5 tracking-tight group-hover:text-indigo-600 transition-colors">
                     Comprehensive Analytics
                   </h3>
-                  <p className="text-slate-600 leading-relaxed text-sm group-hover:text-slate-700 transition-colors">
-                    Detailed performance insights with customizable reports and
-                    data-driven insights. Generate custom exports with detailed
-                    psychometric graphs.
+                  <p className="text-slate-600 leading-relaxed text-xs sm:text-sm">
+                    Detailed performance insights with customizable reports, psychometric scoring, and exportable cohort data.
                   </p>
                 </div>
 
-                {/* Visual Mock: Cohort Benchmark Chart */}
-                <div className="mt-8 border border-slate-200/80 bg-slate-50/70 rounded-2xl p-4 flex flex-col gap-4 shadow-inner">
+                {/* Visual Mock: Clean Frosted Glass Performance Card */}
+                <div className="mt-8 border border-white/90 bg-white/85 backdrop-blur-xl rounded-2xl p-4 flex flex-col gap-3.5 shadow-xl shadow-indigo-500/5">
                   <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-mono font-semibold uppercase text-slate-500 tracking-wider">
+                    <span className="text-[11px] font-semibold text-slate-700">
                       Cohort Benchmark
                     </span>
                     <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
@@ -941,41 +936,17 @@ export default function NationalLandingPage() {
                     </span>
                   </div>
 
-                  <div className="flex items-end justify-between h-28 px-2 gap-2 pt-2">
-                    <div className="flex-1 flex flex-col items-center gap-1.5 h-full justify-end">
-                      <span className="text-[8px] font-mono text-slate-400">45%</span>
-                      <div className="w-full bg-gradient-to-t from-indigo-600 to-indigo-400 rounded-t-md h-[45%] shadow-sm transition-all group-hover:h-[50%]" />
-                    </div>
-                    <div className="flex-1 flex flex-col items-center gap-1.5 h-full justify-end">
-                      <span className="text-[8px] font-mono text-slate-400">80%</span>
-                      <div className="w-full bg-gradient-to-t from-violet-600 to-violet-400 rounded-t-md h-[80%] shadow-sm transition-all group-hover:h-[85%]" />
-                    </div>
-                    <div className="flex-1 flex flex-col items-center gap-1.5 h-full justify-end">
-                      <span className="text-[8px] font-mono text-slate-400">65%</span>
-                      <div className="w-full bg-gradient-to-t from-indigo-600 to-indigo-400 rounded-t-md h-[65%] shadow-sm transition-all group-hover:h-[70%]" />
-                    </div>
-                    <div className="flex-1 flex flex-col items-center gap-1.5 h-full justify-end">
-                      <span className="text-[8px] font-mono text-indigo-600 font-bold">98%</span>
-                      <div className="w-full bg-gradient-to-t from-indigo-600 to-violet-500 rounded-t-md h-[95%] shadow-md ring-2 ring-indigo-500/20" />
-                    </div>
-                    <div className="flex-1 flex flex-col items-center gap-1.5 h-full justify-end">
-                      <span className="text-[8px] font-mono text-slate-400">55%</span>
-                      <div className="w-full bg-gradient-to-t from-indigo-600 to-indigo-400 rounded-t-md h-[55%] shadow-sm transition-all group-hover:h-[60%]" />
-                    </div>
+                  {/* Sleek Minimalist Bars */}
+                  <div className="flex items-end justify-between h-20 px-1 gap-2 pt-1">
+                    <div className="flex-1 bg-indigo-100 rounded-t-md h-[45%] transition-all group-hover:h-[50%]" />
+                    <div className="flex-1 bg-indigo-300 rounded-t-md h-[65%] transition-all group-hover:h-[70%]" />
+                    <div className="flex-1 bg-gradient-to-t from-indigo-600 to-violet-500 rounded-t-md h-[95%] shadow-md" />
+                    <div className="flex-1 bg-indigo-200 rounded-t-md h-[55%] transition-all group-hover:h-[60%]" />
                   </div>
 
-                  <div className="flex justify-between items-center text-[10px] font-mono text-slate-500 border-t border-slate-200/80 pt-2.5">
-                    <div className="flex items-center gap-1.5">
-                      <span className="w-2 h-2 rounded-full bg-indigo-600" />
-                      <span>Score</span>
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      <span className="w-2 h-2 rounded-full bg-violet-500" />
-                      <span>Speed</span>
-                    </div>
-                    <span className="text-slate-900 font-bold">
-                      98% Acc.
-                    </span>
+                  <div className="flex justify-between items-center text-[10px] font-mono text-slate-500 border-t border-slate-200/80 pt-2">
+                    <span>Accuracy: <strong className="text-slate-800">98.4%</strong></span>
+                    <span className="text-indigo-600 font-semibold">Top 5% Cohort</span>
                   </div>
                 </div>
               </div>
@@ -989,41 +960,39 @@ export default function NationalLandingPage() {
             >
               <div className="flex flex-col justify-between h-full">
                 <div>
-                  <div className="relative w-14 h-14 rounded-xl bg-gradient-to-br from-indigo-50 to-indigo-100/60 border border-indigo-200/60 flex items-center justify-center mb-6 overflow-hidden transition-transform duration-300 group-hover:scale-110 group-hover:rotate-3 shadow-sm">
-                    <div className="absolute inset-0 bg-indigo-600/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                    <Clock className="w-7 h-7 text-indigo-600" />
+                  <div className="w-12 h-12 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center mb-5 text-indigo-600 shadow-sm transition-transform duration-300 group-hover:scale-105">
+                    <Clock className="w-6 h-6" />
                   </div>
-                  <h3 className="font-heading font-bold text-xl text-slate-900 mb-3 tracking-tight group-hover:text-indigo-600 transition-colors">
+                  <h3 className="font-heading font-bold text-xl text-slate-900 mb-2.5 tracking-tight group-hover:text-indigo-600 transition-colors">
                     Real-time Assessment
                   </h3>
-                  <p className="text-slate-600 leading-relaxed text-sm group-hover:text-slate-700 transition-colors">
-                    Instant evaluation with automated grading and immediate
-                    feedback systems.
+                  <p className="text-slate-600 leading-relaxed text-sm">
+                    Instant evaluation with automated test grading and immediate candidate feedback.
                   </p>
                 </div>
 
-                {/* Visual Mock: Live Countdown & Auto-Evaluation */}
-                <div className="mt-6 border border-slate-200/80 bg-slate-50/70 rounded-2xl p-4 flex flex-col gap-3 shadow-inner">
+                {/* Visual Mock: Clean Countdown & Live Grading */}
+                <div className="mt-6 border border-slate-200/80 bg-slate-50/80 rounded-2xl p-4 flex flex-col gap-3 shadow-sm">
                   <div className="flex items-center justify-between">
-                    <div className="flex flex-col">
-                      <span className="text-[9px] text-slate-400 uppercase font-semibold tracking-wider font-mono">
-                        Remaining
+                    <div>
+                      <span className="text-[9px] text-slate-400 uppercase font-semibold tracking-wider font-mono block">
+                        Time Remaining
                       </span>
-                      <span className="text-xl font-mono font-extrabold text-slate-900 tracking-wider">
+                      <span className="text-lg font-mono font-extrabold text-slate-900 tracking-wider">
                         00:42:15
                       </span>
                     </div>
-                    <div className="px-3 py-1.5 rounded-full bg-emerald-50 text-emerald-600 font-semibold text-xs border border-emerald-200/80 flex items-center gap-1.5 shadow-sm">
+                    <span className="px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-600 font-semibold text-[10px] border border-emerald-200 flex items-center gap-1.5 shadow-sm">
                       <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
                       Auto-Graded
-                    </div>
+                    </span>
                   </div>
                   <div className="w-full bg-slate-200 rounded-full h-1.5 overflow-hidden">
                     <div className="bg-gradient-to-r from-indigo-600 to-emerald-500 h-full w-[88%] rounded-full" />
                   </div>
-                  <div className="flex justify-between text-[9px] font-mono text-slate-500">
+                  <div className="flex justify-between text-[10px] font-mono text-slate-500">
                     <span>Evaluated: 44/50</span>
-                    <span className="text-emerald-600 font-bold">Instant Pass</span>
+                    <span className="text-emerald-600 font-semibold">88% Complete</span>
                   </div>
                 </div>
               </div>
@@ -1033,7 +1002,7 @@ export default function NationalLandingPage() {
             <BentoCard
               index={3}
               borderRadiusClass="rounded-[28px]"
-              className="md:col-span-1 p-0 overflow-hidden relative group min-h-[380px] flex flex-col justify-between"
+              className="md:col-span-1 p-0 overflow-hidden relative group min-h-[360px] flex flex-col justify-between"
             >
               {/* Full Bleed 3D Image covering full height & width */}
               <div className="absolute inset-0 w-full h-full overflow-hidden bg-white">
@@ -1042,13 +1011,12 @@ export default function NationalLandingPage() {
                   alt="Custom Test Builder 3D Engine"
                   className="w-full h-full object-cover object-center transition-transform duration-700 ease-out group-hover:scale-105"
                 />
-                {/* Subtle gradient scrim at the bottom for crisp text readability */}
                 <div className="absolute inset-0 bg-gradient-to-t from-white/95 via-white/50 to-transparent pointer-events-none" />
               </div>
 
               {/* Floating Top Badge */}
               <div className="relative z-10 p-6 flex justify-between items-start">
-                <div className="w-11 h-11 rounded-xl bg-white/90 backdrop-blur-md border border-slate-200/80 flex items-center justify-center text-indigo-600 shadow-sm transition-transform duration-300 group-hover:scale-110">
+                <div className="w-11 h-11 rounded-xl bg-white/90 backdrop-blur-md border border-slate-200/80 flex items-center justify-center text-indigo-600 shadow-sm transition-transform duration-300 group-hover:scale-105">
                   <Code2 className="w-5 h-5 text-indigo-600" />
                 </div>
                 <span className="px-3 py-1 rounded-full bg-white/90 backdrop-blur-md border border-slate-200/80 text-[10px] font-mono text-indigo-700 font-bold shadow-sm flex items-center gap-1.5">
@@ -1057,14 +1025,13 @@ export default function NationalLandingPage() {
                 </span>
               </div>
 
-              {/* Sleek Bottom Heading & Description Overlay */}
+              {/* Sleek Bottom Heading & Description */}
               <div className="relative z-10 p-6 pt-0 flex flex-col">
                 <h3 className="font-heading font-bold text-xl text-slate-900 mb-1.5 tracking-tight group-hover:text-indigo-600 transition-colors">
                   Custom Test Builder
                 </h3>
                 <p className="text-slate-600 leading-relaxed text-xs font-medium">
-                  Create assessments with multiple question types, coding
-                  challenges, and adaptive difficulty.
+                  Build assessments with coding challenges, MCQs, and adaptive difficulty.
                 </p>
               </div>
             </BentoCard>
@@ -1077,21 +1044,19 @@ export default function NationalLandingPage() {
             >
               <div className="flex flex-col justify-between h-full">
                 <div>
-                  <div className="relative w-14 h-14 rounded-xl bg-gradient-to-br from-indigo-50 to-indigo-100/60 border border-indigo-200/60 flex items-center justify-center mb-6 overflow-hidden transition-transform duration-300 group-hover:scale-110 group-hover:rotate-3 shadow-sm">
-                    <div className="absolute inset-0 bg-indigo-600/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                    <Users className="w-7 h-7 text-indigo-600" />
+                  <div className="w-12 h-12 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center mb-5 text-indigo-600 shadow-sm transition-transform duration-300 group-hover:scale-105">
+                    <Users className="w-6 h-6" />
                   </div>
-                  <h3 className="font-heading font-bold text-xl text-slate-900 mb-3 tracking-tight group-hover:text-indigo-600 transition-colors">
+                  <h3 className="font-heading font-bold text-xl text-slate-900 mb-2.5 tracking-tight group-hover:text-indigo-600 transition-colors">
                     Multi-user Management
                   </h3>
-                  <p className="text-slate-600 leading-relaxed text-sm group-hover:text-slate-700 transition-colors">
-                    Role-based access control for administrators, trainers, and
-                    students with bulk operations.
+                  <p className="text-slate-600 leading-relaxed text-sm">
+                    Granular role-based access control for administrators, recruiters, trainers, and candidates.
                   </p>
                 </div>
 
-                {/* Visual Mock: Role-based Access & Avatars */}
-                <div className="mt-6 border border-slate-200/80 bg-slate-50/70 rounded-2xl p-4 flex flex-col gap-3 shadow-inner">
+                {/* Visual Mock: Clean Role-based Access Pill */}
+                <div className="mt-6 border border-slate-200/80 bg-slate-50/80 rounded-2xl p-4 flex flex-col gap-3 shadow-sm">
                   <div className="flex items-center justify-between">
                     <div className="flex -space-x-2 overflow-hidden">
                       <div className="h-8 w-8 rounded-full ring-2 ring-white bg-indigo-600 flex items-center justify-center text-[10px] font-bold text-white shadow-sm">
@@ -1104,85 +1069,81 @@ export default function NationalLandingPage() {
                         ST
                       </div>
                     </div>
-                    <span className="text-[10px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200/80 px-2 py-0.5 rounded-full font-mono">
-                      Role-based Access
+                    <span className="text-[10px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200/80 px-2.5 py-0.5 rounded-full font-mono">
+                      RBAC Active
                     </span>
                   </div>
-                  <div className="flex justify-between items-center text-[9px] font-mono text-slate-500 border-t border-slate-200/80 pt-2">
+                  <div className="flex justify-between items-center text-[10px] font-mono text-slate-500 border-t border-slate-200/80 pt-2">
                     <span>Admin • Trainer • Student</span>
-                    <span className="text-emerald-600 font-semibold">RBAC Active ✓</span>
+                    <span className="text-emerald-600 font-semibold">Ready ✓</span>
                   </div>
                 </div>
               </div>
             </BentoCard>
 
-            {/* Card 6: Certification Ready */}
+            {/* Card 6: Detailed Candidate Reports */}
             <BentoCard
               index={5}
               borderRadiusClass="rounded-tr-[32px] rounded-bl-[32px] rounded-tl-lg rounded-br-lg"
               className="md:col-span-2"
             >
-              <div className="grid md:grid-cols-2 gap-6 h-full items-center">
-                <div className="flex flex-col justify-between h-full">
+              <div className="grid md:grid-cols-2 gap-8 h-full items-center">
+                <div className="flex flex-col justify-between h-full py-1">
                   <div>
-                    <div className="relative w-14 h-14 rounded-xl bg-gradient-to-br from-indigo-50 to-indigo-100/60 border border-indigo-200/60 flex items-center justify-center mb-6 overflow-hidden transition-transform duration-300 group-hover:scale-110 group-hover:rotate-3 shadow-sm">
-                      <div className="absolute inset-0 bg-indigo-600/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                      <Award className="w-7 h-7 text-indigo-600" />
+                    <div className="w-12 h-12 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center mb-5 text-indigo-600 shadow-sm transition-transform duration-300 group-hover:scale-105">
+                      <FileText className="w-6 h-6" />
                     </div>
-                    <h3 className="font-heading font-bold text-xl text-slate-900 mb-3 tracking-tight group-hover:text-indigo-600 transition-colors">
-                      Certification Ready
+                    <h3 className="font-heading font-bold text-xl text-slate-900 mb-2.5 tracking-tight group-hover:text-indigo-600 transition-colors">
+                      Detailed Candidate Reports
                     </h3>
-                    <p className="text-slate-600 leading-relaxed text-sm group-hover:text-slate-700 transition-colors">
-                      Generate professional certificates and shareable digital
-                      badges instantly. Enable candidates to showcase verified
-                      credentials directly on LinkedIn, resume profiles, or
-                      portfolios.
+                    <p className="text-slate-600 leading-relaxed text-sm">
+                      Generate comprehensive evaluation dossiers with automated scoring breakdowns, proctoring violation logs, and downloadable audit reports.
                     </p>
                   </div>
                   <div className="mt-6 flex items-center gap-2 text-xs font-semibold text-indigo-600">
-                    <span>LinkedIn & Profile Integration</span>
+                    <span>Audit & Reporting Suite</span>
                     <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
                   </div>
                 </div>
 
-                {/* Visual Mock: Digital Certificate Preview */}
-                <div className="relative border border-indigo-500/30 bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950 rounded-2xl p-4 flex flex-col justify-between shadow-2xl h-52 overflow-hidden text-white">
-                  <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/15 rounded-full blur-2xl pointer-events-none" />
-
+                {/* Visual Mock: Clean Light Candidate Dossier Card */}
+                <div className="relative border border-slate-200/90 bg-gradient-to-br from-white to-slate-50 rounded-2xl p-4 flex flex-col justify-between shadow-md h-52">
                   <div className="flex justify-between items-start">
                     <div>
-                      <h4 className="text-[11px] text-indigo-400 tracking-wider uppercase font-semibold flex items-center gap-1.5">
-                        <Sparkles className="w-3 h-3 text-indigo-400" />
-                        Gryphon 360 Certification
+                      <span className="text-[10px] text-indigo-600 font-mono font-semibold uppercase tracking-wider block">
+                        Assessment Dossier
+                      </span>
+                      <h4 className="text-sm font-bold text-slate-900 mt-0.5">
+                        Aditya Verma
                       </h4>
-                      <p className="text-[8px] text-slate-400 font-mono mt-0.5">
-                        Verified Credential
-                      </p>
                     </div>
-                    <div className="w-7 h-7 rounded-full bg-gradient-to-tr from-indigo-600 to-violet-600 flex items-center justify-center shadow-lg border border-indigo-400/40">
-                      <Award className="w-3.5 h-3.5 text-white" />
+                    <span className="px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-200 text-[10px] font-mono font-bold flex items-center gap-1 shadow-sm">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                      Score: 94.5%
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-2 bg-slate-100/70 border border-slate-200/70 rounded-xl p-2.5 text-center font-mono">
+                    <div>
+                      <span className="text-[8px] text-slate-400 uppercase block">Integrity</span>
+                      <span className="text-[11px] font-bold text-emerald-600">99.4%</span>
+                    </div>
+                    <div>
+                      <span className="text-[8px] text-slate-400 uppercase block">Time</span>
+                      <span className="text-[11px] font-bold text-slate-700">42m 15s</span>
+                    </div>
+                    <div>
+                      <span className="text-[8px] text-slate-400 uppercase block">Violations</span>
+                      <span className="text-[11px] font-bold text-emerald-600">0 Flags</span>
                     </div>
                   </div>
 
-                  <div className="my-1.5 bg-white/5 border border-white/10 rounded-xl p-2.5 backdrop-blur-sm">
-                    <div className="text-[8px] text-slate-400 uppercase font-mono">
-                      Candidate Name
-                    </div>
-                    <div className="text-sm font-bold text-slate-100">
-                      Aditya Verma
-                    </div>
-                    <div className="text-[8px] text-emerald-400 mt-0.5 font-mono flex items-center gap-1">
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                      Score: 96% (Elite tier)
-                    </div>
-                  </div>
-
-                  <div className="flex justify-between items-end border-t border-white/10 pt-2 text-[8px] text-slate-400 font-mono">
-                    <div>ID: RX-2026-9A7F</div>
-                    <div className="text-indigo-400 font-semibold flex items-center gap-1">
-                      <span>Verifiable Link</span>
-                      <span className="text-emerald-400 font-bold">✓</span>
-                    </div>
+                  <div className="flex justify-between items-center text-[10px] font-mono text-slate-500 border-t border-slate-200/80 pt-2">
+                    <span>ID: REP-2026-9A7F</span>
+                    <span className="text-indigo-600 font-semibold flex items-center gap-1 hover:underline cursor-pointer">
+                      <Download className="w-3 h-3" />
+                      <span>Audit PDF</span>
+                    </span>
                   </div>
                 </div>
               </div>
