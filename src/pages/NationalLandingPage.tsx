@@ -1033,43 +1033,27 @@ export default function NationalLandingPage() {
             <BentoCard
               index={3}
               borderRadiusClass="rounded-[28px]"
-              className="md:col-span-1"
+              className="md:col-span-1 overflow-hidden flex flex-col justify-between p-0 bg-slate-50/60 border-slate-200/80 hover:shadow-xl transition-all duration-300 relative group"
             >
-              <div className="flex flex-col justify-between h-full">
+              {/* Full width 3D art taking top space */}
+              <div className="w-full h-64 sm:h-72 overflow-hidden flex items-center justify-center bg-slate-100/40">
+                <img
+                  src="/skill-track-card-circle.png"
+                  alt="Custom Test Builder Graphic"
+                  className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                />
+              </div>
+
+              {/* Overlapping text box overlaying the bottom part of the card */}
+              <div className="-mt-12 relative z-10 mx-3 mb-3 p-5 bg-white/95 backdrop-blur-md rounded-[20px] shadow-lg border border-slate-200/70 flex flex-col justify-between">
                 <div>
-                  <div className="relative w-14 h-14 rounded-xl bg-gradient-to-br from-indigo-50 to-indigo-100/60 border border-indigo-200/60 flex items-center justify-center mb-6 overflow-hidden transition-transform duration-300 group-hover:scale-110 group-hover:rotate-3 shadow-sm">
-                    <div className="absolute inset-0 bg-indigo-600/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                    <Code2 className="w-7 h-7 text-indigo-600" />
-                  </div>
-                  <h3 className="font-heading font-bold text-xl text-slate-900 mb-3 tracking-tight group-hover:text-indigo-600 transition-colors">
+                  <h3 className="font-heading font-bold text-lg text-slate-900 mb-1.5 tracking-tight group-hover:text-indigo-600 transition-colors">
                     Custom Test Builder
                   </h3>
-                  <p className="text-slate-600 leading-relaxed text-sm group-hover:text-slate-700 transition-colors">
+                  <p className="text-slate-600 leading-relaxed text-xs">
                     Create assessments with multiple question types, coding
                     challenges, and adaptive difficulty.
                   </p>
-                </div>
-
-                {/* Visual Mock: Question & Code Builder Studio */}
-                <div className="mt-6 border border-slate-800 bg-slate-950 rounded-2xl p-3.5 flex flex-col gap-2.5 shadow-xl text-white font-mono">
-                  <div className="flex items-center justify-between pb-1.5 border-b border-slate-800 text-[10px]">
-                    <div className="flex items-center gap-1.5 text-indigo-400 font-semibold">
-                      <span className="w-2 h-2 rounded-full bg-indigo-500" />
-                      <span>Custom Test Builder</span>
-                    </div>
-                    <span className="px-2 py-0.5 rounded bg-indigo-950 text-indigo-300 border border-indigo-800/80 text-[8px]">
-                      Adaptive
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-1.5 text-[9px]">
-                    <span className="px-2 py-0.5 rounded bg-indigo-600/20 text-indigo-300 border border-indigo-500/30">MCQ</span>
-                    <span className="px-2 py-0.5 rounded bg-emerald-600/20 text-emerald-300 border border-emerald-500/30">Coding</span>
-                    <span className="px-2 py-0.5 rounded bg-slate-800 text-slate-400">SQL</span>
-                  </div>
-                  <div className="bg-slate-900/90 rounded-lg p-2 border border-slate-800 text-[9px] text-slate-300 flex justify-between items-center">
-                    <span className="truncate">def evaluate_solution(code):</span>
-                    <span className="text-emerald-400 font-semibold text-[8px]">3/3 Passed ✓</span>
-                  </div>
                 </div>
               </div>
             </BentoCard>
