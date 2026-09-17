@@ -166,7 +166,7 @@ function BentoCard({
       viewport={{ once: true }}
       transition={{ duration: 0.6, delay: index * 0.1 }}
       onMouseMove={handleMouseMove}
-      className={`group relative overflow-hidden border border-border/60 bg-white/85 backdrop-blur-md p-8 transition-all duration-500 hover:-translate-y-2 hover:shadow-2xl hover:shadow-primary/5 hover:border-transparent ${borderRadiusClass} ${className}`}
+      className={`group relative overflow-hidden border border-border/60 bg-white/85 backdrop-blur-md ${className.includes("p-") ? "" : "p-8"} transition-all duration-500 hover:-translate-y-2 hover:shadow-2xl hover:shadow-primary/5 hover:border-transparent ${borderRadiusClass} ${className}`}
     >
       {/* Background spotlight gradient */}
       <div
@@ -1033,50 +1033,39 @@ export default function NationalLandingPage() {
             <BentoCard
               index={3}
               borderRadiusClass="rounded-[28px]"
-              className="md:col-span-1"
+              className="md:col-span-1 p-0 overflow-hidden relative group min-h-[380px] flex flex-col justify-between"
             >
-              <div className="flex flex-col justify-between h-full">
-                <div>
-                  <div className="relative w-14 h-14 rounded-xl bg-gradient-to-br from-indigo-50 to-indigo-100/60 border border-indigo-200/60 flex items-center justify-center mb-6 overflow-hidden transition-transform duration-300 group-hover:scale-110 group-hover:rotate-3 shadow-sm">
-                    <div className="absolute inset-0 bg-indigo-600/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                    <Code2 className="w-7 h-7 text-indigo-600" />
-                  </div>
-                  <h3 className="font-heading font-bold text-xl text-slate-900 mb-3 tracking-tight group-hover:text-indigo-600 transition-colors">
-                    Custom Test Builder
-                  </h3>
-                  <p className="text-slate-600 leading-relaxed text-sm group-hover:text-slate-700 transition-colors">
-                    Create assessments with multiple question types, coding
-                    challenges, and adaptive difficulty.
-                  </p>
+              {/* Full Bleed 3D Image covering full height & width */}
+              <div className="absolute inset-0 w-full h-full overflow-hidden bg-white">
+                <img
+                  src="/custom-test-builder-3d.png"
+                  alt="Custom Test Builder 3D Engine"
+                  className="w-full h-full object-cover object-center transition-transform duration-700 ease-out group-hover:scale-105"
+                />
+                {/* Subtle gradient scrim at the bottom for crisp text readability */}
+                <div className="absolute inset-0 bg-gradient-to-t from-white/95 via-white/50 to-transparent pointer-events-none" />
+              </div>
+
+              {/* Floating Top Badge */}
+              <div className="relative z-10 p-6 flex justify-between items-start">
+                <div className="w-11 h-11 rounded-xl bg-white/90 backdrop-blur-md border border-slate-200/80 flex items-center justify-center text-indigo-600 shadow-sm transition-transform duration-300 group-hover:scale-110">
+                  <Code2 className="w-5 h-5 text-indigo-600" />
                 </div>
+                <span className="px-3 py-1 rounded-full bg-white/90 backdrop-blur-md border border-slate-200/80 text-[10px] font-mono text-indigo-700 font-bold shadow-sm flex items-center gap-1.5">
+                  <Sparkles className="w-3 h-3 text-indigo-500" />
+                  Adaptive Engine
+                </span>
+              </div>
 
-                {/* Visual Mock: Borderless Floating 3D Artwork with Ambient Glow */}
-                <div className="mt-6 relative w-full h-44 flex items-center justify-center">
-                  {/* Soft ambient background glow */}
-                  <div className="absolute inset-0 bg-gradient-to-tr from-indigo-500/10 via-violet-500/5 to-transparent rounded-2xl blur-xl pointer-events-none" />
-
-                  {/* Free-floating 3D illustration */}
-                  <img
-                    src="/custom-test-builder-3d.png"
-                    alt="Custom Test Builder 3D Engine"
-                    className="w-full h-full object-contain filter drop-shadow-xl transition-transform duration-700 ease-out group-hover:scale-110 group-hover:-translate-y-1 relative z-10"
-                  />
-
-                  {/* Floating micro glass badges */}
-                  <div className="absolute top-1 right-1 z-20">
-                    <span className="px-2.5 py-1 rounded-full bg-white/90 backdrop-blur-md border border-slate-200/80 text-[10px] font-mono text-indigo-600 font-semibold shadow-sm flex items-center gap-1.5 transition-transform duration-300 group-hover:translate-x-0.5">
-                      <Sparkles className="w-2.5 h-2.5 text-indigo-500" />
-                      Adaptive
-                    </span>
-                  </div>
-
-                  <div className="absolute bottom-1 left-1 z-20">
-                    <span className="px-2.5 py-1 rounded-full bg-white/90 backdrop-blur-md border border-slate-200/80 text-[10px] font-mono text-slate-700 font-medium shadow-sm flex items-center gap-1.5 transition-transform duration-300 group-hover:-translate-x-0.5">
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                      Multi-IDE
-                    </span>
-                  </div>
-                </div>
+              {/* Sleek Bottom Heading & Description Overlay */}
+              <div className="relative z-10 p-6 pt-0 flex flex-col">
+                <h3 className="font-heading font-bold text-xl text-slate-900 mb-1.5 tracking-tight group-hover:text-indigo-600 transition-colors">
+                  Custom Test Builder
+                </h3>
+                <p className="text-slate-600 leading-relaxed text-xs font-medium">
+                  Create assessments with multiple question types, coding
+                  challenges, and adaptive difficulty.
+                </p>
               </div>
             </BentoCard>
 
