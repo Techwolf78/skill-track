@@ -1050,21 +1050,31 @@ export default function NationalLandingPage() {
                   </p>
                 </div>
 
-                {/* Visual Mock: 3D Glass Engine Mock */}
-                <div className="mt-6 relative rounded-2xl overflow-hidden border border-indigo-100/80 bg-gradient-to-b from-indigo-50/40 via-white to-slate-50/60 p-3 flex flex-col items-center justify-between shadow-inner group/node">
-                  <div className="w-full h-32 flex items-center justify-center relative">
-                    <img
-                      src="/custom-test-builder-3d.png"
-                      alt="Custom Test Builder 3D Engine"
-                      className="w-full h-full object-contain filter drop-shadow-md transition-transform duration-500 group-hover/node:scale-105"
-                    />
-                  </div>
-                  <div className="w-full flex items-center justify-between pt-2 border-t border-indigo-100/60 text-[10px] font-mono">
-                    <span className="flex items-center gap-1 text-indigo-600 font-semibold bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-200/60">
-                      <Sparkles className="w-2.5 h-2.5" />
-                      Adaptive Engine
+                {/* Visual Mock: Borderless Floating 3D Artwork with Ambient Glow */}
+                <div className="mt-6 relative w-full h-44 flex items-center justify-center">
+                  {/* Soft ambient background glow */}
+                  <div className="absolute inset-0 bg-gradient-to-tr from-indigo-500/10 via-violet-500/5 to-transparent rounded-2xl blur-xl pointer-events-none" />
+
+                  {/* Free-floating 3D illustration */}
+                  <img
+                    src="/custom-test-builder-3d.png"
+                    alt="Custom Test Builder 3D Engine"
+                    className="w-full h-full object-contain filter drop-shadow-xl transition-transform duration-700 ease-out group-hover:scale-110 group-hover:-translate-y-1 relative z-10"
+                  />
+
+                  {/* Floating micro glass badges */}
+                  <div className="absolute top-1 right-1 z-20">
+                    <span className="px-2.5 py-1 rounded-full bg-white/90 backdrop-blur-md border border-slate-200/80 text-[10px] font-mono text-indigo-600 font-semibold shadow-sm flex items-center gap-1.5 transition-transform duration-300 group-hover:translate-x-0.5">
+                      <Sparkles className="w-2.5 h-2.5 text-indigo-500" />
+                      Adaptive
                     </span>
-                    <span className="text-slate-500 font-medium">Multi-Type IDE</span>
+                  </div>
+
+                  <div className="absolute bottom-1 left-1 z-20">
+                    <span className="px-2.5 py-1 rounded-full bg-white/90 backdrop-blur-md border border-slate-200/80 text-[10px] font-mono text-slate-700 font-medium shadow-sm flex items-center gap-1.5 transition-transform duration-300 group-hover:-translate-x-0.5">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                      Multi-IDE
+                    </span>
                   </div>
                 </div>
               </div>
