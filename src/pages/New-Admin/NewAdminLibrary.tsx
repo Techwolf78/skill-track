@@ -817,7 +817,7 @@ export default function NewAdminLibrary() {
       mcqTypeParam = problemType;
     }
 
-    const sortParam = sortBy === "NEWEST" ? "createdAt,desc" : "createdAt,asc";
+    const sortParam = sortBy === "OLDEST" ? "created_at,asc" : undefined;
     const searchCombined = searchQuery.trim() || techSearch.trim() || undefined;
 
     return {

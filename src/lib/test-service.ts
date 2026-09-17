@@ -719,8 +719,10 @@ export const testService = {
     if (params?.tag && params.tag.trim()) queryParams.append("tag", params.tag.trim());
     if (params?.subjectId && params.subjectId !== "all") queryParams.append("subjectId", params.subjectId);
     if (params?.topicId && params.topicId !== "all") queryParams.append("topicId", params.topicId);
-    if (params?.subtopicId && params.subtopicId !== "all") queryParams.append("subtopicId", params.subtopicId);
-    if (params?.sort) queryParams.append("sort", params.sort);
+    if (params?.sort && params.sort.trim()) {
+      const normalizedSort = params.sort.trim().replace(/^createdAt/i, "created_at");
+      queryParams.append("sort", normalizedSort);
+    }
     queryParams.append("page", String(params?.page ?? 0));
     queryParams.append("size", String(params?.size ?? 20));
 

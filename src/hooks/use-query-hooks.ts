@@ -355,6 +355,8 @@ export function useQuestionsPageQuery(params?: {
     queryFn: () => testService.getQuestionsPage(params),
     placeholderData: keepPreviousData,
     staleTime: 30_000,
+    throwOnError: false,
+    retry: 1,
   });
 }
 
