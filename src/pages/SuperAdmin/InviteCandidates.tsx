@@ -358,7 +358,7 @@ export default function InviteCandidates() {
                 setTestMailRecipient("");
                 setIsTestMailDialogOpen(true);
               }}
-              className="text-xs gap-1.5 h-8 border-orange-500/40 text-orange-600 hover:bg-orange-500/10 hover:border-orange-500 font-medium"
+              className="text-xs gap-1.5 h-8 border-indigo-500/40 text-indigo-600 hover:bg-indigo-500/10 hover:border-indigo-500 font-medium"
             >
               <Send className="w-3.5 h-3.5" />
               Send Test Mail
@@ -737,7 +737,7 @@ export default function InviteCandidates() {
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-foreground">
-              <Mail className="w-4 h-4 text-orange-500" /> Test Mail Server / AWS SES
+              <Mail className="w-4 h-4 text-indigo-600" /> Test Mail Server / AWS SES
             </DialogTitle>
             <DialogDescription className="text-xs text-muted-foreground">
               Send an instant diagnostic email to verify that your AWS SES SMTP gateway is live, credentials are active, and emails are delivering properly.
@@ -818,7 +818,7 @@ export default function InviteCandidates() {
             <Button
               onClick={handleSendTestEmail}
               disabled={sendingTestMail || !testMailRecipient.trim()}
-              className="gap-2 bg-orange-500 hover:bg-orange-600 text-white font-medium shadow-sm"
+              className="gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium shadow-sm cursor-pointer"
             >
               {sendingTestMail ? (
                 <>

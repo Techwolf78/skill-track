@@ -153,7 +153,7 @@ export default function NewAdminSettings() {
     return (
       <div className="flex items-center justify-center min-h-[50vh]">
         <div className="flex flex-col items-center gap-3">
-          <Loader2 className="w-8 h-8 animate-spin text-[#1E40AF]" />
+          <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
           <p className="text-xs text-slate-500 font-medium">Loading account settings...</p>
         </div>
       </div>
@@ -195,7 +195,7 @@ export default function NewAdminSettings() {
             onClick={() => handleTabChange("account")}
             className={`pb-3 text-xs font-bold uppercase tracking-wider transition-all relative ${
               activeTab === "account"
-                ? "text-emerald-600 border-b-2 border-emerald-500 font-semibold"
+                ? "text-indigo-600 border-b-2 border-indigo-600 font-bold"
                 : "text-slate-500 hover:text-slate-800"
             }`}
           >
@@ -206,7 +206,7 @@ export default function NewAdminSettings() {
             onClick={() => handleTabChange("password")}
             className={`pb-3 text-xs font-bold uppercase tracking-wider transition-all relative ${
               activeTab === "password"
-                ? "text-emerald-600 border-b-2 border-emerald-500 font-semibold"
+                ? "text-indigo-600 border-b-2 border-indigo-600 font-bold"
                 : "text-slate-500 hover:text-slate-800"
             }`}
           >
@@ -238,7 +238,7 @@ export default function NewAdminSettings() {
                     onChange={(e) => setName(e.target.value)}
                     placeholder="Enter full name"
                     required
-                    className="border-0 border-b border-slate-300 rounded-none px-0 py-1.5 focus-visible:ring-0 focus-visible:border-blue-600 shadow-none text-sm text-slate-800 bg-transparent"
+                    className="border-0 border-b border-slate-300 rounded-none px-0 py-1.5 focus-visible:ring-0 focus-visible:border-indigo-600 shadow-none text-sm text-slate-800 bg-transparent"
                   />
                 </div>
 
@@ -252,7 +252,7 @@ export default function NewAdminSettings() {
                     value={phoneNumber}
                     onChange={(e) => setPhoneNumber(e.target.value)}
                     placeholder="+91 9876543210"
-                    className="border-0 border-b border-slate-300 rounded-none px-0 py-1.5 focus-visible:ring-0 focus-visible:border-blue-600 shadow-none text-sm text-slate-800 bg-transparent font-mono"
+                    className="border-0 border-b border-slate-300 rounded-none px-0 py-1.5 focus-visible:ring-0 focus-visible:border-indigo-600 shadow-none text-sm text-slate-800 bg-transparent font-mono"
                   />
                 </div>
 
@@ -298,7 +298,7 @@ export default function NewAdminSettings() {
                 <Button
                   type="submit"
                   disabled={savingProfile}
-                  className="bg-[#2e52b2] hover:bg-[#234294] text-white text-xs font-bold uppercase tracking-wider px-6 py-2.5 rounded-sm shadow-none"
+                  className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold uppercase tracking-wider px-6 py-2.5 rounded-sm shadow-none cursor-pointer"
                 >
                   {savingProfile ? (
                     <>
@@ -338,7 +338,7 @@ export default function NewAdminSettings() {
                   onChange={(e) => setOldPassword(e.target.value)}
                   placeholder="Enter current password"
                   required
-                  className="border-0 border-b border-slate-300 rounded-none px-0 py-1.5 focus-visible:ring-0 focus-visible:border-blue-600 shadow-none text-sm text-slate-800 bg-transparent"
+                  className="border-0 border-b border-slate-300 rounded-none px-0 py-1.5 focus-visible:ring-0 focus-visible:border-indigo-600 shadow-none text-sm text-slate-800 bg-transparent"
                 />
               </div>
 
@@ -354,7 +354,7 @@ export default function NewAdminSettings() {
                   onChange={(e) => setNewPassword(e.target.value)}
                   placeholder="Enter new password (min. 8 characters)"
                   required
-                  className="border-0 border-b border-slate-300 rounded-none px-0 py-1.5 focus-visible:ring-0 focus-visible:border-blue-600 shadow-none text-sm text-slate-800 bg-transparent"
+                  className="border-0 border-b border-slate-300 rounded-none px-0 py-1.5 focus-visible:ring-0 focus-visible:border-indigo-600 shadow-none text-sm text-slate-800 bg-transparent"
                 />
                 <p className="text-[11px] text-slate-400">Must be at least 8 characters</p>
               </div>
@@ -371,7 +371,7 @@ export default function NewAdminSettings() {
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   placeholder="Confirm new password"
                   required
-                  className="border-0 border-b border-slate-300 rounded-none px-0 py-1.5 focus-visible:ring-0 focus-visible:border-blue-600 shadow-none text-sm text-slate-800 bg-transparent"
+                  className="border-0 border-b border-slate-300 rounded-none px-0 py-1.5 focus-visible:ring-0 focus-visible:border-indigo-600 shadow-none text-sm text-slate-800 bg-transparent"
                 />
               </div>
 
@@ -380,7 +380,7 @@ export default function NewAdminSettings() {
                 <Button
                   type="submit"
                   disabled={updatingPassword}
-                  className="bg-[#2e52b2] hover:bg-[#234294] text-white text-xs font-bold uppercase tracking-wider px-6 py-2.5 rounded-sm shadow-none"
+                  className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold uppercase tracking-wider px-6 py-2.5 rounded-sm shadow-none cursor-pointer"
                 >
                   {updatingPassword ? (
                     <>
