@@ -127,14 +127,14 @@ export default function Documentation() {
   };
 
   return (
-    <div className="h-screen flex flex-col bg-white text-slate-900 font-sans selection:bg-orange-500/15 selection:text-orange-900 overflow-hidden">
-      {/* 1. Clean White / Sunset Orange Fixed Top Navigation Bar */}
+    <div className="h-screen flex flex-col bg-white text-slate-900 font-sans selection:bg-indigo-500/15 selection:text-indigo-900 overflow-hidden">
+      {/* 1. Clean White / Electric Indigo Fixed Top Navigation Bar */}
       <header className="shrink-0 z-50 h-14 bg-white/95 backdrop-blur-md border-b border-slate-200/80 px-4 sm:px-8 flex items-center justify-between gap-4 shadow-2xs">
         {/* Left: Branding & Version dropdown pill */}
         <div className="flex items-center gap-4">
           <button
             onClick={() => navigate(-1)}
-            className="flex items-center gap-1.5 text-xs font-semibold text-slate-700 hover:text-orange-600 px-3 py-1.5 rounded-lg border border-slate-200 bg-slate-50 hover:bg-orange-50/50 hover:border-orange-200 transition-all shadow-2xs"
+            className="flex items-center gap-1.5 text-xs font-semibold text-slate-700 hover:text-indigo-600 px-3 py-1.5 rounded-lg border border-slate-200 bg-slate-50 hover:bg-indigo-50/50 hover:border-indigo-200 transition-all shadow-2xs"
           >
             <ArrowLeft className="w-3.5 h-3.5" />
             <span>Back to Console</span>
@@ -144,7 +144,7 @@ export default function Documentation() {
 
           <div className="flex items-center gap-2">
             <span className="font-extrabold text-base tracking-tight text-slate-900 flex items-center gap-1.5">
-              <span className="text-orange-600">RxOne</span> docs
+              <span className="text-indigo-600">Gryphon</span> docs
             </span>
             <span className="rounded-full bg-slate-100 border border-slate-200 px-2 py-0.5 text-[11px] font-mono font-medium text-slate-600">
               v2.4
@@ -160,7 +160,7 @@ export default function Documentation() {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search documentation... (Ctrl+K)"
-              className="h-8 pl-8 pr-12 text-xs bg-slate-50 border-slate-200 text-slate-900 placeholder:text-slate-400 focus-visible:ring-orange-500/30 rounded-full"
+              className="h-8 pl-8 pr-12 text-xs bg-slate-50 border-slate-200 text-slate-900 placeholder:text-slate-400 focus-visible:ring-indigo-500/30 rounded-full"
             />
             <kbd className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none inline-flex h-4 select-none items-center rounded border border-slate-200 bg-white px-1 text-[9px] font-mono text-slate-400">
               ⌘K
@@ -186,7 +186,7 @@ export default function Documentation() {
               <Printer className="w-3.5 h-3.5 text-slate-500" />
               <span>Print</span>
             </Button>
-            <div className="relative px-2.5 py-1 rounded-full bg-orange-50 border border-orange-200 text-orange-600 text-[11px] font-mono font-semibold">
+            <div className="relative px-2.5 py-1 rounded-full bg-indigo-50 border border-indigo-200 text-indigo-600 text-[11px] font-mono font-semibold">
               Live Engine
             </div>
           </div>
@@ -197,12 +197,12 @@ export default function Documentation() {
       <div className="flex-1 max-w-[1600px] w-full mx-auto px-4 sm:px-6 lg:px-8 overflow-hidden bg-white">
         <div className="grid grid-cols-1 lg:grid-cols-[240px_minmax(0,1fr)_190px] gap-6 xl:gap-8 h-full">
           
-          {/* LEFT SIDEBAR (Clean White Theme + Sunset Orange Active Indicators) */}
+          {/* LEFT SIDEBAR (Clean White Theme + Electric Indigo Active Indicators) */}
           <aside className="hidden lg:block h-full overflow-y-auto py-6 pr-4 text-xs scrollbar-thin scrollbar-thumb-slate-200 border-r border-slate-100">
             {/* Top Primary Navigation Group with Icons */}
             <div className="mb-6 pb-6 border-b border-slate-200 space-y-1">
-              <div className="flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-orange-600 font-semibold bg-orange-50/80 border border-orange-200/60">
-                <BookOpen className="w-4 h-4 text-orange-600" />
+              <div className="flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-indigo-600 font-semibold bg-indigo-50/80 border border-indigo-200/60">
+                <BookOpen className="w-4 h-4 text-indigo-600" />
                 <span>Documentation</span>
               </div>
               <a
@@ -231,7 +231,7 @@ export default function Documentation() {
             {searchQuery.trim() ? (
               // Search Results
               <div className="space-y-2">
-                <div className="font-mono text-[11px] font-semibold text-orange-600 uppercase tracking-wider flex items-center justify-between">
+                <div className="font-mono text-[11px] font-semibold text-indigo-600 uppercase tracking-wider flex items-center justify-between">
                   <span>Results ({filteredArticles?.length || 0})</span>
                   <button
                     onClick={() => setSearchQuery("")}
@@ -251,7 +251,7 @@ export default function Documentation() {
                         className={cn(
                           "w-full text-left py-1.5 px-2.5 rounded-md transition-colors block text-xs",
                           selectedArticleId === art.id
-                            ? "font-semibold text-orange-600 bg-orange-50 border border-orange-200"
+                            ? "font-semibold text-indigo-600 bg-indigo-50 border border-indigo-200"
                             : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
                         )}
                       >
@@ -279,8 +279,8 @@ export default function Documentation() {
                               className={cn(
                                 "w-full text-left pl-3.5 py-1 text-xs transition-colors block border-l",
                                 isCurrent
-                                  ? "border-orange-500 font-bold text-orange-600"
-                                  : "border-transparent text-slate-600 hover:border-slate-400 hover:text-slate-900"
+                                    ? "border-indigo-600 font-bold text-indigo-600"
+                                    : "border-transparent text-slate-600 hover:border-slate-400 hover:text-slate-900"
                               )}
                             >
                               {art.title}
@@ -299,7 +299,7 @@ export default function Documentation() {
           <main className="h-full overflow-y-auto py-6 pr-2 min-w-0 scrollbar-thin scrollbar-thumb-slate-200 scroll-smooth">
             {/* Category / Title / Subhead */}
             <div className="space-y-2 mb-6">
-              <div className="font-mono text-xs font-semibold uppercase tracking-widest text-orange-600">
+              <div className="font-mono text-xs font-semibold uppercase tracking-widest text-indigo-600">
                 {currentArticle.category}
               </div>
               <h1 className="text-3xl sm:text-4xl font-extrabold text-slate-900 tracking-tight">
@@ -314,7 +314,7 @@ export default function Documentation() {
             {currentArticle.content.quickReference && (
               <div className="my-8 space-y-2">
                 <div className="flex items-center gap-2 text-xs font-mono font-semibold uppercase tracking-wider text-slate-700">
-                  <TableProperties className="w-3.5 h-3.5 text-orange-600" />
+                  <TableProperties className="w-3.5 h-3.5 text-indigo-600" />
                   <span>Quick Reference Matrix</span>
                 </div>
                 <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-2xs">
@@ -330,13 +330,13 @@ export default function Documentation() {
                     </thead>
                     <tbody className="divide-y divide-slate-100 font-mono text-[11px]">
                       {currentArticle.content.quickReference.rows.map((row, rIdx) => (
-                        <tr key={rIdx} className="hover:bg-orange-50/30 transition-colors">
+                        <tr key={rIdx} className="hover:bg-indigo-50/30 transition-colors">
                           {row.map((cell, cIdx) => (
                             <td
                               key={cIdx}
                               className={cn(
                                 "py-2.5 px-4 text-slate-700",
-                                cIdx === 0 && "font-bold text-orange-600"
+                                cIdx === 0 && "font-bold text-indigo-600"
                               )}
                             >
                               {cell}
@@ -373,7 +373,7 @@ export default function Documentation() {
                   {section.paramsTable && (
                     <div className="my-5 space-y-2">
                       <div className="text-xs font-mono text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
-                        <Sliders className="w-3.5 h-3.5 text-orange-600" />
+                        <Sliders className="w-3.5 h-3.5 text-indigo-600" />
                         <span>Parameters & Configuration</span>
                       </div>
                       <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
@@ -389,7 +389,7 @@ export default function Documentation() {
                           <tbody className="divide-y divide-slate-100 font-sans text-xs">
                             {section.paramsTable.map((p, pIdx) => (
                               <tr key={pIdx} className="hover:bg-slate-50 transition-colors">
-                                <td className="py-2.5 px-4 font-mono font-bold text-orange-600">
+                                <td className="py-2.5 px-4 font-mono font-bold text-indigo-600">
                                   {p.name}
                                 </td>
                                 <td className="py-2.5 px-4 font-mono text-slate-500 text-[11px]">
@@ -558,7 +558,7 @@ export default function Documentation() {
                   <li key={idx} className="-ml-px">
                     <a
                       href={`#section-${idx}`}
-                      className="block pl-2.5 py-0.5 text-[11px] text-slate-500 hover:text-orange-600 hover:border-l hover:border-orange-500 transition-colors truncate"
+                      className="block pl-2.5 py-0.5 text-[11px] text-slate-500 hover:text-indigo-600 hover:border-l hover:border-indigo-600 transition-colors truncate"
                     >
                       {sec.heading}
                     </a>
@@ -569,15 +569,15 @@ export default function Documentation() {
               {/* Compact Architecture Card */}
               <div className="pt-4 mt-4 border-t border-slate-200 space-y-2">
                 <div className="rounded-lg border border-slate-200 bg-slate-50/80 p-2.5 space-y-2 shadow-2xs">
-                  <div className="text-[10px] font-mono text-orange-600 uppercase font-semibold">
+                  <div className="text-[10px] font-mono text-indigo-600 uppercase font-semibold">
                     Architecture
                   </div>
                   <div className="font-semibold text-[11px] text-slate-900 leading-snug">
-                    RxOne High-Concurrency
+                    Gryphon 360 Platform
                   </div>
                   <Button
                     size="sm"
-                    className="w-full h-6 text-[10px] bg-orange-500 hover:bg-orange-600 text-white font-medium rounded-md px-2"
+                    className="w-full h-6 text-[10px] bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-md px-2"
                     onClick={() =>
                       toast({
                         title: "Video Stream",

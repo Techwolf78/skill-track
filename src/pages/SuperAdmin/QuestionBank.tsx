@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -37,6 +37,10 @@ import {
   AlertCircle,
   CheckCircle2,
   Sparkles,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
 } from "lucide-react";
 import * as XLSX from "xlsx";
 import {
@@ -118,8 +122,31 @@ export default function SuperAdminQuestionBank() {
   const [cognitiveFilter, setCognitiveFilter] = useState<CognitiveLevelType>("ALL");
   const [formatFilter, setFormatFilter] = useState<QuestionFormatType>("ALL");
 
-  const [currentPage, setCurrentPage] = useState(1);
-  const ITEMS_PER_PAGE = 8;
+  const location = useLocation();
+  const [pageSize, setPageSize] = useState<number>(() => {
+    const fromState = location.state?.pageSize || location.state?.returnPageSize;
+    const fromSession = Number(sessionStorage.getItem("superadmin_qb_page_size"));
+    const validSizes = [8, 10, 15, 20, 50, 100];
+    if (fromState && validSizes.includes(fromState)) return fromState;
+    if (fromSession && validSizes.includes(fromSession)) return fromSession;
+    return 10;
+  });
+
+  const [currentPage, setCurrentPage] = useState<number>(() => {
+    const fromState = location.state?.page || location.state?.returnPage;
+    const fromSession = Number(sessionStorage.getItem("superadmin_qb_page"));
+    if (fromState && fromState > 0) return fromState;
+    if (fromSession && fromSession > 0) return fromSession;
+    return 1;
+  });
+
+  useEffect(() => {
+    sessionStorage.setItem("superadmin_qb_page_size", String(pageSize));
+  }, [pageSize]);
+
+  useEffect(() => {
+    sessionStorage.setItem("superadmin_qb_page", String(currentPage));
+  }, [currentPage]);
 
   const [selectedAdvancedQuestion, setSelectedAdvancedQuestion] = useState<ExtendedQuestion | null>(null);
   const [importDialogOpen, setImportDialogOpen] = useState(false);
@@ -249,7 +276,15 @@ export default function SuperAdminQuestionBank() {
         description: "Editing mock questions is disabled in this dashboard layout.",
       });
     } else {
-      navigate(`/superadmin/questions/edit/${question.id}`);
+      sessionStorage.setItem("superadmin_qb_page", String(currentPage));
+      sessionStorage.setItem("superadmin_qb_page_size", String(pageSize));
+      navigate(`/superadmin/questions/edit/${question.id}`, {
+        state: {
+          returnPage: currentPage,
+          returnPageSize: pageSize,
+          returnActiveTab: activeTab,
+        },
+      });
     }
   };
 
@@ -288,11 +323,19 @@ export default function SuperAdminQuestionBank() {
     return matchesTab && matchesSearch && matchesDifficulty && matchesSubject && matchesDomain && matchesCognitive && matchesFormat;
   });
 
-  const totalPages = Math.ceil(filteredQuestions.length / ITEMS_PER_PAGE);
-  const paginatedQuestions = filteredQuestions.slice(
-    (currentPage - 1) * ITEMS_PER_PAGE,
-    currentPage * ITEMS_PER_PAGE
-  );
+  const totalQuestions = filteredQuestions.length;
+  const totalPages = Math.max(1, Math.ceil(totalQuestions / pageSize));
+  const safePage = Math.min(Math.max(1, currentPage), totalPages);
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [totalPages, currentPage]);
+
+  const startIndex = (safePage - 1) * pageSize;
+  const endIndex = Math.min(safePage * pageSize, totalQuestions);
+  const paginatedQuestions = filteredQuestions.slice(startIndex, startIndex + pageSize);
 
   const getSubjectName = (subjectId?: string) => {
     if (!subjectId) return "Core General";
@@ -331,7 +374,7 @@ export default function SuperAdminQuestionBank() {
             Import Questions
           </Button>
           <Button
-            className="gap-2 bg-[#6366F1] hover:bg-[#4F46E5] text-white shadow-sm font-semibold"
+            className="gap-2 bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm font-semibold"
             onClick={() => setCreateModalOpen(true)}
           >
             <Plus className="w-4 h-4" />
@@ -658,45 +701,110 @@ export default function SuperAdminQuestionBank() {
               </TableBody>
             </Table>
 
-            {/* Pagination Controls */}
-            {totalPages > 1 && (
-              <div className="flex items-center justify-between px-6 py-4 border-t bg-muted/20">
-                <p className="text-xs text-muted-foreground font-medium">
-                  Showing <span className="font-semibold text-foreground">{(currentPage - 1) * ITEMS_PER_PAGE + 1}</span> to{" "}
-                  <span className="font-semibold text-foreground">{Math.min(currentPage * ITEMS_PER_PAGE, filteredQuestions.length)}</span> of{" "}
-                  <span className="font-semibold text-foreground">{filteredQuestions.length}</span> questions
-                </p>
-                <div className="flex items-center gap-2">
+            {/* Pagination Controls Footer */}
+            {totalQuestions > 0 && (
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-4 px-6 py-4 border-t bg-muted/20 text-xs">
+                <div className="flex flex-wrap items-center gap-3 text-muted-foreground">
+                  <p className="font-medium">
+                    Showing <span className="font-semibold text-foreground">{totalQuestions === 0 ? 0 : startIndex + 1}</span> to{" "}
+                    <span className="font-semibold text-foreground">{endIndex}</span> of{" "}
+                    <span className="font-semibold text-foreground">{totalQuestions}</span> questions
+                  </p>
+
+                  <div className="flex items-center gap-1.5 ml-0 sm:ml-4">
+                    <span className="text-muted-foreground font-medium">Rows per page:</span>
+                    <Select
+                      value={String(pageSize)}
+                      onValueChange={(val) => {
+                        const newSize = Number(val);
+                        setPageSize(newSize);
+                        setCurrentPage(1);
+                      }}
+                    >
+                      <SelectTrigger className="h-8 w-[76px] text-xs bg-background">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="8">8</SelectItem>
+                        <SelectItem value="10">10</SelectItem>
+                        <SelectItem value="15">15</SelectItem>
+                        <SelectItem value="20">20</SelectItem>
+                        <SelectItem value="50">50</SelectItem>
+                        <SelectItem value="100">100</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-1.5">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(1)}
+                    disabled={safePage <= 1}
+                    className="h-8 w-8 p-0"
+                    title="First page"
+                  >
+                    <ChevronsLeft className="w-4 h-4" />
+                  </Button>
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
-                    disabled={currentPage === 1}
-                    className="h-8 text-xs font-semibold"
+                    disabled={safePage <= 1}
+                    className="h-8 px-2.5 text-xs font-semibold"
                   >
+                    <ChevronLeft className="w-3.5 h-3.5 mr-1" />
                     Previous
                   </Button>
+
                   <div className="flex items-center gap-1">
-                    {Array.from({ length: totalPages }, (_, idx) => idx + 1).map((page) => (
-                      <Button
-                        key={page}
-                        variant={currentPage === page ? "default" : "outline"}
-                        size="sm"
-                        className="w-8 h-8 p-0 text-xs font-semibold"
-                        onClick={() => setCurrentPage(page)}
-                      >
-                        {page}
-                      </Button>
-                    ))}
+                    {Array.from({ length: totalPages }, (_, idx) => idx + 1)
+                      .filter((page) => {
+                        if (totalPages <= 7) return true;
+                        if (page === 1 || page === totalPages) return true;
+                        return Math.abs(page - safePage) <= 1;
+                      })
+                      .map((page, idx, arr) => {
+                        const prevPage = arr[idx - 1];
+                        const showEllipsis = prevPage && page - prevPage > 1;
+                        return (
+                          <div key={page} className="flex items-center gap-1">
+                            {showEllipsis && <span className="px-1 text-muted-foreground">...</span>}
+                            <Button
+                              variant={safePage === page ? "default" : "outline"}
+                              size="sm"
+                              className={`w-8 h-8 p-0 text-xs font-semibold ${
+                                safePage === page ? "bg-primary text-primary-foreground font-bold" : ""
+                              }`}
+                              onClick={() => setCurrentPage(page)}
+                            >
+                              {page}
+                            </Button>
+                          </div>
+                        );
+                      })}
                   </div>
+
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
-                    disabled={currentPage === totalPages}
-                    className="h-8 text-xs font-semibold"
+                    disabled={safePage >= totalPages}
+                    className="h-8 px-2.5 text-xs font-semibold"
                   >
                     Next
+                    <ChevronRight className="w-3.5 h-3.5 ml-1" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(totalPages)}
+                    disabled={safePage >= totalPages}
+                    className="h-8 w-8 p-0"
+                    title="Last page"
+                  >
+                    <ChevronsRight className="w-4 h-4" />
                   </Button>
                 </div>
               </div>
@@ -930,7 +1038,7 @@ function SuperAdminImportQuestionsDialog({
 
   const [jsonText, setJsonText] = useState("");
   const [parsedRows, setParsedRows] = useState<ParsedQuestionRow[]>([]);
-  const [rawFileRows, setRawFileRows] = useState<any[] | null>(null);
+  const [rawFileRows, setRawFileRows] = useState<Record<string, unknown>[] | null>(null);
   const [parseError, setParseError] = useState<string | null>(null);
   const [fileName, setFileName] = useState<string | null>(null);
 
@@ -956,7 +1064,7 @@ function SuperAdminImportQuestionsDialog({
     subId: string,
     topId: string,
     subtopId: string,
-    sourceRows: any[]
+    sourceRows: Record<string, unknown>[]
   ) => {
     const context: TaxonomyContext = {
       subjects,
@@ -1017,8 +1125,9 @@ function SuperAdminImportQuestionsDialog({
           const list = Array.isArray(raw) ? raw : [raw];
           setRawFileRows(list);
           reparseRowsWithContext(defaultSubjectId, defaultTopicId, defaultSubtopicId, list);
-        } catch (err: any) {
-          setParseError("Invalid JSON file: " + err.message);
+        } catch (err: unknown) {
+          const msg = err instanceof Error ? err.message : String(err);
+          setParseError("Invalid JSON file: " + msg);
         }
       };
       reader.readAsText(file);
@@ -1028,7 +1137,7 @@ function SuperAdminImportQuestionsDialog({
           const data = new Uint8Array(evt.target?.result as ArrayBuffer);
           const workbook = XLSX.read(data, { type: "array" });
           const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-          const rows: any[] = XLSX.utils.sheet_to_json(firstSheet);
+          const rows: Record<string, unknown>[] = XLSX.utils.sheet_to_json(firstSheet);
 
           if (!rows.length) {
             setParseError("The uploaded Excel sheet contains no rows.");
@@ -1037,8 +1146,9 @@ function SuperAdminImportQuestionsDialog({
 
           setRawFileRows(rows);
           reparseRowsWithContext(defaultSubjectId, defaultTopicId, defaultSubtopicId, rows);
-        } catch (err: any) {
-          setParseError("Failed to parse Excel file: " + err.message);
+        } catch (err: unknown) {
+          const msg = err instanceof Error ? err.message : String(err);
+          setParseError("Failed to parse Excel file: " + msg);
         }
       };
       reader.readAsArrayBuffer(file);
@@ -1277,11 +1387,12 @@ function SuperAdminImportQuestionsDialog({
       });
       onImportSuccess();
       onClose();
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("[SuperAdminQuestionBank] Bulk import error:", err);
+      const apiErr = err as { response?: { data?: { message?: string } }; message?: string };
       toast({
         title: "Bulk import failed",
-        description: err.response?.data?.message || err.message || "Please check question parameters",
+        description: apiErr.response?.data?.message || apiErr.message || "Please check question parameters",
         variant: "destructive",
       });
     }
@@ -1322,7 +1433,7 @@ function SuperAdminImportQuestionsDialog({
               className="flex items-center gap-1 h-7 px-2.5 text-xs font-medium border-slate-200"
               title="Download Coding Questions Excel Template"
             >
-              <FileSpreadsheet className="w-3.5 h-3.5 text-[#3b4992]" />
+              <FileSpreadsheet className="w-3.5 h-3.5 text-indigo-600" />
               <span>Coding Template</span>
             </Button>
           </div>
@@ -1334,7 +1445,7 @@ function SuperAdminImportQuestionsDialog({
         <div className="p-3.5 bg-slate-50/70 rounded-lg border border-slate-200 space-y-2.5">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold text-slate-800 flex items-center gap-1.5">
-              <FolderTree className="w-3.5 h-3.5 text-[#3b4992]" />
+              <FolderTree className="w-3.5 h-3.5 text-indigo-600" />
               Default Hierarchy
             </span>
           </div>

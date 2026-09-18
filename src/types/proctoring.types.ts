@@ -3,6 +3,7 @@ export type ViolationType =
   | "EXTENDED_TAB_SWITCH"
   | "MULTI_FACE" 
   | "LOOK_AWAY" 
+  | "NO_FACE"
   | "SPEECH" 
   | "DEVTOOLS_OPEN" 
   | "COPY_PASTE" 
@@ -29,6 +30,8 @@ export interface ProctoringState {
   cameraActive: boolean;
   screenActive: boolean;
   micActive: boolean;
+  faceNotVisible: boolean;
+  isCameraObscured: boolean;
 }
 
 export interface ProctoringConfig {

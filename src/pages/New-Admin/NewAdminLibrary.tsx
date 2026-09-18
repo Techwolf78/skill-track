@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import {
   Search,
   ShoppingBag,
@@ -33,7 +33,7 @@ import {
 } from "lucide-react";
 import * as XLSX from "xlsx";
 import {
-  useQuestionsQuery,
+  useQuestionsPageQuery,
   useSubjectsQuery,
   useTopicsQuery,
   useSubtopicsQuery,
@@ -53,6 +53,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { CreateProblemModal } from "@/components/admin/CreateProblemModal";
+import { formatPlainTextExcerpt } from "@/lib/html-utils";
 
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -117,12 +118,18 @@ const DEFAULT_FORM: FormState = {
 const fmt = (s?: string) =>
   s ? s.charAt(0).toUpperCase() + s.slice(1).toLowerCase() : "—";
 
-const getQuestionMcqType = (q: any): string => {
+const getQuestionVis = (q: any): "PUBLIC" | "ORG_OWNED" => {
+  if (q.visibility) return q.visibility;
+  if (q.organisationId || q.organisation_id) return "ORG_OWNED";
+  return "PUBLIC";
+};
+
+const getQuestionMcqType = (q: Partial<Question> & { options?: Array<string | { text?: string }> }): string => {
   if (q.mcqType) {
     const raw = String(q.mcqType).toUpperCase();
     if (raw !== "SINGLE_CORRECT" && raw !== "MCQ") return raw;
   }
-  const opts = (q.mcqOptions || q.options || []).map((o: any) =>
+  const opts = (q.mcqOptions || q.options || []).map((o: string | { text?: string }) =>
     (typeof o === "string" ? o : o.text || "").toLowerCase().trim()
   );
   if (
@@ -169,7 +176,7 @@ const fmtMcqType = (t?: string) => {
 };
 
 const fmtTime = (q: Question) => {
-  const avgSeconds = q.avg_time_seconds ?? (q as any).avgTimeSeconds;
+  const avgSeconds = q.avg_time_seconds ?? (q as unknown as { avgTimeSeconds?: number }).avgTimeSeconds;
   if (avgSeconds && avgSeconds > 0) {
     const mins = Math.round(avgSeconds / 60);
     if (mins < 1) {
@@ -250,7 +257,7 @@ function ImportQuestionsDialog({
 
   const [jsonText, setJsonText] = useState("");
   const [parsedRows, setParsedRows] = useState<ParsedQuestionRow[]>([]);
-  const [rawFileRows, setRawFileRows] = useState<any[] | null>(null);
+  const [rawFileRows, setRawFileRows] = useState<Record<string, unknown>[] | null>(null);
   const [parseError, setParseError] = useState<string | null>(null);
   const [fileName, setFileName] = useState<string | null>(null);
 
@@ -276,7 +283,7 @@ function ImportQuestionsDialog({
     subId: string,
     topId: string,
     subtopId: string,
-    sourceRows: any[]
+    sourceRows: Record<string, unknown>[]
   ) => {
     const context: TaxonomyContext = {
       subjects,
@@ -337,8 +344,9 @@ function ImportQuestionsDialog({
           const list = Array.isArray(raw) ? raw : [raw];
           setRawFileRows(list);
           reparseRowsWithContext(defaultSubjectId, defaultTopicId, defaultSubtopicId, list);
-        } catch (err: any) {
-          setParseError("Invalid JSON file: " + err.message);
+        } catch (err: unknown) {
+          const msg = err instanceof Error ? err.message : String(err);
+          setParseError("Invalid JSON file: " + msg);
         }
       };
       reader.readAsText(file);
@@ -348,7 +356,7 @@ function ImportQuestionsDialog({
           const data = new Uint8Array(evt.target?.result as ArrayBuffer);
           const workbook = XLSX.read(data, { type: "array" });
           const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-          const rows: any[] = XLSX.utils.sheet_to_json(firstSheet);
+          const rows: Record<string, unknown>[] = XLSX.utils.sheet_to_json(firstSheet);
 
           if (!rows.length) {
             setParseError("The uploaded Excel sheet contains no rows.");
@@ -357,8 +365,9 @@ function ImportQuestionsDialog({
 
           setRawFileRows(rows);
           reparseRowsWithContext(defaultSubjectId, defaultTopicId, defaultSubtopicId, rows);
-        } catch (err: any) {
-          setParseError("Failed to parse Excel file: " + err.message);
+        } catch (err: unknown) {
+          const msg = err instanceof Error ? err.message : String(err);
+          setParseError("Failed to parse Excel file: " + msg);
         }
       };
       reader.readAsArrayBuffer(file);
@@ -478,9 +487,10 @@ function ImportQuestionsDialog({
       toast.success(`Successfully imported ${payload.length} questions.`);
       onImportSuccess();
       onClose();
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("[NewAdminLibrary] Bulk import error:", err);
-      toast.error("Bulk import failed: " + (err.response?.data?.message || err.message || "Please check question parameters"));
+      const apiErr = err as { response?: { data?: { message?: string } }; message?: string };
+      toast.error("Bulk import failed: " + (apiErr.response?.data?.message || apiErr.message || "Please check question parameters"));
     }
   };
 
@@ -511,7 +521,7 @@ function ImportQuestionsDialog({
               className="flex items-center gap-1.5 px-3 py-1.5 border border-slate-200 text-xs font-medium text-slate-700 hover:bg-slate-50 hover:text-slate-900 transition-colors cursor-pointer rounded"
               title="Download Coding Questions Excel Template"
             >
-              <FileSpreadsheet className="w-3.5 h-3.5 text-[#3b4992]" />
+              <FileSpreadsheet className="w-3.5 h-3.5 text-indigo-600" />
               <span>Coding Template</span>
             </button>
           </div>
@@ -524,7 +534,7 @@ function ImportQuestionsDialog({
         <div className="p-3.5 bg-slate-50/70 border border-slate-200 rounded space-y-2.5">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold text-slate-800 flex items-center gap-1.5">
-              <FolderTree className="w-3.5 h-3.5 text-[#3b4992]" />
+              <FolderTree className="w-3.5 h-3.5 text-indigo-600" />
               Default Hierarchy
             </span>
           </div>
@@ -595,7 +605,7 @@ function ImportQuestionsDialog({
         {/* Upload File Zone */}
         <div className="w-full">
           <label className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-slate-200 hover:border-indigo-400 bg-slate-50/50 hover:bg-slate-50 cursor-pointer transition-colors w-full rounded">
-            <Upload className="w-6 h-6 text-[#3b4992] mb-1.5" />
+            <Upload className="w-6 h-6 text-indigo-600 mb-1.5" />
             <p className="text-xs font-semibold text-slate-700 text-center truncate max-w-full px-2">
               {fileName ? fileName : "Click to browse or drag & drop question spreadsheet"}
             </p>
@@ -731,7 +741,7 @@ function ImportQuestionsDialog({
           <button
             onClick={handleBulkSubmit}
             disabled={bulkCreateMutation.isPending || parsedRows.length === 0}
-            className="px-4 py-2 bg-[#3b4992] hover:bg-[#2f3b75] disabled:opacity-50 text-white text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-sm cursor-pointer rounded"
+            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-sm cursor-pointer rounded"
           >
             {bulkCreateMutation.isPending ? (
               <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Importing...</>
@@ -753,7 +763,6 @@ function ImportQuestionsDialog({
 
 export default function NewAdminLibrary() {
   const navigate = useNavigate();
-  const { data: dbQuestions = [], isLoading, isError, refetch } = useQuestionsQuery();
 
   const [selectedLibrary, setSelectedLibrary] = useState<LibraryType>("PUBLIC");
   const [problemType, setProblemType] = useState<ProblemType>("ALL");
@@ -764,114 +773,85 @@ export default function NewAdminLibrary() {
   const [selectedLevel, setSelectedLevel] = useState<"ALL" | "EASY" | "MEDIUM" | "HARD">("ALL");
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
-
-  // Calculate counts per library
-  const publicCount = useMemo(
-    () => dbQuestions.filter((q) => (q.visibility ?? "PUBLIC") === "PUBLIC").length,
-    [dbQuestions]
-  );
-  const orgCount = useMemo(
-    () => dbQuestions.filter((q) => (q.visibility ?? "PUBLIC") === "ORG_OWNED").length,
-    [dbQuestions]
-  );
+  const location = useLocation();
+  const [currentPage, setCurrentPage] = useState<number>(() => {
+    const fromState = location.state?.page || location.state?.returnPage;
+    const fromSession = Number(sessionStorage.getItem("admin_library_page"));
+    if (fromState && fromState > 0) return fromState;
+    if (fromSession && fromSession > 0) return fromSession;
+    return 1;
+  });
+  const [pageSize, setPageSize] = useState<number>(() => {
+    const fromState = location.state?.pageSize || location.state?.returnPageSize;
+    const fromSession = Number(sessionStorage.getItem("admin_library_page_size"));
+    const valid = [10, 20, 50, 100];
+    if (fromState && valid.includes(fromState)) return fromState;
+    if (fromSession && valid.includes(fromSession)) return fromSession;
+    return 10;
+  });
 
   useEffect(() => {
-    if (dbQuestions && dbQuestions.length > 0) {
-      console.log("[NewAdminLibrary] Fetched questions from backend:", dbQuestions);
-      const orgQuestions = dbQuestions.filter((q) => q.visibility === "ORG_OWNED");
-      console.log("[NewAdminLibrary] Org Owned questions:", orgQuestions);
-      if (orgQuestions.length > 0) {
-        console.log("[NewAdminLibrary] Latest Org Owned question:", {
-          id: orgQuestions[0].id,
-          title: orgQuestions[0].title,
-          tags: orgQuestions[0].tags,
-          prompt: orgQuestions[0].prompt,
-          questionType: orgQuestions[0].questionType,
-          visibility: orgQuestions[0].visibility,
-        });
-      }
-    }
-  }, [dbQuestions]);
+    sessionStorage.setItem("admin_library_page", String(currentPage));
+  }, [currentPage]);
 
-  const filteredQuestions = useMemo(() => {
-    const list = dbQuestions.filter((q) => {
-      const vis = q.visibility ?? "PUBLIC";
-      if (vis !== selectedLibrary) return false;
-      if (problemType !== "ALL") {
-        const qt = (q.questionType ?? "").toUpperCase();
-        if (problemType === "CODING") {
-          if (qt !== "CODING" || q.isLanguageSpecific) return false;
-        } else if (problemType === "LANGUAGE_SPECIFIC_CODING") {
-          if (qt !== "CODING" || !q.isLanguageSpecific) return false;
-        } else {
-          // Specific MCQ Subtype filter (SINGLE_CORRECT, MULTIPLE_CORRECT, TRUE_FALSE, ASSERTION_REASON, FILL_IN_THE_BLANK)
-          if (qt !== "MCQ") return false;
-          const mt = getQuestionMcqType(q);
-          if (mt !== problemType) return false;
-        }
-      }
-      if (selectedLevel !== "ALL") {
-        const diff = (q.difficulty ?? "").toUpperCase();
-        if (diff !== selectedLevel) return false;
-      }
-      if (techSearch.trim()) {
-        const ts = techSearch.trim().toLowerCase();
-        const hit =
-          (q.subject?.name ?? "").toLowerCase().includes(ts) ||
-          (q.topic?.name ?? "").toLowerCase().includes(ts) ||
-          (q.subtopic?.name ?? "").toLowerCase().includes(ts) ||
-          (q.tags ?? []).some((t) => t.toLowerCase().includes(ts)) ||
-          (q.title ?? "").toLowerCase().includes(ts);
-        if (!hit) return false;
-      }
-      if (tagSearch.trim()) {
-        const ts = tagSearch.trim().toLowerCase();
-        const hasTag = (q.tags ?? []).some((t) => t.toLowerCase().includes(ts));
-        if (!hasTag) return false;
-      }
-      if (searchQuery.trim()) {
-        const s = searchQuery.toLowerCase();
-        const hit =
-          (q.title ?? "").toLowerCase().includes(s) ||
-          (q.prompt ?? "").toLowerCase().includes(s) ||
-          (q.tags ?? []).some((t) => t.toLowerCase().includes(s)) ||
-          (q.questionType ?? "").toLowerCase().includes(s);
-        if (!hit) return false;
-      }
-      return true;
-    });
-
-    return [...list].sort((a, b) => {
-      if (sortBy === "NEWEST") {
-        const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-        const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-        if (dateA !== dateB) return dateB - dateA;
-        return (b.id || "").localeCompare(a.id || "");
-      }
-      if (sortBy === "OLDEST") {
-        const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-        const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-        if (dateA !== dateB) return dateA - dateB;
-        return (a.id || "").localeCompare(b.id || "");
-      }
-      return 0;
-    });
-  }, [dbQuestions, selectedLibrary, problemType, selectedLevel, techSearch, tagSearch, searchQuery, sortBy]);
+  useEffect(() => {
+    sessionStorage.setItem("admin_library_page_size", String(pageSize));
+  }, [pageSize]);
 
   // Reset page when filters change
   useEffect(() => {
     setCurrentPage(1);
   }, [selectedLibrary, problemType, selectedLevel, techSearch, tagSearch, searchQuery, sortBy, pageSize]);
 
-  const totalQuestions = filteredQuestions.length;
-  const totalPages = Math.ceil(totalQuestions / pageSize) || 1;
+  // Map UI filters to backend query params
+  const queryParams = useMemo(() => {
+    let typeParam: string | undefined = undefined;
+    let mcqTypeParam: string | undefined = undefined;
+    let isLangSpecParam: boolean | undefined = undefined;
 
-  const paginatedQuestions = useMemo(() => {
-    const startIndex = (currentPage - 1) * pageSize;
-    return filteredQuestions.slice(startIndex, startIndex + pageSize);
-  }, [filteredQuestions, currentPage, pageSize]);
+    if (problemType === "CODING") {
+      typeParam = "CODING";
+      isLangSpecParam = false;
+    } else if (problemType === "LANGUAGE_SPECIFIC_CODING") {
+      typeParam = "CODING";
+      isLangSpecParam = true;
+    } else if (problemType !== "ALL") {
+      typeParam = "MCQ";
+      mcqTypeParam = problemType;
+    }
+
+    const sortParam = sortBy === "OLDEST" ? "created_at,asc" : undefined;
+    const searchCombined = searchQuery.trim() || techSearch.trim() || undefined;
+
+    return {
+      page: currentPage - 1,
+      size: pageSize,
+      visibility: selectedLibrary,
+      type: typeParam,
+      mcqType: mcqTypeParam,
+      isLanguageSpecific: isLangSpecParam,
+      difficulty: selectedLevel !== "ALL" ? selectedLevel : undefined,
+      search: searchCombined,
+      tag: tagSearch.trim() || undefined,
+      sort: sortParam,
+    };
+  }, [
+    currentPage,
+    pageSize,
+    selectedLibrary,
+    problemType,
+    selectedLevel,
+    searchQuery,
+    techSearch,
+    tagSearch,
+    sortBy,
+  ]);
+
+  const { data: pageData, isLoading, isError, refetch } = useQuestionsPageQuery(queryParams);
+
+  const paginatedQuestions = pageData?.content || [];
+  const totalQuestions = pageData?.totalElements ?? 0;
+  const totalPages = pageData?.totalPages ?? 1;
 
   const startRecord = totalQuestions === 0 ? 0 : (currentPage - 1) * pageSize + 1;
   const endRecord = Math.min(currentPage * pageSize, totalQuestions);
@@ -976,7 +956,7 @@ export default function NewAdminLibrary() {
         </div>
 
         {/* Technologies Card (DoSelect Style) */}
-        <div className="bg-white border border-slate-200/80 shadow-[0_1px_3px_rgba(0,0,0,0.03)] p-4 space-y-2.5">
+        <div className="bg-white border border-slate-200/80 shadow-[0_1px_3px_rgba(0,0,0,0.03)] p-3 space-y-2">
           <p className="text-xs font-semibold text-slate-700">Technologies</p>
           <div className="relative">
             <input
@@ -984,7 +964,7 @@ export default function NewAdminLibrary() {
               placeholder="Search for a technology..."
               value={techSearch}
               onChange={(e) => setTechSearch(e.target.value)}
-              className="w-full border-b border-slate-200 focus:border-[#4353a4] text-xs text-slate-800 placeholder-slate-400 py-1.5 focus:outline-none bg-transparent"
+              className="w-full border-b border-slate-200 focus:border-indigo-600 text-xs text-slate-800 placeholder-slate-400 py-1 focus:outline-none bg-transparent"
             />
             {techSearch && (
               <button
@@ -998,7 +978,7 @@ export default function NewAdminLibrary() {
         </div>
 
         {/* Tags Card (DoSelect Style) */}
-        <div className="bg-white border border-slate-200/80 shadow-[0_1px_3px_rgba(0,0,0,0.03)] p-4 space-y-2.5">
+        <div className="bg-white border border-slate-200/80 shadow-[0_1px_3px_rgba(0,0,0,0.03)] p-3 space-y-2">
           <p className="text-xs font-semibold text-slate-700">Tags</p>
           <div className="relative">
             <input
@@ -1006,7 +986,7 @@ export default function NewAdminLibrary() {
               placeholder="Search for a tag..."
               value={tagSearch}
               onChange={(e) => setTagSearch(e.target.value)}
-              className="w-full border-b border-slate-200 focus:border-[#4353a4] text-xs text-slate-800 placeholder-slate-400 py-1.5 focus:outline-none bg-transparent"
+              className="w-full border-b border-slate-200 focus:border-indigo-600 text-xs text-slate-800 placeholder-slate-400 py-1 focus:outline-none bg-transparent"
             />
             {tagSearch && (
               <button
@@ -1020,15 +1000,15 @@ export default function NewAdminLibrary() {
         </div>
 
         {/* Other Filters Card (Level Dropdown) */}
-        <div className="bg-white border border-slate-200/80 shadow-[0_1px_3px_rgba(0,0,0,0.03)] p-4 space-y-3">
+        <div className="bg-white border border-slate-200/80 shadow-[0_1px_3px_rgba(0,0,0,0.03)] p-3 space-y-2">
           <p className="text-xs font-semibold text-slate-700">Other filters</p>
           <div className="flex items-center justify-between">
             <span className="text-xs text-slate-600 font-medium">Level</span>
             <div className="relative flex items-center">
               <select
                 value={selectedLevel}
-                onChange={(e) => setSelectedLevel(e.target.value as any)}
-                className="appearance-none bg-transparent pr-5 pl-1 py-1 text-xs font-medium text-slate-700 focus:outline-none cursor-pointer"
+                onChange={(e) => setSelectedLevel(e.target.value as "ALL" | "EASY" | "MEDIUM" | "HARD")}
+                className="appearance-none bg-transparent pr-5 pl-1 py-0.5 text-xs font-medium text-slate-700 focus:outline-none cursor-pointer"
               >
                 <option value="ALL">All</option>
                 <option value="EASY">Easy</option>
@@ -1042,12 +1022,12 @@ export default function NewAdminLibrary() {
       </aside>
 
       {/* ── Right Main Area ── */}
-      <main className="flex-1 w-full space-y-4 min-w-0">
+      <main className="flex-1 w-full space-y-3 min-w-0">
         {/* Search + Sort + Create Button (DoSelect Style) */}
-        <div className="bg-white border border-slate-200/80 shadow-[0_1px_3px_rgba(0,0,0,0.03)] p-3 flex flex-wrap items-center gap-3">
+        <div className="bg-white border border-slate-200/80 shadow-[0_1px_3px_rgba(0,0,0,0.03)] p-2.5 flex flex-wrap items-center gap-2.5">
           {/* Search Input */}
-          <div className="flex-1 min-w-[240px] flex items-center gap-2.5 border border-slate-200/90 px-3.5 py-2.5 bg-white text-xs">
-            <Search className="w-4 h-4 text-slate-400 shrink-0" />
+          <div className="flex-1 min-w-[240px] flex items-center gap-2 border border-slate-200/90 px-3 py-1.5 bg-white text-xs">
+            <Search className="w-3.5 h-3.5 text-slate-400 shrink-0" />
             <input
               type="text"
               placeholder="Search questions by title, tag or type..."
@@ -1063,7 +1043,7 @@ export default function NewAdminLibrary() {
           </div>
 
           {/* Sort Dropdown Button */}
-          <div className="relative flex items-center border border-slate-200/90 px-3.5 py-2.5 bg-white text-xs text-slate-700 font-normal hover:bg-slate-50/50 transition-colors">
+          <div className="relative flex items-center border border-slate-200/90 px-3 py-1.5 bg-white text-xs text-slate-700 font-normal hover:bg-slate-50/50 transition-colors">
             <ArrowUpDown className="w-3.5 h-3.5 text-slate-500 mr-2 shrink-0" />
             <select
               value={sortBy}
@@ -1078,7 +1058,7 @@ export default function NewAdminLibrary() {
           {/* Import Questions Button */}
           <button
             onClick={() => setImportOpen(true)}
-            className="shrink-0 flex items-center gap-1.5 px-3.5 py-2.5 text-xs font-semibold border border-slate-200/90 text-slate-700 bg-white hover:bg-slate-50 transition-all shadow-none cursor-pointer"
+            className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold border border-slate-200/90 text-slate-700 bg-white hover:bg-slate-50 transition-all shadow-none cursor-pointer"
           >
             <Upload className="w-3.5 h-3.5 text-slate-500" />
             <span>Import Questions</span>
@@ -1087,7 +1067,7 @@ export default function NewAdminLibrary() {
           {/* Create Question Button */}
           <button
             onClick={() => setCreateModalOpen(true)}
-            className="shrink-0 flex items-center gap-1.5 px-4 py-2.5 text-xs font-semibold shadow-sm bg-[#6366F1] hover:bg-[#4F46E5] text-white transition-all cursor-pointer"
+            className="shrink-0 flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold shadow-xs bg-indigo-600 hover:bg-indigo-700 text-white transition-all cursor-pointer"
           >
             <Plus className="w-3.5 h-3.5" />
             <span>Create Question</span>
@@ -1095,14 +1075,14 @@ export default function NewAdminLibrary() {
         </div>
 
         {/* Questions List */}
-        <div className="bg-white border border-slate-200 overflow-hidden">
+        <div className="bg-white border border-slate-200 overflow-hidden shadow-xs">
           {isLoading ? (
-            <div className="py-16 flex justify-center items-center gap-2 text-slate-400 text-xs">
+            <div className="py-14 flex justify-center items-center gap-2 text-slate-400 text-xs">
               <Loader2 className="w-4 h-4 animate-spin text-indigo-500" />
               Loading questions...
             </div>
           ) : isError ? (
-            <div className="py-14 text-center text-slate-500 text-xs space-y-3">
+            <div className="py-12 text-center text-slate-500 text-xs space-y-2.5">
               <p className="text-slate-600 font-medium">Failed to load questions from server.</p>
               <button
                 onClick={() => refetch()}
@@ -1111,8 +1091,8 @@ export default function NewAdminLibrary() {
                 Retry
               </button>
             </div>
-          ) : filteredQuestions.length === 0 ? (
-            <div className="py-14 text-center text-slate-400 text-xs space-y-3">
+          ) : paginatedQuestions.length === 0 ? (
+            <div className="py-12 text-center text-slate-400 text-xs space-y-2.5">
               <p>No questions match the current filters.</p>
               <button
                 onClick={() => { setProblemType("ALL"); setSearchQuery(""); }}
@@ -1127,17 +1107,27 @@ export default function NewAdminLibrary() {
                 const isCoding = (q.questionType ?? "").toUpperCase() === "CODING";
                 const time = fmtTime(q);
                 return (
-                  <div key={q.id} className="p-6 space-y-2.5 hover:bg-slate-50/50 transition-colors">
+                  <div key={q.id} className="px-5 py-3 space-y-1.5 hover:bg-slate-50/50 transition-colors">
                     {/* Header Row: Title & Action Icons */}
                     <div className="flex items-start justify-between gap-4">
-                      <h3 className="font-bold text-slate-900 text-[15px] leading-snug">
+                      <h3 className="font-bold text-slate-900 text-sm leading-snug">
                         {q.title || "Not available"}
                       </h3>
                       <div className="flex items-center gap-3 shrink-0 text-slate-400">
                         {/* Edit Button for ORG_OWNED / Company Questions */}
-                        {(q.visibility === "ORG_OWNED" || selectedLibrary === "ORG_OWNED") && (
+                        {(getQuestionVis(q) === "ORG_OWNED" || selectedLibrary === "ORG_OWNED") && (
                           <button
-                            onClick={() => navigate(`/admin/questions/edit/${q.id}`, { state: q })}
+                            onClick={() => {
+                              sessionStorage.setItem("admin_library_page", String(currentPage));
+                              sessionStorage.setItem("admin_library_page_size", String(pageSize));
+                              navigate(`/admin/questions/edit/${q.id}`, {
+                                state: {
+                                  ...q,
+                                  returnPage: currentPage,
+                                  returnPageSize: pageSize,
+                                },
+                              });
+                            }}
                             className="p-0.5 hover:text-indigo-600 transition-colors cursor-pointer"
                             title="Edit Question"
                           >
@@ -1166,7 +1156,7 @@ export default function NewAdminLibrary() {
                     </div>
 
                     {/* Metadata Row (DoSelect Style: ≡ MCQ, ⊙ Single, BarChart2 Hard, Clock 10 mins.) */}
-                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-slate-500 font-medium">
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-500 font-medium">
                       <div className="flex items-center gap-1">
                         <span className="text-slate-400 font-mono text-[13px] leading-none">≡</span>
                         <span>{isCoding ? (q.isLanguageSpecific ? "Language Specific" : "Coding") : "MCQ"}</span>
@@ -1176,7 +1166,7 @@ export default function NewAdminLibrary() {
                       {isCoding && (
                         <div className="flex items-center gap-1.5 flex-wrap">
                           <span
-                            className="inline-flex items-center text-[11px] font-medium text-slate-600 bg-slate-100 px-2 py-0.5 rounded border border-slate-200"
+                            className="inline-flex items-center text-[10px] font-medium text-slate-600 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200"
                             title={q.status === "UNDER_REVIEW" ? "Driver verification pending" : "All drivers verified"}
                           >
                             {q.status === "UNDER_REVIEW" ? "Under Review" : "Active"}
@@ -1207,30 +1197,24 @@ export default function NewAdminLibrary() {
                     </div>
 
                     {/* Tags Row */}
-                    <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+                    <div className="flex flex-wrap items-center gap-1.5">
                       {q.tags && q.tags.length > 0 ? (
                         q.tags.map((t, idx) => (
                           <span
                             key={idx}
-                            className="text-[11px] px-2 py-0.5 bg-slate-100/90 text-slate-600 font-normal border border-slate-200"
+                            className="text-[10px] px-1.5 py-0.5 bg-slate-100/90 text-slate-600 font-normal border border-slate-200"
                           >
                             {t}
                           </span>
                         ))
                       ) : (
-                        <span className="text-xs text-slate-400 italic">Not available</span>
+                        <span className="text-[11px] text-slate-400 italic">Not available</span>
                       )}
                     </div>
 
                     {/* Problem Statement / Description */}
-                    <p className="pt-0.5 text-xs text-slate-600 leading-relaxed font-normal line-clamp-3">
-                      {q.prompt
-                        ? q.prompt
-                            .replace(/<[^>]*>/g, " ")
-                            .replace(/&nbsp;/g, " ")
-                            .replace(/\s+/g, " ")
-                            .trim()
-                        : "Not available"}
+                    <p className="text-xs text-slate-500 leading-normal font-normal line-clamp-1">
+                      {formatPlainTextExcerpt(q.prompt)}
                     </p>
                   </div>
                 );
@@ -1241,7 +1225,7 @@ export default function NewAdminLibrary() {
 
         {/* Pagination Card (DoSelect Style) */}
         {!isLoading && !isError && totalQuestions > 0 && (
-          <div className="bg-white border border-slate-200/80 shadow-[0_1px_3px_rgba(0,0,0,0.04)] p-3 flex flex-wrap items-center justify-end gap-5 text-xs text-slate-600">
+          <div className="bg-white border border-slate-200/80 shadow-[0_1px_3px_rgba(0,0,0,0.04)] p-2.5 flex flex-wrap items-center justify-end gap-4 text-xs text-slate-600">
             {/* Page Selector */}
             <div className="flex items-center gap-1.5">
               <span className="px-1.5 py-0.5 bg-slate-100 text-[10px] font-semibold text-slate-500 tracking-wider">

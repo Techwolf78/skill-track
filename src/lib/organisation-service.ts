@@ -2,22 +2,50 @@ import { apiClient } from "./api-client";
 import { BaseResponse } from "./auth-service";
 import { SpringPage, unwrapPageResponse, unwrapArrayResponse } from "./api/baseResponseUtils";
 
+export interface OrganisationSubscriptionConfig {
+  allocatedPins: number;
+  planTier: "Standard" | "Pro" | "Enterprise";
+  billingMode: "One-time Subscription" | "Annual Recurring" | "Monthly";
+  subscriptionStartDate: string;
+  subscriptionEndDate: string;
+  billingCycleStartDate: string;
+  billingCycleEndDate: string;
+  maxTeamSeats: number;
+  enabledProctoringTiers: {
+    basic: boolean;
+    standard: boolean;
+    advanced: boolean;
+  };
+  customNotes?: string;
+  statementAdjustments?: Array<{
+    id: string;
+    date: string;
+    reason: string;
+    pinsChange: number;
+    assessmentName?: string;
+    initiatedBy: string;
+  }>;
+}
+
 export interface OrganisationResponse {
   id: string;
   name: string;
   logoUrl?: string;
   createdAt: string;
   updatedAt: string;
+  subscription?: OrganisationSubscriptionConfig;
 }
 
 export interface CreateOrganisationRequest {
   name: string;
   logoUrl?: string;
+  subscription?: Partial<OrganisationSubscriptionConfig>;
 }
 
 export interface UpdateOrganisationRequest {
   name?: string;
   logoUrl?: string;
+  subscription?: Partial<OrganisationSubscriptionConfig>;
 }
 
 export interface OrganisationDashboardStats {
@@ -119,5 +147,56 @@ export const organisationService = {
 
   deleteOrganisation: async (id: string): Promise<void> => {
     await apiClient.delete(`/organisations/${id}`);
+  },
+
+  getSubscriptionConfig: (organisationId: string): OrganisationSubscriptionConfig => {
+    const defaultSub: OrganisationSubscriptionConfig = {
+      allocatedPins: 10911,
+      planTier: "Standard",
+      billingMode: "One-time Subscription",
+      subscriptionStartDate: "2025-11-14",
+      subscriptionEndDate: "2027-08-26",
+      billingCycleStartDate: "2025-11-14",
+      billingCycleEndDate: "2027-08-26",
+      maxTeamSeats: 20,
+      enabledProctoringTiers: {
+        basic: true,
+        standard: true,
+        advanced: true,
+      },
+      statementAdjustments: [],
+    };
+
+    try {
+      const stored = localStorage.getItem(`org_sub_config_${organisationId}`);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        return { ...defaultSub, ...parsed };
+      }
+    } catch {}
+
+    return defaultSub;
+  },
+
+  updateSubscriptionConfig: (
+    organisationId: string,
+    updates: Partial<OrganisationSubscriptionConfig>
+  ): OrganisationSubscriptionConfig => {
+    const current = organisationService.getSubscriptionConfig(organisationId);
+    const updated: OrganisationSubscriptionConfig = {
+      ...current,
+      ...updates,
+      enabledProctoringTiers: {
+        ...current.enabledProctoringTiers,
+        ...(updates.enabledProctoringTiers || {}),
+      },
+      statementAdjustments: updates.statementAdjustments || current.statementAdjustments || [],
+    };
+
+    try {
+      localStorage.setItem(`org_sub_config_${organisationId}`, JSON.stringify(updated));
+    } catch {}
+
+    return updated;
   },
 };

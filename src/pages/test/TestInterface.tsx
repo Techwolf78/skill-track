@@ -50,10 +50,11 @@ import { ProctoringProvider, useProctoring, ProctoringConfigDto } from "@/procto
 import { CameraPreview } from "@/proctoring/components/CameraPreview";
 import { EnvironmentCheck } from "@/proctoring/components/EnvironmentCheck";
 import { IdentityVerification } from "@/proctoring/components/IdentityVerification";
+import { FaceNotVisibleModal } from "@/proctoring/components/FaceNotVisibleModal";
 import { Shield, ShieldAlert, ShieldCheck as ShieldCheckIcon, Camera } from "lucide-react";
 import { AnswerStore, computeContentHash } from "@/lib/exam/answerStorage";
 import { detectTimeExtension } from "@/lib/exam/sessionLogic";
-import { decodeHtmlIfNeeded, isHtmlContent } from "@/lib/html-utils";
+import { decodeHtmlIfNeeded, isHtmlContent, renderFormattedContent } from "@/lib/html-utils";
 
 import { mapBackendToFrontendLang } from "../../types/question";
 
@@ -68,11 +69,11 @@ interface Question {
   sampleInput?: string;
   sampleOutput?: string;
   sampleExplanation?: string;
-  examples?: Array<{ input: string; output?: string; expectedOutput?: string; explanation?: string }>;
-  visibleTestCases?: Array<{ id?: string; input: string; expectedOutput: string; explanation?: string }>;
-  testCases?: Array<{ id?: string; input: string; expectedOutput?: string; output?: string; expected?: string; explanation?: string; sample?: boolean; isSample?: boolean; isHidden?: boolean }>;
+  examples?: TestCaseSampleItem[];
+  visibleTestCases?: TestCaseSampleItem[];
+  testCases?: TestCaseSampleItem[];
   codeTemplate?: Record<string, CodeTemplateEntry>;
-  languageTemplates?: Record<string, any>;
+  languageTemplates?: Record<string, unknown>;
   starterCode?: Record<string, string>;
   difficulty?: string;
   constraints?: string;
@@ -84,10 +85,64 @@ interface Question {
   imageUrl?: string;
 }
 
+type VendorDocument = Document & {
+  webkitFullscreenElement?: Element | null;
+  mozFullScreenElement?: Element | null;
+  msFullscreenElement?: Element | null;
+};
+
+interface TestCaseDisplayResult {
+  status: string;
+  passed: boolean;
+  input?: string;
+  output?: string;
+  expected?: string;
+  compileOutput?: string;
+  stderr?: string;
+  execTimeMs?: number;
+}
+
+interface TestCaseSampleItem {
+  id?: string;
+  input?: string | number | null;
+  output?: string | number | null;
+  expectedOutput?: string | number | null;
+  expected?: string | number | null;
+  explanation?: string;
+  sample?: boolean;
+  isSample?: boolean;
+  isHidden?: boolean;
+}
+
+interface QuestionLikeObject {
+  visibleTestCases?: TestCaseSampleItem[];
+  testCases?: TestCaseSampleItem[];
+  testcases?: TestCaseSampleItem[];
+  test_cases?: TestCaseSampleItem[];
+  coding?: {
+    visibleTestCases?: TestCaseSampleItem[];
+    testCases?: TestCaseSampleItem[];
+    test_cases?: TestCaseSampleItem[];
+    sampleExplanation?: string;
+    sampleInput?: string;
+    sampleOutput?: string;
+    examples?: { data?: TestCaseSampleItem[] } | TestCaseSampleItem[];
+    languageTemplates?: Record<string, unknown>;
+  };
+  sampleExplanation?: string;
+  sampleInput?: string;
+  sampleOutput?: string;
+  prompt?: string;
+  constraints?: string;
+  examples?: TestCaseSampleItem[];
+  languageTemplates?: Record<string, unknown>;
+}
+
 interface RawPaperQuestion {
   snapshotQuestionId?: string;
   sourceQuestionId: string;
   orderIndex: number;
+  displayOrderIndex?: number;
   marks: number;
   type: "MCQ" | "CODING";
   prompt: string;
@@ -114,7 +169,7 @@ interface RawPaperQuestion {
 }
 
 // Helper to extract ONLY sample (public) test cases for candidate display
-const getSampleTestcases = (q: any): Array<{ input: string; output: string; explanation?: string }> => {
+const getSampleTestcases = (q: QuestionLikeObject | null | undefined): Array<{ input: string; output: string; explanation?: string }> => {
   if (!q) return [];
   const list: Array<{ input: string; output: string; explanation?: string }> = [];
 
@@ -136,7 +191,7 @@ const getSampleTestcases = (q: any): Array<{ input: string; output: string; expl
   if (list.length === 0) {
     const rawCases = q.testCases || q.testcases || q.test_cases || q.coding?.testCases || q.coding?.test_cases;
     if (Array.isArray(rawCases) && rawCases.length > 0) {
-      const sampleCases = rawCases.filter((tc: any) => (tc.sample === true || tc.isSample === true) && !tc.isHidden);
+      const sampleCases = rawCases.filter((tc: TestCaseSampleItem) => (tc.sample === true || tc.isSample === true) && !tc.isHidden);
       for (const tc of sampleCases) {
         list.push({
           input: tc.input != null ? String(tc.input) : "",
@@ -156,7 +211,7 @@ const getSampleTestcases = (q: any): Array<{ input: string; output: string; expl
 
   // 3. Check examples array
   if (list.length === 0) {
-    const rawExamples = q.examples || q.coding?.examples || (Array.isArray(q.coding?.examples?.data) ? q.coding.examples.data : null);
+    const rawExamples = q.examples || (Array.isArray(q.coding?.examples) ? q.coding.examples : (q.coding?.examples && "data" in q.coding.examples && Array.isArray(q.coding.examples.data) ? q.coding.examples.data : null));
     if (Array.isArray(rawExamples) && rawExamples.length > 0) {
       for (const ex of rawExamples) {
         if (ex && !ex.isHidden) {
@@ -190,7 +245,7 @@ const getSampleTestcases = (q: any): Array<{ input: string; output: string; expl
   if (list.length === 0 && q.prompt) {
     const pText = `${q.prompt || ""}\n${q.sampleExplanation || ""}\n${q.constraints || ""}`;
     const exampleRegex =
-      /(?:Example\s*(\d+)|\*\*Example\s*(\d+)\*\*|###\s*Example\s*(\d+))[\s\S]*?(?:Input|\*\*Input:\*\*)\s*[:\.]?\s*`?([^`\n\r]+)`?[\s\S]*?(?:Output|\*\*Output:\*\*)\s*[:\.]?\s*`?([^`\n\r]+)`?(?:[\s\S]*?(?:Explanation|\*\*Explanation:\*\*)\s*[:\.]?\s*([^\n\r]+))?/gi;
+      /(?:Example\s*(\d+)|\*\*Example\s*(\d+)\*\*|###\s*Example\s*(\d+))[\s\S]*?(?:Input|\*\*Input:\*\*)\s*[:.]?\s*`?([^`\n\r]+)`?[\s\S]*?(?:Output|\*\*Output:\*\*)\s*[:.]?\s*`?([^`\n\r]+)`?(?:[\s\S]*?(?:Explanation|\*\*Explanation:\*\*)\s*[:.]?\s*([^\n\r]+))?/gi;
     let match;
     while ((match = exampleRegex.exec(pText)) !== null && list.length < 3) {
       const rawIn = match[4]?.trim();
@@ -364,8 +419,9 @@ export default function TestInterface() {
         toast({ title: "Assessment Activated", description: "All checks passed. Assessment timer started!" });
         sessionStorage.setItem(`env_checked_${sessionId}`, "true");
         setEnvChecked(true);
-      } catch (err: any) {
-        const errMsg = err?.response?.data?.message || err?.message || "";
+      } catch (err: unknown) {
+        const errorObj = err as { response?: { data?: { message?: string } }; message?: string };
+        const errMsg = errorObj?.response?.data?.message || errorObj?.message || "";
         console.error("Session activation error:", err);
         if (errMsg.toLowerCase().includes("candidate photo") || errMsg.toLowerCase().includes("photo must be uploaded")) {
           sessionStorage.removeItem(`identity_verified_${sessionId}`);
@@ -407,9 +463,19 @@ export default function TestInterface() {
 }
 
 function TestInterfaceContent({ testId, sessionId, navigate, toast, onRequireIdentityVerification }: { testId?: string; sessionId?: string; navigate: (path: string) => void; toast: (props: { title?: string; description?: string; variant?: "default" | "destructive" }) => void; onRequireIdentityVerification?: () => void }) {
-  const { violations, trustScore, isProctoringActive, startProctoring, syncViolations, flushEvidence, videoRef, config } = useProctoring();
+  const { violations, trustScore, isProctoringActive, startProctoring, stopProctoring, syncViolations, flushEvidence, videoRef, config } = useProctoring();
   const lastWarnedCountRef = useRef(0);
   const hasWarnedFullscreenRef = useRef(false);
+
+  // Stop all proctoring and media hardware when TestInterface unmounts
+  useEffect(() => {
+    return () => {
+      stopProctoring();
+      if (document.fullscreenElement) {
+        document.exitFullscreen().catch(() => {});
+      }
+    };
+  }, [stopProctoring]);
 
   const [isDraftSynced, setIsDraftSynced] = useState(false);
   const saveVersionsRef = useRef<Record<string, number>>({});
@@ -514,7 +580,7 @@ function TestInterfaceContent({ testId, sessionId, navigate, toast, onRequireIde
   const [isRunning, setIsRunning] = useState(false);
   const [isSubmittingCode, setIsSubmittingCode] = useState(false);
   const [output, setOutput] = useState<{ type: 'success' | 'error', message: string } | null>(null);
-  const [testCaseResults, setTestCaseResults] = useState<TestCaseResult[]>([]);
+  const [testCaseResults, setTestCaseResults] = useState<TestCaseDisplayResult[]>([]);
   const [selectedTestCaseIdx, setSelectedTestCaseIdx] = useState<number | null>(null);
   const [submissionPhase, setSubmissionPhase] = useState<"idle" | "running" | "result">("idle");
   const [overallStatus, setOverallStatus] = useState<string | null>(null);
@@ -522,11 +588,16 @@ function TestInterfaceContent({ testId, sessionId, navigate, toast, onRequireIde
 
   // Fullscreen enforcement
   const [isFullscreen, setIsFullscreen] = useState(() => {
+    const doc = document as Document & {
+      webkitFullscreenElement?: Element | null;
+      mozFullScreenElement?: Element | null;
+      msFullscreenElement?: Element | null;
+    };
     return !!(
-      document.fullscreenElement ||
-      (document as any).webkitFullscreenElement ||
-      (document as any).mozFullScreenElement ||
-      (document as any).msFullscreenElement
+      doc.fullscreenElement ||
+      doc.webkitFullscreenElement ||
+      doc.mozFullScreenElement ||
+      doc.msFullscreenElement
     );
   });
   const [fullscreenTimer, setFullscreenTimer] = useState(10);
@@ -537,7 +608,11 @@ function TestInterfaceContent({ testId, sessionId, navigate, toast, onRequireIde
 
   const enterFullscreen = useCallback(async () => {
     try {
-      const docEl = document.documentElement as any;
+      const docEl = document.documentElement as HTMLElement & {
+        webkitRequestFullscreen?: () => Promise<void>;
+        mozRequestFullScreen?: () => Promise<void>;
+        msRequestFullscreen?: () => Promise<void>;
+      };
       const requestFs =
         docEl.requestFullscreen ||
         docEl.webkitRequestFullscreen ||
@@ -620,8 +695,9 @@ function TestInterfaceContent({ testId, sessionId, navigate, toast, onRequireIde
         try {
           await testService.activateTestSession(sessionId);
           console.log("✅ STEP 2b: Session activated.");
-        } catch (activateErr: any) {
-          const errMsg = activateErr?.response?.data?.message || activateErr?.message || "";
+        } catch (activateErr: unknown) {
+          const activateErrObj = activateErr as { response?: { data?: { message?: string } }; message?: string };
+          const errMsg = activateErrObj?.response?.data?.message || activateErrObj?.message || "";
           console.warn("⚠️ Session activation error:", activateErr);
           if (errMsg.toLowerCase().includes("candidate photo") || errMsg.toLowerCase().includes("photo must be uploaded")) {
             console.log("🔄 Candidate photo missing on backend. Falling back to Identity Verification...");
@@ -656,7 +732,7 @@ function TestInterfaceContent({ testId, sessionId, navigate, toast, onRequireIde
             id: q.snapshotQuestionId || q.sourceQuestionId,
             testId: paper.testId,
             questionId: q.sourceQuestionId,
-            orderIndex: q.orderIndex,
+            orderIndex: q.displayOrderIndex !== undefined ? q.displayOrderIndex : q.orderIndex,
             marks: q.marks,
             sectionName: q.sectionName,
             timeLimitSecs: q.coding?.timeLimitSecs,
@@ -766,10 +842,9 @@ useEffect(() => {
     console.log("🔍 Test.questions:", test?.questions);
     
     const qs = test.questions
-      .sort((a, b) => a.orderIndex - b.orderIndex)
       .map(tq => {
         const rawStarterCode = tq.question?.coding?.starterCode || tq.question?.starterCode;
-        const rawTemplates = (tq.question as any)?.languageTemplates || (tq.question?.coding as any)?.languageTemplates;
+        const rawTemplates = (tq.question as { languageTemplates?: Record<string, unknown> } | undefined)?.languageTemplates || (tq.question?.coding as { languageTemplates?: Record<string, unknown> } | undefined)?.languageTemplates;
         const processedStarterCode: Record<string, string> = {};
         if (rawStarterCode) {
           Object.entries(rawStarterCode).forEach(([lang, val]) => {
@@ -780,40 +855,58 @@ useEffect(() => {
         if (rawTemplates) {
           Object.entries(rawTemplates).forEach(([lang, val]) => {
             const frontendLang = mapBackendToFrontendLang(lang);
-            const templateStr = typeof val === "string" ? val : (val as any)?.template || (val as any)?.code || "";
+            const templateObj = typeof val === "object" && val !== null ? (val as { template?: string; code?: string }) : undefined;
+            const templateStr = typeof val === "string" ? val : templateObj?.template || templateObj?.code || "";
             if (templateStr && !processedStarterCode[frontendLang]) {
               processedStarterCode[frontendLang] = templateStr;
             }
           });
         }
 
+        const tqWithSection = tq as typeof tq & { section?: string };
+        const qObj = tq.question as (QuestionLikeObject & {
+          questionType?: "MCQ" | "CODING";
+          type?: "MCQ" | "CODING";
+          prompt?: string;
+          mcqOptions?: unknown[];
+          options?: unknown[];
+          difficulty?: string;
+          timeLimitSecs?: number;
+          memoryLimitMb?: number;
+          hints?: string[];
+          tags?: string[];
+          title?: string;
+          codeTemplate?: Record<string, CodeTemplateEntry>;
+          imageUrl?: string;
+        }) | undefined;
+
         return {
           ...(tq.question || {}),
           id: tq.questionId,
-          type: tq.question?.questionType || tq.question?.type || "MCQ",
-          prompt: tq.question?.prompt || "No prompt",
+          type: qObj?.questionType || qObj?.type || "MCQ",
+          prompt: qObj?.prompt || "No prompt",
           marks: tq.marks,
-          sectionName: tq.sectionName || (tq as any).section || undefined,
-          options: tq.question?.mcqOptions || (tq.question as any)?.options || [],
-          problemStatement: tq.question?.prompt,
-          sampleInput: tq.question?.sampleInput,
-          sampleOutput: tq.question?.sampleOutput,
-          sampleExplanation: tq.question?.sampleExplanation,
-          examples: (tq.question as any)?.examples,
-          visibleTestCases: (tq.question as any)?.visibleTestCases,
-          testCases: ((tq.question as any)?.testCases || (tq.question as any)?.coding?.testCases || [])
-            .filter((tc: any) => (tc.sample === true || tc.isSample === true) && !tc.isHidden),
-          codeTemplate: tq.question?.codeTemplate,
+          sectionName: tq.sectionName || tqWithSection.section || undefined,
+          options: qObj?.mcqOptions || qObj?.options || [],
+          problemStatement: qObj?.prompt,
+          sampleInput: qObj?.sampleInput,
+          sampleOutput: qObj?.sampleOutput,
+          sampleExplanation: qObj?.sampleExplanation,
+          examples: qObj?.examples,
+          visibleTestCases: qObj?.visibleTestCases,
+          testCases: ((qObj?.testCases || qObj?.coding?.testCases || []) as TestCaseSampleItem[])
+            .filter((tc: TestCaseSampleItem) => (tc.sample === true || tc.isSample === true) && !tc.isHidden),
+          codeTemplate: qObj?.codeTemplate,
           languageTemplates: rawTemplates,
           starterCode: processedStarterCode,
-          difficulty: tq.question?.difficulty,
-          constraints: tq.question?.constraints,
-          timeLimitSecs: tq.question?.timeLimitSecs || tq.timeLimitSecs,
-          memoryLimitMb: tq.question?.memoryLimitMb,
-          hints: tq.question?.hints,
-          tags: tq.question?.tags,
-          title: tq.question?.title,
-          imageUrl: (tq.question as { imageUrl?: string })?.imageUrl,
+          difficulty: qObj?.difficulty,
+          constraints: qObj?.constraints,
+          timeLimitSecs: qObj?.timeLimitSecs || tq.timeLimitSecs,
+          memoryLimitMb: qObj?.memoryLimitMb,
+          hints: qObj?.hints,
+          tags: qObj?.tags,
+          title: qObj?.title,
+          imageUrl: qObj?.imageUrl,
         };
       });
 
@@ -852,8 +945,8 @@ useEffect(() => {
       questionLangs = Object.keys(currentQ.starterCode) as LanguageKey[];
     } else if (currentQ.codeTemplate && Object.keys(currentQ.codeTemplate).length > 0) {
       questionLangs = Object.keys(currentQ.codeTemplate) as LanguageKey[];
-    } else if ((currentQ as any).languageTemplates && Object.keys((currentQ as any).languageTemplates).length > 0) {
-      questionLangs = Object.keys((currentQ as any).languageTemplates).map(k => k === "python" ? "python3" : k) as LanguageKey[];
+    } else if (currentQ.languageTemplates && Object.keys(currentQ.languageTemplates).length > 0) {
+      questionLangs = Object.keys(currentQ.languageTemplates).map(k => k === "python" ? "python3" : k) as LanguageKey[];
     }
 
     if (questionLangs.length > 0 && !questionLangs.includes(language)) {
@@ -1017,10 +1110,28 @@ useEffect(() => {
       }
 
       // Use the new dedicated submit endpoint
-      await testService.submitSession(sessionId, answers);
+      await testService.submitSession(sessionId);
 
       // Clear local storage session cache
       AnswerStore.clearSession(sessionId);
+
+      // Stop proctoring, release camera/mic/screen streams, and exit fullscreen immediately
+      stopProctoring();
+      if (document.fullscreenElement) {
+        document.exitFullscreen().catch(() => {});
+      }
+      document.querySelectorAll<HTMLMediaElement>("video, audio").forEach((el) => {
+        if (el.srcObject instanceof MediaStream) {
+          el.srcObject.getTracks().forEach((track) => {
+            try {
+              track.stop();
+            } catch (e) {
+              void e;
+            }
+          });
+          el.srcObject = null;
+        }
+      });
 
       toast({ title: "Success", description: "Test submitted successfully, your responses have been recorded" });
       navigate(`/test/${testId}/results?session=${sessionId}`);
@@ -1036,7 +1147,7 @@ useEffect(() => {
       setSubmitting(false);
       setShowSubmitDialog(false);
     }
-  }, [sessionId, answers, testId, navigate, toast, syncViolations, flushEvidence, questions, currentIndex, flushQuestionTiming, submitting]);
+  }, [sessionId, answers, testId, navigate, toast, syncViolations, flushEvidence, stopProctoring, questions, currentIndex, language, flushQuestionTiming, submitting]);
 
   const handleAutoSubmit = useCallback(async () => {
     toast({
@@ -1049,11 +1160,12 @@ useEffect(() => {
   // Fullscreen enforcement effects
   useEffect(() => {
     const handleFullscreenChange = () => {
+      const doc = document as VendorDocument;
       const isFs = !!(
-        document.fullscreenElement ||
-        (document as any).webkitFullscreenElement ||
-        (document as any).mozFullScreenElement ||
-        (document as any).msFullscreenElement
+        doc.fullscreenElement ||
+        doc.webkitFullscreenElement ||
+        doc.mozFullScreenElement ||
+        doc.msFullscreenElement
       );
       setIsFullscreen(isFs);
     };
@@ -1332,16 +1444,19 @@ useEffect(() => {
         sourceCode: code,
       });
       
-      const mappedTestCases = (Array.isArray(resultsArray) ? resultsArray : []).map((tc: any) => ({
-        status: tc.status || "ACCEPTED",
-        passed: tc.status === "ACCEPTED",
-        input: tc.input || "",
-        output: tc.actualOutput || tc.stdout || tc.stderr || tc.compileOutput || "",
-        expected: tc.expectedOutput || (tc as any).expected || "",
-        compileOutput: tc.compileOutput || "",
-        stderr: tc.stderr || "",
-        execTimeMs: tc.execTimeMs || tc.executionTimeMs || 0,
-      }));
+      const mappedTestCases: TestCaseDisplayResult[] = (Array.isArray(resultsArray) ? resultsArray : []).map((raw) => {
+        const tc = raw as TestCaseResult & { expected?: string; output?: string; executionTimeMs?: number };
+        return {
+          status: tc.status || "ACCEPTED",
+          passed: tc.status === "ACCEPTED" || tc.passed === true,
+          input: tc.input || "",
+          output: tc.actualOutput || tc.output || tc.stdout || tc.stderr || tc.compileOutput || "",
+          expected: tc.expectedOutput || tc.expected || "",
+          compileOutput: tc.compileOutput || "",
+          stderr: tc.stderr || "",
+          execTimeMs: tc.execTimeMs || tc.executionTimeMs || 0,
+        };
+      });
 
       setTestCaseResults(mappedTestCases);
 
@@ -1777,12 +1892,14 @@ useEffect(() => {
     );
   }
 
+  const isFullscreenLocked = !isFullscreen && isProctoringActive;
+
   return (
     <div className="min-h-screen bg-background flex flex-col relative">
       {/* Fullscreen Enforcement Overlay on Reload & Tab Switch */}
-      {!isFullscreen && isProctoringActive && Boolean(config?.fullscreen || config?.fullscreenExitTracking || config?.tabSwitch) && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-md p-4">
-          <div className="bg-white p-8 rounded-2xl border border-slate-200 shadow-2xl text-center max-w-md w-full animate-in zoom-in duration-300">
+      {isFullscreenLocked && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/75 backdrop-blur-sm p-4 pointer-events-auto">
+          <div className="bg-white p-8 rounded-2xl border border-slate-200 shadow-2xl text-center max-w-md w-full animate-in zoom-in duration-200">
             <div className="mx-auto mb-5 w-16 h-16 rounded-full bg-orange-500/10 flex items-center justify-center animate-pulse">
               <Monitor className="w-8 h-8 text-orange-600" />
             </div>
@@ -1804,7 +1921,7 @@ useEffect(() => {
 
       <div className={cn(
         "flex-1 flex flex-col overflow-hidden",
-        !isFullscreen && isProctoringActive && "blur-md pointer-events-none"
+        isFullscreenLocked && "blur-md pointer-events-none select-none"
       )}>
         {/* Header */}
         <header className="sticky top-0 z-40 border-b bg-card/90 backdrop-blur px-6 py-4 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
@@ -1939,23 +2056,13 @@ useEffect(() => {
                         {/* Problem Statement Title */}
                         <h2 className="text-sm font-bold text-slate-900">Problem Statement</h2>
 
-                        {/* Formatted HTML Problem Statement */}
-                        {(() => {
-                          const rawPrompt = currentQuestion.prompt || currentQuestion.title || "";
-                          const decodedPrompt = decodeHtmlIfNeeded(rawPrompt);
-                          return isHtmlContent(decodedPrompt) ? (
-                            <div
-                              className="text-[13px] md:text-sm text-slate-800 leading-relaxed font-sans prose prose-slate max-w-none [&_h3]:text-sm [&_h3]:font-bold [&_h3]:text-slate-900 [&_h3]:mt-4 [&_h3]:mb-1.5 [&_ol]:list-decimal [&_ol]:pl-5 [&_ul]:list-disc [&_ul]:pl-5 [&_li]:my-1 [&_p]:my-1.5 [&_pre]:bg-[#18181b] [&_pre]:text-amber-300 [&_pre]:p-3 [&_pre]:rounded-sm [&_pre]:font-mono [&_pre]:text-xs [&_pre]:overflow-x-auto [&_code]:font-mono [&_code]:text-xs [&_code]:bg-slate-100 [&_code]:text-pink-600 [&_code]:px-1 [&_code]:py-0.5 [&_code]:rounded-xs"
-                              dangerouslySetInnerHTML={{
-                                __html: decodedPrompt,
-                              }}
-                            />
-                          ) : (
-                            <div className="text-[13px] md:text-sm text-slate-800 leading-relaxed whitespace-pre-wrap font-normal">
-                              {decodedPrompt}
-                            </div>
-                          );
-                        })()}
+                        {/* Formatted HTML/Markdown Problem Statement */}
+                        <div
+                          className="text-[13px] md:text-sm text-slate-800 leading-relaxed font-sans prose prose-slate max-w-none [&_h3]:text-xs [&_h3]:font-bold [&_h3]:text-slate-900 [&_h3]:uppercase [&_h3]:tracking-wider [&_h3]:mt-4 [&_h3]:mb-1.5 [&_h2]:text-sm [&_h2]:font-bold [&_h2]:text-slate-900 [&_h2]:mt-4 [&_h2]:mb-1.5 [&_ol]:list-decimal [&_ol]:pl-5 [&_ul]:list-disc [&_ul]:pl-5 [&_li]:my-1 [&_p]:my-1.5 [&_pre]:bg-[#18181b] [&_pre]:text-amber-300 [&_pre]:p-3 [&_pre]:rounded-sm [&_pre]:font-mono [&_pre]:text-xs [&_pre]:overflow-x-auto [&_code]:font-mono [&_code]:text-xs [&_code]:bg-slate-100 [&_code]:text-pink-600 [&_code]:px-1 [&_code]:py-0.5 [&_code]:rounded-xs"
+                          dangerouslySetInnerHTML={{
+                            __html: renderFormattedContent(currentQuestion.prompt || currentQuestion.title || ""),
+                          }}
+                        />
 
                         {/* Question Image */}
                         {currentQuestion.imageUrl && (
@@ -2081,7 +2188,7 @@ useEffect(() => {
                             isLoading={isSubmittingCode}
                             loadingText="SUBMITTING..."
                             disabled={isRunning}
-                            className="px-3.5 py-1.5 bg-[#4353a4] hover:bg-[#344287] text-white text-xs font-semibold rounded shadow-xs flex items-center gap-1.5 transition-colors cursor-pointer"
+                            className="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded shadow-xs flex items-center gap-1.5 transition-colors cursor-pointer"
                           >
                             <Save className="w-3.5 h-3.5" />
                             <span>SUBMIT</span>
@@ -2181,7 +2288,7 @@ useEffect(() => {
                                 </div>
                               ) : (
                                 <>
-                                  {testCaseResults.map((tc: any, idx) => (
+                                  {testCaseResults.map((tc: TestCaseDisplayResult, idx: number) => (
                                     <div
                                       key={idx}
                                       className={`p-2.5 rounded border ${
@@ -2284,22 +2391,12 @@ useEffect(() => {
                               {currentQuestion.title}
                             </h2>
                           )}
-                        {(() => {
-                          const rawPrompt = currentQuestion.prompt || currentQuestion.title || "";
-                          const decodedPrompt = decodeHtmlIfNeeded(rawPrompt);
-                          return isHtmlContent(decodedPrompt) ? (
-                            <div
-                              className="text-base font-normal mt-3 prose prose-slate max-w-none [&_ol]:list-decimal [&_ol]:pl-5 [&_ul]:list-disc [&_ul]:pl-5 [&_pre]:bg-slate-900 [&_pre]:text-slate-100 [&_pre]:p-3 [&_pre]:rounded-sm [&_code]:bg-slate-100 [&_code]:text-pink-600 [&_code]:px-1 [&_code]:py-0.5"
-                              dangerouslySetInnerHTML={{
-                                __html: decodedPrompt,
-                              }}
-                            />
-                          ) : (
-                            <div className="text-base font-medium mt-3 whitespace-pre-wrap">
-                              {decodedPrompt}
-                            </div>
-                          );
-                        })()}
+                        <div
+                          className="text-base font-normal mt-3 prose prose-slate max-w-none [&_ol]:list-decimal [&_ol]:pl-5 [&_ul]:list-disc [&_ul]:pl-5 [&_pre]:bg-slate-900 [&_pre]:text-slate-100 [&_pre]:p-3 [&_pre]:rounded-sm [&_code]:bg-slate-100 [&_code]:text-pink-600 [&_code]:px-1 [&_code]:py-0.5"
+                          dangerouslySetInnerHTML={{
+                            __html: renderFormattedContent(currentQuestion.prompt || currentQuestion.title || ""),
+                          }}
+                        />
                         {currentQuestion.tags && currentQuestion.tags.length > 0 && (
                           <div className="flex flex-wrap gap-1 mt-2">
                             {currentQuestion.tags.map((tag, idx) => (
@@ -2560,6 +2657,7 @@ useEffect(() => {
       </AlertDialog>
 
       {config?.camera && <CameraPreview position="bottom-right" size="small" showOnHover />}
+      <FaceNotVisibleModal />
       </div>
     </div>
   );

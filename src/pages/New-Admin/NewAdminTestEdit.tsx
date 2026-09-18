@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import {
@@ -269,18 +270,28 @@ export default function NewAdminTestEdit() {
       setActiveTab("PROBLEMS");
     }
   }, [searchParams]);
+
   const [loading, setLoading] = useState(Boolean(id));
   const [test, setTest] = useState<Test | null>(null);
   const [questions, setQuestions] = useState<Array<TestQuestion & { question?: Question }>>([]);
   // Section UI state
   const [groupedQuestions, setGroupedQuestions] = useState<Record<string, Array<TestQuestion & { question?: Question }>>>({});
+  // Section Management & Drag States
   const [sectionOrder, setSectionOrder] = useState<string[]>([]);
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
-  const [addSectionOpen, setAddSectionOpen] = useState(false);
-  const [newSectionName, setNewSectionName] = useState("");
   const [editingSectionName, setEditingSectionName] = useState<string | null>(null);
   const [editingSectionValue, setEditingSectionValue] = useState("");
   const [movingSectionFor, setMovingSectionFor] = useState<string | null>(null); // tq.id being moved
+
+  // Section Settings Modal state (problem shuffle, custom marks, rename, create section)
+  const [sectionSettings, setSectionSettings] = useState<Record<string, { shuffleProblems?: boolean; [key: string]: any }>>({});
+  const [sectionSettingsModalOpen, setSectionSettingsModalOpen] = useState(false);
+  const [isCreatingNewSection, setIsCreatingNewSection] = useState(false);
+  const [activeModalSection, setActiveModalSection] = useState<string | null>(null);
+  const [modalSectionName, setModalSectionName] = useState("");
+  const [modalProblemShuffle, setModalProblemShuffle] = useState(false);
+  const [modalMarksPerQuestion, setModalMarksPerQuestion] = useState<number | string>(10);
+  const [savingSectionSettings, setSavingSectionSettings] = useState(false);
 
   // General Settings Form States
   const [title, setTitle] = useState("");
@@ -350,6 +361,8 @@ export default function NewAdminTestEdit() {
   const [candidateRowsPerPage, setCandidateRowsPerPage] = useState(15);
   const [statusAccordionOpen, setStatusAccordionOpen] = useState(true);
   const [invitedOnAccordionOpen, setInvitedOnAccordionOpen] = useState(true);
+  const [candidateSortField, setCandidateSortField] = useState<"totalScore" | "percentScore" | "time" | null>(null);
+  const [candidateSortOrder, setCandidateSortOrder] = useState<"asc" | "desc" | null>(null);
 
   // ── Modals for 3-dots actions ──
   const [selectedCandidateForReport, setSelectedCandidateForReport] = useState<CandidateInvitation | null>(null);
@@ -398,6 +411,8 @@ export default function NewAdminTestEdit() {
         } else {
           setInstructions("");
         }
+
+        setSectionSettings(testData.sectionSettings || {});
 
         // Populate Schedule - sort by recency (startTime / createdAt desc)
         const sortedSchedules = [...(testSchedules || [])].sort((a, b) => {
@@ -591,7 +606,7 @@ export default function NewAdminTestEdit() {
     } finally {
       setLoadingCandidatesData(false);
     }
-  }, [id, selectedScheduleId]);
+  }, [id]);
 
   useEffect(() => {
     if (activeTab === "CANDIDATES") {
@@ -717,22 +732,6 @@ export default function NewAdminTestEdit() {
     }
   };
 
-  const handleConfirmNewSection = () => {
-    const name = newSectionName.trim();
-    if (!name) { toast.error("Section name cannot be empty"); return; }
-    if (sectionOrder.includes(name)) { toast.error(`Section "${name}" already exists`); return; }
-    setSectionOrder((prev) => {
-      // Insert before "Ungrouped" if it exists, otherwise append
-      const ungroupedIdx = prev.indexOf("Ungrouped");
-      if (ungroupedIdx === -1) return [...prev, name];
-      return [...prev.slice(0, ungroupedIdx), name, ...prev.slice(ungroupedIdx)];
-    });
-    setGroupedQuestions((prev) => ({ ...prev, [name]: [] }));
-    setNewSectionName("");
-    setAddSectionOpen(false);
-    toast.success(`Section "${name}" created`);
-  };
-
   const handleRenameSection = async (oldName: string, newName: string) => {
     const trimmed = newName.trim();
     if (!trimmed) {
@@ -812,6 +811,169 @@ export default function NewAdminTestEdit() {
         return next;
       });
       toast.success(`Section "${sectionName}" deleted`);
+    }
+  };
+
+  const handleOpenAddSectionModal = () => {
+    setIsCreatingNewSection(true);
+    setActiveModalSection(null);
+    setModalSectionName("");
+    setModalProblemShuffle(false);
+    setModalMarksPerQuestion(10);
+    setSectionSettingsModalOpen(true);
+  };
+
+  const handleOpenSectionSettings = (section: string) => {
+    setIsCreatingNewSection(false);
+    setActiveModalSection(section);
+    setModalSectionName(section === "Ungrouped" ? "Ungrouped" : section);
+    const currentSettings = sectionSettings[section] || {};
+    setModalProblemShuffle(Boolean(currentSettings.shuffleProblems));
+    const sectionQs = groupedQuestions[section] || [];
+    const firstMark = sectionQs.length > 0 && sectionQs[0].marks !== undefined ? sectionQs[0].marks : 10;
+    setModalMarksPerQuestion(firstMark);
+    setSectionSettingsModalOpen(true);
+  };
+
+  const handleSaveSectionSettings = async () => {
+    if (isCreatingNewSection) {
+      const name = modalSectionName.trim();
+      if (!name) {
+        toast.error("Section name cannot be empty");
+        return;
+      }
+      if (sectionOrder.includes(name)) {
+        toast.error(`Section "${name}" already exists`);
+        return;
+      }
+
+      setSavingSectionSettings(true);
+      try {
+        setSectionOrder((prev) => {
+          const ungroupedIdx = prev.indexOf("Ungrouped");
+          if (ungroupedIdx === -1) return [...prev, name];
+          return [...prev.slice(0, ungroupedIdx), name, ...prev.slice(ungroupedIdx)];
+        });
+        setGroupedQuestions((prev) => ({ ...prev, [name]: [] }));
+
+        const updatedSectionSettings = {
+          ...sectionSettings,
+          [name]: {
+            shuffleProblems: modalProblemShuffle,
+          },
+        };
+        setSectionSettings(updatedSectionSettings);
+
+        if (id) {
+          await testService.updateTest(id, { sectionSettings: updatedSectionSettings });
+        }
+
+        toast.success(`Section "${name}" created successfully`);
+        setSectionSettingsModalOpen(false);
+        setIsCreatingNewSection(false);
+      } catch (err: any) {
+        console.error("[NewAdminTestEdit] Failed to create section:", err);
+        toast.error("Failed to create section: " + (err.message || "Unknown error"));
+      } finally {
+        setSavingSectionSettings(false);
+      }
+      return;
+    }
+
+    if (!activeModalSection) return;
+    const oldName = activeModalSection;
+    const newName = modalSectionName.trim() || (oldName === "Ungrouped" ? "Ungrouped" : "");
+
+    if (!newName) {
+      toast.error("Section name cannot be empty");
+      return;
+    }
+    if (newName !== oldName && sectionOrder.includes(newName)) {
+      toast.error(`Section "${newName}" already exists`);
+      return;
+    }
+
+    setSavingSectionSettings(true);
+    try {
+      const sectionQs = groupedQuestions[oldName] || [];
+
+      // 1. If Rename happened or custom marks applied, update test_questions
+      const needRename = newName !== oldName;
+      const newMarksValue = Number(modalMarksPerQuestion) >= 0 ? Number(modalMarksPerQuestion) : 0;
+      const needMarksUpdate = modalMarksPerQuestion !== "" && sectionQs.some((tq) => tq.marks !== newMarksValue);
+
+      if (sectionQs.length > 0 && (needRename || needMarksUpdate)) {
+        await Promise.all(
+          sectionQs.map((tq) => {
+            const payload: any = {};
+            if (needRename) payload.sectionName = newName === "Ungrouped" ? "" : newName;
+            if (needMarksUpdate) payload.marks = newMarksValue;
+            return testService.updateTestQuestion(tq.id, payload);
+          })
+        );
+      }
+
+      // 2. Update local questions & groupedQuestions state
+      setGroupedQuestions((prev) => {
+        const next = { ...prev };
+        const currentList = next[oldName] || [];
+        const updatedList = currentList.map((tq) => ({
+          ...tq,
+          sectionName: needRename ? (newName === "Ungrouped" ? undefined : newName) : tq.sectionName,
+          marks: needMarksUpdate ? newMarksValue : tq.marks,
+        }));
+
+        if (needRename) {
+          delete next[oldName];
+          next[newName] = updatedList;
+        } else {
+          next[oldName] = updatedList;
+        }
+        return next;
+      });
+
+      if (needRename) {
+        setSectionOrder((prev) => prev.map((s) => (s === oldName ? newName : s)));
+        setCollapsedSections((prev) => {
+          const next = new Set(prev);
+          if (next.has(oldName)) {
+            next.delete(oldName);
+            next.add(newName);
+          }
+          return next;
+        });
+      }
+
+      if (needMarksUpdate) {
+        setQuestions((prev) =>
+          prev.map((q) =>
+            sectionQs.some((sq) => sq.id === q.id) ? { ...q, marks: newMarksValue } : q
+          )
+        );
+      }
+
+      // 3. Update sectionSettings map on test
+      const updatedSectionSettings = { ...sectionSettings };
+      if (needRename && updatedSectionSettings[oldName]) {
+        delete updatedSectionSettings[oldName];
+      }
+      updatedSectionSettings[newName] = {
+        ...(updatedSectionSettings[newName] || {}),
+        shuffleProblems: modalProblemShuffle,
+      };
+      setSectionSettings(updatedSectionSettings);
+
+      if (id) {
+        await testService.updateTest(id, { sectionSettings: updatedSectionSettings });
+      }
+
+      toast.success("Section settings updated successfully");
+      setSectionSettingsModalOpen(false);
+    } catch (err: any) {
+      console.error("[NewAdminTestEdit] Failed to update section settings:", err);
+      toast.error("Failed to update section settings: " + (err.message || "Unknown error"));
+    } finally {
+      setSavingSectionSettings(false);
     }
   };
 
@@ -1016,9 +1178,113 @@ export default function NewAdminTestEdit() {
     }
   };
 
+  // ── Candidate Sorting Helpers ──
+  const getTimeTakenSeconds = useCallback((inv: CandidateInvitation): number | null => {
+    const scoreEntry = candidateResults[inv.id];
+    const result = scoreEntry?.result;
+    if (result?.timeTakenSeconds !== undefined && result?.timeTakenSeconds !== null && !isNaN(Number(result.timeTakenSeconds))) {
+      return Number(result.timeTakenSeconds);
+    }
+    const startedAt =
+      scoreEntry?.session?.startedAt ||
+      scoreEntry?.session?.startTime ||
+      scoreEntry?.session?.createdAt ||
+      scoreEntry?.detail?.systemInfo?.startedAt ||
+      scoreEntry?.detail?.startedAt ||
+      scoreEntry?.detail?.createdAt;
+    const endedAt =
+      scoreEntry?.session?.endedAt ||
+      scoreEntry?.session?.endTime ||
+      scoreEntry?.session?.updatedAt ||
+      scoreEntry?.detail?.systemInfo?.endedAt ||
+      scoreEntry?.detail?.systemInfo?.submittedAt ||
+      scoreEntry?.detail?.submittedAt ||
+      scoreEntry?.detail?.endedAt ||
+      result?.evaluatedAt ||
+      result?.createdAt;
+    if (startedAt && endedAt) {
+      const diff = (new Date(endedAt).getTime() - new Date(startedAt).getTime()) / 1000;
+      return isNaN(diff) ? null : Math.max(0, Math.floor(diff));
+    }
+    const rawTime = result?.timeTaken ?? (inv as any)?.timeTaken;
+    if (rawTime !== undefined && rawTime !== null && rawTime !== "") {
+      const str = String(rawTime).trim().toLowerCase();
+      let total = 0;
+      let matched = false;
+      const hoursMatch = str.match(/(\d+)\s*h/);
+      if (hoursMatch) {
+        total += parseInt(hoursMatch[1], 10) * 3600;
+        matched = true;
+      }
+      const minsMatch = str.match(/(\d+)\s*m/);
+      if (minsMatch) {
+        total += parseInt(minsMatch[1], 10) * 60;
+        matched = true;
+      }
+      const secsMatch = str.match(/(\d+)\s*s/);
+      if (secsMatch) {
+        total += parseInt(secsMatch[1], 10);
+        matched = true;
+      }
+      if (matched) return total;
+      const num = Number(str);
+      if (!isNaN(num)) return num;
+    }
+    return null;
+  }, [candidateResults]);
+
+  const getTotalScoreNumber = useCallback((inv: CandidateInvitation): number | null => {
+    const scoreEntry = candidateResults[inv.id];
+    const r = scoreEntry?.result;
+    const d = scoreEntry?.detail;
+    const val = r?.score ?? r?.totalScore ?? d?.score ?? d?.totalScore ?? (inv as any)?.score ?? (inv as any)?.totalScore;
+    return val !== undefined && val !== null && val !== "" && !isNaN(Number(val)) ? Number(val) : null;
+  }, [candidateResults]);
+
+  const getPercentageNumber = useCallback((inv: CandidateInvitation): number | null => {
+    const scoreEntry = candidateResults[inv.id];
+    const r = scoreEntry?.result;
+    const d = scoreEntry?.detail;
+    const val = r?.percentage ?? r?.scorePercentage ?? d?.percentage ?? d?.scorePercentage ?? (inv as any)?.percentage ?? (inv as any)?.scorePercentage;
+    return val !== undefined && val !== null && val !== "" && !isNaN(Number(val)) ? Number(val) : null;
+  }, [candidateResults]);
+
+  const handleSort = (field: "totalScore" | "percentScore" | "time") => {
+    if (candidateSortField === field) {
+      if (candidateSortOrder === "desc") {
+        setCandidateSortOrder("asc");
+      } else if (candidateSortOrder === "asc") {
+        setCandidateSortField(null);
+        setCandidateSortOrder(null);
+      } else {
+        setCandidateSortOrder("desc");
+      }
+    } else {
+      setCandidateSortField(field);
+      setCandidateSortOrder(field === "time" ? "asc" : "desc");
+    }
+    setCandidatePage(1);
+  };
+
+  const handleExplicitSort = (
+    field: "totalScore" | "percentScore" | "time",
+    order: "asc" | "desc",
+    e?: React.MouseEvent
+  ) => {
+    if (e) e.stopPropagation();
+    if (candidateSortField === field && candidateSortOrder === order) {
+      setCandidateSortField(null);
+      setCandidateSortOrder(null);
+    } else {
+      setCandidateSortField(field);
+      setCandidateSortOrder(order);
+    }
+    setCandidatePage(1);
+  };
+
   // ── Filtered Candidates for the CANDIDATES Tab ──
   const filteredCandidates = useMemo(() => {
-    return invitations.filter((inv) => {
+    const list = invitations.filter((inv) => {
       const scoreEntry = candidateResults[inv.id];
       const detailCand = scoreEntry?.detail?.candidate;
       const name = (
@@ -1043,18 +1309,57 @@ export default function NewAdminTestEdit() {
       }
 
       const result = scoreEntry?.result;
-      const pass = result?.passed;
-      const status = inv.status;
+      const isPassed = result?.passed === true;
+      const isFailed = result && result.passed === false;
+      const isSubmitted = inv.status === "SUBMITTED" || inv.sessionStatus === "SUBMITTED" || inv.sessionStatus === "AUTO_SUBMITTED";
+      const isInProgress =
+        (inv.status === "ACCEPTED" || inv.sessionStatus === "IN_PROGRESS" || scoreEntry?.session?.status === "IN_PROGRESS") &&
+        !isPassed &&
+        !isFailed &&
+        !isSubmitted;
 
-      if (candidateStatusFilter === "PASSED" && !pass) return false;
-      if (candidateStatusFilter === "FAILED" && (pass === undefined || pass === true)) return false;
-      if (candidateStatusFilter === "INVITED" && status !== "PENDING") return false;
-      if (candidateStatusFilter === "IN_PROGRESS" && status !== "ACCEPTED") return false;
-      if (candidateStatusFilter === "SUBMITTED" && status !== "SUBMITTED") return false;
+      if (candidateStatusFilter === "PASSED" && !isPassed) return false;
+      if (candidateStatusFilter === "FAILED" && !isFailed) return false;
+      if (candidateStatusFilter === "IN_PROGRESS" && !isInProgress) return false;
+      if (candidateStatusFilter === "SUBMITTED" && !isSubmitted) return false;
+      if (candidateStatusFilter === "INVITED" && inv.status !== "PENDING") return false;
 
       return true;
     });
-  }, [invitations, candidateSearchQuery, candidateStatusFilter, candidateResults]);
+
+    if (!candidateSortField || !candidateSortOrder) return list;
+
+    return [...list].sort((a, b) => {
+      let numA: number | null = null;
+      let numB: number | null = null;
+
+      if (candidateSortField === "totalScore") {
+        numA = getTotalScoreNumber(a);
+        numB = getTotalScoreNumber(b);
+      } else if (candidateSortField === "percentScore") {
+        numA = getPercentageNumber(a);
+        numB = getPercentageNumber(b);
+      } else if (candidateSortField === "time") {
+        numA = getTimeTakenSeconds(a);
+        numB = getTimeTakenSeconds(b);
+      }
+
+      if (numA === null && numB === null) return 0;
+      if (numA === null) return 1;
+      if (numB === null) return -1;
+      return candidateSortOrder === "asc" ? numA - numB : numB - numA;
+    });
+  }, [
+    invitations,
+    candidateSearchQuery,
+    candidateStatusFilter,
+    candidateResults,
+    candidateSortField,
+    candidateSortOrder,
+    getTotalScoreNumber,
+    getPercentageNumber,
+    getTimeTakenSeconds,
+  ]);
 
   const totalCandidatePages = Math.max(
     1,
@@ -1260,7 +1565,7 @@ export default function NewAdminTestEdit() {
     }
     // Convert basic HTML break / paragraph / list elements to clean text formatting
     text = text
-      .replace(/<br\s*[\/]?>/gi, "\n")
+      .replace(/<br\s*\/?>/gi, "\n")
       .replace(/<\/p>/gi, "\n\n")
       .replace(/<p[^>]*>/gi, "")
       .replace(/<\/li>/gi, "\n")
@@ -1335,14 +1640,14 @@ export default function NewAdminTestEdit() {
             fallbackQuestions = [];
           }
         }
-        rawQuestionsList = fallbackQuestions.map((tq) => ({
+        rawQuestionsList = fallbackQuestions.map((tq: any) => ({
           id: tq.question?.id || tq.questionId || tq.id,
           sourceQuestionId: tq.question?.id || tq.questionId,
-          prompt: tq.question?.prompt || tq.prompt,
-          type: tq.question?.type || tq.type,
-          coding: tq.question?.coding || tq.coding,
-          options: tq.question?.mcqOptions || tq.question?.options || tq.mcqOptions || (tq as any).options || [],
-          mcqOptions: tq.question?.mcqOptions || tq.question?.options || tq.mcqOptions || (tq as any).options || [],
+          prompt: tq.question?.prompt || (tq as any).prompt,
+          type: (tq.question as any)?.type || (tq as any).type,
+          coding: (tq.question as any)?.coding || (tq as any).coding,
+          options: (tq.question as any)?.mcqOptions || (tq.question as any)?.options || tq.mcqOptions || (tq as any).options || [],
+          mcqOptions: (tq.question as any)?.mcqOptions || (tq.question as any)?.options || tq.mcqOptions || (tq as any).options || [],
         }));
       }
       const questionsList = rawQuestionsList;
@@ -1706,7 +2011,7 @@ export default function NewAdminTestEdit() {
           );
           const isCoding =
             String(q.type || "").toUpperCase() === "CODING" ||
-            String(enrichedQuestion?.type || "").toUpperCase() === "CODING" ||
+            String((enrichedQuestion as any)?.type || "").toUpperCase() === "CODING" ||
             Boolean(q.coding || (enrichedQuestion as any)?.coding) ||
             String(sub?.questionType || "").toUpperCase() === "CODING";
 
@@ -2021,36 +2326,36 @@ export default function NewAdminTestEdit() {
 
         const name =
           inv.candidateName ||
-          inv.candidate?.user?.name ||
-          inv.candidate?.name ||
-          inv.candidate?.candidateName ||
+          (inv.candidate as any)?.user?.name ||
+          (inv.candidate as any)?.name ||
+          (inv.candidate as any)?.candidateName ||
           detail?.candidate?.candidateName ||
           detail?.candidate?.name ||
           detail?.candidateName ||
           "Candidate";
         const email =
           inv.candidateEmail ||
-          inv.candidate?.user?.email ||
-          inv.candidate?.email ||
+          (inv.candidate as any)?.user?.email ||
+          (inv.candidate as any)?.email ||
           detail?.candidate?.email ||
           detail?.candidateEmail ||
           "—";
         const phone =
-          inv.candidatePhone ||
-          inv.candidate?.user?.phoneNumber ||
-          inv.candidate?.phoneNumber ||
-          inv.candidate?.phone ||
+          (inv as any).candidatePhone ||
+          (inv.candidate as any)?.user?.phoneNumber ||
+          (inv.candidate as any)?.phoneNumber ||
+          (inv.candidate as any)?.phone ||
           detail?.candidate?.phoneNumber ||
           "—";
         const college =
-          inv.candidate?.organisation?.name ||
-          (inv.candidate?.extraFields?.collegeName as string) ||
-          (inv.candidate?.extraFields?.college as string) ||
+          (inv.candidate as any)?.organisation?.name ||
+          ((inv.candidate as any)?.extraFields?.collegeName as string) ||
+          ((inv.candidate as any)?.extraFields?.college as string) ||
           "—";
         const domain =
-          (inv.candidate?.extraFields?.domain as string) ||
-          (inv.candidate?.extraFields?.department as string) ||
-          (inv.candidate?.extraFields?.branch as string) ||
+          ((inv.candidate as any)?.extraFields?.domain as string) ||
+          ((inv.candidate as any)?.extraFields?.department as string) ||
+          ((inv.candidate as any)?.extraFields?.branch as string) ||
           "—";
 
         const status =
@@ -2207,17 +2512,17 @@ export default function NewAdminTestEdit() {
         const detail = scoreEntry?.detail;
         const name =
           inv.candidateName ||
-          inv.candidate?.user?.name ||
-          inv.candidate?.name ||
-          inv.candidate?.candidateName ||
+          (inv.candidate as any)?.user?.name ||
+          (inv.candidate as any)?.name ||
+          (inv.candidate as any)?.candidateName ||
           detail?.candidate?.candidateName ||
           detail?.candidate?.name ||
           detail?.candidateName ||
           "Candidate";
         const email =
           inv.candidateEmail ||
-          inv.candidate?.user?.email ||
-          inv.candidate?.email ||
+          (inv.candidate as any)?.user?.email ||
+          (inv.candidate as any)?.email ||
           detail?.candidate?.email ||
           detail?.candidateEmail ||
           "—";
@@ -2249,17 +2554,17 @@ export default function NewAdminTestEdit() {
         const detail = scoreEntry?.detail;
         const name =
           inv.candidateName ||
-          inv.candidate?.user?.name ||
-          inv.candidate?.name ||
-          inv.candidate?.candidateName ||
+          (inv.candidate as any)?.user?.name ||
+          (inv.candidate as any)?.name ||
+          (inv.candidate as any)?.candidateName ||
           detail?.candidate?.candidateName ||
           detail?.candidate?.name ||
           detail?.candidateName ||
           "Candidate";
         const email =
           inv.candidateEmail ||
-          inv.candidate?.user?.email ||
-          inv.candidate?.email ||
+          (inv.candidate as any)?.user?.email ||
+          (inv.candidate as any)?.email ||
           detail?.candidate?.email ||
           detail?.candidateEmail ||
           "—";
@@ -2342,20 +2647,27 @@ export default function NewAdminTestEdit() {
 
   return (
     <div className="min-h-screen bg-[#F6F8FA] flex flex-col font-sans text-slate-800 antialiased selection:bg-indigo-500 selection:text-white">
-      {/* ── 1. Top Navbar (Dark Gryphon360 Navbar) ── */}
-      <header className="h-20 bg-[#081225] border-b border-[#142340] px-4 md:px-8 flex items-center justify-between z-30 sticky top-0 shadow-md">
+      {/* ── 1. Top Navbar (Sleek Slate Header with Breadcrumbs) ── */}
+      <header className="h-14 bg-[#0f172a] border-b border-slate-800/90 px-4 md:px-8 flex items-center justify-between z-30 sticky top-0 shadow-xs">
         {/* Left Side: Logo + Divider + Breadcrumb */}
         <div className="flex items-center space-x-3 md:space-x-4 min-w-0">
           <div
-            onClick={() => navigate("/admin/tests")}
+            onClick={() => navigate("/admin/home")}
             className="flex items-center gap-2 cursor-pointer group shrink-0"
           >
-            <GryphonLogo variant="dark" size="md" />
+            <GryphonLogo variant="dark" size="sm" />
           </div>
 
           <div className="h-5 w-[1px] bg-slate-700 mx-1 shrink-0" />
 
           <div className="flex items-center text-xs md:text-sm text-slate-400 font-medium space-x-1.5 truncate">
+            <span
+              onClick={() => navigate("/admin/home")}
+              className="hover:text-slate-200 cursor-pointer transition-colors shrink-0"
+            >
+              Dashboard
+            </span>
+            <ChevronRight className="w-3.5 h-3.5 text-slate-500 shrink-0" />
             <button
               onClick={() => navigate("/admin/tests")}
               className="hover:text-slate-200 cursor-pointer transition-colors shrink-0"
@@ -2373,14 +2685,14 @@ export default function NewAdminTestEdit() {
         <div className="flex items-center space-x-3 shrink-0">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <button className="flex items-center gap-2.5 px-2 py-1 hover:bg-white/5 transition-colors focus:outline-none cursor-pointer">
-                <Avatar className="w-8 h-8 border border-slate-700 bg-slate-800 text-slate-200">
-                  <AvatarFallback className="bg-[#4353a4] text-white text-xs font-bold">
+              <button className="flex items-center gap-2.5 px-2.5 py-1.5 hover:bg-slate-800/70 transition-colors focus:outline-none cursor-pointer rounded-md">
+                <Avatar className="w-7 h-7 border border-slate-700 bg-slate-800 text-slate-200">
+                  <AvatarFallback className="bg-indigo-600 text-white text-[11px] font-bold">
                     {user?.name ? user.name.slice(0, 2).toUpperCase() : "AD"}
                   </AvatarFallback>
                 </Avatar>
                 <div className="hidden sm:flex items-center">
-                  <span className="text-xs font-semibold text-slate-200">
+                  <span className="text-xs font-medium text-slate-200">
                     {user?.name || "Admin User"}
                   </span>
                 </div>
@@ -2415,176 +2727,140 @@ export default function NewAdminTestEdit() {
       </header>
 
       {/* ── 2. Main Content Workspace ── */}
-      <main className="max-w-7xl mx-auto px-4 md:px-8 py-8 w-full space-y-6">
+      <main className="max-w-7xl mx-auto px-4 md:px-8 py-3.5 w-full space-y-3">
         {/* Top Header Row: Test Name + Duration */}
-        <div className="space-y-1">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2.5">
-            <h1 className="text-xl md:text-2xl font-bold tracking-tight text-slate-900">
+            <h1 className="text-lg md:text-xl font-bold tracking-tight text-slate-900">
               {testTitle}
             </h1>
             <span
-              className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-[#10B981] text-white shrink-0 shadow-xs"
+              className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-[#10B981] text-white shrink-0 shadow-xs"
               title="Active & Verified"
             >
-              <Check className="w-3 h-3 stroke-[3]" />
+              <Check className="w-2.5 h-2.5 stroke-[3]" />
             </span>
-          </div>
-
-          <div className="flex items-center gap-4 text-xs text-slate-500 font-medium">
-            <span className="flex items-center gap-1.5">
+            <span className="text-slate-300">|</span>
+            <div className="flex items-center gap-1.5 text-xs text-slate-500 font-medium">
               <Clock className="w-3.5 h-3.5 text-slate-400" />
               <span>{durationStr}</span>
-            </span>
+            </div>
           </div>
         </div>
 
-        {/* ── 3. Tab Navigations (4 Standalone Tabs) ── */}
-        <div className="bg-white border border-slate-200/90 shadow-sm px-6 flex items-center overflow-x-auto scrollbar-none">
-          {/* PROBLEMS TAB */}
-          <button
-            onClick={() => setActiveTab("PROBLEMS")}
-            className={`py-3.5 px-4 text-xs font-bold tracking-wider uppercase flex items-center gap-2 transition-all cursor-pointer border-b-2 -mb-[1px] ${
-              activeTab === "PROBLEMS"
-                ? "border-[#10B981] text-[#0d9488]"
-                : "border-transparent text-slate-500 hover:text-slate-800"
-            }`}
-          >
-            <span>PROBLEMS</span>
-            <span
-              className={`w-5 h-5 rounded-full text-[11px] font-bold flex items-center justify-center ${
+        {/* ── 3. Tab Navigations (4 Standalone Tabs + Actions) ── */}
+        <div className="bg-white border border-slate-200/90 shadow-xs px-4 flex items-center justify-between overflow-x-auto scrollbar-none">
+          <div className="flex items-center">
+            {/* PROBLEMS TAB */}
+            <button
+              onClick={() => setActiveTab("PROBLEMS")}
+              className={`py-2.5 px-3.5 text-xs font-bold tracking-wider uppercase flex items-center gap-2 transition-all cursor-pointer border-b-2 -mb-[1px] ${
                 activeTab === "PROBLEMS"
-                  ? "bg-[#081225] text-white"
-                  : "bg-slate-100 text-slate-600"
+                  ? "border-indigo-600 text-indigo-600"
+                  : "border-transparent text-slate-500 hover:text-slate-800"
               }`}
             >
-              {questions.length}
-            </span>
-          </button>
+              <span>PROBLEMS</span>
+              <span
+                className={`min-w-[20px] h-5 px-1.5 rounded-full text-[11px] font-bold inline-flex items-center justify-center leading-none ${
+                  activeTab === "PROBLEMS"
+                    ? "bg-slate-900 text-white"
+                    : "bg-slate-100 text-slate-600"
+                }`}
+              >
+                {questions.length}
+              </span>
+            </button>
 
-          {/* GENERAL SETTINGS TAB */}
-          <button
-            onClick={() => setActiveTab("GENERAL_SETTINGS")}
-            className={`py-3.5 px-4 text-xs font-bold tracking-wider uppercase transition-all cursor-pointer border-b-2 -mb-[1px] ${
-              activeTab === "GENERAL_SETTINGS"
-                ? "border-[#10B981] text-[#0d9488]"
-                : "border-transparent text-slate-500 hover:text-slate-800"
-            }`}
-          >
-            <span>GENERAL SETTINGS</span>
-          </button>
+            {/* GENERAL SETTINGS TAB */}
+            <button
+              onClick={() => setActiveTab("GENERAL_SETTINGS")}
+              className={`py-2.5 px-3.5 text-xs font-bold tracking-wider uppercase transition-all cursor-pointer border-b-2 -mb-[1px] ${
+                activeTab === "GENERAL_SETTINGS"
+                  ? "border-indigo-600 text-indigo-600"
+                  : "border-transparent text-slate-500 hover:text-slate-800"
+              }`}
+            >
+              <span>GENERAL SETTINGS</span>
+            </button>
 
-          {/* ADVANCED SETTINGS TAB */}
-          <button
-            onClick={() => setActiveTab("ADVANCED_SETTINGS")}
-            className={`py-3.5 px-4 text-xs font-bold tracking-wider uppercase transition-all cursor-pointer border-b-2 -mb-[1px] ${
-              activeTab === "ADVANCED_SETTINGS"
-                ? "border-[#10B981] text-[#0d9488]"
-                : "border-transparent text-slate-500 hover:text-slate-800"
-            }`}
-          >
-            <span>ADVANCED SETTINGS</span>
-          </button>
+            {/* ADVANCED SETTINGS TAB */}
+            <button
+              onClick={() => setActiveTab("ADVANCED_SETTINGS")}
+              className={`py-2.5 px-3.5 text-xs font-bold tracking-wider uppercase transition-all cursor-pointer border-b-2 -mb-[1px] ${
+                activeTab === "ADVANCED_SETTINGS"
+                  ? "border-indigo-600 text-indigo-600"
+                  : "border-transparent text-slate-500 hover:text-slate-800"
+              }`}
+            >
+              <span>ADVANCED SETTINGS</span>
+            </button>
 
-          {/* CANDIDATES TAB */}
-          <button
-            onClick={() => setActiveTab("CANDIDATES")}
-            className={`py-3.5 px-4 text-xs font-bold tracking-wider uppercase flex items-center gap-2 transition-all cursor-pointer border-b-2 -mb-[1px] ${
-              activeTab === "CANDIDATES"
-                ? "border-[#10B981] text-[#0d9488]"
-                : "border-transparent text-slate-500 hover:text-slate-800"
-            }`}
-          >
-            <span>CANDIDATES</span>
-            <span
-              className={`w-5 h-5 rounded-full text-[11px] font-bold flex items-center justify-center ${
+            {/* CANDIDATES TAB */}
+            <button
+              onClick={() => setActiveTab("CANDIDATES")}
+              className={`py-2.5 px-3.5 text-xs font-bold tracking-wider uppercase flex items-center gap-2 transition-all cursor-pointer border-b-2 -mb-[1px] ${
                 activeTab === "CANDIDATES"
-                  ? "bg-[#081225] text-white"
-                  : "bg-slate-100 text-slate-600"
+                  ? "border-indigo-600 text-indigo-600"
+                  : "border-transparent text-slate-500 hover:text-slate-800"
               }`}
             >
-              {invitations.length}
-            </span>
-          </button>
+              <span>CANDIDATES</span>
+              <span
+                className={`min-w-[20px] h-5 px-1.5 rounded-full text-[11px] font-bold inline-flex items-center justify-center leading-none ${
+                  activeTab === "CANDIDATES"
+                    ? "bg-slate-900 text-white"
+                    : "bg-slate-100 text-slate-600"
+                }`}
+              >
+                {invitations.length}
+              </span>
+            </button>
+          </div>
+
+          {/* Right Action: Add Problems / Section dropdown button */}
+          {activeTab === "PROBLEMS" && (
+            <div className="flex items-center gap-2 shrink-0 py-1.5">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    className="px-2.5 py-1 text-xs font-semibold text-indigo-600 hover:text-white hover:bg-indigo-600 border border-indigo-200 hover:border-indigo-600 transition-colors cursor-pointer flex items-center gap-1 shadow-xs rounded-none"
+                    title="Add problems or section"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Add Problems / Section</span>
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56 bg-white border border-slate-200 shadow-xl p-1 text-xs">
+                  <DropdownMenuItem
+                    onClick={() => navigate(id ? `/admin/tests/${id}/add-problems` : "/admin/library")}
+                    className="cursor-pointer py-1.5 px-2.5 flex items-center gap-2 text-slate-700 hover:bg-slate-50 font-medium"
+                  >
+                    <Plus className="w-3.5 h-3.5 text-slate-500" />
+                    <span>Add problems to test</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={handleOpenAddSectionModal}
+                    className="cursor-pointer py-1.5 px-2.5 flex items-center gap-2 text-slate-700 hover:bg-slate-50 font-medium"
+                  >
+                    <LayoutGrid className="w-3.5 h-3.5 text-slate-500" />
+                    <span>Add a new section in test</span>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          )}
         </div>
 
         {/* ── 4. Tab Content Body ── */}
         <div>
           {/* ── PROBLEMS TAB ── */}
           {activeTab === "PROBLEMS" && (
-            <div className="space-y-4">
-              {/* Header Bar */}
-              <div className="p-4 bg-white border border-slate-200/90 shadow-sm flex items-center justify-between">
-                <span className="text-xs font-semibold text-slate-700">Problems</span>
-                <div className="flex items-center gap-2">
-                  {/* Inline Add Section input if active */}
-                  {addSectionOpen && (
-                    <div className="flex items-center gap-1.5 mr-2">
-                      <input
-                        autoFocus
-                        type="text"
-                        value={newSectionName}
-                        onChange={(e) => setNewSectionName(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") handleConfirmNewSection();
-                          if (e.key === "Escape") {
-                            setAddSectionOpen(false);
-                            setNewSectionName("");
-                          }
-                        }}
-                        placeholder="Section name…"
-                        className="text-xs border border-indigo-300 rounded px-2.5 py-1 focus:outline-none focus:border-indigo-500 w-44"
-                      />
-                      <button
-                        onClick={handleConfirmNewSection}
-                        className="text-xs px-2.5 py-1 bg-indigo-600 text-white rounded hover:bg-indigo-700 cursor-pointer font-medium"
-                      >
-                        Add
-                      </button>
-                      <button
-                        onClick={() => {
-                          setAddSectionOpen(false);
-                          setNewSectionName("");
-                        }}
-                        className="text-xs px-2 py-1 text-slate-500 hover:text-slate-800 cursor-pointer"
-                      >
-                        ✕
-                      </button>
-                    </div>
-                  )}
-
-                  {/* Header Plus Action Dropdown */}
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <button
-                        className="p-1.5 text-indigo-700 hover:text-indigo-900 hover:bg-indigo-50/80 rounded transition-colors cursor-pointer flex items-center justify-center border border-indigo-200/60"
-                        title="Add problems or section"
-                      >
-                        <Plus className="w-4 h-4" />
-                      </button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-56 bg-white border border-slate-200 shadow-xl p-1 text-xs">
-                      <DropdownMenuItem
-                        onClick={() => navigate(id ? `/admin/tests/${id}/add-problems` : "/admin/library")}
-                        className="cursor-pointer py-2 px-3 flex items-center gap-2.5 text-slate-700 hover:bg-slate-50 font-medium"
-                      >
-                        <Plus className="w-4 h-4 text-slate-500" />
-                        <span>Add problems in this section</span>
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        onClick={() => setAddSectionOpen(true)}
-                        className="cursor-pointer py-2 px-3 flex items-center gap-2.5 text-slate-700 hover:bg-slate-50 font-medium"
-                      >
-                        <LayoutGrid className="w-4 h-4 text-slate-500" />
-                        <span>Add a new section in test</span>
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
-              </div>
+            <div className="space-y-3">
 
               {/* Problems — section-grouped list */}
               {questions.length === 0 && sectionOrder.length === 0 ? (
-                <div className="bg-white border border-slate-200/90 shadow-sm py-12 px-4 text-center text-slate-400 text-xs space-y-2">
+                <div className="bg-white border border-slate-200/90 shadow-xs py-10 px-4 text-center text-slate-400 text-xs space-y-2">
                   <p>No problems added to this test yet.</p>
                   <button
                     onClick={() => navigate(id ? `/admin/tests/${id}/add-problems` : "/admin/library")}
@@ -2595,7 +2871,7 @@ export default function NewAdminTestEdit() {
                   </button>
                 </div>
               ) : (
-                <div className="space-y-4">
+                <div className="space-y-3">
                   {sectionOrder
                     .filter((section) => {
                       if (section === "Ungrouped") {
@@ -2614,12 +2890,12 @@ export default function NewAdminTestEdit() {
                       return (
                         <div
                           key={section}
-                          className="bg-white border border-slate-200/90 shadow-sm overflow-hidden"
+                          className="bg-white border border-slate-200/90 shadow-xs overflow-hidden"
                         >
                           {/* 1. Section Header Bar */}
-                          <div className="flex items-center justify-between px-5 py-3.5 bg-white border-b border-slate-100">
+                          <div className="flex items-center justify-between px-4 py-2 bg-slate-50/80 border-b border-slate-200">
                             {/* Left: Section Title */}
-                            <div className="flex items-center gap-2.5 flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-1 min-w-0">
                               {isEditingThisSection ? (
                                 <div className="flex items-center gap-1.5">
                                   <input
@@ -2634,11 +2910,11 @@ export default function NewAdminTestEdit() {
                                         setEditingSectionValue("");
                                       }
                                     }}
-                                    className="text-sm font-semibold text-slate-800 border border-indigo-400 rounded px-2 py-0.5 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                                    className="text-xs font-semibold text-slate-800 border border-indigo-400 rounded px-2 py-0.5 focus:outline-none focus:ring-1 focus:ring-indigo-500"
                                   />
                                   <button
                                     onClick={() => handleRenameSection(section, editingSectionValue)}
-                                    className="text-xs px-2 py-1 bg-indigo-600 text-white rounded hover:bg-indigo-700 cursor-pointer font-medium"
+                                    className="text-xs px-2 py-0.5 bg-indigo-600 text-white rounded hover:bg-indigo-700 cursor-pointer font-medium"
                                   >
                                     Save
                                   </button>
@@ -2647,40 +2923,45 @@ export default function NewAdminTestEdit() {
                                       setEditingSectionName(null);
                                       setEditingSectionValue("");
                                     }}
-                                    className="text-xs px-1.5 py-1 text-slate-500 hover:text-slate-800 cursor-pointer"
+                                    className="text-xs px-1.5 py-0.5 text-slate-500 hover:text-slate-800 cursor-pointer"
                                   >
                                     ✕
                                   </button>
                                 </div>
                               ) : (
-                                <span className="text-sm font-semibold text-slate-800 truncate">
-                                  {section}
-                                </span>
+                                <div className="flex items-center gap-2 min-w-0">
+                                  <span className="text-xs font-bold text-slate-800 truncate">
+                                    {section}
+                                  </span>
+                                  {sectionSettings[section]?.shuffleProblems && (
+                                    <span className="text-[10px] font-medium bg-indigo-50 text-indigo-700 border border-indigo-200/60 px-1.5 py-0.5 rounded-full shrink-0 flex items-center gap-1">
+                                      <RefreshCw className="w-2.5 h-2.5" />
+                                      Shuffle on
+                                    </span>
+                                  )}
+                                </div>
                               )}
                             </div>
 
                             {/* Right Actions: Settings Dropdown, Plus, Collapse/Expand Toggle */}
-                            <div className="flex items-center gap-3 shrink-0 ml-3">
+                            <div className="flex items-center gap-2 shrink-0 ml-3">
                               {/* Settings Menu */}
                               <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
                                   <button
-                                    className="p-1 text-[#3b4992] hover:text-indigo-900 transition-colors cursor-pointer"
-                                    title="Section options"
+                                    className="p-1 text-slate-500 hover:text-indigo-600 transition-colors cursor-pointer"
+                                    title="Section settings"
                                   >
-                                    <Settings className="w-4 h-4" />
+                                    <Settings className="w-3.5 h-3.5" />
                                   </button>
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent align="end" className="w-48 bg-white border border-slate-200 shadow-xl p-1 text-xs">
                                   <DropdownMenuItem
-                                    onClick={() => {
-                                      setEditingSectionName(section);
-                                      setEditingSectionValue(section);
-                                    }}
+                                    onClick={() => handleOpenSectionSettings(section)}
                                     className="cursor-pointer py-1.5 px-2.5 flex items-center gap-2 text-slate-700 hover:bg-slate-50"
                                   >
-                                    <Edit className="w-3.5 h-3.5 text-slate-500" />
-                                    <span>Edit Section Name</span>
+                                    <Settings className="w-3.5 h-3.5 text-slate-500" />
+                                    <span>Section Settings</span>
                                   </DropdownMenuItem>
                                   {section !== "Ungrouped" && (
                                     <>
@@ -2697,14 +2978,33 @@ export default function NewAdminTestEdit() {
                                 </DropdownMenuContent>
                               </DropdownMenu>
 
-                              {/* Plus Icon: Add question to this section */}
-                              <button
-                                onClick={() => navigate(`/admin/tests/${id}/add-problems?section=${encodeURIComponent(section)}`)}
-                                className="p-1 text-[#3b4992] hover:text-indigo-900 transition-colors cursor-pointer"
-                                title={`Add problems to ${section}`}
-                              >
-                                <Plus className="w-4 h-4" />
-                              </button>
+                              {/* Plus Icon: Dropdown to Add question to this section OR Add new section */}
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <button
+                                    className="p-1 text-slate-500 hover:text-indigo-600 transition-colors cursor-pointer"
+                                    title="Add problems or section"
+                                  >
+                                    <Plus className="w-3.5 h-3.5" />
+                                  </button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end" className="w-56 bg-white border border-slate-200 shadow-xl p-1 text-xs">
+                                  <DropdownMenuItem
+                                    onClick={() => navigate(`/admin/tests/${id}/add-problems?section=${encodeURIComponent(section)}`)}
+                                    className="cursor-pointer py-2 px-3 flex items-center gap-2.5 text-slate-700 hover:bg-slate-50 font-medium"
+                                  >
+                                    <Plus className="w-4 h-4 text-slate-500" />
+                                    <span>Add problems in this section</span>
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem
+                                    onClick={handleOpenAddSectionModal}
+                                    className="cursor-pointer py-2 px-3 flex items-center gap-2.5 text-slate-700 hover:bg-slate-50 font-medium"
+                                  >
+                                    <LayoutGrid className="w-4 h-4 text-slate-500" />
+                                    <span>Add a new section in test</span>
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
 
                               {/* Collapse / Expand Toggle Button */}
                               <button
@@ -2716,21 +3016,21 @@ export default function NewAdminTestEdit() {
                                     return next;
                                   })
                                 }
-                                className="p-1 text-[#3b4992] hover:text-indigo-900 transition-colors cursor-pointer"
+                                className="p-1 text-slate-500 hover:text-indigo-600 transition-colors cursor-pointer"
                                 title={isCollapsed ? "Expand section" : "Collapse section"}
                               >
                                 {isCollapsed ? (
-                                  <ChevronDown className="w-4 h-4" />
+                                  <ChevronDown className="w-3.5 h-3.5" />
                                 ) : (
-                                  <ChevronUp className="w-4 h-4" />
+                                  <ChevronUp className="w-3.5 h-3.5" />
                                 )}
                               </button>
                             </div>
                           </div>
 
                           {/* 2. Sub-Header: Using X of X problems banner */}
-                          <div className="px-5 py-2.5 bg-slate-50/50 border-b border-slate-100 flex items-center gap-2 text-xs text-slate-600">
-                            <span className="text-slate-400 font-serif italic text-sm">ⓘ</span>
+                          <div className="px-4 py-1.5 bg-slate-50/40 border-b border-slate-100 flex items-center gap-2 text-xs text-slate-500">
+                            <span className="text-slate-400 font-serif italic text-xs">ⓘ</span>
                             <span>
                               Using {totalSectionCount} of {totalSectionCount} problems in this section.
                             </span>
@@ -2740,11 +3040,11 @@ export default function NewAdminTestEdit() {
                           {!isCollapsed && (
                             <div>
                               {sectionQs.length === 0 ? (
-                                <div className="py-12 px-4 text-center space-y-3">
+                                <div className="py-8 px-4 text-center space-y-2">
                                   <p className="text-xs text-slate-500 font-medium">No problems added yet.</p>
                                   <button
                                     onClick={() => navigate(`/admin/tests/${id}/add-problems?section=${encodeURIComponent(section)}`)}
-                                    className="text-xs font-bold tracking-wider text-[#3b4992] hover:text-indigo-800 transition-colors cursor-pointer uppercase underline underline-offset-4"
+                                    className="text-xs font-bold tracking-wider text-indigo-600 hover:text-indigo-800 transition-colors cursor-pointer uppercase underline underline-offset-4"
                                   >
                                     ADD PROBLEMS
                                   </button>
@@ -2765,15 +3065,15 @@ export default function NewAdminTestEdit() {
                                     return (
                                       <div
                                         key={tq.id || index}
-                                        className="pl-9 pr-5 py-4 hover:bg-slate-50/60 transition-colors space-y-1.5"
+                                        className="px-4 py-2.5 hover:bg-slate-50/60 transition-colors space-y-1"
                                       >
                                         <div className="flex items-start justify-between gap-4">
-                                          <h3 className="font-bold text-slate-900 text-sm leading-snug">{qTitle}</h3>
+                                          <h3 className="font-bold text-slate-900 text-xs md:text-sm leading-snug">{qTitle}</h3>
 
                                           <DropdownMenu>
                                             <DropdownMenuTrigger asChild>
-                                              <button className="p-1 text-slate-400 hover:text-slate-700 transition-colors cursor-pointer">
-                                                <MoreVertical className="w-4 h-4" />
+                                              <button className="p-0.5 text-slate-400 hover:text-slate-700 transition-colors cursor-pointer">
+                                                <MoreVertical className="w-3.5 h-3.5" />
                                               </button>
                                             </DropdownMenuTrigger>
                                             <DropdownMenuContent align="end" className="w-52 bg-white border border-slate-200 shadow-xl p-1 text-xs">
@@ -2819,7 +3119,7 @@ export default function NewAdminTestEdit() {
                                         </div>
 
                                         {/* Metadata row */}
-                                        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-500 font-medium">
+                                        <div className="flex flex-wrap items-center gap-x-3.5 gap-y-0.5 text-[11px] text-slate-500 font-medium">
                                           <div className="flex items-center gap-1 font-mono text-slate-400">
                                             <span>=</span>
                                             <span className="text-slate-600 font-sans">
@@ -2828,13 +3128,13 @@ export default function NewAdminTestEdit() {
                                           </div>
                                           {!isCoding && mcqSubtype && (
                                             <div className="flex items-center gap-1">
-                                              <span className="text-slate-400 text-[11px]">⊙</span>
+                                              <span className="text-slate-400 text-[10px]">⊙</span>
                                               <span>{mcqSubtype}</span>
                                             </div>
                                           )}
                                           {difficulty && (
                                             <div className="flex items-center gap-1">
-                                              <span className="text-slate-400 text-[10px]">❖</span>
+                                              <span className="text-slate-400 text-[9px]">❖</span>
                                               <span>{fmt(difficulty)}</span>
                                             </div>
                                           )}
@@ -2846,7 +3146,7 @@ export default function NewAdminTestEdit() {
                                           )}
                                           {testCasesCount && (
                                             <div className="flex items-center gap-1">
-                                              <span className="text-slate-400 font-mono text-[11px]">⊘</span>
+                                              <span className="text-slate-400 font-mono text-[10px]">⊘</span>
                                               <span>{testCasesCount}</span>
                                             </div>
                                           )}
@@ -2879,7 +3179,7 @@ export default function NewAdminTestEdit() {
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
                   placeholder="e.g., Full Stack Developer Assessment"
-                  className="w-full border-b border-slate-200 focus:border-[#4353a4] py-1.5 text-sm text-slate-800 focus:outline-none bg-transparent"
+                  className="w-full border-b border-slate-200 focus:border-indigo-600 py-1.5 text-sm text-slate-800 focus:outline-none bg-transparent"
                 />
                 <p className="text-[11px] text-slate-400">A clear, descriptive name helps candidates identify the assessment.</p>
               </div>
@@ -2898,7 +3198,7 @@ export default function NewAdminTestEdit() {
                     value={durationMins}
                     onChange={(e) => setDurationMins(e.target.value)}
                     placeholder="60"
-                    className="w-full border-b border-slate-200 focus:border-[#4353a4] py-1.5 text-sm text-slate-800 focus:outline-none bg-transparent"
+                    className="w-full border-b border-slate-200 focus:border-indigo-600 py-1.5 text-sm text-slate-800 focus:outline-none bg-transparent"
                   />
                 </div>
 
@@ -2915,7 +3215,7 @@ export default function NewAdminTestEdit() {
                     value={passMark}
                     onChange={(e) => setPassMark(e.target.value)}
                     placeholder="40"
-                    className="w-full border-b border-slate-200 focus:border-[#4353a4] py-1.5 text-sm text-slate-800 focus:outline-none bg-transparent"
+                    className="w-full border-b border-slate-200 focus:border-indigo-600 py-1.5 text-sm text-slate-800 focus:outline-none bg-transparent"
                   />
                 </div>
               </div>
@@ -2935,7 +3235,7 @@ export default function NewAdminTestEdit() {
                         value={lvl}
                         checked={difficulty === lvl}
                         onChange={() => setDifficulty(lvl)}
-                        className="w-5 h-5 text-[#4353a4] focus:ring-[#4353a4] border-slate-300 cursor-pointer"
+                        className="w-5 h-5 text-indigo-600 focus:ring-indigo-600 border-slate-300 cursor-pointer"
                       />
                       <span>{fmt(lvl)}</span>
                     </label>
@@ -2953,7 +3253,7 @@ export default function NewAdminTestEdit() {
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   placeholder="Provide an overview, target skills, or objectives for this test..."
-                  className="w-full border border-slate-200 p-3.5 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#4353a4] leading-relaxed"
+                  className="w-full border border-slate-200 p-3.5 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-indigo-600 leading-relaxed"
                 />
                 <p className="text-[11px] text-slate-400">Brief summary of the test curriculum and intended evaluation areas.</p>
               </div>
@@ -2977,7 +3277,7 @@ export default function NewAdminTestEdit() {
                 <button
                   onClick={handleSaveGeneralSettings}
                   disabled={savingGeneralSettings}
-                  className="px-6 py-2.5 bg-[#4353a4] hover:bg-[#344285] disabled:opacity-50 text-white text-xs font-bold tracking-wider uppercase shadow-xs transition-colors rounded-none cursor-pointer inline-flex items-center gap-2"
+                  className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-xs font-bold tracking-wider uppercase shadow-xs transition-colors rounded-none cursor-pointer inline-flex items-center gap-2"
                 >
                   {savingGeneralSettings ? (
                     <>
@@ -3134,7 +3434,7 @@ export default function NewAdminTestEdit() {
                     onClick={handleSaveSchedule}
                     disabled={savingSchedule || !isScheduleDirty}
                     size="sm"
-                    className="bg-[#4353a4] hover:bg-[#344285] text-white"
+                    className="bg-indigo-600 hover:bg-indigo-700 text-white"
                   >
                     {savingSchedule ? (
                       <>
@@ -3246,7 +3546,7 @@ export default function NewAdminTestEdit() {
                     onClick={handleSaveProctoring}
                     disabled={savingProctoring || !isProctoringDirty}
                     size="sm"
-                    className="bg-[#4353a4] hover:bg-[#344285] text-white"
+                    className="bg-indigo-600 hover:bg-indigo-700 text-white"
                   >
                     {savingProctoring ? (
                       <>
@@ -3303,7 +3603,7 @@ export default function NewAdminTestEdit() {
                   </div>
                   <button
                     onClick={() => setActiveTab("ADVANCED_SETTINGS")}
-                    className="text-xs font-semibold text-[#4353a4] hover:text-[#324080] inline-flex items-center gap-1 cursor-pointer self-start sm:self-auto"
+                    className="text-xs font-semibold text-indigo-600 hover:text-indigo-800 inline-flex items-center gap-1 cursor-pointer self-start sm:self-auto"
                   >
                     <span>Edit Schedule Window</span>
                     <ChevronRight className="w-3.5 h-3.5" />
@@ -3322,8 +3622,11 @@ export default function NewAdminTestEdit() {
                         setCandidateStatusFilter("ALL");
                         setCandidateSearchQuery("");
                         setInvitedByMe(false);
+                        setCandidateSortField(null);
+                        setCandidateSortOrder(null);
+                        setCandidatePage(1);
                       }}
-                      className="text-xs font-semibold text-[#4353a4] hover:text-[#324080] cursor-pointer"
+                      className="text-xs font-semibold text-indigo-600 hover:text-indigo-800 cursor-pointer"
                     >
                       Clear
                     </button>
@@ -3349,6 +3652,7 @@ export default function NewAdminTestEdit() {
                           { key: "ALL", label: `All (${invitations.length})` },
                           { key: "PASSED", label: "Passed" },
                           { key: "FAILED", label: "Failed" },
+                          { key: "IN_PROGRESS", label: "In Progress" },
                           { key: "INVITED", label: "Invited (Pending)" },
                         ].map((st) => (
                           <label
@@ -3360,7 +3664,7 @@ export default function NewAdminTestEdit() {
                               name="candidateStatus"
                               checked={candidateStatusFilter === st.key}
                               onChange={() => setCandidateStatusFilter(st.key)}
-                              className="text-[#4353a4] focus:ring-0 w-3.5 h-3.5 cursor-pointer"
+                              className="text-indigo-600 focus:ring-0 w-3.5 h-3.5 cursor-pointer"
                             />
                             <span>{st.label}</span>
                           </label>
@@ -3384,7 +3688,7 @@ export default function NewAdminTestEdit() {
                           setCandidatePage(1);
                         }}
                         placeholder="Search for a candidate..."
-                        className="w-full pl-9 pr-4 py-2 text-xs border border-slate-200 rounded-none focus:outline-none focus:border-[#4353a4] bg-white text-slate-800 placeholder-slate-400"
+                        className="w-full pl-9 pr-4 py-2 text-xs border border-slate-200 rounded-none focus:outline-none focus:border-indigo-600 bg-white text-slate-800 placeholder-slate-400"
                       />
                     </div>
 
@@ -3398,7 +3702,7 @@ export default function NewAdminTestEdit() {
                           }
                           setIsAddCandidatesOpen(true);
                         }}
-                        className="px-4 py-2 bg-[#4353a4] hover:bg-[#344285] text-white text-xs font-bold tracking-wider uppercase inline-flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs"
+                        className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold tracking-wider uppercase inline-flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs"
                       >
                         <Plus className="w-3.5 h-3.5" />
                         <span>Add Candidates</span>
@@ -3408,7 +3712,7 @@ export default function NewAdminTestEdit() {
                         onClick={handleDownloadReport}
                         className="px-4 py-2 border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 hover:text-slate-900 text-xs font-bold tracking-wider uppercase inline-flex items-center gap-2 transition-colors cursor-pointer shadow-xs"
                       >
-                        <CloudDownload className="w-4 h-4 text-[#4353a4]" />
+                        <CloudDownload className="w-4 h-4 text-indigo-600" />
                         <span>Download Report</span>
                       </button>
                     </div>
@@ -3455,13 +3759,137 @@ export default function NewAdminTestEdit() {
                   <div className="overflow-x-auto">
                     <table className="w-full text-left border-collapse">
                       <thead>
-                        <tr className="border-b border-slate-100 bg-white text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                        <tr className="border-b border-slate-100 bg-white text-[11px] font-bold text-slate-400 uppercase tracking-wider select-none">
                           <th className="py-3 px-4 w-10"></th>
                           <th className="py-3 px-4">Candidate</th>
                           <th className="py-3 px-4">Status</th>
-                          <th className="py-3 px-4">Time</th>
-                          <th className="py-3 px-4">Total Score</th>
-                          <th className="py-3 px-4">% Score</th>
+
+                          {/* Time Column with Up and Down Sort Arrows */}
+                          <th className="py-3 px-4">
+                            <button
+                              type="button"
+                              onClick={() => handleSort("time")}
+                              className="group inline-flex items-center gap-1.5 uppercase font-bold text-slate-500 hover:text-slate-900 transition-colors cursor-pointer select-none"
+                              title="Click to sort by Time"
+                            >
+                              <span className={candidateSortField === "time" ? "text-slate-900 font-bold" : ""}>
+                                Time
+                              </span>
+                              <div className="inline-flex flex-col items-center">
+                                <span
+                                  onClick={(e) => handleExplicitSort("time", "asc", e)}
+                                  title="Sort Time Ascending (Fastest first)"
+                                  className="cursor-pointer -mb-1 inline-flex"
+                                >
+                                  <ChevronUp
+                                    className={`w-3.5 h-3.5 transition-all ${
+                                      candidateSortField === "time" && candidateSortOrder === "asc"
+                                        ? "text-orange-600 font-bold stroke-[3] scale-110"
+                                        : "text-slate-300 group-hover:text-slate-400"
+                                    }`}
+                                  />
+                                </span>
+                                <span
+                                  onClick={(e) => handleExplicitSort("time", "desc", e)}
+                                  title="Sort Time Descending (Slowest first)"
+                                  className="cursor-pointer inline-flex"
+                                >
+                                  <ChevronDown
+                                    className={`w-3.5 h-3.5 transition-all ${
+                                      candidateSortField === "time" && candidateSortOrder === "desc"
+                                        ? "text-orange-600 font-bold stroke-[3] scale-110"
+                                        : "text-slate-300 group-hover:text-slate-400"
+                                    }`}
+                                  />
+                                </span>
+                              </div>
+                            </button>
+                          </th>
+
+                          {/* Total Score Column with Up and Down Sort Arrows */}
+                          <th className="py-3 px-4">
+                            <button
+                              type="button"
+                              onClick={() => handleSort("totalScore")}
+                              className="group inline-flex items-center gap-1.5 uppercase font-bold text-slate-500 hover:text-slate-900 transition-colors cursor-pointer select-none"
+                              title="Click to sort by Total Score"
+                            >
+                              <span className={candidateSortField === "totalScore" ? "text-slate-900 font-bold" : ""}>
+                                Total Score
+                              </span>
+                              <div className="inline-flex flex-col items-center">
+                                <span
+                                  onClick={(e) => handleExplicitSort("totalScore", "asc", e)}
+                                  title="Sort Total Score Ascending (Lowest to Highest)"
+                                  className="cursor-pointer -mb-1 inline-flex"
+                                >
+                                  <ChevronUp
+                                    className={`w-3.5 h-3.5 transition-all ${
+                                      candidateSortField === "totalScore" && candidateSortOrder === "asc"
+                                        ? "text-orange-600 font-bold stroke-[3] scale-110"
+                                        : "text-slate-300 group-hover:text-slate-400"
+                                    }`}
+                                  />
+                                </span>
+                                <span
+                                  onClick={(e) => handleExplicitSort("totalScore", "desc", e)}
+                                  title="Sort Total Score Descending (Highest to Lowest)"
+                                  className="cursor-pointer inline-flex"
+                                >
+                                  <ChevronDown
+                                    className={`w-3.5 h-3.5 transition-all ${
+                                      candidateSortField === "totalScore" && candidateSortOrder === "desc"
+                                        ? "text-orange-600 font-bold stroke-[3] scale-110"
+                                        : "text-slate-300 group-hover:text-slate-400"
+                                    }`}
+                                  />
+                                </span>
+                              </div>
+                            </button>
+                          </th>
+
+                          {/* % Score Column with Up and Down Sort Arrows */}
+                          <th className="py-3 px-4">
+                            <button
+                              type="button"
+                              onClick={() => handleSort("percentScore")}
+                              className="group inline-flex items-center gap-1.5 uppercase font-bold text-slate-500 hover:text-slate-900 transition-colors cursor-pointer select-none"
+                              title="Click to sort by % Score"
+                            >
+                              <span className={candidateSortField === "percentScore" ? "text-slate-900 font-bold" : ""}>
+                                % Score
+                              </span>
+                              <div className="inline-flex flex-col items-center">
+                                <span
+                                  onClick={(e) => handleExplicitSort("percentScore", "asc", e)}
+                                  title="Sort % Score Ascending (Lowest to Highest)"
+                                  className="cursor-pointer -mb-1 inline-flex"
+                                >
+                                  <ChevronUp
+                                    className={`w-3.5 h-3.5 transition-all ${
+                                      candidateSortField === "percentScore" && candidateSortOrder === "asc"
+                                        ? "text-orange-600 font-bold stroke-[3] scale-110"
+                                        : "text-slate-300 group-hover:text-slate-400"
+                                    }`}
+                                  />
+                                </span>
+                                <span
+                                  onClick={(e) => handleExplicitSort("percentScore", "desc", e)}
+                                  title="Sort % Score Descending (Highest to Lowest)"
+                                  className="cursor-pointer inline-flex"
+                                >
+                                  <ChevronDown
+                                    className={`w-3.5 h-3.5 transition-all ${
+                                      candidateSortField === "percentScore" && candidateSortOrder === "desc"
+                                        ? "text-orange-600 font-bold stroke-[3] scale-110"
+                                        : "text-slate-300 group-hover:text-slate-400"
+                                    }`}
+                                  />
+                                </span>
+                              </div>
+                            </button>
+                          </th>
+
                           <th className="py-3 px-4 text-right">More Actions</th>
                         </tr>
                       </thead>
@@ -3681,7 +4109,7 @@ export default function NewAdminTestEdit() {
                                         }}
                                         className="cursor-pointer py-2 px-2.5 flex items-center gap-2 text-slate-700 hover:bg-slate-50"
                                       >
-                                        <Send className="w-3.5 h-3.5 text-[#4353a4]" />
+                                        <Send className="w-3.5 h-3.5 text-indigo-600" />
                                         <span>Resend Invitation</span>
                                       </DropdownMenuItem>
 
@@ -3875,7 +4303,7 @@ export default function NewAdminTestEdit() {
             <Button
               disabled={resending}
               onClick={handleConfirmSingleResend}
-              className="bg-[#4353a4] hover:bg-[#344285] text-white text-xs font-semibold"
+              className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold"
             >
               {resending ? (
                 <>
@@ -3982,6 +4410,123 @@ export default function NewAdminTestEdit() {
           loadCandidatesData();
         }}
       />
+
+      {/* Section Settings / Add Section Modal */}
+      <Dialog open={sectionSettingsModalOpen} onOpenChange={setSectionSettingsModalOpen}>
+        <DialogContent className="sm:max-w-[480px] bg-white text-slate-900 p-0 overflow-hidden border border-slate-200 shadow-2xl rounded-xl">
+          <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+            <div className="flex items-center gap-2.5">
+              <div className="p-2 rounded-lg bg-indigo-50 text-indigo-600">
+                {isCreatingNewSection ? <LayoutGrid className="w-5 h-5" /> : <Settings className="w-5 h-5" />}
+              </div>
+              <div>
+                <DialogTitle className="text-base font-semibold text-slate-900">
+                  {isCreatingNewSection ? "Add New Section" : "Section Settings"}
+                </DialogTitle>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  {isCreatingNewSection
+                    ? "Configure section name, problem shuffling, and scoring scheme for the new section."
+                    : "Configure section name, problem shuffling, and scoring scheme."}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="px-6 py-5 space-y-6">
+            {/* 1. Edit / Create Section Name */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-slate-700">
+                Section Name
+              </label>
+              <input
+                type="text"
+                value={modalSectionName}
+                onChange={(e) => setModalSectionName(e.target.value)}
+                placeholder="e.g. Coding, Quantitative Aptitude, Technical"
+                className="w-full text-sm text-slate-800 border border-slate-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 bg-white"
+              />
+            </div>
+
+            {/* 2. Problem Shuffle */}
+            <div className="space-y-2 pt-1 border-t border-slate-100">
+              <div>
+                <h4 className="text-sm font-semibold text-slate-800">Problem shuffle</h4>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Different candidates will see different ordering of problems in this section.
+                </p>
+              </div>
+              <label className="flex items-center gap-2.5 cursor-pointer select-none pt-1">
+                <input
+                  type="checkbox"
+                  checked={modalProblemShuffle}
+                  onChange={(e) => setModalProblemShuffle(e.target.checked)}
+                  className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                />
+                <span className="text-xs font-medium text-slate-700">
+                  Enable problem shuffle.
+                </span>
+              </label>
+            </div>
+
+            {/* 3. Custom Scoring */}
+            <div className="space-y-3 pt-4 border-t border-slate-100">
+              <div>
+                <h4 className="text-sm font-semibold text-slate-800">Custom Scoring</h4>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Set marks per question in this section.
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <div className="flex items-center gap-3">
+                  <label className="text-xs font-medium text-slate-600 whitespace-nowrap">
+                    Marks per question:
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={modalMarksPerQuestion}
+                    onChange={(e) => setModalMarksPerQuestion(e.target.value)}
+                    className="w-24 text-sm text-slate-800 border border-slate-300 rounded-md px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 bg-white"
+                  />
+                </div>
+                {!isCreatingNewSection && (
+                  <p className="text-[11px] text-slate-400">
+                    {groupedQuestions[activeModalSection || ""]?.length || 0} question(s) in this section will be allocated {modalMarksPerQuestion || 0} mark(s) each.
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Modal Footer */}
+          <div className="px-6 py-3.5 bg-slate-50 border-t border-slate-100 flex items-center justify-end gap-2.5">
+            <button
+              type="button"
+              disabled={savingSectionSettings}
+              onClick={() => setSectionSettingsModalOpen(false)}
+              className="px-3.5 py-1.5 text-xs font-medium text-slate-600 hover:text-slate-800 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors cursor-pointer"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              disabled={savingSectionSettings}
+              onClick={handleSaveSectionSettings}
+              className="px-4 py-1.5 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg shadow-sm transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+            >
+              {savingSectionSettings ? (
+                <>
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  <span>{isCreatingNewSection ? "Creating..." : "Saving..."}</span>
+                </>
+              ) : (
+                <span>{isCreatingNewSection ? "Create Section" : "Save Changes"}</span>
+              )}
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

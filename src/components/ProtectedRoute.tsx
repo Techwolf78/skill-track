@@ -39,7 +39,7 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   }
 
   if (!hasAnyRole(user.role, requiredRoles)) {
-    return <Navigate to="/unauthorized" replace />;
+    return <Navigate to={fallbackTo} replace />;
   }
 
   return <>{children}</>;

@@ -6,7 +6,37 @@
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
-    <link rel="icon" type="image/png" href="/Gryphon360logoFavicon1.png" />
+    <!-- Dynamic adaptive favicon: Light mode -> #4758AA purple, Dark mode -> Crisp White (like GitHub) -->
+    <script>
+      (function() {
+        function updateThemeFavicon() {
+          var isDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+          var targetHref = isDark ? '/ga-icon-white.png' : '/ga-icon-purple.png';
+          
+          // Remove all previous icon links so Chromium/Safari don't pick up stale fallback tags
+          var existingIcons = document.querySelectorAll("link[rel*='icon']");
+          for (var i = 0; i < existingIcons.length; i++) {
+            existingIcons[i].parentNode.removeChild(existingIcons[i]);
+          }
+
+          var link = document.createElement('link');
+          link.id = 'dynamic-favicon';
+          link.rel = 'icon';
+          link.type = 'image/png';
+          link.href = targetHref;
+          document.head.appendChild(link);
+        }
+        updateThemeFavicon();
+        if (window.matchMedia) {
+          window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', updateThemeFavicon);
+        }
+      })();
+    </script>
+    <noscript>
+      <link rel="icon" type="image/png" href="/ga-icon-white.png" media="(prefers-color-scheme: dark)" />
+      <link rel="icon" type="image/png" href="/ga-icon-purple.png" media="(prefers-color-scheme: light)" />
+      <link rel="icon" type="image/png" href="/ga-icon-purple.png" />
+    </noscript>
     <title>Gryphon 360 | India's Leading Skill Assessment Platform</title>
     <meta name="description" content="Gryphon 360 is India's premier skill assessment platform, trusted by institutions nationwide." />
     <meta name="author" content="Gryphon 360" />

@@ -1,16 +1,23 @@
 import React, { useState, useEffect } from "react";
-import { 
-  Camera, 
-  Mic, 
-  Monitor, 
-  CheckCircle2, 
-  AlertCircle, 
+import {
+  Camera,
+  Mic,
+  Monitor,
+  CheckCircle2,
+  AlertCircle,
   Loader2,
   ShieldCheck,
-  Play
+  Play,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { useProctoring } from "@/proctoring/ProctoringProvider";
 
@@ -22,7 +29,15 @@ interface CheckState {
   fullscreen: "pending" | "success" | "error";
 }
 
-export const EnvironmentCheck: React.FC<{ onComplete: () => void; config?: { camera?: boolean; audio?: boolean; screenShare?: boolean; fullscreen?: boolean } }> = ({ onComplete, config }) => {
+export const EnvironmentCheck: React.FC<{
+  onComplete: () => void;
+  config?: {
+    camera?: boolean;
+    audio?: boolean;
+    screenShare?: boolean;
+    fullscreen?: boolean;
+  };
+}> = ({ onComplete, config }) => {
   const { startProctoring } = useProctoring();
 
   const requireCamera = config ? !!config.camera : true;
@@ -35,7 +50,7 @@ export const EnvironmentCheck: React.FC<{ onComplete: () => void; config?: { cam
     mic: requireAudio ? "pending" : "success",
     screen: requireScreen ? "pending" : "success",
     browser: "pending",
-    fullscreen: requireFullscreen ? "pending" : "success"
+    fullscreen: requireFullscreen ? "pending" : "success",
   });
   const [isVerifying, setIsVerifying] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -47,85 +62,129 @@ export const EnvironmentCheck: React.FC<{ onComplete: () => void; config?: { cam
     const handleFullscreenChange = () => {
       const active = !!document.fullscreenElement;
       setIsFullscreen(active);
-      setChecks(prev => ({ 
-        ...prev, 
-        fullscreen: active ? "success" : "pending" 
+      setChecks((prev) => ({
+        ...prev,
+        fullscreen: active ? "success" : "pending",
       }));
     };
 
     document.addEventListener("fullscreenchange", handleFullscreenChange);
-    return () => document.removeEventListener("fullscreenchange", handleFullscreenChange);
+    return () =>
+      document.removeEventListener("fullscreenchange", handleFullscreenChange);
   }, [requireFullscreen]);
 
   const verifyEnvironment = async () => {
     setIsVerifying(true);
     setScreenErrorMsg(null);
-    
+
     // 1. Browser Check (Always Required)
-    const isModern = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
-    setChecks(prev => ({ ...prev, browser: isModern ? "success" : "error" }));
+    const isModern = !!(
+      navigator.mediaDevices && navigator.mediaDevices.getUserMedia
+    );
+    setChecks((prev) => ({ ...prev, browser: isModern ? "success" : "error" }));
 
     // 2. Camera Check (If Enabled)
     if (requireCamera) {
       try {
-        const camStream = await navigator.mediaDevices.getUserMedia({ video: true });
-        camStream.getTracks().forEach(t => t.stop());
-        setChecks(prev => ({ ...prev, camera: "success" }));
+        const camStream = await navigator.mediaDevices.getUserMedia({
+          video: true,
+        });
+        camStream.getTracks().forEach((t) => t.stop());
+        setChecks((prev) => ({ ...prev, camera: "success" }));
       } catch (e) {
-        setChecks(prev => ({ ...prev, camera: "error" }));
+        setChecks((prev) => ({ ...prev, camera: "error" }));
       }
     } else {
-      setChecks(prev => ({ ...prev, camera: "success" }));
+      setChecks((prev) => ({ ...prev, camera: "success" }));
     }
 
     // 3. Mic Check (If Enabled)
     if (requireAudio) {
       try {
-        const micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        micStream.getTracks().forEach(t => t.stop());
-        setChecks(prev => ({ ...prev, mic: "success" }));
+        const micStream = await navigator.mediaDevices.getUserMedia({
+          audio: true,
+        });
+        micStream.getTracks().forEach((t) => t.stop());
+        setChecks((prev) => ({ ...prev, mic: "success" }));
       } catch (e) {
-        setChecks(prev => ({ ...prev, mic: "error" }));
+        setChecks((prev) => ({ ...prev, mic: "error" }));
       }
     } else {
-      setChecks(prev => ({ ...prev, mic: "success" }));
+      setChecks((prev) => ({ ...prev, mic: "success" }));
     }
 
     // 4. Screen Sharing Check (If Enabled)
     if (requireScreen) {
       try {
         if (navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia) {
-          const screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
-          
-          const track = screenStream.getVideoTracks()[0];
-          const settings = track ? track.getSettings() : {};
-          const displaySurface = settings.displaySurface;
-          const isEntireScreen = displaySurface !== 'window' && displaySurface !== 'browser';
+          const isExtendedPre =
+            "isExtended" in window.screen
+              ? (window.screen as unknown as { isExtended?: boolean })
+                  .isExtended
+              : false;
+          if (isExtendedPre) {
+            setChecks((prev) => ({ ...prev, screen: "error" }));
+            setScreenErrorMsg(
+              "Multiple displays detected. Please disconnect extra monitors.",
+            );
+            setIsVerifying(false);
+            return;
+          }
 
-          const isExtended = 'isExtended' in window.screen ? (window.screen as unknown as { isExtended?: boolean }).isExtended : false;
-          
-          screenStream.getTracks().forEach(t => t.stop());
+          const screenStream = await navigator.mediaDevices.getDisplayMedia({
+            video: {
+              displaySurface: "monitor",
+            },
+            audio: false,
+            preferCurrentTab: false,
+            selfBrowserSurface: "exclude",
+            surfaceSwitching: "exclude",
+            systemAudio: "exclude",
+          } as MediaStreamConstraints);
+
+          const track = screenStream.getVideoTracks()[0];
+          const settings = track
+            ? (track.getSettings() as MediaTrackSettings & {
+                displaySurface?: string;
+              })
+            : {};
+          const displaySurface = settings.displaySurface;
+          const isEntireScreen = displaySurface === "monitor";
+
+          const isExtended =
+            "isExtended" in window.screen
+              ? (window.screen as unknown as { isExtended?: boolean })
+                  .isExtended
+              : false;
+
+          screenStream.getTracks().forEach((t) => t.stop());
 
           if (!isEntireScreen) {
-            setChecks(prev => ({ ...prev, screen: "error" }));
-            setScreenErrorMsg("Please share your ENTIRE screen (not a window or tab).");
+            setChecks((prev) => ({ ...prev, screen: "error" }));
+            setScreenErrorMsg(
+              "Please share your ENTIRE screen (not a window or tab).",
+            );
           } else if (isExtended) {
-            setChecks(prev => ({ ...prev, screen: "error" }));
-            setScreenErrorMsg("Multiple displays detected. Please disconnect extra monitors.");
+            setChecks((prev) => ({ ...prev, screen: "error" }));
+            setScreenErrorMsg(
+              "Multiple displays detected. Please disconnect extra monitors.",
+            );
           } else {
-            setChecks(prev => ({ ...prev, screen: "success" }));
+            setChecks((prev) => ({ ...prev, screen: "success" }));
           }
         } else {
-          setChecks(prev => ({ ...prev, screen: "error" }));
+          setChecks((prev) => ({ ...prev, screen: "error" }));
           setScreenErrorMsg("Your browser does not support screen sharing.");
         }
       } catch (e) {
         console.error("Screen sharing check failed:", e);
-        setChecks(prev => ({ ...prev, screen: "error" }));
-        setScreenErrorMsg("Screen sharing permission is required. Please try again.");
+        setChecks((prev) => ({ ...prev, screen: "error" }));
+        setScreenErrorMsg(
+          "Screen sharing permission is required. Please try again.",
+        );
       }
     } else {
-      setChecks(prev => ({ ...prev, screen: "success" }));
+      setChecks((prev) => ({ ...prev, screen: "success" }));
     }
 
     setIsVerifying(false);
@@ -143,13 +202,13 @@ export const EnvironmentCheck: React.FC<{ onComplete: () => void; config?: { cam
     }
   };
 
-  const allPassed = Object.values(checks).every(v => v === "success");
+  const allPassed = Object.values(checks).every((v) => v === "success");
 
   const handleStart = () => {
     if (requireFullscreen) {
       try {
         if (document.documentElement.requestFullscreen) {
-          document.documentElement.requestFullscreen().catch(err => {
+          document.documentElement.requestFullscreen().catch((err) => {
             console.warn("Fullscreen request denied or failed:", err);
           });
         }
@@ -157,7 +216,7 @@ export const EnvironmentCheck: React.FC<{ onComplete: () => void; config?: { cam
         console.warn("Fullscreen API not available:", err);
       }
     }
-    
+
     startProctoring();
     onComplete();
   };
@@ -169,49 +228,53 @@ export const EnvironmentCheck: React.FC<{ onComplete: () => void; config?: { cam
           <div className="mx-auto mb-4 w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
             <ShieldCheck className="w-8 h-8 text-primary" />
           </div>
-          <CardTitle className="text-2xl font-bold">System Compatibility Check</CardTitle>
+          <CardTitle className="text-2xl font-bold">
+            System Compatibility Check
+          </CardTitle>
           <CardDescription>
             Verifying required system settings before you enter your assessment.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <CheckItem 
-            icon={<ShieldCheck className="w-5 h-5" />} 
-            label="Browser Compatibility" 
-            status={checks.browser} 
+          <CheckItem
+            icon={<ShieldCheck className="w-5 h-5" />}
+            label="Browser Compatibility"
+            status={checks.browser}
             description="Checking for modern browser features"
           />
 
           {requireCamera && (
-            <CheckItem 
-              icon={<Camera className="w-5 h-5" />} 
-              label="Camera Access" 
-              status={checks.camera} 
+            <CheckItem
+              icon={<Camera className="w-5 h-5" />}
+              label="Camera Access"
+              status={checks.camera}
               description="Required for face monitoring"
             />
           )}
 
           {requireAudio && (
-            <CheckItem 
-              icon={<Mic className="w-5 h-5" />} 
-              label="Microphone Access" 
-              status={checks.mic} 
+            <CheckItem
+              icon={<Mic className="w-5 h-5" />}
+              label="Microphone Access"
+              status={checks.mic}
               description="Required for audio monitoring"
             />
           )}
 
           {requireScreen && (
-            <CheckItem 
-              icon={<Monitor className="w-5 h-5" />} 
-              label="Screen Share & Display Check" 
-              status={checks.screen} 
-              description={screenErrorMsg || "Ensure only one monitor is connected"}
+            <CheckItem
+              icon={<Monitor className="w-5 h-5" />}
+              label="Screen Share & Display Check"
+              status={checks.screen}
+              description={
+                screenErrorMsg || "Ensure only one monitor is connected"
+              }
             />
           )}
 
           {requireFullscreen && !isFullscreen && (
             <div className="pt-2">
-              <Button 
+              <Button
                 variant="default"
                 className="w-full gap-2"
                 onClick={toggleFullscreen}
@@ -227,9 +290,9 @@ export const EnvironmentCheck: React.FC<{ onComplete: () => void; config?: { cam
         </CardContent>
         <CardFooter className="flex flex-col gap-3">
           {!allPassed ? (
-            <Button 
-              className="w-full" 
-              onClick={verifyEnvironment} 
+            <Button
+              className="w-full"
+              onClick={verifyEnvironment}
               disabled={isVerifying}
             >
               {isVerifying ? (
@@ -242,8 +305,8 @@ export const EnvironmentCheck: React.FC<{ onComplete: () => void; config?: { cam
               )}
             </Button>
           ) : (
-            <Button 
-              className="w-full bg-[#4353a4] hover:bg-[#344285] text-white gap-2" 
+            <Button
+              className="w-full bg-indigo-600 hover:bg-indigo-700 text-white gap-2"
               onClick={handleStart}
             >
               <Play className="w-4 h-4" />
@@ -256,22 +319,33 @@ export const EnvironmentCheck: React.FC<{ onComplete: () => void; config?: { cam
   );
 };
 
-const CheckItem: React.FC<{ 
-  icon: React.ReactNode; 
-  label: string; 
+const CheckItem: React.FC<{
+  icon: React.ReactNode;
+  label: string;
   status: "pending" | "success" | "error";
   description: string;
 }> = ({ icon, label, status, description }) => {
   const statusConfig = {
-    pending: { color: "text-muted-foreground", icon: <div className="w-4 h-4 rounded-full border-2 border-muted" /> },
-    success: { color: "text-green-500", icon: <CheckCircle2 className="w-5 h-5" /> },
+    pending: {
+      color: "text-muted-foreground",
+      icon: <div className="w-4 h-4 rounded-full border-2 border-muted" />,
+    },
+    success: {
+      color: "text-green-500",
+      icon: <CheckCircle2 className="w-5 h-5" />,
+    },
     error: { color: "text-red-500", icon: <AlertCircle className="w-5 h-5" /> },
   };
 
   return (
     <div className="flex items-center justify-between p-3 rounded-lg border bg-card/50">
       <div className="flex items-center gap-3">
-        <div className={cn("p-2 rounded-md bg-background border", statusConfig[status].color)}>
+        <div
+          className={cn(
+            "p-2 rounded-md bg-background border",
+            statusConfig[status].color,
+          )}
+        >
           {icon}
         </div>
         <div>
@@ -279,9 +353,7 @@ const CheckItem: React.FC<{
           <p className="text-xs text-muted-foreground mt-1">{description}</p>
         </div>
       </div>
-      <div>
-        {statusConfig[status].icon}
-      </div>
+      <div>{statusConfig[status].icon}</div>
     </div>
   );
 };

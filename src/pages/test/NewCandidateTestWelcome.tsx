@@ -154,6 +154,7 @@ export default function NewCandidateTestWelcome({
   const navigate = useNavigate();
   const { toast } = useToast();
   const { login: loginToContext, user, isAuthenticated } = useAuth();
+  const isCandidateAuthenticated = isAuthenticated && user?.role === "CANDIDATE";
 
   const effectiveTestId =
     testIdProp || routeTestId || routeId || searchParams.get("testId") || searchParams.get("id");
@@ -184,7 +185,13 @@ export default function NewCandidateTestWelcome({
     startTime?: string;
     endTime?: string;
     testTitle?: string;
+    durationMins?: number;
+    organisationName?: string;
   } | null>(null);
+
+  /* ────── Magic-link gate state ────── */
+  const [pendingMagicToken, setPendingMagicToken] = useState<string | null>(null);
+  const [isVerifyingMagicToken, setIsVerifyingMagicToken] = useState(false);
 
   /* ────── Timers ────── */
   useEffect(() => {
@@ -259,7 +266,7 @@ export default function NewCandidateTestWelcome({
         } else {
           const storedToken = localStorage.getItem("token");
           if (storedToken) decoded = parseJwt(storedToken);
-          if (!isAuthenticated || !decoded) {
+          if (!isCandidateAuthenticated || !decoded || decoded.role !== "CANDIDATE") {
             setLoading(false);
             return;
           }
@@ -406,7 +413,7 @@ export default function NewCandidateTestWelcome({
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [routeId, routeToken, isAuthenticated, loginToContext]
+    [routeId, routeToken, isCandidateAuthenticated, loginToContext]
   );
 
   /* ────── Auth Handlers (ported from TestAccess.tsx) ────── */
@@ -436,27 +443,36 @@ export default function NewCandidateTestWelcome({
   );
 
   const verifyMagicToken = useCallback(
-    async (magicTokenStr: string) => {
+    async (magicTokenStr: string, autoOpenWizard = false) => {
       try {
-        setLoading(true);
+        setIsVerifyingMagicToken(true);
         setError(null);
         const response = await apiClient.post(`/candidate-invitations/${routeId}/access/verify`, {
           magicToken: magicTokenStr,
         });
         const authData = response.data?.data || response.data;
         if (!authData || !authData.accessToken) throw new Error("Authentication failed.");
+        // Remove magicToken from URL only after successful verification
         window.history.replaceState({}, "", `/test/access/${routeId}`);
+        setPendingMagicToken(null);
         toast({ title: "Verification Successful", description: "Magic link authenticated successfully." });
         await handleAuthResponse(authData);
+        if (autoOpenWizard) {
+          if (onStartAssessment) {
+            onStartAssessment();
+          } else {
+            setIsOnboardingOpen(true);
+          }
+        }
       } catch (err: unknown) {
         const errorVal = err as { response?: { data?: { message?: string } }; message?: string };
         console.error("Magic token verification failed:", err);
-        window.history.replaceState({}, "", `/test/access/${routeId}`);
         setError(errorVal.response?.data?.message || errorVal.message || "Failed to verify magic access link");
-        setLoading(false);
+      } finally {
+        setIsVerifyingMagicToken(false);
       }
     },
-    [routeId, toast, handleAuthResponse]
+    [routeId, toast, handleAuthResponse, onStartAssessment]
   );
 
   const handleSendAccessCode = async () => {
@@ -524,20 +540,36 @@ export default function NewCandidateTestWelcome({
             startTime: s?.startTime,
             endTime: s?.endTime,
             testTitle: s?.testTitle,
+            durationMins: s?.durationMins,
+            organisationName: s?.organisationName,
           });
 
           if (submitted || expired) {
             setLoading(false);
             return;
           }
-          if (magicToken) verifyMagicToken(magicToken);
-          else if (routeToken || isAuthenticated) validateToken();
-          else setLoading(false);
+
+          if (magicToken) {
+            // Gate: store token in state — do NOT auto-fire POST.
+            // Crawlers will stop here; real candidates click "Proceed to Assessment".
+            setPendingMagicToken(magicToken);
+            setLoading(false);
+          } else if (routeToken || isCandidateAuthenticated) {
+            validateToken();
+          } else {
+            setLoading(false);
+          }
         })
         .catch(() => {
-          if (magicToken) verifyMagicToken(magicToken);
-          else if (routeToken || isAuthenticated) validateToken();
-          else setLoading(false);
+          if (magicToken) {
+            // Status fetch failed but we still gate the magic link behind a button click
+            setPendingMagicToken(magicToken);
+            setLoading(false);
+          } else if (routeToken || isCandidateAuthenticated) {
+            validateToken();
+          } else {
+            setLoading(false);
+          }
         });
     } else if (routeToken && !routeId) {
       setError("This link is outdated. Please use the secure invitation link.");
@@ -546,7 +578,7 @@ export default function NewCandidateTestWelcome({
       setLoading(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [routeId, routeToken, isAuthenticated]);
+  }, [routeId, routeToken, isCandidateAuthenticated]);
 
   /* ────── Derived Display Values ────── */
 
@@ -562,13 +594,13 @@ export default function NewCandidateTestWelcome({
     return { total, mcqCount, codingCount, otherCount };
   }, [questions]);
 
-  const displayTitle = testData?.testTitle || titleProp || "Not Available";
-  const displayAuthor = testData?.organisationName || user?.organisationData?.name || authorProp || "Not Available";
-  const displayDuration = testData ? `${testData.durationMins} mins` : durationProp != null ? `${durationProp} mins` : "Not Available";
-  const displayTotalProblems = testData?.questionCount || questionStats.total || problemsProp || "Not Available";
+  const displayTitle = testData?.testTitle || invitationStatus?.testTitle || titleProp || "Assessment";
+  const displayAuthor = testData?.organisationName || invitationStatus?.organisationName || user?.organisationData?.name || authorProp || "Assessment Provider";
+  const displayDuration = testData ? `${testData.durationMins} mins` : invitationStatus?.durationMins ? `${invitationStatus.durationMins} mins` : durationProp != null ? `${durationProp} mins` : "45 mins";
+  const displayTotalProblems = testData?.questionCount || questionStats.total || problemsProp || 1;
 
-  const displayStartTime = (testData?.startTime ? formatDateTime(testData.startTime) : null) || startProp || "Not Available";
-  const displayEndTime = (testData?.endTime ? formatDateTime(testData.endTime) : null) || endProp || "Not Available";
+  const displayStartTime = (testData?.startTime ? formatDateTime(testData.startTime) : invitationStatus?.startTime ? formatDateTime(invitationStatus.startTime) : null) || startProp || "Not Available";
+  const displayEndTime = (testData?.endTime ? formatDateTime(testData.endTime) : invitationStatus?.endTime ? formatDateTime(invitationStatus.endTime) : null) || endProp || "Not Available";
 
   // Instructions extraction
   const resolvedInstructions = useMemo(() => {
@@ -591,8 +623,10 @@ export default function NewCandidateTestWelcome({
     return null;
   }, [instructionsProp, testData?.instructions, test]);
 
-  const handleStart = () => {
-    if (onStartAssessment) {
+  const handleStart = async () => {
+    if (pendingMagicToken) {
+      await verifyMagicToken(pendingMagicToken, true);
+    } else if (onStartAssessment) {
       onStartAssessment();
     } else {
       setIsOnboardingOpen(true);
@@ -605,7 +639,7 @@ export default function NewCandidateTestWelcome({
   if (loading) {
     return (
       <div className="min-h-screen bg-[#edf2f7] flex flex-col items-center justify-center font-sans text-slate-800 gap-4">
-        <Loader2 className="w-10 h-10 animate-spin text-[#4353a4]" />
+        <Loader2 className="w-10 h-10 animate-spin text-indigo-600" />
         <p className="text-sm font-semibold text-slate-600 animate-pulse">Preparing your secure environment...</p>
         {showColdStartMessage && (
           <p className="text-center text-xs text-amber-600 animate-pulse max-w-xs px-4">
@@ -633,7 +667,7 @@ export default function NewCandidateTestWelcome({
               <span className="text-xs text-slate-700 font-medium">All responses are securely stored and cannot be modified.</span>
             </div>
             <div className="flex items-center gap-3 rounded-xl bg-slate-50 border border-slate-200/80 px-4 py-3.5">
-              <Clock className="w-5 h-5 text-[#4353a4] shrink-0" />
+              <Clock className="w-5 h-5 text-indigo-600 shrink-0" />
               <span className="text-xs text-slate-700 font-medium">Results will be shared by your administrator once evaluation is complete.</span>
             </div>
           </CardContent>
@@ -703,8 +737,8 @@ export default function NewCandidateTestWelcome({
     );
   }
 
-  // Auth screen: Not authenticated and no testData → show Send Access Link / OTP
-  if ((error || !testData) && !isAuthenticated) {
+  // Auth screen: Not candidate-authenticated, no pending magicToken, and no testData → show Send Access Link / OTP
+  if ((error || !testData) && !isCandidateAuthenticated && !pendingMagicToken) {
     return (
       <div className="min-h-screen flex items-center justify-center p-4 bg-slate-50 text-slate-900 font-sans relative">
         <Card className="max-w-md w-full border border-slate-200 bg-white shadow-xl rounded-2xl relative overflow-hidden animate-in fade-in duration-300">
@@ -745,7 +779,7 @@ export default function NewCandidateTestWelcome({
                       if (val.length === 6) handleOtpSubmit(val);
                     }}
                     disabled={isVerifyingOtp}
-                    className="text-center text-2xl tracking-[0.3em] font-mono h-12 bg-white border-slate-200 text-slate-900 focus-visible:ring-[#4353a4]"
+                    className="text-center text-2xl tracking-[0.3em] font-mono h-12 bg-white border-slate-200 text-slate-900 focus-visible:ring-indigo-500"
                     autoComplete="one-time-code"
                   />
                 </div>
@@ -753,7 +787,7 @@ export default function NewCandidateTestWelcome({
                   <Button
                     onClick={() => handleOtpSubmit(otpCode)}
                     disabled={otpCode.length !== 6 || isVerifyingOtp}
-                    className="w-full h-11 bg-[#4353a4] hover:bg-[#344285] text-white font-semibold shadow-sm"
+                    className="w-full h-11 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold shadow-sm"
                   >
                     {isVerifyingOtp ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : null}
                     {isVerifyingOtp ? "Verifying..." : "Submit Code"}
@@ -773,7 +807,7 @@ export default function NewCandidateTestWelcome({
                 <Button
                   onClick={handleSendAccessCode}
                   disabled={isLoggingIn || otpCooldown > 0}
-                  className="w-full h-11 bg-[#4353a4] hover:bg-[#344285] text-white font-semibold shadow-sm"
+                  className="w-full h-11 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold shadow-sm"
                 >
                   {isLoggingIn ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : null}
                   {isLoggingIn ? "SENDING LINK..." : "SEND ACCESS LINK"}
@@ -860,7 +894,7 @@ export default function NewCandidateTestWelcome({
           {/* 2. Test Info Metadata Banner */}
           <div className="bg-white border border-slate-200/90 rounded-sm shadow-xs p-5 md:p-6 grid grid-cols-1 md:grid-cols-3 gap-6 items-center">
             <div className="flex items-center gap-3.5">
-              <div className="w-10 h-10 rounded-full bg-indigo-50 border border-indigo-100 flex items-center justify-center text-[#4353a4] shrink-0">
+              <div className="w-10 h-10 rounded-full bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 shrink-0">
                 <Clock className="w-5 h-5 stroke-[1.75]" />
               </div>
               <div className="space-y-0.5">
@@ -869,7 +903,7 @@ export default function NewCandidateTestWelcome({
               </div>
             </div>
             <div className="flex items-center gap-3.5 md:border-l md:border-slate-100 md:pl-6">
-              <div className="w-10 h-10 rounded-full bg-indigo-50 border border-indigo-100 flex items-center justify-center text-[#4353a4] shrink-0">
+              <div className="w-10 h-10 rounded-full bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 shrink-0">
                 <FileText className="w-5 h-5 stroke-[1.75]" />
               </div>
               <div className="space-y-0.5">
@@ -880,7 +914,7 @@ export default function NewCandidateTestWelcome({
               </div>
             </div>
             <div className="flex items-center gap-3.5 md:border-l md:border-slate-100 md:pl-6">
-              <div className="w-10 h-10 rounded-full bg-indigo-50 border border-indigo-100 flex items-center justify-center text-[#4353a4] shrink-0">
+              <div className="w-10 h-10 rounded-full bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 shrink-0">
                 <Calendar className="w-5 h-5 stroke-[1.75]" />
               </div>
               <div className="space-y-0.5 text-xs text-slate-600">
@@ -899,7 +933,7 @@ export default function NewCandidateTestWelcome({
               {resolvedInstructions ? (
                 /<[a-z][\s\S]*>/i.test(resolvedInstructions) ? (
                   <div
-                    className="text-xs md:text-sm text-slate-700 leading-relaxed font-sans prose prose-slate max-w-none [&_ol]:list-decimal [&_ol]:pl-5 [&_ul]:list-disc [&_ul]:pl-5 [&_li]:my-1 [&_p]:my-1.5 [&_pre]:bg-slate-900 [&_pre]:text-slate-100 [&_pre]:p-3.5 [&_pre]:rounded-xs [&_pre]:font-mono [&_pre]:text-xs [&_pre]:overflow-x-auto [&_code]:font-mono [&_code]:text-xs [&_code]:bg-slate-100 [&_code]:text-pink-600 [&_code]:px-1 [&_code]:py-0.5 [&_code]:rounded-xs [&_pre_code]:bg-transparent [&_pre_code]:text-inherit [&_pre_code]:p-0 [&_a]:text-[#4353a4] [&_a]:underline [&_a]:font-medium hover:[&_a]:text-[#344287] [&_blockquote]:border-none [&_blockquote]:italic [&_blockquote]:text-slate-700 [&_blockquote]:my-1.5 [&_blockquote]:px-1 [&_blockquote]:before:content-['\\201C'] [&_blockquote]:after:content-['\\201D'] [&_blockquote]:before:font-serif [&_blockquote]:after:font-serif [&_blockquote]:before:text-[#4353a4] [&_blockquote]:after:text-[#4353a4] [&_blockquote]:before:font-bold [&_blockquote]:after:font-bold [&_sup]:text-[9px] [&_sub]:text-[9px]"
+                    className="text-xs md:text-sm text-slate-700 leading-relaxed font-sans prose prose-slate max-w-none [&_ol]:list-decimal [&_ol]:pl-5 [&_ul]:list-disc [&_ul]:pl-5 [&_li]:my-1 [&_p]:my-1.5 [&_pre]:bg-slate-900 [&_pre]:text-slate-100 [&_pre]:p-3.5 [&_pre]:rounded-xs [&_pre]:font-mono [&_pre]:text-xs [&_pre]:overflow-x-auto [&_code]:font-mono [&_code]:text-xs [&_code]:bg-slate-100 [&_code]:text-pink-600 [&_code]:px-1 [&_code]:py-0.5 [&_code]:rounded-xs [&_pre_code]:bg-transparent [&_pre_code]:text-inherit [&_pre_code]:p-0 [&_a]:text-indigo-600 [&_a]:underline [&_a]:font-medium hover:[&_a]:text-indigo-700 [&_blockquote]:border-none [&_blockquote]:italic [&_blockquote]:text-slate-700 [&_blockquote]:my-1.5 [&_blockquote]:px-1 [&_blockquote]:before:content-['\\201C'] [&_blockquote]:after:content-['\\201D'] [&_blockquote]:before:font-serif [&_blockquote]:after:font-serif [&_blockquote]:before:text-indigo-500 [&_blockquote]:after:text-indigo-500 [&_blockquote]:before:font-bold [&_blockquote]:after:font-bold [&_sup]:text-[9px] [&_sub]:text-[9px]"
                     dangerouslySetInnerHTML={{ __html: resolvedInstructions }}
                   />
                 ) : (
@@ -920,12 +954,28 @@ export default function NewCandidateTestWelcome({
 
               {/* Action Button */}
               <div className="pt-4 flex flex-col items-center justify-center gap-3">
+                {error && (
+                  <div className="flex items-start gap-2.5 bg-red-50 border border-red-200 rounded-lg p-3 text-xs text-red-700 max-w-md w-full">
+                    <AlertCircle className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
+                    <span>{error}</span>
+                  </div>
+                )}
                 <Button
                   onClick={handleStart}
-                  className="bg-[#4353a4] hover:bg-[#344287] text-white px-8 py-5 text-xs md:text-sm font-bold tracking-wider uppercase rounded-xs shadow-sm hover:shadow transition-all inline-flex items-center gap-2 cursor-pointer"
+                  disabled={isVerifyingMagicToken}
+                  className="bg-indigo-600 hover:bg-indigo-700 text-white px-8 py-5 text-xs md:text-sm font-bold tracking-wider uppercase rounded-xs shadow-sm hover:shadow transition-all inline-flex items-center gap-2 cursor-pointer"
                 >
-                  <Play className="w-3.5 h-3.5 fill-current" />
-                  <span>Start Assessment</span>
+                  {isVerifyingMagicToken ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>Verifying & Starting...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Play className="w-3.5 h-3.5 fill-current" />
+                      <span>Proceed to Assessment</span>
+                    </>
+                  )}
                 </Button>
                 <p className="text-[11px] md:text-xs text-slate-500 flex items-center gap-1.5 text-center font-normal pt-1">
                   <Info className="w-3.5 h-3.5 text-slate-400 shrink-0" />

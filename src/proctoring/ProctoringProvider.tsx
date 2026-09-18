@@ -116,6 +116,8 @@ export const ProctoringProvider: React.FC<{
     cameraActive: false,
     screenActive: false,
     micActive: false,
+    faceNotVisible: false,
+    isCameraObscured: false,
   });
 
   const store = useRef(new ViolationStore(sessionId));
@@ -128,6 +130,7 @@ export const ProctoringProvider: React.FC<{
     switch (type) {
       case "MULTI_FACE": severity = "HIGH"; break;
       case "LOOK_AWAY": severity = "MEDIUM"; break;
+      case "NO_FACE": severity = "HIGH"; break;
       case "TAB_SWITCH": severity = "HIGH"; break;
       case "EXTENDED_TAB_SWITCH": severity = "HIGH"; break;
       case "SPEECH": severity = "MEDIUM"; break;
@@ -145,7 +148,7 @@ export const ProctoringProvider: React.FC<{
     }));
 
     // Traffic Optimization:
-    // Capture & upload image evidence for malpractice events (TAB_SWITCH, MULTI_FACE, DEVTOOLS, BACKGROUND_OBJECT, SCREEN_RECORD)
+    // Capture & upload image evidence for malpractice events (TAB_SWITCH, MULTI_FACE, NO_FACE, DEVTOOLS, BACKGROUND_OBJECT, SCREEN_RECORD)
     const requiresImageEvidence = ["TAB_SWITCH", "EXTENDED_TAB_SWITCH", "MULTI_FACE", "NO_FACE", "DEVTOOLS_OPEN", "BACKGROUND_OBJECT", "SCREEN_RECORD"].includes(type);
 
     // 30-second cooldown guard per violation type to avoid uploading duplicate frames back-to-back
@@ -183,7 +186,24 @@ export const ProctoringProvider: React.FC<{
     addViolation(type, meta || {});
   }, [addViolation]);
 
-  const { videoRef } = useCameraMonitor(state.isProctoringActive && config.camera, handleViolation);
+  const handleFaceStatusChange = useCallback((status: { faceNotVisible: boolean; isCameraObscured: boolean }) => {
+    setState(prev => {
+      if (prev.faceNotVisible === status.faceNotVisible && prev.isCameraObscured === status.isCameraObscured) {
+        return prev;
+      }
+      return {
+        ...prev,
+        faceNotVisible: status.faceNotVisible,
+        isCameraObscured: status.isCameraObscured,
+      };
+    });
+  }, []);
+
+  const { videoRef } = useCameraMonitor(
+    state.isProctoringActive && config.camera, 
+    handleViolation,
+    handleFaceStatusChange
+  );
   useTabMonitor(state.isProctoringActive && config.tabSwitch, handleViolation);
   useDevToolsDetector(state.isProctoringActive && config.devtools, () => addViolation("DEVTOOLS_OPEN"));
   useAudioMonitor(state.isProctoringActive && config.audio, handleViolation);
@@ -280,8 +300,38 @@ export const ProctoringProvider: React.FC<{
     return () => window.removeEventListener("online", handleOnline);
   }, []);
 
-  const startProctoring = () => setState(prev => ({ ...prev, isProctoringActive: true }));
-  const stopProctoring = () => setState(prev => ({ ...prev, isProctoringActive: false }));
+  const startProctoring = useCallback(() => setState(prev => ({ ...prev, isProctoringActive: true })), []);
+  
+  const stopProctoring = useCallback(() => {
+    setState(prev => ({
+      ...prev,
+      isProctoringActive: false,
+      cameraActive: false,
+      screenActive: false,
+      micActive: false,
+    }));
+
+    // Explicitly stop all media streams attached to any video/audio element
+    document.querySelectorAll<HTMLMediaElement>("video, audio").forEach((el) => {
+      if (el.srcObject instanceof MediaStream) {
+        el.srcObject.getTracks().forEach((track) => {
+          try {
+            track.stop();
+          } catch (e) {
+            void e;
+          }
+        });
+        el.srcObject = null;
+      }
+    });
+  }, []);
+
+  // Cleanup on provider unmount
+  useEffect(() => {
+    return () => {
+      stopProctoring();
+    };
+  }, [stopProctoring]);
 
   const syncViolations = useCallback(async () => {
     const score = await store.current.syncToBackend();
@@ -310,6 +360,7 @@ export const ProctoringProvider: React.FC<{
   );
 };
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const useProctoring = () => {
   const context = useContext(ProctoringContext);
   if (!context) throw new Error("useProctoring must be used within ProctoringProvider");

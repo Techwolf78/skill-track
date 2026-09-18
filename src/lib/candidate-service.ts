@@ -286,6 +286,12 @@ export const candidateService = {
     await apiClient.delete(`/candidates/${id}`);
   },
 
+  // Update a candidate
+  updateCandidate: async (id: string, data: Partial<CreateCandidateRequest>): Promise<Candidate> => {
+    const response = await apiClient.patch<Candidate>(`/candidates/${id}`, data);
+    return unwrapResponse(response);
+  },
+
   // Get the currently logged-in candidate's own profile
   // Uses GET /candidates/me — accessible by CANDIDATE role only
   getMyProfile: async (): Promise<Candidate | null> => {

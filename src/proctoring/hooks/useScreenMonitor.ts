@@ -2,7 +2,10 @@ import { useEffect, useRef } from "react";
 
 export function useScreenMonitor(
   isActive: boolean,
-  onViolation: (type: "SCREEN_RECORD", metadata: Record<string, unknown>) => void
+  onViolation: (
+    type: "SCREEN_RECORD",
+    metadata: Record<string, unknown>,
+  ) => void,
 ) {
   const streamRef = useRef<MediaStream | null>(null);
   const onViolationRef = useRef(onViolation);
@@ -16,7 +19,7 @@ export function useScreenMonitor(
     if (!isActive) {
       // Stop stream if proctoring is deactivated
       if (streamRef.current) {
-        streamRef.current.getTracks().forEach(t => t.stop());
+        streamRef.current.getTracks().forEach((t) => t.stop());
         streamRef.current = null;
       }
       return;
@@ -27,34 +30,109 @@ export function useScreenMonitor(
 
     const startScreenCapture = async () => {
       try {
-        const stream = await navigator.mediaDevices.getDisplayMedia({ video: true });
+        // 1. Pre-check for multiple monitors
+        const isExtendedPre =
+          "isExtended" in window.screen
+            ? (window.screen as unknown as { isExtended?: boolean }).isExtended
+            : false;
+        if (isExtendedPre) {
+          onViolationRef.current("SCREEN_RECORD", {
+            detail:
+              "Multiple displays detected. Secondary monitors are not permitted.",
+          });
+        }
+
+        // 2. Request Entire Screen with Chromium constraints
+        const stream = await navigator.mediaDevices.getDisplayMedia({
+          video: {
+            displaySurface: "monitor",
+          },
+          audio: false,
+          preferCurrentTab: false,
+          selfBrowserSurface: "exclude",
+          surfaceSwitching: "exclude",
+          systemAudio: "exclude",
+        } as MediaStreamConstraints);
+
+        const track = stream.getVideoTracks()[0];
+        const settings = track
+          ? (track.getSettings() as MediaTrackSettings & {
+              displaySurface?: string;
+            })
+          : {};
+        const displaySurface = settings.displaySurface;
+
+        // 3. Strict surface validation
+        if (displaySurface && displaySurface !== "monitor") {
+          track.stop();
+          streamRef.current = null;
+          onViolationRef.current("SCREEN_RECORD", {
+            detail:
+              "Entire screen share required. Single tab or application window sharing is prohibited.",
+            surface: displaySurface,
+          });
+          return;
+        }
+
         streamRef.current = stream;
 
         // Re-enforce fullscreen
-        if (!document.fullscreenElement && document.documentElement.requestFullscreen) {
+        if (
+          !document.fullscreenElement &&
+          document.documentElement.requestFullscreen
+        ) {
           document.documentElement.requestFullscreen().catch(() => {});
         }
 
-        stream.getVideoTracks()[0].onended = () => {
-          onViolationRef.current("SCREEN_RECORD", { detail: "Screen sharing stopped" });
+        track.onended = () => {
+          onViolationRef.current("SCREEN_RECORD", {
+            detail: "Screen sharing was stopped by user",
+          });
         };
-      } catch (err) {
+      } catch (err: unknown) {
         console.error("Screen capture failed:", err);
-        onViolationRef.current("SCREEN_RECORD", { detail: "Screen sharing denied" });
+        const errName =
+          typeof err === "object" && err !== null && "name" in err
+            ? String((err as { name: string }).name)
+            : "";
+        onViolationRef.current("SCREEN_RECORD", {
+          detail:
+            errName === "NotAllowedError"
+              ? "Screen sharing permission denied"
+              : "Screen sharing capture failed",
+        });
       }
     };
 
     startScreenCapture();
+  }, [isActive]);
 
-    // Note: We don't stop tracks here on every effect re-run to avoid loops
-    // We handle it in the !isActive check and unmount
+  // Periodic multi-screen check while active
+  useEffect(() => {
+    if (!isActive) return;
+
+    const checkScreens = () => {
+      const isExtended =
+        "isExtended" in window.screen
+          ? (window.screen as unknown as { isExtended?: boolean }).isExtended
+          : false;
+      if (isExtended) {
+        onViolationRef.current("SCREEN_RECORD", {
+          detail:
+            "Multiple displays detected. Secondary monitors are not permitted.",
+        });
+      }
+    };
+
+    const intervalId = setInterval(checkScreens, 5000);
+    return () => clearInterval(intervalId);
   }, [isActive]);
 
   // Handle unmount specifically
   useEffect(() => {
     return () => {
       if (streamRef.current) {
-        streamRef.current.getTracks().forEach(t => t.stop());
+        streamRef.current.getTracks().forEach((t) => t.stop());
         streamRef.current = null;
       }
     };

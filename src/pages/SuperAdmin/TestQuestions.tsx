@@ -47,6 +47,7 @@ import {
   Topic,
 } from "@/lib/test-service";
 import { useToast } from "@/hooks/use-toast";
+import { renderFormattedContent } from "@/lib/html-utils";
 
 export default function TestQuestions() {
   const { id } = useParams<{ id: string }>();
@@ -513,14 +514,10 @@ const handleAddQuestions = async () => {
                           {question.marks || 0} marks
                         </Badge>
                       </div>
-                      {/<[a-z][\s\S]*>/i.test(question.prompt || "") ? (
-                        <div
-                          className="text-sm font-medium prose prose-sm max-w-none"
-                          dangerouslySetInnerHTML={{ __html: question.prompt || "" }}
-                        />
-                      ) : (
-                        <p className="text-sm font-medium">{question.prompt}</p>
-                      )}
+                      <div
+                        className="text-sm font-medium prose prose-sm max-w-none"
+                        dangerouslySetInnerHTML={{ __html: renderFormattedContent(question.prompt) }}
+                      />
                       {question.mcqOptions &&
                         question.mcqOptions.length > 0 && (
                           <div className="mt-2 text-xs text-muted-foreground">

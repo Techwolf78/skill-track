@@ -30,6 +30,7 @@ export interface CreateUserRequest {
 export interface UpdateUserRequestPatch {
   name?: string;
   phoneNumber?: string;
+  password?: string;
   role?: string;
 }
 

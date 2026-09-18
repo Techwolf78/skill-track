@@ -13,7 +13,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { apiClient } from "@/lib/api-client";
-import { Loader2, AlertCircle, Building2 } from "lucide-react";
+import { Loader2, AlertCircle, Building2, Eye, EyeOff } from "lucide-react";
 import type { Candidate } from "@/lib/candidate-service";
 import { organisationService, type OrganisationResponse } from "@/lib/organisation-service";
 import {
@@ -38,6 +38,8 @@ export function EditCandidateDialog({ open, onOpenChange, candidate, onSuccess, 
   const [loading, setLoading] = useState(false);
   const [organisations, setOrganisations] = useState<OrganisationResponse[]>([]);
   const [customFields, setCustomFields] = useState<CustomFieldItem[]>([]);
+  const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
     phoneNumber: "",
@@ -57,6 +59,8 @@ export function EditCandidateDialog({ open, onOpenChange, candidate, onSuccess, 
   // Populate form when candidate changes
   useEffect(() => {
     if (candidate) {
+      setPassword("");
+      setShowPassword(false);
       setFormData({
         name: candidate.user.name || "",
         phoneNumber: candidate.user.phoneNumber || "",
@@ -78,7 +82,7 @@ export function EditCandidateDialog({ open, onOpenChange, candidate, onSuccess, 
       }
       setCustomFields(loadedCustomFields);
     }
-  }, [candidate]);
+  }, [candidate, open]);
 
   const handleSubmit = async () => {
     if (!formData.name.trim()) {
@@ -108,6 +112,7 @@ export function EditCandidateDialog({ open, onOpenChange, candidate, onSuccess, 
       const payload: {
         name: string;
         phoneNumber?: string;
+        password?: string;
         extraFields?: Record<string, unknown>;
         organisationId?: string;
       } = {
@@ -115,6 +120,10 @@ export function EditCandidateDialog({ open, onOpenChange, candidate, onSuccess, 
         phoneNumber: formData.phoneNumber || undefined,
         extraFields,
       };
+
+      if (password.trim()) {
+        payload.password = password.trim();
+      }
 
       if (isSuperAdmin) {
         payload.organisationId = formData.organisationId;
@@ -171,6 +180,26 @@ export function EditCandidateDialog({ open, onOpenChange, candidate, onSuccess, 
                   className="bg-muted"
                 />
                 <p className="text-xs text-muted-foreground mt-1">Email cannot be changed</p>
+              </div>
+              <div className="col-span-2">
+                <Label>New Password (Optional)</Label>
+                <div className="relative">
+                  <Input
+                    type={showPassword ? "text" : "password"}
+                    placeholder="Leave blank to keep current password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="pr-10"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">Enter a new password if you want to reset it for this candidate</p>
               </div>
               {isSuperAdmin && (
                 <div className="col-span-2">

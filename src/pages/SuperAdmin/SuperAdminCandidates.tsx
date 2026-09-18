@@ -38,6 +38,8 @@ import {
   Brain,
   MessageSquare,
   AlertCircle,
+  Building2,
+  User,
 } from "lucide-react";
 import { CustomFieldsSection, CustomFieldItem } from "@/components/candidates/CustomFieldsSection";
 import {
@@ -65,6 +67,9 @@ import { Candidate } from "@/lib/candidate-service";
 import { BulkUploadCandidates } from "../Admin/BulkUploadCandidates";
 import { EditCandidateDialog } from "../Admin/EditCandidateDialog";
 import { DeleteConfirmDialog } from "../Admin/DeleteConfirmDialog";
+import * as XLSX from "xlsx";
+import { saveAs } from "file-saver";
+import { formatDate, getTodayDateString } from "@/lib/date-utils";
 
 interface CandidateInsightData {
   totalTests?: number;
@@ -105,20 +110,20 @@ function CandidateInsightsSection({ candidateId, onInsightsLoaded }: { candidate
 
   if (loading) {
     return (
-      <div className="mt-4 pt-4 border-t border-border flex items-center justify-center py-6 gap-2">
-        <Loader2 className="w-5 h-5 animate-spin text-primary" />
-        <span className="text-xs text-muted-foreground">Loading talent insights...</span>
+      <div className="mt-4 pt-4 border-t border-slate-200 flex items-center justify-center py-6 gap-2">
+        <Loader2 className="w-5 h-5 animate-spin text-slate-800" />
+        <span className="text-xs text-slate-500">Loading talent insights...</span>
       </div>
     );
   }
 
   if (error || !insights) {
     return (
-      <div className="mt-4 pt-4 border-t border-border py-4 text-center">
-        <Brain className="w-8 h-8 text-muted-foreground/30 mx-auto mb-2 animate-pulse" />
-        <p className="text-xs font-medium text-muted-foreground">{error || "No talent insights computed yet."}</p>
-        <p className="text-[10px] text-muted-foreground/60 mt-1 max-w-xs mx-auto">
-          Insights are automatically generated nightly at 2:00 AM once candidate test submissions are evaluated.
+      <div className="mt-4 pt-4 border-t border-slate-200 py-4 text-center">
+        <Brain className="w-7 h-7 text-slate-300 mx-auto mb-2" />
+        <p className="text-xs font-medium text-slate-600">{error || "No talent insights computed yet."}</p>
+        <p className="text-[10px] text-slate-400 mt-1 max-w-xs mx-auto">
+          Insights are automatically generated nightly once candidate test submissions are evaluated.
         </p>
       </div>
     );
@@ -144,100 +149,71 @@ function CandidateInsightsSection({ candidateId, onInsightsLoaded }: { candidate
   const improvementList = parseList(insights.improvementAreas);
 
   return (
-    <div className="mt-6 pt-6 border-t border-border space-y-4">
+    <div className="mt-5 pt-5 border-t border-slate-200 space-y-3">
       <div className="flex items-center gap-2 mb-2">
-        <Brain className="w-5 h-5 text-indigo-500 animate-pulse" />
-        <h4 className="text-xs font-bold uppercase tracking-wider text-foreground">Talent & Cognitive Analytics</h4>
-        <span className="text-[10px] text-muted-foreground ml-auto">
-          Last computed: {insights.lastComputed ? new Date(insights.lastComputed).toLocaleDateString() : "N/A"}
-        </span>
+        <Brain className="w-4 h-4 text-indigo-600" />
+        <h4 className="text-xs font-bold uppercase tracking-wider text-slate-900">Talent & Cognitive Analytics</h4>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {/* Talent Percentile Gauge */}
-        <div className="bg-card border rounded-xl p-4 flex flex-col items-center justify-center text-center shadow-sm relative overflow-hidden bg-gradient-to-br from-card to-muted/20">
-          <div className="relative h-20 w-20 flex items-center justify-center">
-            <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
-              <circle cx="50" cy="50" r="40" className="stroke-muted" strokeWidth="6" fill="transparent" />
-              <circle
-                cx="50" cy="50" r="40"
-                className="stroke-indigo-650 dark:stroke-indigo-500 transition-all duration-1000"
-                strokeWidth="6"
-                fill="transparent"
-                strokeDasharray={251.2}
-                strokeDashoffset={251.2 - (251.2 * (insights.overallPercentile || 0)) / 100}
-                strokeLinecap="round"
-              />
-            </svg>
-            <div className="absolute text-center flex flex-col">
-              <span className="text-base font-bold font-mono text-indigo-600 dark:text-indigo-400">{Math.round(insights.overallPercentile || 0)}%</span>
-            </div>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        {/* Metric 1: Overall Percentile */}
+        <div className="bg-white border border-slate-200 rounded-lg p-3 space-y-1 shadow-2xs">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block">Assessment Percentile</span>
+          <div className="flex items-baseline gap-1.5">
+            <span className="text-2xl font-black font-mono text-slate-900">
+              {typeof insights.overallPercentile === "number" ? Math.round(insights.overallPercentile) : "N/A"}
+            </span>
+            {typeof insights.overallPercentile === "number" && <span className="text-xs font-bold text-slate-500">%ile</span>}
           </div>
-          <span className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground mt-2">Overall Percentile</span>
-          <div className="flex gap-4 mt-3 text-xs w-full justify-around border-t pt-2">
-            <div>
-              <span className="text-muted-foreground block text-[9px] uppercase font-semibold">Tests</span>
-              <span className="font-semibold text-sm">{insights.totalTests || 0}</span>
-            </div>
-            <div>
-              <span className="text-muted-foreground block text-[9px] uppercase font-semibold">Evaluations</span>
-              <span className="font-semibold text-sm">{insights.totalEvals || 0}</span>
-            </div>
-          </div>
+          <p className="text-[10px] text-slate-400 leading-relaxed">
+            Overall benchmark performance across national assessments.
+          </p>
         </div>
 
-        {/* Communication Skills */}
-        <div className="bg-card border rounded-xl p-4 flex flex-col justify-between shadow-sm bg-gradient-to-br from-card to-muted/20">
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground">Communication Index</span>
-              <MessageSquare className="w-4 h-4 text-indigo-500" />
-            </div>
-            <div className="flex items-baseline gap-1 mt-1">
-              <span className="text-2xl font-bold font-mono text-indigo-600 dark:text-indigo-400">{Math.round(insights.commPercentile || 0)}%</span>
-              <span className="text-xs text-muted-foreground">percentile</span>
-            </div>
-            <p className="text-[10px] text-muted-foreground mt-2 leading-relaxed">
-              Analyzed based on commentary structure, syntax style patterns, and problem decomposition clarity.
-            </p>
+        {/* Metric 2: Communication Rating */}
+        <div className="bg-white border border-slate-200 rounded-lg p-3 space-y-1 shadow-2xs">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block">Communication Score</span>
+          <div className="flex items-baseline gap-1.5">
+            <span className="text-2xl font-black font-mono text-slate-900">
+              {typeof insights.commPercentile === "number" ? Math.round(insights.commPercentile) : "N/A"}
+            </span>
+            {typeof insights.commPercentile === "number" && <span className="text-xs font-bold text-slate-500">%ile</span>}
           </div>
-          
           {improvementList.length > 0 && (
-            <div className="mt-3 pt-2 border-t text-[10px] text-left">
-              <span className="font-bold text-muted-foreground uppercase tracking-wider block text-[8px] mb-1">Growth Recommendation</span>
-              <span className="text-foreground italic">"{improvementList[0]}"</span>
+            <div className="mt-2 pt-1.5 border-t border-slate-100 text-[10px]">
+              <span className="text-slate-700 italic">"{improvementList[0]}"</span>
             </div>
           )}
         </div>
 
         {/* Strong vs Weak Skills */}
-        <div className="bg-card border rounded-xl p-4 space-y-3.5 shadow-sm bg-gradient-to-br from-card to-muted/20">
-          <div className="space-y-1.5 text-left">
-            <span className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground block">Key Strengths</span>
+        <div className="bg-white border border-slate-200 rounded-lg p-3 space-y-2.5 shadow-2xs">
+          <div className="space-y-1 text-left">
+            <span className="text-[9px] font-bold uppercase tracking-wider text-slate-500 block">Key Strengths</span>
             <div className="flex flex-wrap gap-1">
               {strongList.length > 0 ? (
                 strongList.map((topic, i) => (
-                  <Badge key={i} variant="outline" className="bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20 text-[9px] py-0 px-1.5">
+                  <span key={i} className="px-1.5 py-0.5 bg-indigo-50 text-indigo-700 border border-indigo-200 text-[9px] font-semibold rounded">
                     {topic}
-                  </Badge>
+                  </span>
                 ))
               ) : (
-                <span className="text-[10px] text-muted-foreground italic">No strong topics identified yet.</span>
+                <span className="text-[10px] text-slate-400 italic">No strong topics identified yet.</span>
               )}
             </div>
           </div>
 
-          <div className="space-y-1.5 pt-2 border-t text-left">
-            <span className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground block">Weak Areas</span>
+          <div className="space-y-1 pt-1.5 border-t border-slate-100 text-left">
+            <span className="text-[9px] font-bold uppercase tracking-wider text-slate-500 block">Weak Areas</span>
             <div className="flex flex-wrap gap-1">
               {weakList.length > 0 ? (
                 weakList.map((topic, i) => (
-                  <Badge key={i} variant="outline" className="bg-rose-500/10 text-rose-700 dark:text-rose-400 border-rose-500/20 text-[9px] py-0 px-1.5">
+                  <span key={i} className="px-1.5 py-0.5 bg-slate-100 text-slate-700 border border-slate-200 text-[9px] font-medium rounded">
                     {topic}
-                  </Badge>
+                  </span>
                 ))
               ) : (
-                <span className="text-[10px] text-muted-foreground italic">No weak topics identified yet.</span>
+                <span className="text-[10px] text-slate-400 italic">No weak topics identified yet.</span>
               )}
             </div>
           </div>
@@ -336,7 +312,6 @@ export default function Students() {
   // Server-filtered candidates on the current page
   const candidates = pageData?.content ?? [];
 
-
   // Backend pagination metadata
   const totalElements = pageData?.totalElements ?? 0;
   const totalPages = pageData?.totalPages ?? 1;
@@ -370,7 +345,6 @@ export default function Students() {
 
     setSubmitting(true);
     try {
-      // Build extraFields JSON map from predefined + custom fields
       const extraFieldsMap: Record<string, string> = {};
       Object.entries(formData.extraFields).forEach(([k, v]) => {
         if (v.trim()) extraFieldsMap[k] = v.trim();
@@ -421,12 +395,55 @@ export default function Students() {
       const err = error as { response?: { data?: { message?: string } } };
       toast({ 
         title: "Delete Failed", 
-        description: err.response?.data?.message || "Failed to delete candidate. This action is restricted by the backend (e.g. if the candidate has active test sessions, submissions, or invitations).", 
+        description: err.response?.data?.message || "Failed to delete candidate. This action is restricted by the backend.", 
         variant: "destructive" 
       });
     } finally {
       setDeleting(false);
     }
+  };
+
+  const handleExportCandidates = () => {
+    if (candidates.length === 0) {
+      toast({
+        title: "No Data",
+        description: "No candidates to export.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const formattedData = candidates.map((c) => ({
+      Name: c.user.name || "N/A",
+      Email: c.user.email,
+      Phone: c.user.phoneNumber || "N/A",
+      Organisation: c.organisation.name,
+      Role: c.user.role || "CANDIDATE",
+      "Created Date": c.createdAt ? formatDate(c.createdAt) : "N/A",
+    }));
+
+    const worksheet = XLSX.utils.json_to_sheet(formattedData);
+    worksheet["!autofilter"] = { ref: "A1:F1" };
+
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Candidates");
+
+    const colWidths = Object.keys(formattedData[0]).map((key) => {
+      const maxLength = Math.max(
+        key.length,
+        ...formattedData.map((row) => String(row[key as keyof typeof row]).length),
+      );
+      return { wch: maxLength + 2 };
+    });
+    worksheet["!cols"] = colWidths;
+
+    const excelBuffer = XLSX.write(workbook, { bookType: "xlsx", type: "array" });
+    const file = new Blob([excelBuffer], {
+      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    });
+
+    const date = getTodayDateString();
+    saveAs(file, `Candidates_${date}.xlsx`);
   };
 
   const getInitials = (name: string) => {
@@ -438,13 +455,13 @@ export default function Students() {
     const entries = Object.entries(extraFields);
     if (entries.length === 0) return null;
     return (
-      <div className="mt-3 pt-3 border-t border-border">
-        <p className="text-xs font-semibold text-muted-foreground mb-2">Additional Info:</p>
-        <div className="grid grid-cols-2 gap-2 text-xs">
+      <div className="mt-3 pt-3 border-t border-slate-200">
+        <p className="text-xs font-semibold text-slate-700 mb-2">Additional Information</p>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
           {entries.map(([key, value]) => (
-            <div key={key}>
-              <span className="text-muted-foreground">{key}:</span>{" "}
-              <span className="text-foreground">{String(value)}</span>
+            <div key={key} className="bg-white border border-slate-200 rounded p-2">
+              <span className="text-slate-500 font-medium block text-[10px] uppercase tracking-wider">{key}</span>
+              <span className="text-slate-900 font-semibold">{String(value)}</span>
             </div>
           ))}
         </div>
@@ -453,34 +470,61 @@ export default function Students() {
   };
 
   return (
-    <div className="p-8 space-y-6 animate-fade-in">
+    <div className="p-8 space-y-6 animate-fade-in font-sans">
+      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-heading font-bold">Candidates</h1>
-          <p className="text-muted-foreground mt-1">Manage candidates across all organisations</p>
+          <h1 className="text-3xl font-heading font-bold text-slate-900">Candidates</h1>
+          <p className="text-muted-foreground mt-1 text-sm">
+            Manage student candidate records across all partner organisations
+          </p>
         </div>
-        <div className="flex items-center gap-3">
-          <Button variant="outline"><Download className="w-4 h-4 mr-2" />Export</Button>
-          <Button variant="outline" onClick={() => setIsBulkUploadOpen(true)}><Upload className="w-4 h-4 mr-2" />Bulk Upload</Button>
-          <Button variant="hero" onClick={() => setIsAddDialogOpen(true)}><Plus className="w-4 h-4 mr-2" />Add Candidate</Button>
+        <div className="flex items-center gap-2.5">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleExportCandidates}
+            className="h-9 text-xs font-medium border-slate-200 text-slate-700 hover:bg-slate-50 hover:text-slate-900 rounded"
+          >
+            <Download className="w-4 h-4 mr-1.5 text-slate-500" />
+            Export
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setIsBulkUploadOpen(true)}
+            className="h-9 text-xs font-medium border-slate-200 text-slate-700 hover:bg-slate-50 hover:text-slate-900 rounded"
+          >
+            <Upload className="w-4 h-4 mr-1.5 text-slate-500" />
+            Bulk Upload
+          </Button>
+          <Button
+            variant="default"
+            onClick={() => setIsAddDialogOpen(true)}
+            className="bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold h-9 px-4 rounded"
+          >
+            <Plus className="w-4 h-4 mr-1.5" />
+            Add Candidate
+          </Button>
         </div>
       </div>
 
-      <div className="flex items-center gap-4">
+      {/* Filters */}
+      <div className="flex items-center gap-3">
         <div className="relative flex-1 max-w-md">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
             placeholder="Search candidates by name, email or phone..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10"
+            className="pl-10 h-10 text-xs border-slate-200 focus-visible:ring-slate-400"
           />
         </div>
         <Select value={selectedOrganisation} onValueChange={setSelectedOrganisation}>
-          <SelectTrigger className="w-64">
+          <SelectTrigger className="w-64 h-10 text-xs border-slate-200 bg-white">
             <SelectValue placeholder="All Organisations" />
           </SelectTrigger>
-          <SelectContent>
+          <SelectContent className="text-xs">
             <SelectItem value="all">All Organisations</SelectItem>
             {organisations.map(org => (
               <SelectItem key={org.id} value={org.id}>{org.name}</SelectItem>
@@ -489,95 +533,167 @@ export default function Students() {
         </Select>
       </div>
 
-      <div className="rounded-xl border bg-card overflow-hidden">
+      {/* Candidates Table */}
+      <div className="rounded-lg border border-slate-200/90 bg-white overflow-hidden shadow-2xs">
         <Table>
           <TableHeader>
-            <TableRow className="bg-muted/50">
-              <TableHead className="font-semibold">Candidate</TableHead>
-              <TableHead className="font-semibold">Contact</TableHead>
-              <TableHead className="font-semibold">Organisation</TableHead>
-              <TableHead className="font-semibold">Role</TableHead>
-              <TableHead className="font-semibold text-center">Tests</TableHead>
-              <TableHead className="font-semibold text-right">Actions</TableHead>
+            <TableRow className="bg-slate-50/80 hover:bg-slate-50/80 border-b border-slate-200">
+              <TableHead className="text-[11.5px] font-bold text-slate-700 py-3 uppercase tracking-wider pl-4">Candidate</TableHead>
+              <TableHead className="text-[11.5px] font-bold text-slate-700 py-3 uppercase tracking-wider">Contact</TableHead>
+              <TableHead className="text-[11.5px] font-bold text-slate-700 py-3 uppercase tracking-wider">Organisation</TableHead>
+              <TableHead className="text-[11.5px] font-bold text-slate-700 py-3 uppercase tracking-wider">Role</TableHead>
+              <TableHead className="text-[11.5px] font-bold text-slate-700 py-3 uppercase tracking-wider text-center">Tests</TableHead>
+              <TableHead className="text-[11.5px] font-bold text-slate-700 py-3 uppercase tracking-wider text-right pr-4">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {loading ? (
-              <TableRow><TableCell colSpan={6} className="text-center py-10"><Loader2 className="w-6 h-6 animate-spin mx-auto" /></TableCell></TableRow>
+              <TableRow>
+                <TableCell colSpan={6} className="text-center py-20 text-muted-foreground">
+                  <div className="flex flex-col items-center gap-2">
+                    <div className="w-8 h-8 border-4 border-slate-900 border-t-transparent rounded-full animate-spin" />
+                    <span className="text-xs">Fetching candidate database...</span>
+                  </div>
+                </TableCell>
+              </TableRow>
             ) : candidatesError ? (
               <TableRow>
-                <TableCell colSpan={6} className="text-center py-10">
-                  <div className="flex flex-col items-center justify-center gap-2 text-destructive">
-                    <AlertCircle className="w-8 h-8 text-destructive" />
-                    <p className="font-semibold text-sm">Failed to load candidates from server.</p>
-                    <p className="text-xs text-muted-foreground">
-                      {(candidatesErrorObj as { message?: string })?.message || "Server connection or resource limit error"}
+                <TableCell colSpan={6} className="text-center py-20">
+                  <div className="flex flex-col items-center justify-center gap-2 text-rose-600">
+                    <AlertCircle className="w-7 h-7" />
+                    <p className="font-semibold text-xs">Failed to load candidates from server.</p>
+                    <p className="text-[11px] text-slate-500">
+                      {(candidatesErrorObj as { message?: string })?.message || "Server connection error"}
                     </p>
-                    <Button variant="outline" size="sm" onClick={() => refetchCandidates()} className="mt-2 text-xs">
+                    <Button variant="outline" size="sm" onClick={() => refetchCandidates()} className="mt-2 text-xs h-8 border-slate-200">
                       Retry Connection
                     </Button>
                   </div>
                 </TableCell>
               </TableRow>
             ) : candidates.length === 0 ? (
-              <TableRow><TableCell colSpan={6} className="text-center py-10">
-                {debouncedSearch || selectedOrganisation !== "all"
-                  ? "No candidates match the current filters on this page."
-                  : "No candidates found."}
-              </TableCell></TableRow>
+              <TableRow>
+                <TableCell colSpan={6} className="text-center py-20 text-muted-foreground text-xs">
+                  {debouncedSearch || selectedOrganisation !== "all"
+                    ? "No candidates match the current filters on this page."
+                    : "No candidates found."}
+                </TableCell>
+              </TableRow>
             ) : candidates.map((candidate) => (
               <React.Fragment key={candidate.id}>
-                <TableRow className="hover:bg-muted/30 transition-colors cursor-pointer" onClick={() => setExpandedRow(expandedRow === candidate.id ? null : candidate.id)}>
-                  <TableCell>
+                <TableRow
+                  className="hover:bg-slate-50/50 border-b border-slate-100 transition-colors cursor-pointer group"
+                  onClick={() => setExpandedRow(expandedRow === candidate.id ? null : candidate.id)}
+                >
+                  <TableCell className="pl-4">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-gradient-primary flex items-center justify-center text-primary-foreground font-semibold">
+                      <div className="w-8 h-8 rounded-md bg-slate-900 flex items-center justify-center text-white text-xs font-bold shrink-0 shadow-2xs">
                         {getInitials(candidate.user.name)}
                       </div>
                       <div>
-                        <p className="font-medium">{candidate.user.name}</p>
-                        <p className="text-xs text-muted-foreground">{candidate.user.email}</p>
+                        <p className="text-xs font-bold text-slate-900 leading-tight flex items-center gap-1">
+                          {candidate.user.name}
+                          {expandedRow === candidate.id ? (
+                            <ChevronUp className="w-3.5 h-3.5 text-slate-400" />
+                          ) : (
+                            <ChevronDown className="w-3.5 h-3.5 text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity" />
+                          )}
+                        </p>
+                        <p className="text-[11px] text-slate-400 font-mono mt-0.5">
+                          {candidate.user.email}
+                        </p>
                       </div>
-                      {expandedRow === candidate.id ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
                     </div>
                   </TableCell>
                   <TableCell>
-                    <div className="flex flex-col gap-1">
-                      <span className="flex items-center gap-1 text-xs text-muted-foreground"><Mail className="w-3 h-3" />Email</span>
-                      <span className="flex items-center gap-1 text-xs text-muted-foreground"><Phone className="w-3 h-3" />{candidate.user.phoneNumber || "N/A"}</span>
+                    <div className="space-y-0.5 text-xs">
+                      <div className="flex items-center gap-1.5 text-slate-600 font-mono text-[11px]">
+                        <Mail className="w-3 h-3 text-slate-400" />
+                        {candidate.user.email}
+                      </div>
+                      {candidate.user.phoneNumber && (
+                        <div className="flex items-center gap-1.5 text-slate-500 font-mono text-[11px]">
+                          <Phone className="w-3 h-3 text-slate-400" />
+                          {candidate.user.phoneNumber}
+                        </div>
+                      )}
                     </div>
                   </TableCell>
-                  <TableCell>{candidate.organisation.name}</TableCell>
-                  <TableCell><Badge variant="outline">{candidate.user.role || "CANDIDATE"}</Badge></TableCell>
-                   <TableCell className="text-center font-medium">{testsCountMap[candidate.id] ?? 0}</TableCell>
-                  <TableCell className="text-right">
+                  <TableCell>
+                    <div className="flex items-center gap-1.5 text-xs font-medium text-slate-800">
+                      <Building2 className="w-3.5 h-3.5 text-slate-400" />
+                      <span>{candidate.organisation.name}</span>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <span className="px-2.5 py-0.5 bg-slate-100 text-slate-700 border border-slate-200 text-[10px] font-semibold rounded inline-flex items-center gap-1">
+                      {candidate.user.role || "CANDIDATE"}
+                    </span>
+                  </TableCell>
+                  <TableCell className="text-center">
+                    {(testsCountMap[candidate.id] ?? 0) > 0 ? (
+                      <span className="px-2 py-0.5 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded font-mono font-bold text-xs inline-block">
+                        {testsCountMap[candidate.id]}
+                      </span>
+                    ) : (
+                      <span className="px-2 py-0.5 bg-slate-100 text-slate-500 rounded font-mono text-xs inline-block">
+                        0
+                      </span>
+                    )}
+                  </TableCell>
+                  <TableCell className="text-right pr-4">
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                        <Button variant="ghost" size="icon"><MoreVertical className="w-4 h-4" /></Button>
+                        <Button variant="ghost" size="icon" className="h-7 w-7 text-slate-400 hover:text-slate-800 rounded">
+                          <MoreVertical className="w-3.5 h-3.5" />
+                        </Button>
                       </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setSelectedCandidate(candidate); setIsEditDialogOpen(true); }}><Edit2 className="w-4 h-4 mr-2" />Edit</DropdownMenuItem>
-                        <DropdownMenuItem className="text-destructive" onClick={(e) => { e.stopPropagation(); setCandidateToDelete(candidate); setIsDeleteDialogOpen(true); }}><Trash2 className="w-4 h-4 mr-2" />Delete</DropdownMenuItem>
+                      <DropdownMenuContent align="end" className="text-xs w-36">
+                        <DropdownMenuItem
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedCandidate(candidate);
+                            setIsEditDialogOpen(true);
+                          }}
+                        >
+                          <Edit2 className="w-3.5 h-3.5 mr-2 text-slate-500" />
+                          Edit
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          className="text-destructive font-medium"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setCandidateToDelete(candidate);
+                            setIsDeleteDialogOpen(true);
+                          }}
+                        >
+                          <Trash2 className="w-3.5 h-3.5 mr-2" />
+                          Delete
+                        </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </TableCell>
                 </TableRow>
                 {expandedRow === candidate.id && (
-                  <TableRow className="bg-muted/10">
-                    <TableCell colSpan={6} className="py-4 px-8">
-                      <div className="grid grid-cols-3 gap-8">
-                        <div>
-                          <p className="text-xs font-semibold text-muted-foreground uppercase mb-2">Account Details</p>
-                          <p className="text-sm">User ID: <span className="text-muted-foreground">{candidate.user.id}</span></p>
-                          <p className="text-sm">Candidate ID: <span className="text-muted-foreground">{candidate.id}</span></p>
+                  <TableRow className="bg-slate-50/60 border-b border-slate-200">
+                    <TableCell colSpan={6} className="py-4 px-6">
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div className="p-3 bg-white border border-slate-200 rounded-md">
+                          <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Account Details</p>
+                          <p className="text-xs text-slate-700">User ID: <span className="font-mono text-slate-500">{candidate.user.id}</span></p>
+                          <p className="text-xs text-slate-700 mt-1">Candidate ID: <span className="font-mono text-slate-500">{candidate.id}</span></p>
                         </div>
-                        <div>
-                          <p className="text-xs font-semibold text-muted-foreground uppercase mb-2">Metadata</p>
-                          <p className="text-sm">Created: <span className="text-muted-foreground">{candidate.createdAt ? new Date(candidate.createdAt).toLocaleDateString() : "N/A"}</span></p>
-                          <div className="text-sm flex items-center">Stale Data: <Badge variant={candidate.stale ? "destructive" : "secondary"} className="ml-2">{candidate.stale ? "Yes" : "No"}</Badge></div>
+                        <div className="p-3 bg-white border border-slate-200 rounded-md">
+                          <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Metadata</p>
+                          <p className="text-xs text-slate-700">Created: <span className="font-mono text-slate-500">{candidate.createdAt ? new Date(candidate.createdAt).toLocaleDateString("en-GB") : "N/A"}</span></p>
+                          <div className="text-xs text-slate-700 mt-1 flex items-center">
+                            Stale Record: <span className="ml-1.5 px-2 py-0.5 rounded text-[10px] font-semibold border bg-slate-100 text-slate-700 border-slate-200">{candidate.stale ? "Yes" : "No"}</span>
+                          </div>
                         </div>
-                        <div>
-                          <p className="text-xs font-semibold text-muted-foreground uppercase mb-2">Organisation Info</p>
-                          <p className="text-sm">Org ID: <span className="text-muted-foreground">{candidate.organisation.id}</span></p>
+                        <div className="p-3 bg-white border border-slate-200 rounded-md">
+                          <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Organisation Info</p>
+                          <p className="text-xs text-slate-700">Org Name: <span className="font-semibold text-slate-900">{candidate.organisation.name}</span></p>
+                          <p className="text-xs text-slate-700 mt-1">Org ID: <span className="font-mono text-slate-500">{candidate.organisation.id}</span></p>
                         </div>
                       </div>
                       {formatExtraFields(candidate.extraFields)}
@@ -599,22 +715,22 @@ export default function Students() {
       </div>
 
       {/* Pagination Controls Footer */}
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-card p-4 rounded-xl border border-border/60 shadow-sm text-xs">
-        <div className="flex items-center gap-3 text-muted-foreground">
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-white p-3.5 rounded-lg border border-slate-200/90 shadow-2xs text-xs text-slate-600">
+        <div className="flex items-center gap-3 text-slate-500">
           <span>
             Showing{" "}
-            <strong className="text-foreground font-semibold">{pageStart}</strong>
+            <strong className="text-slate-900 font-semibold">{pageStart}</strong>
             {" "}to{" "}
-            <strong className="text-foreground font-semibold">{pageEnd}</strong>
+            <strong className="text-slate-900 font-semibold">{pageEnd}</strong>
             {" "}of{" "}
-            <strong className="text-foreground font-semibold">{totalElements}</strong> candidates
+            <strong className="text-slate-900 font-semibold">{totalElements}</strong> candidates
             {(debouncedSearch || selectedOrganisation !== "all") && (
-              <span className="ml-1 text-muted-foreground/70">(filtered on page)</span>
+              <span className="ml-1 text-slate-400 font-mono">(filtered)</span>
             )}
           </span>
 
           <div className="flex items-center gap-1.5 ml-2">
-            <span className="hidden sm:inline text-muted-foreground">Rows per page:</span>
+            <span className="hidden sm:inline text-slate-500">Rows per page:</span>
             <Select
               value={String(pageSize)}
               onValueChange={(val) => {
@@ -622,10 +738,10 @@ export default function Students() {
                 setPage(0);
               }}
             >
-              <SelectTrigger className="h-8 w-20 text-xs bg-background">
+              <SelectTrigger className="h-8 w-20 text-xs border-slate-200 bg-white">
                 <SelectValue />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="text-xs">
                 <SelectItem value="10">10</SelectItem>
                 <SelectItem value="15">15</SelectItem>
                 <SelectItem value="25">25</SelectItem>
@@ -642,7 +758,7 @@ export default function Students() {
             size="sm"
             onClick={() => setPage(0)}
             disabled={isFirstPage || loading}
-            className="h-8 w-8 p-0"
+            className="h-8 w-8 p-0 border-slate-200 text-slate-700 hover:bg-slate-50"
             title="First Page"
           >
             <ChevronsLeft className="h-4 w-4" />
@@ -652,13 +768,13 @@ export default function Students() {
             size="sm"
             onClick={() => setPage((p) => Math.max(0, p - 1))}
             disabled={isFirstPage || loading}
-            className="h-8 w-8 p-0"
+            className="h-8 w-8 p-0 border-slate-200 text-slate-700 hover:bg-slate-50"
             title="Previous Page"
           >
             <ChevronLeft className="h-4 w-4" />
           </Button>
 
-          <span className="px-2 font-medium text-foreground">
+          <span className="px-2 font-medium text-slate-800">
             Page {page + 1} of {totalPages}
           </span>
 
@@ -667,7 +783,7 @@ export default function Students() {
             size="sm"
             onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
             disabled={isLastPage || loading}
-            className="h-8 w-8 p-0"
+            className="h-8 w-8 p-0 border-slate-200 text-slate-700 hover:bg-slate-50"
             title="Next Page"
           >
             <ChevronRight className="h-4 w-4" />
@@ -677,7 +793,7 @@ export default function Students() {
             size="sm"
             onClick={() => setPage(totalPages - 1)}
             disabled={isLastPage || loading}
-            className="h-8 w-8 p-0"
+            className="h-8 w-8 p-0 border-slate-200 text-slate-700 hover:bg-slate-50"
             title="Last Page"
           >
             <ChevronsRight className="h-4 w-4" />
@@ -685,61 +801,104 @@ export default function Students() {
         </div>
       </div>
 
+      {/* Add Candidate Dialog */}
       <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Add New Candidate</DialogTitle>
-            <DialogDescription>Create a new candidate record and assign to an organisation.</DialogDescription>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto bg-white text-slate-900 p-6">
+          <DialogHeader className="border-b border-slate-100 pb-3">
+            <DialogTitle className="text-base font-bold text-slate-900">Add New Candidate</DialogTitle>
+            <DialogDescription className="text-xs text-slate-500">
+              Create a new candidate record and assign to an organisation.
+            </DialogDescription>
           </DialogHeader>
-          <div className="grid gap-6 py-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Full Name*</label>
-                <Input placeholder="John Doe" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} />
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-slate-700">Full Name*</label>
+                <Input
+                  placeholder="John Doe"
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  className="h-9 text-xs border-slate-200"
+                />
               </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Email Address*</label>
-                <Input type="email" placeholder="john@example.com" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} />
-                {emailError ? <p className="text-xs text-destructive">{emailError}</p> : null}
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-slate-700">Email Address*</label>
+                <Input
+                  type="email"
+                  placeholder="john@example.com"
+                  value={formData.email}
+                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  className="h-9 text-xs border-slate-200"
+                />
+                {emailError ? <p className="text-[11px] text-rose-600">{emailError}</p> : null}
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Password*</label>
-                <Input type="password" value={formData.password} onChange={(e) => setFormData({ ...formData, password: e.target.value })} />
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-slate-700">Password*</label>
+                <Input
+                  type="password"
+                  value={formData.password}
+                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                  className="h-9 text-xs border-slate-200"
+                />
               </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Phone Number</label>
-                <Input placeholder="+91 1234567890" value={formData.phoneNumber} onChange={(e) => setFormData({ ...formData, phoneNumber: e.target.value })} />
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-slate-700">Phone Number</label>
+                <Input
+                  placeholder="+91 1234567890"
+                  value={formData.phoneNumber}
+                  onChange={(e) => setFormData({ ...formData, phoneNumber: e.target.value })}
+                  className="h-9 text-xs border-slate-200"
+                />
               </div>
             </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Organisation*</label>
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-slate-700">Organisation*</label>
               <Select value={formData.organisationId} onValueChange={(v) => setFormData({ ...formData, organisationId: v })}>
-                <SelectTrigger><SelectValue placeholder="Select Organisation" /></SelectTrigger>
-                <SelectContent>
+                <SelectTrigger className="h-9 text-xs border-slate-200"><SelectValue placeholder="Select Organisation" /></SelectTrigger>
+                <SelectContent className="text-xs">
                   {organisations.map(org => <SelectItem key={org.id} value={org.id}>{org.name}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-4 border-t pt-4">
-              <h4 className="font-medium text-sm">Additional Information</h4>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">College</label>
-                  <Input value={formData.extraFields.college} onChange={(e) => setFormData({ ...formData, extraFields: { ...formData.extraFields, college: e.target.value } })} />
+            <div className="space-y-3 border-t border-slate-100 pt-3">
+              <h4 className="font-semibold text-xs text-slate-800">Additional Information</h4>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-slate-600">College</label>
+                  <Input
+                    value={formData.extraFields.college}
+                    onChange={(e) => setFormData({ ...formData, extraFields: { ...formData.extraFields, college: e.target.value } })}
+                    className="h-9 text-xs border-slate-200"
+                  />
                 </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Course</label>
-                  <Input value={formData.extraFields.course} onChange={(e) => setFormData({ ...formData, extraFields: { ...formData.extraFields, course: e.target.value } })} />
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-slate-600">Course</label>
+                  <Input
+                    value={formData.extraFields.course}
+                    onChange={(e) => setFormData({ ...formData, extraFields: { ...formData.extraFields, course: e.target.value } })}
+                    className="h-9 text-xs border-slate-200"
+                  />
                 </div>
               </div>
               <CustomFieldsSection customFields={customFields} onChange={setCustomFields} />
             </div>
-            <div className="flex justify-end gap-3 mt-4">
-              <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>Cancel</Button>
-              <Button variant="hero" onClick={handleAddCandidate} disabled={submitting}>
-                {submitting ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Plus className="w-4 h-4 mr-2" />}
+            <div className="flex justify-end gap-2.5 mt-4 border-t border-slate-100 pt-3">
+              <Button
+                variant="outline"
+                onClick={() => setIsAddDialogOpen(false)}
+                className="h-9 text-xs border-slate-200 text-slate-700 hover:bg-slate-50"
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="default"
+                onClick={handleAddCandidate}
+                disabled={submitting}
+                className="bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold h-9"
+              >
+                {submitting ? <Loader2 className="w-4 h-4 animate-spin mr-1.5" /> : <Plus className="w-4 h-4 mr-1.5" />}
                 Add Candidate
               </Button>
             </div>

@@ -112,7 +112,7 @@ const LineSelect = ({
     <select
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      className="w-full appearance-none bg-transparent border-b border-slate-200 focus:border-[#4353a4] py-2 pr-6 text-xs text-slate-800 focus:outline-none cursor-pointer"
+      className="w-full appearance-none bg-transparent border-b border-slate-200 focus:border-indigo-600 py-2 pr-6 text-xs text-slate-800 focus:outline-none cursor-pointer"
     >
       {children}
     </select>
@@ -220,6 +220,16 @@ export default function NewAdminQuestionCreate() {
 
   const returnPath = isSuperAdminContext ? "/superadmin/questions" : "/admin/library";
   const libraryLabel = isSuperAdminContext ? "Question Bank" : "Library";
+
+  const handleReturn = () => {
+    navigate(returnPath, {
+      state: {
+        page: initialData.returnPage,
+        pageSize: initialData.returnPageSize,
+        activeTab: initialData.returnActiveTab,
+      },
+    });
+  };
 
   const [isCoding, setIsCoding] = useState(initialData.questionType === "CODING");
   const [isLoadingQuestion, setIsLoadingQuestion] = useState(Boolean(editQuestionId));
@@ -464,6 +474,16 @@ export default function NewAdminQuestionCreate() {
 
   // Driver change with automatic invalidation of verification status
   const handleDriverChange = (lang: typeof activeCodeLang, newDriver: string) => {
+    const prevDriver = codeTemplates[lang]?.driver || "";
+    const normPrev = prevDriver.replace(/\r\n/g, "\n").replace(/\r/g, "\n").trim();
+    const normNew = newDriver.replace(/\r\n/g, "\n").replace(/\r/g, "\n").trim();
+    if (normPrev === normNew) {
+      setCodeTemplates((prev) => ({
+        ...prev,
+        [lang]: { ...prev[lang], driver: newDriver },
+      }));
+      return;
+    }
     setCodeTemplates((prev) => ({
       ...prev,
       [lang]: { ...prev[lang], driver: newDriver },
@@ -504,9 +524,10 @@ export default function NewAdminQuestionCreate() {
     const validTestCases = testCases.filter((tc) => tc.input.trim() || tc.expectedOutput.trim());
     const cleanHints = hints.filter((h) => h.trim());
 
-    if (createdQuestionId) {
+    const targetId = editQuestionId || createdQuestionId;
+    if (targetId) {
       // Sync latest test cases and templates before running pre-flight verification
-      await testService.updateQuestion(createdQuestionId, {
+      await testService.updateQuestion(targetId, {
         title: title.trim(),
         prompt: prompt.trim(),
         subject_id: subjectId,
@@ -529,7 +550,7 @@ export default function NewAdminQuestionCreate() {
           params: signature.params,
         },
       });
-      return createdQuestionId;
+      return targetId;
     }
 
     const dto: CreateQuestionRequest = {
@@ -708,11 +729,13 @@ export default function NewAdminQuestionCreate() {
 
     setIsSaving(true);
     try {
-      if (editQuestionId) {
-        await apiClient.put(`/questions/${editQuestionId}`, dto);
+      const targetQuestionId = editQuestionId || createdQuestionId;
+      if (targetQuestionId) {
+        await apiClient.put(`/questions/${targetQuestionId}`, dto);
         toast.success("Problem updated successfully!");
       } else {
-        await createMutation.mutateAsync(dto);
+        const saved = await createMutation.mutateAsync(dto);
+        if (saved?.id) setCreatedQuestionId(saved.id);
         toast.success("Problem saved successfully!");
       }
 
@@ -720,7 +743,7 @@ export default function NewAdminQuestionCreate() {
         setTitle(`${title.trim()} (Copy)`);
         toast.info("Cloned draft ready for editing");
       } else {
-        navigate(returnPath);
+        handleReturn();
       }
     } catch (err: any) {
       console.error("[NewAdminQuestionCreate] Failed to save:", err);
@@ -732,8 +755,8 @@ export default function NewAdminQuestionCreate() {
 
   if (isLoadingQuestion) {
     return (
-      <div className="min-h-screen bg-[#081225] flex flex-col items-center justify-center text-white">
-        <Loader2 className="w-8 h-8 animate-spin text-[#4353a4] mb-3" />
+      <div className="min-h-screen bg-[#0f172a] flex flex-col items-center justify-center text-white">
+        <Loader2 className="w-8 h-8 animate-spin text-indigo-400 mb-3" />
         <p className="text-sm font-medium text-slate-300">Loading problem details...</p>
       </div>
     );
@@ -741,22 +764,29 @@ export default function NewAdminQuestionCreate() {
 
   return (
     <div className="min-h-screen flex flex-col bg-[#F6F8FA] text-slate-800 font-sans antialiased">
-      {/* ── 1. Top Navbar (Dark Navy Bar, NO Second Sub-navbar) ── */}
-      <header className="h-20 bg-[#081225] border-b border-[#142340] px-4 md:px-8 flex items-center justify-between z-30 sticky top-0 shadow-md">
+      {/* ── 1. Top Navbar (Sleek Slate Header with Breadcrumbs) ── */}
+      <header className="h-14 bg-[#0f172a] border-b border-slate-800/90 px-4 md:px-8 flex items-center justify-between z-30 sticky top-0 shadow-xs">
         {/* Left Side: Logo + Divider + Breadcrumb (Library/Question Bank > Problem Title) */}
         <div className="flex items-center space-x-3 md:space-x-4">
           <div
-            onClick={() => navigate(returnPath)}
-            className="flex items-center gap-2 cursor-pointer group"
+            onClick={() => navigate("/admin/home")}
+            className="flex items-center gap-2 cursor-pointer group shrink-0"
           >
-            <GryphonLogo variant="dark" size="md" />
+            <GryphonLogo variant="dark" size="sm" />
           </div>
 
           <div className="h-5 w-[1px] bg-slate-700 mx-1" />
 
           <div className="flex items-center text-xs md:text-sm text-slate-400 font-medium space-x-1.5">
+            <span
+              onClick={() => navigate("/admin/home")}
+              className="hover:text-slate-200 cursor-pointer transition-colors shrink-0"
+            >
+              Dashboard
+            </span>
+            <ChevronRight className="w-3.5 h-3.5 text-slate-500" />
             <button
-              onClick={() => navigate(returnPath)}
+              onClick={handleReturn}
               className="hover:text-slate-200 cursor-pointer transition-colors"
             >
               {libraryLabel}
@@ -770,14 +800,14 @@ export default function NewAdminQuestionCreate() {
         <div className="flex items-center space-x-3">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <button className="flex items-center gap-2.5 px-2 py-1 hover:bg-white/5 transition-colors focus:outline-none cursor-pointer">
-                <Avatar className="w-8 h-8 border border-slate-700 bg-slate-800 text-slate-200">
-                  <AvatarFallback className="bg-[#4353a4] text-white text-xs font-bold">
+              <button className="flex items-center gap-2.5 px-2.5 py-1.5 hover:bg-slate-800/70 transition-colors focus:outline-none cursor-pointer rounded-md">
+                <Avatar className="w-7 h-7 border border-slate-700 bg-slate-800 text-slate-200">
+                  <AvatarFallback className="bg-indigo-600 text-white text-[11px] font-bold">
                     {user?.name ? user.name.slice(0, 2).toUpperCase() : "AD"}
                   </AvatarFallback>
                 </Avatar>
                 <div className="hidden sm:flex items-center">
-                  <span className="text-xs font-semibold text-slate-200">
+                  <span className="text-xs font-medium text-slate-200">
                     {user?.name || "Admin User"}
                   </span>
                 </div>
@@ -869,7 +899,7 @@ export default function NewAdminQuestionCreate() {
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 placeholder="e.g. Invert a Binary Tree"
-                className="w-full border-b border-slate-200 focus:border-[#4353a4] py-1.5 text-sm text-slate-900 font-semibold focus:outline-none transition-colors bg-transparent"
+                className="w-full border-b border-slate-200 focus:border-indigo-600 py-1.5 text-sm text-slate-900 font-semibold focus:outline-none transition-colors bg-transparent"
               />
             </div>
 
@@ -928,7 +958,7 @@ export default function NewAdminQuestionCreate() {
                   value={solvingTimeMins}
                   onChange={(e) => setSolvingTimeMins(e.target.value)}
                   placeholder={isCoding ? "15" : "2"}
-                  className="w-full border-b border-slate-200 focus:border-[#4353a4] py-1.5 text-sm text-slate-800 focus:outline-none bg-transparent"
+                  className="w-full border-b border-slate-200 focus:border-indigo-600 py-1.5 text-sm text-slate-800 focus:outline-none bg-transparent"
                 />
               </div>
 
@@ -944,7 +974,7 @@ export default function NewAdminQuestionCreate() {
                   value={marks}
                   onChange={(e) => setMarks(Number(e.target.value))}
                   placeholder="100"
-                  className="w-full border-b border-slate-200 focus:border-[#4353a4] py-1.5 text-sm text-slate-800 focus:outline-none bg-transparent"
+                  className="w-full border-b border-slate-200 focus:border-indigo-600 py-1.5 text-sm text-slate-800 focus:outline-none bg-transparent"
                 />
               </div>
             </div>
@@ -964,7 +994,7 @@ export default function NewAdminQuestionCreate() {
                       value={lvl}
                       checked={difficulty === lvl}
                       onChange={() => setDifficulty(lvl)}
-                      className="w-4 h-4 text-[#4353a4] focus:ring-[#4353a4] border-slate-300 cursor-pointer"
+                      className="w-4 h-4 text-indigo-600 focus:ring-indigo-600 border-slate-300 cursor-pointer"
                     />
                     <span>{fmt(lvl)}</span>
                   </label>
@@ -1011,7 +1041,7 @@ export default function NewAdminQuestionCreate() {
                       value={timeLimitSecs}
                       onChange={(e) => setTimeLimitSecs(Number(e.target.value))}
                       placeholder="2"
-                      className="w-full border-b border-slate-200 focus:border-[#4353a4] py-1.5 text-sm text-slate-800 focus:outline-none bg-transparent"
+                      className="w-full border-b border-slate-200 focus:border-indigo-600 py-1.5 text-sm text-slate-800 focus:outline-none bg-transparent"
                     />
                   </div>
 
@@ -1025,7 +1055,7 @@ export default function NewAdminQuestionCreate() {
                       value={memoryLimitMb}
                       onChange={(e) => setMemoryLimitMb(Number(e.target.value))}
                       placeholder="256"
-                      className="w-full border-b border-slate-200 focus:border-[#4353a4] py-1.5 text-sm text-slate-800 focus:outline-none bg-transparent"
+                      className="w-full border-b border-slate-200 focus:border-indigo-600 py-1.5 text-sm text-slate-800 focus:outline-none bg-transparent"
                     />
                   </div>
                 </div>
@@ -1039,7 +1069,7 @@ export default function NewAdminQuestionCreate() {
                       value={constraints}
                       onChange={(e) => setConstraints(e.target.value)}
                       placeholder="e.g. 1 <= nums.length <= 10^5&#10;-10^9 <= nums[i] <= 10^9"
-                      className="w-full border border-slate-200 p-3 text-xs font-mono text-slate-800 focus:outline-none focus:border-[#4353a4] bg-slate-50/20 focus:bg-white transition-colors"
+                      className="w-full border border-slate-200 p-3 text-xs font-mono text-slate-800 focus:outline-none focus:border-indigo-600 bg-slate-50/20 focus:bg-white transition-colors"
                     />
                   </div>
 
@@ -1050,7 +1080,7 @@ export default function NewAdminQuestionCreate() {
                       value={sampleExplanation}
                       onChange={(e) => setSampleExplanation(e.target.value)}
                       placeholder="Input: nums = [2,7,11,15], target = 9&#10;Output: [0,1]&#10;Explanation: nums[0] + nums[1] == 9, we return [0, 1]."
-                      className="w-full border border-slate-200 p-3 text-xs font-mono text-slate-800 focus:outline-none focus:border-[#4353a4] bg-slate-50/20 focus:bg-white transition-colors"
+                      className="w-full border border-slate-200 p-3 text-xs font-mono text-slate-800 focus:outline-none focus:border-indigo-600 bg-slate-50/20 focus:bg-white transition-colors"
                     />
                   </div>
                 </div>
@@ -1072,7 +1102,7 @@ export default function NewAdminQuestionCreate() {
                       addTag();
                     }
                   }}
-                  className="flex-1 border-b border-slate-200 focus:border-[#4353a4] py-1.5 text-xs focus:outline-none bg-transparent"
+                  className="flex-1 border-b border-slate-200 focus:border-indigo-600 py-1.5 text-xs focus:outline-none bg-transparent"
                 />
                 <button
                   type="button"
@@ -1115,7 +1145,7 @@ export default function NewAdminQuestionCreate() {
                         addHint();
                       }
                     }}
-                    className="flex-1 border-b border-slate-200 focus:border-[#4353a4] py-1.5 text-xs focus:outline-none bg-transparent"
+                    className="flex-1 border-b border-slate-200 focus:border-indigo-600 py-1.5 text-xs focus:outline-none bg-transparent"
                   />
                   <button
                     type="button"
@@ -1160,7 +1190,7 @@ export default function NewAdminQuestionCreate() {
                     type="checkbox"
                     checked={shuffleOptions}
                     onChange={(e) => setShuffleOptions(e.target.checked)}
-                    className="w-4 h-4 text-[#4353a4] focus:ring-[#4353a4] border-slate-300 cursor-pointer"
+                    className="w-4 h-4 text-indigo-600 focus:ring-indigo-600 border-slate-300 cursor-pointer"
                   />
                 </div>
 
@@ -1176,7 +1206,7 @@ export default function NewAdminQuestionCreate() {
                           onClick={() => toggleCorrect(i)}
                           className={`shrink-0 w-4 h-4 ${mcqType === "MULTIPLE_CORRECT" ? "rounded-xs" : "rounded-full"} border-2 flex items-center justify-center transition-colors cursor-pointer ${
                             opt.isCorrect
-                              ? "border-[#4353a4] bg-[#4353a4] text-white"
+                              ? "border-indigo-600 bg-indigo-600 text-white"
                               : "border-slate-300 hover:border-slate-400 bg-white"
                           }`}
                           title={opt.isCorrect ? "Correct Option" : "Mark as Correct"}
@@ -1208,7 +1238,7 @@ export default function NewAdminQuestionCreate() {
                   <button
                     type="button"
                     onClick={addOption}
-                    className="mt-2 flex items-center gap-1.5 text-xs text-[#4353a4] hover:text-[#38468d] font-semibold cursor-pointer"
+                    className="mt-2 flex items-center gap-1.5 text-xs text-indigo-600 hover:text-indigo-800 font-semibold cursor-pointer"
                   >
                     <Plus className="w-3.5 h-3.5" /> Add Option
                   </button>
@@ -1239,7 +1269,7 @@ export default function NewAdminQuestionCreate() {
                       value={signature.method_name}
                       onChange={(e) => setSignature({ ...signature, method_name: e.target.value })}
                       placeholder="solve"
-                      className="w-full border-b border-slate-200 focus:border-[#4353a4] py-1.5 text-xs text-slate-800 font-mono focus:outline-none bg-transparent"
+                      className="w-full border-b border-slate-200 focus:border-indigo-600 py-1.5 text-xs text-slate-800 font-mono focus:outline-none bg-transparent"
                     />
                   </div>
 
@@ -1250,7 +1280,7 @@ export default function NewAdminQuestionCreate() {
                       value={signature.return_type}
                       onChange={(e) => setSignature({ ...signature, return_type: e.target.value })}
                       placeholder="int, string, list[int], void"
-                      className="w-full border-b border-slate-200 focus:border-[#4353a4] py-1.5 text-xs text-slate-800 font-mono focus:outline-none bg-transparent"
+                      className="w-full border-b border-slate-200 focus:border-indigo-600 py-1.5 text-xs text-slate-800 font-mono focus:outline-none bg-transparent"
                     />
                   </div>
                 </div>
@@ -1273,10 +1303,10 @@ export default function NewAdminQuestionCreate() {
                 {/* Language Selector / Full-Width Tabs Below Header */}
                 {isLanguageSpecific ? (
                   <div className="space-y-1 max-w-sm">
-                    <label className="block text-xs font-semibold text-[#4353a4]">
+                    <label className="block text-xs font-semibold text-indigo-600">
                       Target Programming Language
                     </label>
-                    <div className="relative border-b-2 border-[#4353a4]">
+                    <div className="relative border-b-2 border-indigo-600">
                       <select
                         value={activeCodeLang}
                         onChange={(e) => {
@@ -1290,7 +1320,7 @@ export default function NewAdminQuestionCreate() {
                         <option value="java">Java</option>
                         <option value="cpp">C++</option>
                       </select>
-                      <ChevronDown className="pointer-events-none absolute right-1 top-1/2 -translate-y-1/2 w-4 h-4 text-[#4353a4]" />
+                      <ChevronDown className="pointer-events-none absolute right-1 top-1/2 -translate-y-1/2 w-4 h-4 text-indigo-600" />
                     </div>
                   </div>
                 ) : (
@@ -1414,10 +1444,10 @@ export default function NewAdminQuestionCreate() {
 
                 {/* PreFlight Verification Test Run Panel inside Code Setup */}
                 <PreFlightVerificationPanel
-                  questionId={createdQuestionId || undefined}
+                  questionId={editQuestionId || createdQuestionId || undefined}
                   language={activeCodeLang}
                   driverCode={codeTemplates[activeCodeLang].driver}
-                  testCases={testCases.map((tc, idx) => ({ ...tc, id: `tc-${idx}`, codingQuestionId: createdQuestionId || "" }))}
+                  testCases={testCases.map((tc, idx) => ({ ...tc, id: `tc-${idx}`, codingQuestionId: editQuestionId || createdQuestionId || "" }))}
                   onSaveFirstRequired={handleSaveDraftForVerification}
                   onVerificationSuccess={(res) => {
                     const bLang = mapFrontendToBackendLang(activeCodeLang);
@@ -1482,7 +1512,7 @@ export default function NewAdminQuestionCreate() {
                               max={100}
                               value={tc.weight}
                               onChange={(e) => updateTestCase(idx, "weight", Number(e.target.value))}
-                              className="w-14 border-b border-slate-300 px-1 py-0.5 text-xs bg-transparent focus:outline-none focus:border-[#4353a4]"
+                              className="w-14 border-b border-slate-300 px-1 py-0.5 text-xs bg-transparent focus:outline-none focus:border-indigo-600"
                             />
                           </div>
                           {testCases.length > 1 && (
@@ -1506,7 +1536,7 @@ export default function NewAdminQuestionCreate() {
                             value={tc.input}
                             onChange={(e) => updateTestCase(idx, "input", e.target.value)}
                             placeholder="e.g. 10"
-                            className="w-full border border-slate-200 p-2 text-xs font-mono bg-white focus:outline-none focus:border-[#4353a4]"
+                            className="w-full border border-slate-200 p-2 text-xs font-mono bg-white focus:outline-none focus:border-indigo-600"
                           />
                         </div>
                         <div>
@@ -1516,7 +1546,7 @@ export default function NewAdminQuestionCreate() {
                             value={tc.expectedOutput}
                             onChange={(e) => updateTestCase(idx, "expectedOutput", e.target.value)}
                             placeholder="e.g. 19"
-                            className="w-full border border-slate-200 p-2 text-xs font-mono bg-white focus:outline-none focus:border-[#4353a4]"
+                            className="w-full border border-slate-200 p-2 text-xs font-mono bg-white focus:outline-none focus:border-indigo-600"
                           />
                         </div>
                       </div>
@@ -1529,7 +1559,7 @@ export default function NewAdminQuestionCreate() {
                             value={tc.explanation || ""}
                             onChange={(e) => updateTestCase(idx, "explanation", e.target.value)}
                             placeholder="e.g. n = 10 -> 10 + 9 = 19"
-                            className="w-full border-b border-slate-200 py-1 text-xs text-slate-800 bg-transparent focus:outline-none focus:border-[#4353a4]"
+                            className="w-full border-b border-slate-200 py-1 text-xs text-slate-800 bg-transparent focus:outline-none focus:border-indigo-600"
                           />
                         </div>
                       )}
@@ -1548,7 +1578,7 @@ export default function NewAdminQuestionCreate() {
                 type="button"
                 onClick={() => handleSave(false)}
                 disabled={isSaving || createMutation.isPending}
-                className="w-full py-3 bg-[#4353a4] hover:bg-[#38468d] disabled:opacity-50 text-white text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 shadow-xs transition-all cursor-pointer"
+                className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 shadow-xs transition-all cursor-pointer"
               >
                 {isSaving || createMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                 <span>{isEditMode ? "UPDATE PROBLEM" : "SAVE PROBLEM"}</span>
@@ -1566,7 +1596,7 @@ export default function NewAdminQuestionCreate() {
 
               <button
                 type="button"
-                onClick={() => navigate(returnPath)}
+                onClick={handleReturn}
                 className="w-full py-2 text-xs font-semibold text-slate-500 hover:text-slate-700 transition-colors text-center cursor-pointer"
               >
                 Cancel
@@ -1576,7 +1606,7 @@ export default function NewAdminQuestionCreate() {
             {/* Taxonomy Management Quick Card */}
             <div className="bg-white border border-slate-200/90 shadow-sm p-4 space-y-2.5">
               <div className="flex items-center gap-2 text-slate-800">
-                <FolderTree className="w-4 h-4 text-[#4353a4]" />
+                <FolderTree className="w-4 h-4 text-indigo-600" />
                 <h3 className="text-xs font-bold uppercase tracking-wider">Taxonomy</h3>
               </div>
               <p className="text-[11px] text-slate-500 leading-relaxed">
@@ -1587,7 +1617,7 @@ export default function NewAdminQuestionCreate() {
                 onClick={() => setManageSubjectsOpen(true)}
                 className="w-full py-2 bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
               >
-                <Plus className="w-3.5 h-3.5 text-[#4353a4]" />
+                <Plus className="w-3.5 h-3.5 text-indigo-600" />
                 <span>Manage Subjects & Topics</span>
               </button>
             </div>

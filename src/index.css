@@ -5,35 +5,35 @@
 @tailwind utilities;
 
 /* Gryphon 360 Design System
-   Primary: Sunset Orange #FF5733
-   Accent: Aqua Blue #00D4FF
-   Background: Soft White #FDFDFD
+   Primary: Electric Indigo #4F46E5
+   Sidebar / Header: Dark Obsidian Slate #0F172A
+   Background: Soft Canvas Slate #F6F8FA
 */
 
 @layer base {
    :root {
-     /* RxOne / DoSelect Design System - Brand Blue Theme */
-     --primary: 230 43% 45%;
+     /* Electric Indigo Theme */
+     --primary: 243 75% 59%;
      --primary-foreground: 0 0% 100%;
-     --primary-hover: 230 43% 36%;
+     --primary-hover: 244 58% 51%;
      
      /* Soft Slate / Brand Focus - Accent */
-     --accent: 230 43% 96%;
-     --accent-foreground: 230 43% 30%;
-     --accent-hover: 230 43% 92%;
+     --accent: 226 100% 97%;
+     --accent-foreground: 243 75% 59%;
+     --accent-hover: 226 100% 94%;
      
-     /* Soft White - Background */
-     --background: 0 0% 99%;
-     --foreground: 220 30% 15%;
+     /* Canvas Background #F6F8FA */
+     --background: 210 20% 98%;
+     --foreground: 222 47% 11%;
      
      /* Cards & Surfaces */
      --card: 0 0% 100%;
-     --card-foreground: 220 30% 15%;
+     --card-foreground: 222 47% 11%;
      --card-elevated: 0 0% 100%;
      
      /* Popover */
      --popover: 0 0% 100%;
-     --popover-foreground: 220 30% 15%;
+     --popover-foreground: 222 47% 11%;
      
      /* Secondary - Subtle gray */
      --secondary: 220 14% 96%;
@@ -56,36 +56,36 @@
      --destructive-foreground: 0 0% 100%;
      
      /* Borders & Inputs */
-     --border: 220 13% 91%;
-     --input: 220 13% 91%;
-     --ring: 230 43% 45%;
+     --border: 214 32% 91%;
+     --input: 214 32% 91%;
+     --ring: 243 75% 59%;
      
      /* Radius */
      --radius: 0.75rem;
      
-     /* Sidebar */
-     --sidebar-background: 220 30% 12%;
-     --sidebar-foreground: 220 10% 85%;
-     --sidebar-primary: 230 43% 45%;
+     /* Sidebar (Dark Slate Obsidian #0F172A) */
+     --sidebar-background: 222 47% 11%;
+     --sidebar-foreground: 215 20% 65%;
+     --sidebar-primary: 243 75% 59%;
      --sidebar-primary-foreground: 0 0% 100%;
-     --sidebar-accent: 220 30% 18%;
-     --sidebar-accent-foreground: 220 10% 95%;
-     --sidebar-border: 220 20% 20%;
-     --sidebar-ring: 230 43% 45%;
+     --sidebar-accent: 217 33% 17%;
+     --sidebar-accent-foreground: 210 40% 98%;
+     --sidebar-border: 217 33% 17%;
+     --sidebar-ring: 243 75% 59%;
      
      /* Gradients */
-     --gradient-primary: linear-gradient(135deg, hsl(230, 43%, 55%) 0%, hsl(230, 43%, 45%) 50%, hsl(230, 43%, 35%) 100%);
-     --gradient-accent: linear-gradient(135deg, hsl(191, 100%, 50%) 0%, hsl(200, 100%, 45%) 100%);
-     --gradient-hero: linear-gradient(135deg, hsl(220, 30%, 12%) 0%, hsl(220, 35%, 18%) 100%);
-     --gradient-card: linear-gradient(180deg, hsl(0, 0%, 100%) 0%, hsl(220, 14%, 98%) 100%);
+     --gradient-primary: linear-gradient(135deg, hsl(243, 75%, 65%) 0%, hsl(243, 75%, 59%) 50%, hsl(244, 58%, 45%) 100%);
+     --gradient-accent: linear-gradient(135deg, hsl(243, 75%, 65%) 0%, hsl(226, 100%, 65%) 100%);
+     --gradient-hero: linear-gradient(135deg, hsl(222, 47%, 11%) 0%, hsl(217, 33%, 17%) 100%);
+     --gradient-card: linear-gradient(180deg, hsl(0, 0%, 100%) 0%, hsl(210, 20%, 98%) 100%);
      
      /* Shadows */
-     --shadow-sm: 0 1px 2px 0 hsl(220 30% 15% / 0.05);
-     --shadow-md: 0 4px 6px -1px hsl(220 30% 15% / 0.07), 0 2px 4px -2px hsl(220 30% 15% / 0.07);
-     --shadow-lg: 0 10px 15px -3px hsl(220 30% 15% / 0.08), 0 4px 6px -4px hsl(220 30% 15% / 0.08);
-     --shadow-xl: 0 20px 25px -5px hsl(220 30% 15% / 0.1), 0 8px 10px -6px hsl(220 30% 15% / 0.1);
-     --shadow-primary: 0 4px 14px 0 hsl(230 43% 45% / 0.35);
-     --shadow-accent: 0 4px 14px 0 hsl(191 100% 50% / 0.3);
+     --shadow-sm: 0 1px 2px 0 hsl(222 47% 11% / 0.05);
+     --shadow-md: 0 4px 6px -1px hsl(222 47% 11% / 0.07), 0 2px 4px -2px hsl(222 47% 11% / 0.07);
+     --shadow-lg: 0 10px 15px -3px hsl(222 47% 11% / 0.08), 0 4px 6px -4px hsl(222 47% 11% / 0.08);
+     --shadow-xl: 0 20px 25px -5px hsl(222 47% 11% / 0.1), 0 8px 10px -6px hsl(222 47% 11% / 0.1);
+     --shadow-primary: 0 4px 14px 0 hsl(243 75% 59% / 0.35);
+     --shadow-accent: 0 4px 14px 0 hsl(243 75% 59% / 0.3);
    }
  }
  

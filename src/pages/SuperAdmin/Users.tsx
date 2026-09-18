@@ -2,7 +2,6 @@ import { useState, useEffect } from "react";
 import axios from "axios";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import {
   Table,
@@ -34,6 +33,7 @@ import {
   AlertTriangle,
   Eye,
   EyeOff,
+  Pencil,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -52,11 +52,9 @@ import {
 } from "@/components/ui/dialog";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { userService, type UserResponse } from "@/lib/user-service";
-import {
-  type OrganisationResponse,
-} from "@/lib/organisation-service";
 import { useToast } from "@/hooks/use-toast";
 import * as XLSX from "xlsx";
+import { saveAs } from "file-saver";
 import { useOrganisationsQuery } from "@/hooks/use-query-hooks";
 import { formatDate, getTodayDateString } from "@/lib/date-utils";
 
@@ -113,7 +111,6 @@ export default function Users() {
         size: 1000,
       }),
   });
-
 
   const filteredUsers = (users as UserResponse[]).filter((user) => {
     // Exclude CANDIDATE role completely
@@ -251,7 +248,6 @@ export default function Users() {
       return;
     }
 
-    // Format data nicely
     const formattedData = filteredUsers.map((user) => ({
       Name: user.name || "N/A",
       Email: user.email,
@@ -262,26 +258,12 @@ export default function Users() {
       "Joined Date": formatDate(user.createdAt),
     }));
 
-    if (formattedData.length === 0) {
-      toast({
-        title: "No Data",
-        description: "No users match current filters.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    // Convert JSON → worksheet
     const worksheet = XLSX.utils.json_to_sheet(formattedData);
-
-    // Add header styling (basic)
     worksheet["!autofilter"] = { ref: "A1:G1" };
 
-    // Create workbook
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Users");
 
-    // Auto column width (important for "nicely formatted")
     const colWidths = Object.keys(formattedData[0]).map((key) => {
       const maxLength = Math.max(
         key.length,
@@ -293,7 +275,6 @@ export default function Users() {
     });
     worksheet["!cols"] = colWidths;
 
-    // Generate file
     const excelBuffer = XLSX.write(workbook, {
       bookType: "xlsx",
       type: "array",
@@ -304,69 +285,84 @@ export default function Users() {
     });
 
     const date = getTodayDateString();
-
     saveAs(file, `Users_${date}.xlsx`);
   };
 
-  const getRoleIcon = (role: string) => {
+  const getRoleBadge = (role: string) => {
     switch (role) {
       case "SUPERADMIN":
-        return <ShieldCheck className="w-4 h-4 text-primary" />;
+        return (
+          <span className="px-2.5 py-0.5 bg-slate-900 text-white text-[10px] font-semibold rounded inline-flex items-center gap-1.5 shadow-2xs">
+            <ShieldCheck className="w-3 h-3 text-white" />
+            Super Admin
+          </span>
+        );
       case "ADMIN":
-        return <Shield className="w-4 h-4 text-accent" />;
-      default:
-        return <User className="w-4 h-4 text-muted-foreground" />;
-    }
-  };
-
-  const getRoleBadgeVariant = (role: string) => {
-    switch (role) {
-      case "SUPERADMIN":
-        return "default";
-      case "ADMIN":
-        return "secondary";
+        return (
+          <span className="px-2.5 py-0.5 bg-indigo-50 text-indigo-700 border border-indigo-200 text-[10px] font-semibold rounded inline-flex items-center gap-1.5">
+            <Shield className="w-3 h-3 text-indigo-600" />
+            Admin
+          </span>
+        );
       case "TRAINER":
-        return "outline";
+        return (
+          <span className="px-2.5 py-0.5 bg-slate-100 text-slate-700 border border-slate-200 text-[10px] font-semibold rounded inline-flex items-center gap-1.5">
+            <User className="w-3 h-3 text-slate-600" />
+            Trainer
+          </span>
+        );
       default:
-        return "outline";
+        return (
+          <span className="px-2 py-0.5 bg-slate-100 text-slate-700 border border-slate-200 text-[10px] font-medium rounded">
+            {role}
+          </span>
+        );
     }
   };
 
   return (
-    <div className="p-8 space-y-6 animate-fade-in">
+    <div className="p-8 space-y-6 animate-fade-in font-sans">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-heading font-bold">System Users</h1>
-          <p className="text-muted-foreground mt-1">
+          <h1 className="text-3xl font-heading font-bold text-slate-900">Users</h1>
+          <p className="text-muted-foreground mt-1 text-sm">
             Manage administrators, trainers, and other platform users
           </p>
         </div>
-        <div className="flex items-center gap-3">
-          <Button variant="outline" onClick={handleExportUsers}>
-            <Download className="w-4 h-4 mr-2" />
+        <div className="flex items-center gap-2.5">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleExportUsers}
+            className="h-9 text-xs font-medium border-slate-200 text-slate-700 hover:bg-slate-50 hover:text-slate-900 rounded"
+          >
+            <Download className="w-4 h-4 mr-1.5 text-slate-500" />
             Export Users
           </Button>
 
           <Dialog open={isAddUserOpen} onOpenChange={setIsAddUserOpen}>
             <DialogTrigger asChild>
-              <Button variant="hero">
-                <Plus className="w-4 h-4 mr-2" />
+              <Button
+                variant="default"
+                className="bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold h-9 px-4 rounded"
+              >
+                <Plus className="w-4 h-4 mr-1.5" />
                 Add User
               </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-[500px]">
+            <DialogContent className="sm:max-w-[480px] bg-white text-slate-900 p-6">
               <form onSubmit={handleCreateUser}>
-                <DialogHeader>
-                  <DialogTitle>Add System User</DialogTitle>
-                  <DialogDescription>
-                    Create a new user account with specific permissions.
+                <DialogHeader className="border-b border-slate-100 pb-3">
+                  <DialogTitle className="text-base font-bold text-slate-900">Add System User</DialogTitle>
+                  <DialogDescription className="text-xs text-slate-500">
+                    Create a new user account with specific role permissions.
                   </DialogDescription>
                 </DialogHeader>
                 <div className="grid gap-4 py-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="name">Full Name</Label>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                      <Label htmlFor="name" className="text-xs font-semibold text-slate-700">Full Name</Label>
                       <Input
                         id="name"
                         placeholder="John Doe"
@@ -375,10 +371,11 @@ export default function Users() {
                         onChange={(e) =>
                           setFormData({ ...formData, name: e.target.value })
                         }
+                        className="h-9 text-xs border-slate-200"
                       />
                     </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="email">Email</Label>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="email" className="text-xs font-semibold text-slate-700">Email Address</Label>
                       <Input
                         id="email"
                         type="email"
@@ -388,43 +385,42 @@ export default function Users() {
                         onChange={(e) =>
                           setFormData({ ...formData, email: e.target.value })
                         }
+                        className="h-9 text-xs border-slate-200"
                       />
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="role">User Role</Label>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                      <Label htmlFor="role" className="text-xs font-semibold text-slate-700">User Role</Label>
                       <Select
                         value={formData.role}
                         onValueChange={(val) =>
                           setFormData({ ...formData, role: val })
                         }
                       >
-                        <SelectTrigger>
+                        <SelectTrigger className="h-9 text-xs border-slate-200">
                           <SelectValue placeholder="Select Role" />
                         </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="SUPERADMIN">
-                            Super Admin
-                          </SelectItem>
+                        <SelectContent className="text-xs">
+                          <SelectItem value="SUPERADMIN">Super Admin</SelectItem>
                           <SelectItem value="ADMIN">Admin</SelectItem>
                           <SelectItem value="TRAINER">Trainer</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="org">Organisation</Label>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="org" className="text-xs font-semibold text-slate-700">Organisation</Label>
                       <Select
                         value={formData.organisation_id}
                         onValueChange={(val) =>
                           setFormData({ ...formData, organisation_id: val })
                         }
                       >
-                        <SelectTrigger>
+                        <SelectTrigger className="h-9 text-xs border-slate-200">
                           <SelectValue placeholder="Select Org" />
                         </SelectTrigger>
-                        <SelectContent>
+                        <SelectContent className="text-xs">
                           {organisations.map((org) => (
                             <SelectItem key={org.id} value={org.id}>
                               {org.name}
@@ -435,9 +431,9 @@ export default function Users() {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="phone">Phone Number</Label>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                      <Label htmlFor="phone" className="text-xs font-semibold text-slate-700">Phone Number</Label>
                       <Input
                         id="phone"
                         placeholder="+91..."
@@ -448,10 +444,11 @@ export default function Users() {
                             phoneNumber: e.target.value,
                           })
                         }
+                        className="h-9 text-xs border-slate-200"
                       />
                     </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="pass">Temporary Password</Label>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="pass" className="text-xs font-semibold text-slate-700">Temporary Password</Label>
                       <div className="relative">
                         <Input
                           id="pass"
@@ -461,33 +458,38 @@ export default function Users() {
                           onChange={(e) =>
                             setFormData({ ...formData, password: e.target.value })
                           }
-                          className="pr-10"
+                          className="pr-9 h-9 text-xs border-slate-200"
                         />
                         <button
                           type="button"
                           onClick={() => setShowPassword(!showPassword)}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors focus:outline-none"
+                          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 transition-colors focus:outline-none"
                           tabIndex={-1}
                         >
                           {showPassword ? (
-                            <EyeOff className="w-4 h-4" />
+                            <EyeOff className="w-3.5 h-3.5" />
                           ) : (
-                            <Eye className="w-4 h-4" />
+                            <Eye className="w-3.5 h-3.5" />
                           )}
                         </button>
                       </div>
                     </div>
                   </div>
                 </div>
-                <DialogFooter>
+                <DialogFooter className="border-t border-slate-100 pt-3">
                   <Button
                     type="button"
                     variant="outline"
                     onClick={() => setIsAddUserOpen(false)}
+                    className="h-9 text-xs border-slate-200 text-slate-700 hover:bg-slate-50"
                   >
                     Cancel
                   </Button>
-                  <Button type="submit" variant="hero" disabled={isSubmitting}>
+                  <Button
+                    type="submit"
+                    disabled={isSubmitting}
+                    className="bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold h-9"
+                  >
                     {isSubmitting ? "Creating..." : "Create User"}
                   </Button>
                 </DialogFooter>
@@ -498,41 +500,40 @@ export default function Users() {
       </div>
 
       {/* Filters */}
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-3">
         <div className="relative flex-1 max-w-md">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
             placeholder="Search users by name or email..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10 h-11"
+            className="pl-10 h-10 text-xs border-slate-200 focus-visible:ring-slate-400"
           />
         </div>
         <Select value={roleFilter} onValueChange={setRoleFilter}>
-          <SelectTrigger className="w-48 h-11">
+          <SelectTrigger className="w-44 h-10 text-xs border-slate-200 bg-white">
             <SelectValue placeholder="Filter by Role" />
           </SelectTrigger>
-          <SelectContent>
+          <SelectContent className="text-xs">
             <SelectItem value="all">All Roles</SelectItem>
             <SelectItem value="SUPERADMIN">Super Admin</SelectItem>
             <SelectItem value="ADMIN">Admin</SelectItem>
             <SelectItem value="TRAINER">Trainer</SelectItem>
-            {/* Remove STUDENT/CANDIDATE option */}
           </SelectContent>
         </Select>
       </div>
 
       {/* Users Table */}
-      <div className="rounded-xl border bg-card overflow-hidden shadow-sm">
+      <div className="rounded-lg border border-slate-200/90 bg-white overflow-hidden shadow-2xs">
         <Table>
           <TableHeader>
-            <TableRow className="bg-muted/50">
-              <TableHead className="font-semibold py-4">User</TableHead>
-              <TableHead className="font-semibold">Role</TableHead>
-              <TableHead className="font-semibold">Organisation</TableHead>
-              <TableHead className="font-semibold">Contact Info</TableHead>
-              <TableHead className="font-semibold">Joined Date</TableHead>
-              <TableHead className="font-semibold text-right">
+            <TableRow className="bg-slate-50/80 hover:bg-slate-50/80 border-b border-slate-200">
+              <TableHead className="text-[11.5px] font-bold text-slate-700 py-3 uppercase tracking-wider pl-4">User</TableHead>
+              <TableHead className="text-[11.5px] font-bold text-slate-700 py-3 uppercase tracking-wider">Role</TableHead>
+              <TableHead className="text-[11.5px] font-bold text-slate-700 py-3 uppercase tracking-wider">Organisation</TableHead>
+              <TableHead className="text-[11.5px] font-bold text-slate-700 py-3 uppercase tracking-wider">Contact Info</TableHead>
+              <TableHead className="text-[11.5px] font-bold text-slate-700 py-3 uppercase tracking-wider">Joined Date</TableHead>
+              <TableHead className="text-[11.5px] font-bold text-slate-700 py-3 uppercase tracking-wider text-right pr-4">
                 Actions
               </TableHead>
             </TableRow>
@@ -545,8 +546,8 @@ export default function Users() {
                   className="text-center py-20 text-muted-foreground"
                 >
                   <div className="flex flex-col items-center gap-2">
-                    <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
-                    <span>Fetching user database...</span>
+                    <div className="w-8 h-8 border-4 border-slate-900 border-t-transparent rounded-full animate-spin" />
+                    <span className="text-xs">Fetching user database...</span>
                   </div>
                 </TableCell>
               </TableRow>
@@ -554,7 +555,7 @@ export default function Users() {
               <TableRow>
                 <TableCell
                   colSpan={6}
-                  className="text-center py-20 text-muted-foreground"
+                  className="text-center py-20 text-muted-foreground text-xs"
                 >
                   No users found matching your criteria.
                 </TableCell>
@@ -563,11 +564,11 @@ export default function Users() {
               filteredUsers.map((user) => (
                 <TableRow
                   key={user.id}
-                  className="hover:bg-muted/30 transition-colors group"
+                  className="hover:bg-slate-50/50 border-b border-slate-100 transition-colors group"
                 >
-                  <TableCell>
+                  <TableCell className="pl-4">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-gradient-primary flex items-center justify-center text-primary-foreground font-bold shadow-sm">
+                      <div className="w-8 h-8 rounded-md bg-slate-900 flex items-center justify-center text-white font-bold text-xs shrink-0 shadow-2xs">
                         {user.name
                           ? user.name
                               .split(" ")
@@ -577,64 +578,62 @@ export default function Users() {
                           : "U"}
                       </div>
                       <div>
-                        <p className="font-semibold text-foreground group-hover:text-primary transition-colors">
+                        <p className="text-xs font-bold text-slate-900 leading-tight">
                           {user.name || "Anonymous User"}
                         </p>
-                        <p className="text-xs text-muted-foreground">
+                        <p className="text-[11px] text-slate-400 font-mono mt-0.5">
                           {user.email}
                         </p>
                       </div>
                     </div>
                   </TableCell>
                   <TableCell>
-                    <div className="flex items-center gap-2">
-                      {getRoleIcon(user.role)}
-                      <Badge variant={getRoleBadgeVariant(user.role)}>
-                        {user.role}
-                      </Badge>
+                    {getRoleBadge(user.role)}
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-1.5 text-xs font-medium text-slate-800">
+                      <Building2 className="w-3.5 h-3.5 text-slate-400" />
+                      <span>{user.organisation?.name || "Global / None"}</span>
                     </div>
                   </TableCell>
                   <TableCell>
-                    <span className="text-sm font-medium">
-                      {user.organisation?.name || "Global / None"}
-                    </span>
-                  </TableCell>
-                  <TableCell>
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                        <Mail className="w-3 h-3" />
+                    <div className="space-y-0.5 text-xs">
+                      <div className="flex items-center gap-1.5 text-slate-600 font-mono text-[11px]">
+                        <Mail className="w-3 h-3 text-slate-400" />
                         {user.email}
                       </div>
                       {user.phoneNumber && (
-                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                          <Phone className="w-3 h-3" />
+                        <div className="flex items-center gap-1.5 text-slate-500 font-mono text-[11px]">
+                          <Phone className="w-3 h-3 text-slate-400" />
                           {user.phoneNumber}
                         </div>
                       )}
                     </div>
                   </TableCell>
                   <TableCell>
-                    <span className="text-sm text-muted-foreground">
-                      {new Date(user.createdAt).toLocaleDateString()}
+                    <span className="text-xs text-slate-500 font-mono">
+                      {new Date(user.createdAt).toLocaleDateString("en-GB")}
                     </span>
                   </TableCell>
-                  <TableCell className="text-right">
+                  <TableCell className="text-right pr-4">
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="hover:bg-primary/10"
+                          className="h-7 w-7 text-slate-400 hover:text-slate-800 rounded"
                         >
-                          <MoreVertical className="w-4 h-4" />
+                          <MoreVertical className="w-3.5 h-3.5" />
                         </Button>
                       </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="w-44">
+                      <DropdownMenuContent align="end" className="text-xs w-36">
                         <DropdownMenuItem onClick={() => setViewUser(user)}>
+                          <Eye className="w-3.5 h-3.5 mr-2 text-slate-500" />
                           View Details
                         </DropdownMenuItem>
 
                         <DropdownMenuItem onClick={() => setEditUser(user)}>
+                          <Pencil className="w-3.5 h-3.5 mr-2 text-slate-500" />
                           Edit Profile
                         </DropdownMenuItem>
 
@@ -642,7 +641,7 @@ export default function Users() {
                           className="text-destructive font-medium"
                           onClick={() => setUserToDelete(user)}
                         >
-                          <Trash2 className="w-4 h-4 mr-2" />
+                          <Trash2 className="w-3.5 h-3.5 mr-2" />
                           Delete User
                         </DropdownMenuItem>
                       </DropdownMenuContent>
@@ -660,32 +659,37 @@ export default function Users() {
         open={!!userToDelete}
         onOpenChange={(open) => !open && setUserToDelete(null)}
       >
-        <DialogContent className="sm:max-w-[400px]">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-destructive">
+        <DialogContent className="sm:max-w-[420px] bg-white text-slate-900 p-6">
+          <DialogHeader className="border-b border-slate-100 pb-3">
+            <DialogTitle className="flex items-center gap-2 text-rose-600 text-base font-bold">
               <AlertTriangle className="w-5 h-5" />
               Confirm Deletion
             </DialogTitle>
-            <DialogDescription>
+            <DialogDescription className="text-xs text-slate-500">
               Are you sure you want to delete{" "}
-              <strong>{userToDelete?.name}</strong>? This action cannot be
+              <strong className="text-slate-900">{userToDelete?.name}</strong>? This action cannot be
               undone.
             </DialogDescription>
           </DialogHeader>
-          <div className="py-4">
-            <p className="text-sm text-muted-foreground">
+          <div className="py-3">
+            <p className="text-xs text-slate-500">
               All associated data, including test results and profile
               information, will be permanently removed from the system.
             </p>
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setUserToDelete(null)}>
-              Keep User
+          <DialogFooter className="border-t border-slate-100 pt-3">
+            <Button
+              variant="outline"
+              onClick={() => setUserToDelete(null)}
+              className="h-9 text-xs border-slate-200 text-slate-700 hover:bg-slate-50"
+            >
+              Cancel
             </Button>
             <Button
               variant="destructive"
               onClick={handleDeleteUser}
               disabled={isDeleting}
+              className="h-9 text-xs font-semibold"
             >
               {isDeleting ? "Deleting..." : "Delete Permanently"}
             </Button>
@@ -698,32 +702,33 @@ export default function Users() {
         open={!!editUser}
         onOpenChange={(open) => !open && setEditUser(null)}
       >
-        <DialogContent className="sm:max-w-[500px]">
+        <DialogContent className="sm:max-w-[480px] bg-white text-slate-900 p-6">
           <form onSubmit={handleUpdateUser}>
-            <DialogHeader>
-              <DialogTitle>Edit Profile</DialogTitle>
-              <DialogDescription>
-                Update user profile information. Some fields are locked.
+            <DialogHeader className="border-b border-slate-100 pb-3">
+              <DialogTitle className="text-base font-bold text-slate-900">Edit Profile</DialogTitle>
+              <DialogDescription className="text-xs text-slate-500">
+                Update user profile information. System role and email are locked.
               </DialogDescription>
             </DialogHeader>
 
             {editUser && (
-              <div className="space-y-4 py-4">
+              <div className="space-y-3.5 py-4">
                 {/* Name */}
-                <div className="space-y-2">
-                  <Label>Full Name</Label>
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-semibold text-slate-700">Full Name</Label>
                   <Input
                     value={editForm.name}
                     onChange={(e) =>
                       setEditForm({ ...editForm, name: e.target.value })
                     }
                     required
+                    className="h-9 text-xs border-slate-200"
                   />
                 </div>
 
                 {/* Phone */}
-                <div className="space-y-2">
-                  <Label>Phone Number</Label>
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-semibold text-slate-700">Phone Number</Label>
                   <Input
                     value={editForm.phoneNumber}
                     onChange={(e) =>
@@ -733,44 +738,56 @@ export default function Users() {
                       })
                     }
                     placeholder="+91..."
+                    className="h-9 text-xs border-slate-200"
                   />
                 </div>
 
-                <div className="space-y-2 opacity-60 col-span-2">
-                  <Label>Organisation</Label>
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-semibold text-slate-500">Organisation</Label>
                   <Input
                     value={editUser.organisation?.name || "Global / None"}
                     disabled
+                    className="h-9 text-xs bg-slate-50 border-slate-200 text-slate-600"
                   />
                 </div>
 
                 {/* Locked Fields */}
-                <div className="grid grid-cols-2 gap-4 pt-2">
-                  <div className="space-y-2 opacity-60">
-                    <Label>Email</Label>
-                    <Input value={editUser.email} disabled />
+                <div className="grid grid-cols-2 gap-3 pt-1">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-semibold text-slate-500">Email Address</Label>
+                    <Input
+                      value={editUser.email}
+                      disabled
+                      className="h-9 text-xs bg-slate-50 border-slate-200 text-slate-600 font-mono text-[11px]"
+                    />
                   </div>
 
-                  <div className="space-y-2 opacity-60">
-                    <Label>Role</Label>
-                    <Input value={editUser.role} disabled />
-                    <p className="text-xs text-muted-foreground">
-                      Role cannot be changed
-                    </p>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-semibold text-slate-500">Role</Label>
+                    <Input
+                      value={editUser.role}
+                      disabled
+                      className="h-9 text-xs bg-slate-50 border-slate-200 text-slate-600"
+                    />
                   </div>
                 </div>
               </div>
             )}
 
-            <DialogFooter>
+            <DialogFooter className="border-t border-slate-100 pt-3">
               <Button
                 type="button"
                 variant="outline"
                 onClick={() => setEditUser(null)}
+                className="h-9 text-xs border-slate-200 text-slate-700 hover:bg-slate-50"
               >
                 Cancel
               </Button>
-              <Button type="submit" variant="hero" disabled={isUpdating}>
+              <Button
+                type="submit"
+                disabled={isUpdating}
+                className="bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold h-9"
+              >
                 {isUpdating ? "Saving..." : "Save Changes"}
               </Button>
             </DialogFooter>
@@ -783,19 +800,19 @@ export default function Users() {
         open={!!viewUser}
         onOpenChange={(open) => !open && setViewUser(null)}
       >
-        <DialogContent className="sm:max-w-[650px] max-h-[85vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>User Details</DialogTitle>
-            <DialogDescription>
+        <DialogContent className="sm:max-w-[540px] bg-white text-slate-900 p-6 max-h-[85vh] overflow-y-auto">
+          <DialogHeader className="border-b border-slate-100 pb-3">
+            <DialogTitle className="text-base font-bold text-slate-900">User Details</DialogTitle>
+            <DialogDescription className="text-xs text-slate-500">
               Complete profile and account information.
             </DialogDescription>
           </DialogHeader>
 
           {viewUser && (
-            <div className="space-y-6 py-4">
+            <div className="space-y-4 py-3">
               {/* Profile Header */}
-              <div className="flex items-center gap-4">
-                <div className="w-16 h-16 rounded-full bg-gradient-primary flex items-center justify-center text-lg font-bold text-primary-foreground shadow">
+              <div className="flex items-center gap-3 p-3 bg-slate-50/75 border border-slate-200/80 rounded-md">
+                <div className="w-11 h-11 rounded-md bg-slate-900 flex items-center justify-center text-sm font-bold text-white shadow-2xs shrink-0">
                   {viewUser.name
                     ?.split(" ")
                     .map((n: string) => n[0])
@@ -803,95 +820,84 @@ export default function Users() {
                     .toUpperCase() || "U"}
                 </div>
                 <div>
-                  <h3 className="text-xl font-semibold">
+                  <h3 className="text-sm font-bold text-slate-900">
                     {viewUser.name || "Anonymous User"}
                   </h3>
-                  <p className="text-sm text-muted-foreground">
+                  <p className="text-xs text-slate-500 font-mono">
                     {viewUser.email}
                   </p>
                 </div>
               </div>
 
               {/* Core Info */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="p-4 rounded-lg border bg-muted/40">
-                  <p className="text-xs text-muted-foreground mb-1">User ID</p>
-                  <p className="text-xs font-mono break-all">{viewUser.id}</p>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="p-3 rounded-md border border-slate-200/80 bg-slate-50/60">
+                  <p className="text-[11px] text-slate-500 mb-0.5">User ID</p>
+                  <p className="text-xs font-mono font-semibold text-slate-800 break-all">{viewUser.id}</p>
                 </div>
 
-                <div className="p-4 rounded-lg border bg-muted/40">
-                  <p className="text-xs text-muted-foreground mb-1">Role</p>
-                  <div className="flex items-center gap-2">
-                    {getRoleIcon(viewUser.role)}
-                    <Badge variant={getRoleBadgeVariant(viewUser.role)}>
-                      {viewUser.role}
-                    </Badge>
+                <div className="p-3 rounded-md border border-slate-200/80 bg-slate-50/60">
+                  <p className="text-[11px] text-slate-500 mb-1">Role</p>
+                  <div>
+                    {getRoleBadge(viewUser.role)}
                   </div>
                 </div>
 
-                <div className="p-4 rounded-lg border bg-muted/40">
-                  <p className="text-xs text-muted-foreground mb-1">
-                    Organisation
-                  </p>
-                  <p className="text-sm font-medium">
+                <div className="p-3 rounded-md border border-slate-200/80 bg-slate-50/60">
+                  <p className="text-[11px] text-slate-500 mb-0.5">Organisation</p>
+                  <p className="text-xs font-semibold text-slate-800">
                     {viewUser.organisation?.name || "Global / None"}
                   </p>
                 </div>
 
-                <div className="p-4 rounded-lg border bg-muted/40">
-                  <p className="text-xs text-muted-foreground mb-1">Provider</p>
-                  <Badge variant="outline">
+                <div className="p-3 rounded-md border border-slate-200/80 bg-slate-50/60">
+                  <p className="text-[11px] text-slate-500 mb-0.5">Provider</p>
+                  <span className="px-2 py-0.5 bg-white border border-slate-200 text-slate-700 text-[10px] font-mono font-medium rounded">
                     {viewUser.provider || "LOCAL"}
-                  </Badge>
+                  </span>
                 </div>
               </div>
 
               {/* Contact Info */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="p-4 rounded-lg border bg-muted/40">
-                  <p className="text-xs text-muted-foreground mb-1">Email</p>
-                  <div className="flex items-center gap-2 text-sm">
-                    <Mail className="w-4 h-4 text-muted-foreground" />
+              <div className="grid grid-cols-2 gap-3">
+                <div className="p-3 rounded-md border border-slate-200/80 bg-slate-50/60">
+                  <p className="text-[11px] text-slate-500 mb-0.5">Email</p>
+                  <div className="flex items-center gap-1.5 text-xs font-mono text-slate-700">
+                    <Mail className="w-3.5 h-3.5 text-slate-400" />
                     {viewUser.email}
                   </div>
                 </div>
 
-                <div className="p-4 rounded-lg border bg-muted/40">
-                  <p className="text-xs text-muted-foreground mb-1">
-                    Phone Number
-                  </p>
-                  <div className="flex items-center gap-2 text-sm">
-                    <Phone className="w-4 h-4 text-muted-foreground" />
+                <div className="p-3 rounded-md border border-slate-200/80 bg-slate-50/60">
+                  <p className="text-[11px] text-slate-500 mb-0.5">Phone Number</p>
+                  <div className="flex items-center gap-1.5 text-xs font-mono text-slate-700">
+                    <Phone className="w-3.5 h-3.5 text-slate-400" />
                     {viewUser.phoneNumber || "Not Provided"}
                   </div>
                 </div>
               </div>
 
               {/* Timeline */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="p-4 rounded-lg border bg-muted/40">
-                  <p className="text-xs text-muted-foreground mb-1">
-                    Created At
-                  </p>
-                  <p className="text-sm">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="p-3 rounded-md border border-slate-200/80 bg-slate-50/60">
+                  <p className="text-[11px] text-slate-500 mb-0.5">Created At</p>
+                  <p className="text-xs font-mono text-slate-700">
                     {new Date(viewUser.createdAt).toLocaleString()}
                   </p>
                 </div>
 
-                <div className="p-4 rounded-lg border bg-muted/40">
-                  <p className="text-xs text-muted-foreground mb-1">
-                    Last Updated
-                  </p>
-                  <p className="text-sm">
+                <div className="p-3 rounded-md border border-slate-200/80 bg-slate-50/60">
+                  <p className="text-[11px] text-slate-500 mb-0.5">Last Updated</p>
+                  <p className="text-xs font-mono text-slate-700">
                     {new Date(viewUser.updatedAt).toLocaleString()}
                   </p>
                 </div>
               </div>
 
               {/* System Notice */}
-              <div className="p-4 rounded-lg bg-muted flex items-start gap-3">
-                <Shield className="w-5 h-5 text-primary mt-0.5" />
-                <p className="text-xs text-muted-foreground">
+              <div className="p-3 rounded-md bg-slate-50 border border-slate-200/70 flex items-start gap-2.5">
+                <Shield className="w-4 h-4 text-slate-500 mt-0.5 shrink-0" />
+                <p className="text-[11px] text-slate-500 leading-relaxed">
                   This user’s role and authentication provider are fixed after
                   account creation and cannot be modified.
                 </p>
@@ -899,8 +905,12 @@ export default function Users() {
             </div>
           )}
 
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setViewUser(null)}>
+          <DialogFooter className="border-t border-slate-100 pt-3">
+            <Button
+              variant="outline"
+              onClick={() => setViewUser(null)}
+              className="h-9 text-xs border-slate-200 text-slate-700 hover:bg-slate-50"
+            >
               Close
             </Button>
           </DialogFooter>

@@ -38,6 +38,7 @@ import { useAuth } from "@/lib/auth-context";
 import { testService, Question, McqOption, McqType } from "@/lib/test-service";
 import { apiClient } from "@/lib/api-client";
 import { mapFrontendToBackendLang } from "@/types/question";
+import { renderFormattedContent, decodeHtmlIfNeeded } from "@/lib/html-utils";
 import { QuestionImage } from "@/components/ui/QuestionImage";
 import { toast } from "sonner";
 import { GryphonLogo } from "@/components/ui/GryphonLogo";
@@ -262,8 +263,8 @@ export default function NewAdminQuestionPreview() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#081225] flex flex-col items-center justify-center text-white">
-        <Loader2 className="w-8 h-8 animate-spin text-emerald-400 mb-3" />
+      <div className="min-h-screen bg-[#0f172a] flex flex-col items-center justify-center text-white">
+        <Loader2 className="w-8 h-8 animate-spin text-indigo-400 mb-3" />
         <p className="text-sm font-medium text-slate-300">Loading Question Preview...</p>
       </div>
     );
@@ -271,7 +272,7 @@ export default function NewAdminQuestionPreview() {
 
   if (error || !question) {
     return (
-      <div className="min-h-screen bg-[#081225] flex flex-col items-center justify-center text-white p-4">
+      <div className="min-h-screen bg-[#0f172a] flex flex-col items-center justify-center text-white p-4">
         <AlertCircle className="w-10 h-10 text-rose-400 mb-3" />
         <h2 className="text-lg font-bold text-slate-100 mb-1">Preview Unavailable</h2>
         <p className="text-xs text-slate-400 mb-6 max-w-md text-center">{error || "Could not retrieve question."}</p>
@@ -531,20 +532,27 @@ export default function NewAdminQuestionPreview() {
 
   return (
     <div className="min-h-screen flex flex-col bg-[#F6F8FA] text-slate-800 font-sans antialiased relative">
-      {/* ── 1. Top Navbar (Matching MCQ Preview) ── */}
-      <header className="h-20 bg-[#081225] border-b border-[#142340] px-4 md:px-8 flex items-center justify-between z-30 sticky top-0 shadow-md">
+      {/* ── 1. Top Navbar (Sleek Slate Header with Breadcrumbs) ── */}
+      <header className="h-14 bg-[#0f172a] border-b border-slate-800/90 px-4 md:px-8 flex items-center justify-between z-30 sticky top-0 shadow-xs">
         {/* Left Side: Logo + Divider + Breadcrumb (Library > Question Title) */}
         <div className="flex items-center space-x-3 md:space-x-4 min-w-0">
           <div
-            onClick={() => navigate("/admin/library")}
+            onClick={() => navigate("/admin/home")}
             className="flex items-center gap-2 cursor-pointer group shrink-0"
           >
-            <GryphonLogo variant="dark" size="md" />
+            <GryphonLogo variant="dark" size="sm" />
           </div>
 
           <div className="h-5 w-[1px] bg-slate-700 mx-1 shrink-0" />
 
           <div className="flex items-center text-xs md:text-sm text-slate-400 font-medium space-x-1.5 truncate">
+            <span
+              onClick={() => navigate("/admin/home")}
+              className="hover:text-slate-200 cursor-pointer transition-colors shrink-0"
+            >
+              Dashboard
+            </span>
+            <ChevronRight className="w-3.5 h-3.5 text-slate-500 shrink-0" />
             <button
               onClick={() => navigate("/admin/library")}
               className="hover:text-slate-200 cursor-pointer transition-colors shrink-0"
@@ -562,14 +570,14 @@ export default function NewAdminQuestionPreview() {
         <div className="flex items-center space-x-3 shrink-0">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <button className="flex items-center gap-2.5 px-2 py-1 hover:bg-white/5 transition-colors focus:outline-none cursor-pointer">
-                <Avatar className="w-8 h-8 border border-slate-700 bg-slate-800 text-slate-200">
-                  <AvatarFallback className="bg-[#4353a4] text-white text-xs font-bold">
+              <button className="flex items-center gap-2.5 px-2.5 py-1.5 hover:bg-slate-800/70 transition-colors focus:outline-none cursor-pointer rounded-md">
+                <Avatar className="w-7 h-7 border border-slate-700 bg-slate-800 text-slate-200">
+                  <AvatarFallback className="bg-indigo-600 text-white text-[11px] font-bold">
                     {user?.name ? user.name.slice(0, 2).toUpperCase() : "AD"}
                   </AvatarFallback>
                 </Avatar>
                 <div className="hidden sm:flex items-center">
-                  <span className="text-xs font-semibold text-slate-200">
+                  <span className="text-xs font-medium text-slate-200">
                     {user?.name || "Admin User"}
                   </span>
                 </div>
@@ -604,7 +612,7 @@ export default function NewAdminQuestionPreview() {
       </header>
 
       {/* ── 2. Navy Hero Background Backdrop ── */}
-      <div className="bg-[#0B1028] absolute top-14 left-0 right-0 h-80 -z-0 pointer-events-none" />
+      <div className="bg-[#0f172a] absolute top-15 left-0 right-0 h-80 -z-0 pointer-events-none" />
 
       {/* ── 3. Main Workspace Area ── */}
       <main className="max-w-7xl mx-auto px-4 md:px-8 pt-6 pb-20 w-full relative z-10">
@@ -626,7 +634,7 @@ export default function NewAdminQuestionPreview() {
             {question.visibility === "ORG_OWNED" && (
               <button
                 onClick={() => navigate(`/admin/questions/edit/${question.id}`, { state: question })}
-                className="px-3 py-1.5 bg-[#4353a4] hover:bg-[#38468d] text-white text-xs font-semibold rounded shadow-xs inline-flex items-center gap-1.5 transition-colors cursor-pointer"
+                className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded shadow-xs inline-flex items-center gap-1.5 transition-colors cursor-pointer"
               >
                 <Edit className="w-3.5 h-3.5" />
                 <span>Edit Problem</span>
@@ -712,20 +720,14 @@ export default function NewAdminQuestionPreview() {
                       <p className="text-slate-700 text-xs">{reason || "No reason text provided."}</p>
                     </div>
                   </div>
-                ) : (() => {
-                    const promptHtml = decodeHtmlIfNeeded(question.prompt || "");
-                    const isHtml = /<[a-z][\s\S]*>/i.test(promptHtml);
-                    return isHtml ? (
-                      <div
-                        className="text-[13px] md:text-sm text-slate-800 leading-relaxed font-sans prose prose-slate max-w-none [&_h3]:text-sm [&_h3]:font-bold [&_h3]:text-slate-900 [&_h3]:mt-4 [&_h3]:mb-1.5 [&_ol]:list-decimal [&_ol]:pl-5 [&_ul]:list-disc [&_ul]:pl-5 [&_li]:my-1 [&_p]:my-1.5 [&_pre]:bg-[#18181b] [&_pre]:text-amber-300 [&_pre]:p-3 [&_pre]:rounded-sm [&_pre]:font-mono [&_pre]:text-xs [&_pre]:overflow-x-auto [&_code]:font-mono [&_code]:text-xs [&_code]:bg-slate-100 [&_code]:text-pink-600 [&_code]:px-1 [&_code]:py-0.5 [&_code]:rounded-xs [&_pre_code]:bg-transparent [&_pre_code]:text-inherit [&_pre_code]:p-0"
-                        dangerouslySetInnerHTML={{ __html: promptHtml }}
-                      />
-                    ) : (
-                      <div className="text-[13px] md:text-sm text-slate-800 leading-relaxed whitespace-pre-wrap font-normal">
-                        {promptHtml || "No description provided for this question."}
-                      </div>
-                    );
-                  })()}
+                ) : (
+                  <div
+                    className="text-[13px] md:text-sm text-slate-800 leading-relaxed font-sans prose prose-slate max-w-none [&_h3]:text-xs [&_h3]:font-bold [&_h3]:text-slate-900 [&_h3]:uppercase [&_h3]:tracking-wider [&_h3]:mt-4 [&_h3]:mb-1.5 [&_h2]:text-sm [&_h2]:font-bold [&_h2]:text-slate-900 [&_h2]:mt-4 [&_h2]:mb-1.5 [&_ol]:list-decimal [&_ol]:pl-5 [&_ul]:list-disc [&_ul]:pl-5 [&_li]:my-1 [&_p]:my-1.5 [&_pre]:bg-[#18181b] [&_pre]:text-amber-300 [&_pre]:p-3 [&_pre]:rounded-sm [&_pre]:font-mono [&_pre]:text-xs [&_pre]:overflow-x-auto [&_code]:font-mono [&_code]:text-xs [&_code]:bg-slate-100 [&_code]:text-pink-600 [&_code]:px-1 [&_code]:py-0.5 [&_code]:rounded-xs [&_pre_code]:bg-transparent [&_pre_code]:text-inherit [&_pre_code]:p-0"
+                    dangerouslySetInnerHTML={{
+                      __html: renderFormattedContent(question.prompt || "No description provided for this question."),
+                    }}
+                  />
+                )}
 
                 {/* Question Image */}
                 {question.imageUrl && (
@@ -875,7 +877,7 @@ export default function NewAdminQuestionPreview() {
                     <button
                       onClick={() => handleRunCode(true)}
                       disabled={isExecuting}
-                      className="px-3.5 py-1.5 bg-[#4353a4] hover:bg-[#344287] text-white text-xs font-semibold rounded shadow-xs flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50"
+                      className="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded shadow-xs flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50"
                     >
                       <CheckCircle2 className="w-3.5 h-3.5" />
                       <span>SUBMIT</span>
