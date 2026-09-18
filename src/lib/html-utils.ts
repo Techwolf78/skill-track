@@ -1,6 +1,29 @@
 /**
  * HTML & Markdown utility functions for sanitizing, decoding, and rendering rich text content.
  */
+import DOMPurify from "dompurify";
+
+export const sanitizeHtml = (dirtyHtml: string): string => {
+  if (!dirtyHtml) return "";
+  if (typeof window === "undefined") {
+    return dirtyHtml.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, "");
+  }
+  return DOMPurify.sanitize(dirtyHtml, {
+    USE_PROFILES: { html: true, svg: true },
+    ALLOWED_TAGS: [
+      "h1", "h2", "h3", "h4", "h5", "h6", "blockquote", "p", "a", "ul", "ol",
+      "nl", "li", "b", "i", "strong", "em", "strike", "code", "hr", "br", "div",
+      "table", "thead", "caption", "tbody", "tr", "th", "td", "pre", "span",
+      "img", "svg", "path", "sup", "sub", "small", "details", "summary", "mark",
+    ],
+    ALLOWED_ATTR: [
+      "href", "name", "target", "src", "alt", "class", "style", "title",
+      "width", "height", "viewBox", "fill", "stroke", "stroke-width", "d",
+      "colspan", "rowspan", "border", "align",
+    ],
+    ALLOW_DATA_ATTR: false,
+  });
+};
 
 export const decodeHtmlIfNeeded = (html: string): string => {
   if (!html) return "";
@@ -128,10 +151,8 @@ export const formatMarkdownToHtml = (markdown: string): string => {
 export const renderFormattedContent = (content?: string): string => {
   if (!content) return "";
   const decoded = decodeHtmlIfNeeded(content);
-  if (isHtmlContent(decoded)) {
-    return decoded;
-  }
-  return formatMarkdownToHtml(decoded);
+  const rawHtml = isHtmlContent(decoded) ? decoded : formatMarkdownToHtml(decoded);
+  return sanitizeHtml(rawHtml);
 };
 
 /**
