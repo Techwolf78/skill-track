@@ -42,6 +42,14 @@ const MIME_TYPES = {
   '.wav': 'audio/wav',
 };
 
+const SECURITY_HEADERS = {
+  'X-Content-Type-Options': 'nosniff',
+  'X-Frame-Options': 'SAMEORIGIN',
+  'Referrer-Policy': 'strict-origin-when-cross-origin',
+  'Permissions-Policy': 'camera=(self), microphone=(self), display-capture=(self)',
+  'Cross-Origin-Opener-Policy': 'same-origin',
+};
+
 const server = http.createServer((req, res) => {
   const reqUrl = req.url || '/';
 
@@ -76,7 +84,7 @@ const server = http.createServer((req, res) => {
     proxyReq.on('error', (err) => {
       console.error(`[API Proxy Error] ${req.method} ${targetPath} ->`, err.message);
       if (!res.headersSent) {
-        res.writeHead(502, { 'Content-Type': 'application/json' });
+        res.writeHead(502, { 'Content-Type': 'application/json', ...SECURITY_HEADERS });
         res.end(JSON.stringify({ success: false, status: 502, message: 'Bad Gateway: backend unreachable' }));
       }
     });
@@ -84,7 +92,7 @@ const server = http.createServer((req, res) => {
     proxyReq.on('timeout', () => {
       proxyReq.destroy();
       if (!res.headersSent) {
-        res.writeHead(504, { 'Content-Type': 'application/json' });
+        res.writeHead(504, { 'Content-Type': 'application/json', ...SECURITY_HEADERS });
         res.end(JSON.stringify({ success: false, status: 504, message: 'Gateway Timeout: backend timed out' }));
       }
     });
@@ -97,21 +105,29 @@ const server = http.createServer((req, res) => {
   // 2. STATIC ASSETS & SPA ROUTING
   // =========================================================================
   if (req.method !== 'GET' && req.method !== 'HEAD') {
-    res.writeHead(405, { 'Content-Type': 'text/plain' });
+    res.writeHead(405, { 'Content-Type': 'text/plain', ...SECURITY_HEADERS });
     res.end('Method Not Allowed');
     return;
   }
 
-  // Extract clean pathname without query params
-  let reqPath = decodeURI(reqUrl.split('?')[0]);
-  if (reqPath === '/') {
-    reqPath = '/index.html';
+  // Extract clean pathname without query params safely
+  let reqPath = '/index.html';
+  try {
+    const rawPath = reqUrl.split('?')[0];
+    reqPath = decodeURI(rawPath);
+    if (reqPath === '/') {
+      reqPath = '/index.html';
+    }
+  } catch {
+    res.writeHead(400, { 'Content-Type': 'text/plain', ...SECURITY_HEADERS });
+    res.end('Bad Request: Malformed URI');
+    return;
   }
 
   // Prevent directory traversal attacks
   let filePath = path.normalize(path.join(DIST_DIR, reqPath));
   if (!filePath.startsWith(DIST_DIR)) {
-    res.writeHead(403, { 'Content-Type': 'text/plain' });
+    res.writeHead(403, { 'Content-Type': 'text/plain', ...SECURITY_HEADERS });
     res.end('Forbidden');
     return;
   }
@@ -128,6 +144,7 @@ const server = http.createServer((req, res) => {
         'Content-Type': contentType,
         'Cache-Control': cacheControl,
         'Content-Length': stats.size,
+        ...SECURITY_HEADERS,
       });
 
       if (req.method === 'HEAD') {
@@ -142,6 +159,7 @@ const server = http.createServer((req, res) => {
         res.writeHead(404, {
           'Content-Type': 'text/plain',
           'Cache-Control': 'no-cache, no-store, must-revalidate',
+          ...SECURITY_HEADERS,
         });
         res.end('Asset not found');
         return;
@@ -151,7 +169,7 @@ const server = http.createServer((req, res) => {
       const indexPath = path.join(DIST_DIR, 'index.html');
       fs.stat(indexPath, (indexErr, indexStats) => {
         if (indexErr || !indexStats.isFile()) {
-          res.writeHead(404, { 'Content-Type': 'text/plain' });
+          res.writeHead(404, { 'Content-Type': 'text/plain', ...SECURITY_HEADERS });
           res.end('Application not built yet. Please run npm run build.');
           return;
         }
@@ -162,6 +180,7 @@ const server = http.createServer((req, res) => {
           'Pragma': 'no-cache',
           'Expires': '0',
           'Content-Length': indexStats.size,
+          ...SECURITY_HEADERS,
         });
 
         if (req.method === 'HEAD') {

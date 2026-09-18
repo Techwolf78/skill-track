@@ -26,6 +26,7 @@ import { apiClient } from "@/lib/api-client";
 import { GryphonLogo } from "@/components/ui/GryphonLogo";
 import { useToast } from "@/hooks/use-toast";
 import { formatDateTime } from "@/lib/date-utils";
+import { sanitizeHtml } from "@/lib/html-utils";
 import {
   Card,
   CardContent,
@@ -438,7 +439,6 @@ export default function NewCandidateTestWelcome({
       }
       await validateToken(authData.accessToken);
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     [loginToContext, navigate, effectiveTestId, validateToken]
   );
 
@@ -934,7 +934,7 @@ export default function NewCandidateTestWelcome({
                 /<[a-z][\s\S]*>/i.test(resolvedInstructions) ? (
                   <div
                     className="text-xs md:text-sm text-slate-700 leading-relaxed font-sans prose prose-slate max-w-none [&_ol]:list-decimal [&_ol]:pl-5 [&_ul]:list-disc [&_ul]:pl-5 [&_li]:my-1 [&_p]:my-1.5 [&_pre]:bg-slate-900 [&_pre]:text-slate-100 [&_pre]:p-3.5 [&_pre]:rounded-xs [&_pre]:font-mono [&_pre]:text-xs [&_pre]:overflow-x-auto [&_code]:font-mono [&_code]:text-xs [&_code]:bg-slate-100 [&_code]:text-pink-600 [&_code]:px-1 [&_code]:py-0.5 [&_code]:rounded-xs [&_pre_code]:bg-transparent [&_pre_code]:text-inherit [&_pre_code]:p-0 [&_a]:text-indigo-600 [&_a]:underline [&_a]:font-medium hover:[&_a]:text-indigo-700 [&_blockquote]:border-none [&_blockquote]:italic [&_blockquote]:text-slate-700 [&_blockquote]:my-1.5 [&_blockquote]:px-1 [&_blockquote]:before:content-['\\201C'] [&_blockquote]:after:content-['\\201D'] [&_blockquote]:before:font-serif [&_blockquote]:after:font-serif [&_blockquote]:before:text-indigo-500 [&_blockquote]:after:text-indigo-500 [&_blockquote]:before:font-bold [&_blockquote]:after:font-bold [&_sup]:text-[9px] [&_sub]:text-[9px]"
-                    dangerouslySetInnerHTML={{ __html: resolvedInstructions }}
+                    dangerouslySetInnerHTML={{ __html: sanitizeHtml(resolvedInstructions || "") }}
                   />
                 ) : (
                   <div className="text-xs md:text-sm text-slate-700 leading-relaxed font-sans whitespace-pre-line">

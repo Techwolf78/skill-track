@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import {
   ChevronLeft,
@@ -38,7 +38,7 @@ import { useAuth } from "@/lib/auth-context";
 import { testService, Question, McqOption, McqType } from "@/lib/test-service";
 import { apiClient } from "@/lib/api-client";
 import { mapFrontendToBackendLang } from "@/types/question";
-import { renderFormattedContent, decodeHtmlIfNeeded } from "@/lib/html-utils";
+import { renderFormattedContent, decodeHtmlIfNeeded, sanitizeHtml } from "@/lib/html-utils";
 import { QuestionImage } from "@/components/ui/QuestionImage";
 import { toast } from "sonner";
 import { GryphonLogo } from "@/components/ui/GryphonLogo";
@@ -76,21 +76,6 @@ const DifficultyIcon = ({ level }: { level?: string }) => {
       <rect x="11.5" y="2" width="2.5" height="12" opacity={count >= 3 ? 0.9 : 0.25} />
     </svg>
   );
-};
-
-const decodeHtmlIfNeeded = (html: string): string => {
-  if (!html) return "";
-  if (/&lt;\s*\/?\s*(?:p|h[1-6]|ul|ol|li|code|pre|div|span|strong|em|table|tr|td|th|b|i)\b/i.test(html)) {
-    const txt = document.createElement("textarea");
-    txt.innerHTML = html;
-    let decoded = txt.value;
-    if (/&lt;\s*\/?\s*(?:p|h[1-6]|ul|ol|li|code|pre|div|span|strong|em|table|tr|td|th|b|i)\b/i.test(decoded)) {
-      txt.innerHTML = decoded;
-      decoded = txt.value;
-    }
-    return decoded;
-  }
-  return html;
 };
 
 const getDefaultCode = (language: string, questionTitle?: string): string => {
@@ -214,7 +199,7 @@ export default function NewAdminQuestionPreview() {
   const [overallStatus, setOverallStatus] = useState<string | null>(null);
   const [consoleOutput, setConsoleOutput] = useState<string>("");
 
-  const loadQuestion = (questionId: string) => {
+  const loadQuestion = useCallback((questionId: string) => {
     if (!question) setLoading(true);
     setError(null);
     testService
@@ -226,37 +211,42 @@ export default function NewAdminQuestionPreview() {
           setError("Question not found.");
         }
       })
-      .catch((err) => {
+      .catch((err: unknown) => {
         console.error("Failed to load question preview", err);
         if (!question) {
-          setError("Failed to load question details: " + (err.response?.data?.message || err.message || "Unknown error"));
+          const apiErr = err as { response?: { data?: { message?: string } }; message?: string };
+          setError("Failed to load question details: " + (apiErr.response?.data?.message || apiErr.message || "Unknown error"));
         }
       })
       .finally(() => {
         setLoading(false);
       });
-  };
+  }, [question]);
 
   useEffect(() => {
     if (id) {
       loadQuestion(id);
     }
-  }, [id]);
+  }, [id, loadQuestion]);
 
   // Load initial template when question or language changes
   useEffect(() => {
-    if (question && ((question.questionType || (question as any).type || "").toUpperCase() === "CODING")) {
-      const templates = question.languageTemplates || {};
-      const langKey = selectedLanguage === "python3" ? "python" : selectedLanguage;
-      const tpl =
-        templates[selectedLanguage]?.template ||
-        templates[langKey]?.template ||
-        (question.codeTemplate && (question.codeTemplate[selectedLanguage]?.code || question.codeTemplate[langKey]?.code));
+    if (question) {
+      const qRec = question as unknown as Record<string, unknown>;
+      const isCodingQ = (question.questionType || (qRec.type as string) || "").toString().toUpperCase() === "CODING";
+      if (isCodingQ) {
+        const templates = question.languageTemplates || {};
+        const langKey = selectedLanguage === "python3" ? "python" : selectedLanguage;
+        const tpl =
+          templates[selectedLanguage]?.template ||
+          templates[langKey]?.template ||
+          (question.codeTemplate && (question.codeTemplate[selectedLanguage]?.code || question.codeTemplate[langKey]?.code));
 
-      if (tpl) {
-        setCode(tpl);
-      } else {
-        setCode(getDefaultCode(selectedLanguage, question.title || question.prompt));
+        if (tpl) {
+          setCode(tpl);
+        } else {
+          setCode(getDefaultCode(selectedLanguage, question.title || question.prompt));
+        }
       }
     }
   }, [question, selectedLanguage]);
@@ -296,18 +286,19 @@ export default function NewAdminQuestionPreview() {
     );
   }
 
-  const qType = ((question.questionType || (question as any).type || "") as string).toUpperCase();
+  const qRec = question as unknown as Record<string, unknown>;
+  const qType = (question.questionType || (qRec.type as string) || "").toString().toUpperCase();
   const isCoding = qType === "CODING";
-  const mcqType = (question.mcqType || (question as any).type || "SINGLE_CORRECT") as McqType;
+  const mcqType = (question.mcqType || (qRec.type as McqType) || "SINGLE_CORRECT") as McqType;
   const isMultipleCorrect =
-    question.multipleCorrect ||
+    Boolean(question.multipleCorrect) ||
     mcqType === "MULTIPLE_CORRECT" ||
     mcqType === "IMAGE_MULTIPLE_CORRECT";
   const isAssertionReason = mcqType === "ASSERTION_REASON";
 
   // Parse assertion and reason if applicable
-  let assertion = (question as any).assertion;
-  let reason = (question as any).reason;
+  let assertion = question.assertion || (qRec.assertion as string | undefined);
+  let reason = question.reason || (qRec.reason as string | undefined);
   if (isAssertionReason && (!assertion || !reason)) {
     const match = question.prompt?.match(/Assertion \(A\): (.*?)\.? Reason \(R\): (.*?)\.?$/);
     if (match) {
@@ -316,7 +307,7 @@ export default function NewAdminQuestionPreview() {
     }
   }
 
-  const rawOptions = (question.mcqOptions || (question as any).options || []) as unknown[];
+  const rawOptions = (question.mcqOptions || (qRec.options as unknown[]) || []) as unknown[];
   const options: McqOption[] = rawOptions.map((opt: unknown, idx: number) => {
     if (typeof opt === "string") {
       return { text: opt, isCorrect: false, displayOrder: idx };
@@ -365,7 +356,7 @@ export default function NewAdminQuestionPreview() {
         runAll: isVerify,
       };
 
-      const response = await apiClient.post<any>(
+      const response = await apiClient.post<{ data?: Record<string, unknown>[] }>(
         "/api/code/execute/playground",
         requestBody
       );
@@ -376,33 +367,34 @@ export default function NewAdminQuestionPreview() {
 
       const sampleCases = isVerify
         ? (question.testCases || [])
-        : (question.testCases?.filter((tc: any) => (tc.sample === true || tc.isSample === true) && !tc.isHidden) || []);
+        : (question.testCases?.filter((tc: Record<string, unknown>) => (tc.sample === true || tc.isSample === true) && !tc.isHidden) || []);
 
-      const mappedResults = resultsArray.map((res: any, idx: number) => ({
-        status: res.status || "ACCEPTED",
-        input: res.input || sampleCases[idx]?.input || "",
+      const mappedResults = resultsArray.map((res: Record<string, unknown>, idx: number) => ({
+        status: (res.status as string) || "ACCEPTED",
+        input: (res.input as string) || sampleCases[idx]?.input || "",
         output:
-          res.actualOutput ||
-          res.stdout ||
-          res.stderr ||
-          res.compileOutput ||
+          (res.actualOutput as string) ||
+          (res.stdout as string) ||
+          (res.stderr as string) ||
+          (res.compileOutput as string) ||
           "",
         expected:
-          res.expectedOutput ||
+          (res.expectedOutput as string) ||
           sampleCases[idx]?.expectedOutput ||
-          (sampleCases[idx] as any)?.expected ||
+          ((sampleCases[idx] as Record<string, unknown>)?.expected as string) ||
           "",
-        compileOutput: res.compileOutput || "",
-        stderr: res.stderr || "",
-        executionTimeMs: res.execTimeMs || res.executionTimeMs || 0,
+        compileOutput: (res.compileOutput as string) || "",
+        stderr: (res.stderr as string) || "",
+        executionTimeMs: (res.execTimeMs as number) || (res.executionTimeMs as number) || 0,
       }));
 
       setTestCaseResults(mappedResults);
 
       let computedStatus = "ACCEPTED";
       for (const res of resultsArray) {
-        if (res.status !== "ACCEPTED") {
-          computedStatus = res.status;
+        const itemStatus = (res.status as string) || "ACCEPTED";
+        if (itemStatus !== "ACCEPTED") {
+          computedStatus = itemStatus;
           break;
         }
       }
@@ -418,10 +410,11 @@ export default function NewAdminQuestionPreview() {
       } else {
         toast.error(`Execution result: ${computedStatus.replace(/_/g, " ")}`);
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Execution failed:", err);
+      const errorObj = err as { response?: { data?: { message?: string } }; message?: string };
       const errorMsg =
-        err?.response?.data?.message || err?.message || "Failed to execute code on sandbox.";
+        errorObj?.response?.data?.message || errorObj?.message || "Failed to execute code on sandbox.";
       setOverallStatus("EXECUTION_ERROR");
       setConsoleOutput(`> Error: ${errorMsg}\n`);
       toast.error(errorMsg);
@@ -436,20 +429,22 @@ export default function NewAdminQuestionPreview() {
   };
 
   // Robust sample testcases resolver prioritizing actual question test cases and prompt examples
-  const getSampleTestcases = (q: any) => {
+  const getSampleTestcases = (q: Record<string, unknown> | Question | null | undefined) => {
     const list: Array<{ input: string; output: string; explanation?: string }> = [];
+
+    const qRec = q as Record<string, unknown> | null | undefined;
 
     // 1. Check testCases / testcases array
     const rawCases =
-      q?.testCases ||
-      q?.testcases ||
-      q?.test_cases ||
-      q?.coding?.testCases ||
-      q?.coding?.test_cases;
+      (q as Question)?.testCases ||
+      (qRec?.testcases as Record<string, unknown>[] | undefined) ||
+      (qRec?.test_cases as Record<string, unknown>[] | undefined) ||
+      ((qRec?.coding as Record<string, unknown> | undefined)?.testCases as Record<string, unknown>[] | undefined) ||
+      ((qRec?.coding as Record<string, unknown> | undefined)?.test_cases as Record<string, unknown>[] | undefined);
 
     if (Array.isArray(rawCases) && rawCases.length > 0) {
-      const sampleCases = rawCases.filter((tc: any) => (tc.sample === true || tc.isSample === true) && !tc.isHidden);
-      const targetCases = sampleCases.length > 0 ? sampleCases : rawCases.filter((tc: any) => !tc.isHidden).slice(0, 2);
+      const sampleCases = rawCases.filter((tc: Record<string, unknown>) => (tc.sample === true || tc.isSample === true) && !tc.isHidden);
+      const targetCases = sampleCases.length > 0 ? sampleCases : rawCases.filter((tc: Record<string, unknown>) => !tc.isHidden).slice(0, 2);
       for (const tc of targetCases) {
         list.push({
           input: tc.input != null ? String(tc.input) : "",
@@ -461,17 +456,18 @@ export default function NewAdminQuestionPreview() {
               : tc.expected != null
               ? String(tc.expected)
               : "",
-          explanation: tc.explanation || q?.sampleExplanation,
+          explanation: (tc.explanation as string | undefined) || ((qRec?.sampleExplanation as string) || undefined),
         });
       }
     }
 
     // 2. Check direct examples array
     if (list.length === 0) {
+      const codingObj = qRec?.coding as Record<string, unknown> | undefined;
       const rawExamples =
-        q?.examples ||
-        q?.coding?.examples ||
-        (Array.isArray(q?.coding?.examples?.data) ? q.coding.examples.data : null);
+        (qRec?.examples as Record<string, unknown>[] | undefined) ||
+        (codingObj?.examples as Record<string, unknown>[] | undefined) ||
+        (Array.isArray((codingObj?.examples as Record<string, unknown> | undefined)?.data) ? (codingObj?.examples as Record<string, unknown>).data as Record<string, unknown>[] : null);
 
       if (Array.isArray(rawExamples) && rawExamples.length > 0) {
         for (const ex of rawExamples) {
@@ -488,7 +484,7 @@ export default function NewAdminQuestionPreview() {
                   : ex.expected_output != null
                   ? String(ex.expected_output)
                   : "",
-              explanation: ex.explanation,
+              explanation: ex.explanation as string | undefined,
             });
           }
         }
@@ -496,19 +492,20 @@ export default function NewAdminQuestionPreview() {
     }
 
     // 3. Check direct sampleInput / sampleOutput fields
-    if (list.length === 0 && (q?.sampleInput || q?.coding?.sampleInput)) {
+    if (list.length === 0 && (qRec?.sampleInput || (qRec?.coding as Record<string, unknown> | undefined)?.sampleInput)) {
+      const codingObj = qRec?.coding as Record<string, unknown> | undefined;
       list.push({
-        input: q?.sampleInput || q?.coding?.sampleInput || "",
-        output: q?.sampleOutput || q?.coding?.sampleOutput || "",
-        explanation: q?.sampleExplanation || q?.coding?.sampleExplanation,
+        input: (qRec?.sampleInput as string) || (codingObj?.sampleInput as string) || "",
+        output: (qRec?.sampleOutput as string) || (codingObj?.sampleOutput as string) || "",
+        explanation: (qRec?.sampleExplanation as string | undefined) || (codingObj?.sampleExplanation as string | undefined),
       });
     }
 
     // 4. Try regex extraction of Examples from prompt text
     if (list.length === 0 && q?.prompt) {
-      const pText = `${q?.prompt || ""}\n${q?.sampleExplanation || ""}\n${q?.constraints || ""}`;
+      const pText = `${q?.prompt || ""}\n${(qRec?.sampleExplanation as string) || ""}\n${q?.constraints || ""}`;
       const exampleRegex =
-        /(?:Example\s*(\d+)|\*\*Example\s*(\d+)\*\*|###\s*Example\s*(\d+))[\s\S]*?(?:Input|\*\*Input:\*\*)\s*[:\.]?\s*`?([^`\n\r]+)`?[\s\S]*?(?:Output|\*\*Output:\*\*)\s*[:\.]?\s*`?([^`\n\r]+)`?(?:[\s\S]*?(?:Explanation|\*\*Explanation:\*\*)\s*[:\.]?\s*([^\n\r]+))?/gi;
+        /(?:Example\s*(\d+)|\*\*Example\s*(\d+)\*\*|###\s*Example\s*(\d+))[\s\S]*?(?:Input|\*\*Input:\*\*)\s*[:.]?\s*`?([^`\n\r]+)`?[\s\S]*?(?:Output|\*\*Output:\*\*)\s*[:.]?\s*`?([^`\n\r]+)`?(?:[\s\S]*?(?:Explanation|\*\*Explanation:\*\*)\s*[:.]?\s*([^\n\r]+))?/gi;
       let match;
       while ((match = exampleRegex.exec(pText)) !== null && list.length < 3) {
         const rawIn = match[4]?.trim();
@@ -1148,7 +1145,7 @@ export default function NewAdminQuestionPreview() {
                                 {/<[a-z][\s\S]*>/i.test(opt.text || "") ? (
                                   <div
                                     className="leading-relaxed select-none prose prose-invert prose-xs max-w-none text-xs font-mono [&_p]:my-0.5 [&_ol]:list-decimal [&_ol]:pl-4 [&_ul]:list-disc [&_ul]:pl-4 [&_code]:bg-slate-800 [&_code]:text-pink-400 [&_code]:px-1 [&_code]:py-0.5 [&_code]:rounded-xs"
-                                    dangerouslySetInnerHTML={{ __html: opt.text || "" }}
+                                    dangerouslySetInnerHTML={{ __html: sanitizeHtml(opt.text || "") }}
                                   />
                                 ) : (
                                   <span className="leading-relaxed select-none">
