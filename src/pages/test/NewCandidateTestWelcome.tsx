@@ -154,6 +154,7 @@ export default function NewCandidateTestWelcome({
   const navigate = useNavigate();
   const { toast } = useToast();
   const { login: loginToContext, user, isAuthenticated } = useAuth();
+  const isCandidateAuthenticated = isAuthenticated && user?.role === "CANDIDATE";
 
   const effectiveTestId =
     testIdProp || routeTestId || routeId || searchParams.get("testId") || searchParams.get("id");
@@ -184,7 +185,13 @@ export default function NewCandidateTestWelcome({
     startTime?: string;
     endTime?: string;
     testTitle?: string;
+    durationMins?: number;
+    organisationName?: string;
   } | null>(null);
+
+  /* ────── Magic-link gate state ────── */
+  const [pendingMagicToken, setPendingMagicToken] = useState<string | null>(null);
+  const [isVerifyingMagicToken, setIsVerifyingMagicToken] = useState(false);
 
   /* ────── Timers ────── */
   useEffect(() => {
@@ -259,7 +266,7 @@ export default function NewCandidateTestWelcome({
         } else {
           const storedToken = localStorage.getItem("token");
           if (storedToken) decoded = parseJwt(storedToken);
-          if (!isAuthenticated || !decoded) {
+          if (!isCandidateAuthenticated || !decoded || decoded.role !== "CANDIDATE") {
             setLoading(false);
             return;
           }
@@ -406,7 +413,7 @@ export default function NewCandidateTestWelcome({
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [routeId, routeToken, isAuthenticated, loginToContext]
+    [routeId, routeToken, isCandidateAuthenticated, loginToContext]
   );
 
   /* ────── Auth Handlers (ported from TestAccess.tsx) ────── */
@@ -436,27 +443,36 @@ export default function NewCandidateTestWelcome({
   );
 
   const verifyMagicToken = useCallback(
-    async (magicTokenStr: string) => {
+    async (magicTokenStr: string, autoOpenWizard = false) => {
       try {
-        setLoading(true);
+        setIsVerifyingMagicToken(true);
         setError(null);
         const response = await apiClient.post(`/candidate-invitations/${routeId}/access/verify`, {
           magicToken: magicTokenStr,
         });
         const authData = response.data?.data || response.data;
         if (!authData || !authData.accessToken) throw new Error("Authentication failed.");
+        // Remove magicToken from URL only after successful verification
         window.history.replaceState({}, "", `/test/access/${routeId}`);
+        setPendingMagicToken(null);
         toast({ title: "Verification Successful", description: "Magic link authenticated successfully." });
         await handleAuthResponse(authData);
+        if (autoOpenWizard) {
+          if (onStartAssessment) {
+            onStartAssessment();
+          } else {
+            setIsOnboardingOpen(true);
+          }
+        }
       } catch (err: unknown) {
         const errorVal = err as { response?: { data?: { message?: string } }; message?: string };
         console.error("Magic token verification failed:", err);
-        window.history.replaceState({}, "", `/test/access/${routeId}`);
         setError(errorVal.response?.data?.message || errorVal.message || "Failed to verify magic access link");
-        setLoading(false);
+      } finally {
+        setIsVerifyingMagicToken(false);
       }
     },
-    [routeId, toast, handleAuthResponse]
+    [routeId, toast, handleAuthResponse, onStartAssessment]
   );
 
   const handleSendAccessCode = async () => {
@@ -524,20 +540,36 @@ export default function NewCandidateTestWelcome({
             startTime: s?.startTime,
             endTime: s?.endTime,
             testTitle: s?.testTitle,
+            durationMins: s?.durationMins,
+            organisationName: s?.organisationName,
           });
 
           if (submitted || expired) {
             setLoading(false);
             return;
           }
-          if (magicToken) verifyMagicToken(magicToken);
-          else if (routeToken || isAuthenticated) validateToken();
-          else setLoading(false);
+
+          if (magicToken) {
+            // Gate: store token in state — do NOT auto-fire POST.
+            // Crawlers will stop here; real candidates click "Proceed to Assessment".
+            setPendingMagicToken(magicToken);
+            setLoading(false);
+          } else if (routeToken || isCandidateAuthenticated) {
+            validateToken();
+          } else {
+            setLoading(false);
+          }
         })
         .catch(() => {
-          if (magicToken) verifyMagicToken(magicToken);
-          else if (routeToken || isAuthenticated) validateToken();
-          else setLoading(false);
+          if (magicToken) {
+            // Status fetch failed but we still gate the magic link behind a button click
+            setPendingMagicToken(magicToken);
+            setLoading(false);
+          } else if (routeToken || isCandidateAuthenticated) {
+            validateToken();
+          } else {
+            setLoading(false);
+          }
         });
     } else if (routeToken && !routeId) {
       setError("This link is outdated. Please use the secure invitation link.");
@@ -546,7 +578,7 @@ export default function NewCandidateTestWelcome({
       setLoading(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [routeId, routeToken, isAuthenticated]);
+  }, [routeId, routeToken, isCandidateAuthenticated]);
 
   /* ────── Derived Display Values ────── */
 
@@ -562,13 +594,13 @@ export default function NewCandidateTestWelcome({
     return { total, mcqCount, codingCount, otherCount };
   }, [questions]);
 
-  const displayTitle = testData?.testTitle || titleProp || "Not Available";
-  const displayAuthor = testData?.organisationName || user?.organisationData?.name || authorProp || "Not Available";
-  const displayDuration = testData ? `${testData.durationMins} mins` : durationProp != null ? `${durationProp} mins` : "Not Available";
-  const displayTotalProblems = testData?.questionCount || questionStats.total || problemsProp || "Not Available";
+  const displayTitle = testData?.testTitle || invitationStatus?.testTitle || titleProp || "Assessment";
+  const displayAuthor = testData?.organisationName || invitationStatus?.organisationName || user?.organisationData?.name || authorProp || "Assessment Provider";
+  const displayDuration = testData ? `${testData.durationMins} mins` : invitationStatus?.durationMins ? `${invitationStatus.durationMins} mins` : durationProp != null ? `${durationProp} mins` : "45 mins";
+  const displayTotalProblems = testData?.questionCount || questionStats.total || problemsProp || 1;
 
-  const displayStartTime = (testData?.startTime ? formatDateTime(testData.startTime) : null) || startProp || "Not Available";
-  const displayEndTime = (testData?.endTime ? formatDateTime(testData.endTime) : null) || endProp || "Not Available";
+  const displayStartTime = (testData?.startTime ? formatDateTime(testData.startTime) : invitationStatus?.startTime ? formatDateTime(invitationStatus.startTime) : null) || startProp || "Not Available";
+  const displayEndTime = (testData?.endTime ? formatDateTime(testData.endTime) : invitationStatus?.endTime ? formatDateTime(invitationStatus.endTime) : null) || endProp || "Not Available";
 
   // Instructions extraction
   const resolvedInstructions = useMemo(() => {
@@ -591,8 +623,10 @@ export default function NewCandidateTestWelcome({
     return null;
   }, [instructionsProp, testData?.instructions, test]);
 
-  const handleStart = () => {
-    if (onStartAssessment) {
+  const handleStart = async () => {
+    if (pendingMagicToken) {
+      await verifyMagicToken(pendingMagicToken, true);
+    } else if (onStartAssessment) {
       onStartAssessment();
     } else {
       setIsOnboardingOpen(true);
@@ -703,8 +737,8 @@ export default function NewCandidateTestWelcome({
     );
   }
 
-  // Auth screen: Not authenticated and no testData → show Send Access Link / OTP
-  if ((error || !testData) && !isAuthenticated) {
+  // Auth screen: Not candidate-authenticated, no pending magicToken, and no testData → show Send Access Link / OTP
+  if ((error || !testData) && !isCandidateAuthenticated && !pendingMagicToken) {
     return (
       <div className="min-h-screen flex items-center justify-center p-4 bg-slate-50 text-slate-900 font-sans relative">
         <Card className="max-w-md w-full border border-slate-200 bg-white shadow-xl rounded-2xl relative overflow-hidden animate-in fade-in duration-300">
@@ -920,12 +954,28 @@ export default function NewCandidateTestWelcome({
 
               {/* Action Button */}
               <div className="pt-4 flex flex-col items-center justify-center gap-3">
+                {error && (
+                  <div className="flex items-start gap-2.5 bg-red-50 border border-red-200 rounded-lg p-3 text-xs text-red-700 max-w-md w-full">
+                    <AlertCircle className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
+                    <span>{error}</span>
+                  </div>
+                )}
                 <Button
                   onClick={handleStart}
+                  disabled={isVerifyingMagicToken}
                   className="bg-indigo-600 hover:bg-indigo-700 text-white px-8 py-5 text-xs md:text-sm font-bold tracking-wider uppercase rounded-xs shadow-sm hover:shadow transition-all inline-flex items-center gap-2 cursor-pointer"
                 >
-                  <Play className="w-3.5 h-3.5 fill-current" />
-                  <span>Start Assessment</span>
+                  {isVerifyingMagicToken ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>Verifying & Starting...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Play className="w-3.5 h-3.5 fill-current" />
+                      <span>Proceed to Assessment</span>
+                    </>
+                  )}
                 </Button>
                 <p className="text-[11px] md:text-xs text-slate-500 flex items-center gap-1.5 text-center font-normal pt-1">
                   <Info className="w-3.5 h-3.5 text-slate-400 shrink-0" />
