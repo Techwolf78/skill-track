@@ -257,13 +257,111 @@ export default function ProctoringDashboard() {
   const [activeTab, setActiveTab] = useState("overview");
   const [isSavingReview, setIsSavingReview] = useState(false);
 
-  // Evidence UI Enhancements State
-  const [lightboxImage, setLightboxImage] = useState<{
-    url: string;
-    title: string;
-    capturedAt?: string;
-    eventType?: string;
+  // Evidence UI Enhancements State & Lightbox Gallery
+  const [lightboxGallery, setLightboxGallery] = useState<{
+    items: Array<{
+      url: string;
+      title: string;
+      capturedAt?: string;
+      eventType?: string;
+    }>;
+    currentIndex: number;
   } | null>(null);
+
+  const activeLightboxItem =
+    lightboxGallery && lightboxGallery.items.length > 0
+      ? lightboxGallery.items[lightboxGallery.currentIndex]
+      : null;
+
+  const handlePrevLightbox = useCallback(() => {
+    setLightboxGallery((prev) => {
+      if (!prev || prev.items.length <= 1) return prev;
+      const newIndex =
+        prev.currentIndex > 0 ? prev.currentIndex - 1 : prev.items.length - 1;
+      return { ...prev, currentIndex: newIndex };
+    });
+  }, []);
+
+  const handleNextLightbox = useCallback(() => {
+    setLightboxGallery((prev) => {
+      if (!prev || prev.items.length <= 1) return prev;
+      const newIndex =
+        prev.currentIndex < prev.items.length - 1 ? prev.currentIndex + 1 : 0;
+      return { ...prev, currentIndex: newIndex };
+    });
+  }, []);
+
+  // Keyboard navigation for Lightbox
+  useEffect(() => {
+    if (!lightboxGallery) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "ArrowLeft") {
+        e.preventDefault();
+        handlePrevLightbox();
+      } else if (e.key === "ArrowRight") {
+        e.preventDefault();
+        handleNextLightbox();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [lightboxGallery, handlePrevLightbox, handleNextLightbox]);
+
+  const openEvidenceLightbox = (selectedUrl: string) => {
+    if (!candidateDetails) return;
+    const validEvidences = candidateDetails.evidences
+      .filter((e) => !!e.imageUrl)
+      .map((e) => ({
+        url: e.imageUrl!,
+        title: `Evidence Frame: ${e.eventType.replace(/_/g, " ")}`,
+        capturedAt: e.capturedAt,
+        eventType: e.eventType,
+      }));
+
+    if (validEvidences.length === 0) return;
+    const idx = validEvidences.findIndex((e) => e.url === selectedUrl);
+    setLightboxGallery({
+      items: validEvidences,
+      currentIndex: idx >= 0 ? idx : 0,
+    });
+  };
+
+  const openSnapshotLightbox = (selectedUrl: string, defaultIdx: number) => {
+    if (!candidateDetails) return;
+    const validSnapshots = candidateDetails.snapshots
+      .filter((s) => !!s.imageUrl)
+      .map((s, i) => ({
+        url: s.imageUrl!,
+        title: `Periodic Snapshot #${i + 1}`,
+        capturedAt: s.capturedAt,
+        eventType: "PERIODIC_AUDIT",
+      }));
+
+    if (validSnapshots.length === 0) return;
+    const idx = validSnapshots.findIndex((s) => s.url === selectedUrl);
+    setLightboxGallery({
+      items: validSnapshots,
+      currentIndex: idx >= 0 ? idx : defaultIdx,
+    });
+  };
+
+  const openIdentityLightbox = () => {
+    if (!candidateDetails?.candidatePhoto?.imageUrl) return;
+    setLightboxGallery({
+      items: [
+        {
+          url: candidateDetails.candidatePhoto.imageUrl,
+          title: "Verified Identity Baseline Photo",
+          capturedAt: candidateDetails.candidatePhoto.capturedAt,
+          eventType: "IDENTITY_VERIFICATION",
+        },
+      ],
+      currentIndex: 0,
+    });
+  };
+
   const [compareWithBaseline, setCompareWithBaseline] = useState<string | null>(
     null,
   ); // frame ID being compared
@@ -2638,13 +2736,7 @@ export default function ProctoringDashboard() {
                                 <div
                                   className="relative group cursor-pointer"
                                   onClick={() =>
-                                    ev.imageUrl &&
-                                    setLightboxImage({
-                                      url: ev.imageUrl,
-                                      title: `Evidence Frame: ${ev.eventType.replace(/_/g, " ")}`,
-                                      capturedAt: ev.capturedAt,
-                                      eventType: ev.eventType,
-                                    })
+                                    ev.imageUrl && openEvidenceLightbox(ev.imageUrl)
                                   }
                                 >
                                   <CameraFeedPlaceholder
@@ -2687,14 +2779,7 @@ export default function ProctoringDashboard() {
                                     <Button
                                       size="sm"
                                       variant="outline"
-                                      onClick={() =>
-                                        setLightboxImage({
-                                          url: ev.imageUrl!,
-                                          title: `Evidence Frame: ${ev.eventType.replace(/_/g, " ")}`,
-                                          capturedAt: ev.capturedAt,
-                                          eventType: ev.eventType,
-                                        })
-                                      }
+                                      onClick={() => openEvidenceLightbox(ev.imageUrl!)}
                                       className="h-7 text-[10px] px-2 flex gap-1 items-center"
                                     >
                                       <ZoomIn className="h-3 w-3" /> Inspect
@@ -2767,12 +2852,7 @@ export default function ProctoringDashboard() {
                               className="relative cursor-pointer"
                               onClick={() =>
                                 snap.imageUrl &&
-                                setLightboxImage({
-                                  url: snap.imageUrl,
-                                  title: `Periodic Snapshot #${idx + 1}`,
-                                  capturedAt: snap.capturedAt,
-                                  eventType: "PERIODIC_AUDIT",
-                                })
+                                openSnapshotLightbox(snap.imageUrl, idx)
                               }
                             >
                               <CameraFeedPlaceholder
@@ -2912,15 +2992,7 @@ export default function ProctoringDashboard() {
                         {candidateDetails.candidatePhoto?.imageUrl && !identityImgFailed ? (
                           <div
                             className="relative w-full h-64 bg-slate-950 rounded-lg overflow-hidden flex items-center justify-center border border-slate-800 shadow-md group cursor-pointer"
-                            onClick={() =>
-                              setLightboxImage({
-                                url: candidateDetails.candidatePhoto!.imageUrl,
-                                title: "Verified Identity Baseline Photo",
-                                capturedAt:
-                                  candidateDetails.candidatePhoto?.capturedAt,
-                                eventType: "IDENTITY_VERIFICATION",
-                              })
-                            }
+                            onClick={() => openIdentityLightbox()}
                           >
                             <img
                               src={candidateDetails.candidatePhoto.imageUrl}
@@ -2986,45 +3058,106 @@ export default function ProctoringDashboard() {
         </SheetContent>
       </Sheet>
 
-      {/* 5. Fullscreen Image Lightbox Modal */}
+      {/* 5. Fullscreen Image Lightbox Modal with Next / Previous Navigation */}
       <Dialog
-        open={!!lightboxImage}
-        onOpenChange={(open) => !open && setLightboxImage(null)}
+        open={!!lightboxGallery && !!activeLightboxItem}
+        onOpenChange={(open) => !open && setLightboxGallery(null)}
       >
-        <DialogContent className="max-w-4xl w-[95vw] bg-slate-950 border border-slate-800 text-white p-4">
+        <DialogContent className="max-w-4xl w-[95vw] bg-slate-950 border border-slate-850 text-white p-4">
           <DialogHeader className="flex flex-row items-center justify-between border-b border-slate-850 pb-3">
-            <div>
-              <DialogTitle className="text-base font-bold flex items-center gap-2">
-                <Camera className="h-4 w-4 text-rose-500" />
-                {lightboxImage?.title}
-              </DialogTitle>
-              {lightboxImage?.capturedAt && (
-                <span className="text-xs font-mono text-slate-400 block mt-0.5">
-                  Captured: {lightboxImage.capturedAt}
-                </span>
+            <div className="flex items-center gap-3">
+              <div>
+                <DialogTitle className="text-base font-bold flex items-center gap-2">
+                  <Camera className="h-4 w-4 text-rose-500" />
+                  {activeLightboxItem?.title}
+                </DialogTitle>
+                {activeLightboxItem?.capturedAt && (
+                  <span className="text-xs font-mono text-slate-400 block mt-0.5">
+                    Captured: {activeLightboxItem.capturedAt}
+                  </span>
+                )}
+              </div>
+              {lightboxGallery && lightboxGallery.items.length > 1 && (
+                <Badge className="bg-slate-850 text-slate-300 font-mono text-xs border border-slate-750">
+                  {lightboxGallery.currentIndex + 1} / {lightboxGallery.items.length}
+                </Badge>
               )}
             </div>
           </DialogHeader>
 
-          <div className="relative w-full h-[70vh] max-h-[650px] bg-black rounded-lg overflow-hidden flex items-center justify-center my-2">
-            {lightboxImage?.url && (
+          <div className="relative w-full h-[70vh] max-h-[650px] bg-black rounded-lg overflow-hidden flex items-center justify-center my-2 group">
+            {activeLightboxItem?.url && (
               <img
-                src={lightboxImage.url}
-                alt={lightboxImage.title}
-                className="max-w-full max-h-full object-contain"
+                src={activeLightboxItem.url}
+                alt={activeLightboxItem.title}
+                className="max-w-full max-h-full object-contain select-none"
               />
+            )}
+
+            {/* Floating Left/Right Navigation Overlay Arrows */}
+            {lightboxGallery && lightboxGallery.items.length > 1 && (
+              <>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handlePrevLightbox();
+                  }}
+                  title="Previous image (Left Arrow)"
+                  className="absolute left-3 top-1/2 -translate-y-1/2 h-11 w-11 rounded-full bg-slate-900/80 hover:bg-slate-800 text-white flex items-center justify-center border border-slate-700/60 shadow-lg backdrop-blur-xs transition-all hover:scale-105 active:scale-95 z-20 cursor-pointer"
+                >
+                  <ChevronLeft className="h-6 w-6" />
+                </button>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleNextLightbox();
+                  }}
+                  title="Next image (Right Arrow)"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 h-11 w-11 rounded-full bg-slate-900/80 hover:bg-slate-800 text-white flex items-center justify-center border border-slate-700/60 shadow-lg backdrop-blur-xs transition-all hover:scale-105 active:scale-95 z-20 cursor-pointer"
+                >
+                  <ChevronRight className="h-6 w-6" />
+                </button>
+              </>
             )}
           </div>
 
-          <div className="flex justify-between items-center pt-2 border-t border-slate-850 text-xs">
+          <div className="flex flex-wrap justify-between items-center gap-2 pt-2 border-t border-slate-850 text-xs">
             <span className="font-mono text-slate-400 text-[11px]">
-              {lightboxImage?.eventType
-                ? `Type: ${lightboxImage.eventType}`
+              {activeLightboxItem?.eventType
+                ? `Type: ${activeLightboxItem.eventType}`
                 : "Proctor Telemetry Image"}
             </span>
-            {lightboxImage?.url && (
+
+            {/* Middle Prev / Next Navigation Controls */}
+            {lightboxGallery && lightboxGallery.items.length > 1 && (
+              <div className="flex items-center gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handlePrevLightbox}
+                  className="h-8 px-3 bg-slate-900 border-slate-750 text-slate-200 hover:bg-slate-800 hover:text-white text-xs flex items-center gap-1.5"
+                >
+                  <ChevronLeft className="h-4 w-4" /> Prev
+                </Button>
+                <span className="text-xs font-mono text-slate-300 px-1 font-semibold">
+                  {lightboxGallery.currentIndex + 1} of {lightboxGallery.items.length}
+                </span>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleNextLightbox}
+                  className="h-8 px-3 bg-slate-900 border-slate-750 text-slate-200 hover:bg-slate-800 hover:text-white text-xs flex items-center gap-1.5"
+                >
+                  Next <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+            )}
+
+            {activeLightboxItem?.url && (
               <a
-                href={lightboxImage.url}
+                href={activeLightboxItem.url}
                 target="_blank"
                 rel="noreferrer"
                 download="proctoring-frame.jpg"
