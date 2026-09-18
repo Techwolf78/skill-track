@@ -144,7 +144,7 @@ export default function Documentation() {
 
           <div className="flex items-center gap-2">
             <span className="font-extrabold text-base tracking-tight text-slate-900 flex items-center gap-1.5">
-              <span className="text-indigo-600">RxOne</span> docs
+              <span className="text-indigo-600">Gryphon</span> docs
             </span>
             <span className="rounded-full bg-slate-100 border border-slate-200 px-2 py-0.5 text-[11px] font-mono font-medium text-slate-600">
               v2.4
@@ -573,7 +573,7 @@ export default function Documentation() {
                     Architecture
                   </div>
                   <div className="font-semibold text-[11px] text-slate-900 leading-snug">
-                    RxOne High-Concurrency
+                    Gryphon 360 Platform
                   </div>
                   <Button
                     size="sm"

@@ -17,6 +17,7 @@ import { lazyWithRetry } from "./lib/lazyWithRetry";
 const Login = lazyWithRetry(() => import("./pages/Login"));
 const NotFound = lazyWithRetry(() => import("./pages/NotFound"));
 const NationalLandingPage = lazyWithRetry(() => import("./pages/NationalLandingPage"));
+const PublicHelpCenter = lazyWithRetry(() => import("./pages/PublicHelpCenter"));
 const AdminDashboard = lazyWithRetry(() => import("./pages/SuperAdmin/Dashboard"));
 const Organisations = lazyWithRetry(() => import("./pages/SuperAdmin/Organisations"));
 const Students = lazyWithRetry(() => import("./pages/SuperAdmin/SuperAdminCandidates"));
@@ -90,6 +91,9 @@ const App = () => (
               <Routes>
               <Route path="/" element={<NationalLandingPage />} />
               <Route path="/login" element={<Login />} />
+              <Route path="/help" element={<PublicHelpCenter />} />
+              <Route path="/help-center" element={<PublicHelpCenter />} />
+              <Route path="/status" element={<PublicHelpCenter />} />
               <Route path="/unauthorized" element={<Navigate to="/login" replace />} />
               {/* SuperAdmin Routes (SUPERADMIN role only) */}
               <Route

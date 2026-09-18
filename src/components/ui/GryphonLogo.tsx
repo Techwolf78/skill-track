@@ -44,8 +44,8 @@ export const GryphonLogo: React.FC<GryphonLogoProps> = ({
     variant === "dark"
       ? "text-white"
       : variant === "light"
-      ? "text-slate-900"
-      : "text-slate-900 dark:text-white";
+        ? "text-slate-900"
+        : "text-slate-900 dark:text-white";
 
   const primaryIndigoColor =
     variant === "dark"
@@ -53,7 +53,9 @@ export const GryphonLogo: React.FC<GryphonLogoProps> = ({
       : "text-indigo-600 dark:text-indigo-400";
 
   return (
-    <div className={`inline-flex items-center select-none group ${sizeMap.gap} ${className}`}>
+    <div
+      className={`inline-flex items-center select-none group ${sizeMap.gap} ${className}`}
+    >
       {/* 🦅 Authentic G+A Geometric Emblem (Crisp White in Dark mode, Silver in Light mode) */}
       <div className="shrink-0 flex items-center justify-center transition-transform duration-300 group-hover:scale-105">
         {variant === "dark" ? (
@@ -87,10 +89,14 @@ export const GryphonLogo: React.FC<GryphonLogoProps> = ({
       {/* 🏛️ VISA-Inspired Bold Italic Wordmark with Electric Indigo 360° */}
       {!iconOnly && (
         <div className="font-heading font-black italic uppercase leading-none flex items-baseline tracking-[-0.045em]">
-          <span className={`${sizeMap.text} ${primaryTextColor} transition-colors`}>
+          <span
+            className={`${sizeMap.text} ${primaryTextColor} transition-colors`}
+          >
             GRYPHON
           </span>
-          <span className={`${primaryIndigoColor} ${sizeMap.num} transition-colors ml-0.5`}>
+          <span
+            className={`${primaryIndigoColor} ${sizeMap.num} transition-colors ml-0.5`}
+          >
             360°
           </span>
         </div>

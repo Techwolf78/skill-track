@@ -35,12 +35,24 @@ import {
   Code2,
   Terminal,
   Sparkles,
-  Check,
-  Loader2,
   FileText,
   ShieldCheck,
   Download,
+  Eye,
+  Mic,
+  Video,
+  Check,
+  Loader2,
+  X,
+  HelpCircle,
+  LifeBuoy,
 } from "lucide-react";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 import { useNavigate } from "react-router-dom";
 import { GryphonLogo } from "@/components/ui/GryphonLogo";
 
@@ -92,24 +104,24 @@ const stats = [
 
 const testimonials = [
   {
-    name: "Dr. Rajesh Kumar",
-    role: "Director, IIT Delhi",
+    name: "Dr. Nilesh Uke",
+    role: "Principal, ICEM Pune (Indira Group)",
     content:
-      "Gryphon 360 has revolutionized our assessment process. The anti-cheating features and detailed analytics have helped us maintain academic integrity while providing valuable insights.",
+      "Gryphon 360 has transformed how we conduct semester examinations and placement readiness tests at ICEM Pune. The AI proctoring and deep performance analytics ensure complete academic integrity across all engineering departments.",
     rating: 5,
   },
   {
-    name: "Priya Sharma",
-    role: "HR Director, TCS",
+    name: "Hon. Amit Kolhe",
+    role: "Managing Trustee & President, Sanjivani Kopargaon",
     content:
-      "The platform's scalability and customization options make it perfect for our large-scale recruitment drives. The automated evaluation saves us countless hours.",
+      "The platform's scalability and automated evaluation have streamlined our campus recruitment drives and institutional assessments. It saves our faculty countless hours while delivering benchmark reliability.",
     rating: 5,
   },
   {
-    name: "Prof. Amit Patel",
-    role: "Dean, Engineering College",
+    name: "Mr. Manish Kothari",
+    role: "Founder & Managing Director, ISBR Bangalore",
     content:
-      "Outstanding platform for conducting online examinations. The real-time monitoring and comprehensive reporting features are exactly what we needed.",
+      "Outstanding platform for evaluating modern management and technical skills. The real-time proctoring monitoring and instant candidate scorecards provide our recruiters and students with unmatched precision.",
     rating: 5,
   },
 ];
@@ -138,6 +150,44 @@ const useCases = [
     title: "Government Programs",
     description:
       "Manage large-scale skill development initiatives with secure, scalable assessment solutions.",
+  },
+];
+
+const proctoringFaqs = [
+  {
+    id: "landing-faq-1",
+    question: "How does Gryphon 360 AI proctoring monitor candidate integrity during exams?",
+    badge: "AI Proctoring",
+    answer:
+      "Gryphon 360 leverages real-time client-side neural networks running directly inside the candidate's browser. It monitors 468 facial mesh landmarks, iris gaze vectors (flags sustained looking away), multi-face presence, and acoustic speech levels. Combined with our strict 3-strike tab switch policy and anti-paste clipboard protection, the platform guarantees foolproof academic integrity.",
+  },
+  {
+    id: "landing-faq-2",
+    question: "How does Gryphon 360 protect candidate data privacy and biometric compliance?",
+    badge: "GDPR & Privacy",
+    answer:
+      "Gryphon 360 operates on strict data minimization principles under GDPR (Articles 9 & 32), ISO 27001, and the Indian DPDP Act 2023. Biometric telemetry (mesh landmarks and gaze vectors) is calculated ephemerally at the client edge and never permanently stored. All test session logs are encrypted end-to-end via TLS 1.3 and AES-256.",
+  },
+  {
+    id: "landing-faq-3",
+    question: "What happens if a student's internet disconnects or laptop crashes mid-test?",
+    badge: "Auto-Save Resilience",
+    answer:
+      "Gryphon 360 features an Offline-First Resilience Engine. Every question response, essay draft, and line of code is continuously cached in local browser storage in real time. When connectivity is restored, all data automatically syncs with our servers without timer loss or progress reset.",
+  },
+  {
+    id: "landing-faq-4",
+    question: "What are the device, browser, and hardware requirements for proctored tests?",
+    badge: "Hardware & Setup",
+    answer:
+      "Candidates only need a standard laptop or desktop computer running Google Chrome, Microsoft Edge, Mozilla Firefox, or Apple Safari with a working webcam, microphone, and a basic internet connection (512 kbps+). An automated 15-second pre-flight diagnostic verifies all hardware before the test begins.",
+  },
+  {
+    id: "landing-faq-5",
+    question: "Can candidates be automatically disqualified by AI without human verification?",
+    badge: "Human-in-the-Loop",
+    answer:
+      "Never. Our AI engine only acts as an intelligent assistant, flagging potential anomalies on a synchronized timestamped audit timeline. Disqualifications or score adjustments are strictly performed by authorized faculty members or organizational recruiters after inspecting the logged evidence.",
   },
 ];
 
@@ -202,6 +252,169 @@ function BentoCard({
         {children}
       </div>
     </motion.div>
+  );
+}
+
+function RealTimeTimerWidget() {
+  const [timeLeft, setTimeLeft] = useState(42 * 60 + 15); // Starts at 00:42:15 (2535s)
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setTimeLeft((prev) => {
+        if (prev <= 1) {
+          return 60 * 60; // Reset to 00:60:00 (3600s)
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const formatTimer = (totalSeconds: number) => {
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+    return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+  };
+
+  return (
+    <div className="mt-6 border border-slate-200/80 bg-slate-50/80 rounded-2xl p-4 flex flex-col gap-3 shadow-sm">
+      <div className="flex items-center justify-between">
+        <div>
+          <span className="text-[9px] text-slate-400 uppercase font-semibold tracking-wider font-mono block">
+            Time Remaining
+          </span>
+          <span className="text-lg font-mono font-extrabold text-slate-900 tracking-wider">
+            {formatTimer(timeLeft)}
+          </span>
+        </div>
+        <span className="px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 font-semibold text-[10px] border border-emerald-200/80 flex items-center gap-1.5 shadow-sm">
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+          Live Session
+        </span>
+      </div>
+      <div className="w-full bg-slate-200 rounded-full h-1.5 overflow-hidden">
+        <div className="bg-gradient-to-r from-indigo-600 to-emerald-500 h-full w-[88%] rounded-full" />
+      </div>
+      <div className="flex justify-between items-center text-[10px] font-mono text-slate-500">
+        <span>Answered: 44/50</span>
+        <span className="text-emerald-600 font-semibold">88% Complete</span>
+      </div>
+    </div>
+  );
+}
+
+function CandidateFilterShowcase() {
+  const candidates = [
+    {
+      name: "Priya Sharma",
+      role: "Frontend Dev",
+      score: "64%",
+      shortlisted: false,
+      image: "/cand-1.jpg",
+    },
+    {
+      name: "Rahul Verma",
+      role: "Senior Full-Stack",
+      score: "98.5%",
+      shortlisted: true,
+      image: "/cand-2.jpg",
+    },
+    {
+      name: "Sarah Jenkins",
+      role: "Backend Python",
+      score: "58%",
+      shortlisted: false,
+      image: "/cand-3.jpg",
+    },
+    {
+      name: "Emily Watson",
+      role: "Cloud Architect",
+      score: "71%",
+      shortlisted: false,
+      image: "/cand-4.jpg?v=2",
+    },
+  ];
+
+  return (
+    <div className="relative max-w-md mx-auto">
+      {/* Soft Ambient Glow */}
+      <div className="absolute -inset-4 bg-gradient-to-tr from-indigo-500/15 via-violet-500/10 to-transparent rounded-3xl blur-2xl pointer-events-none" />
+
+      <div className="relative grid grid-cols-2 gap-3 sm:gap-3.5">
+        {candidates.map((cand, idx) => (
+          <div
+            key={idx}
+            className="relative rounded-2xl sm:rounded-[22px] overflow-hidden aspect-square shadow-md border border-slate-200/80 bg-slate-900 transition-all duration-300 group hover:-translate-y-1 hover:shadow-xl"
+          >
+            {/* Full-bleed Portrait Photo */}
+            <img
+              src={cand.image}
+              alt={cand.name}
+              className={`w-full h-full object-cover object-top transition-transform duration-500 group-hover:scale-105 ${
+                cand.shortlisted
+                  ? "filter brightness-100 contrast-105"
+                  : "filter grayscale-[30%] opacity-85"
+              }`}
+            />
+
+            {/* Smooth Vignette Gradient Scrim for Bottom Overlay */}
+            <div
+              className={`absolute inset-0 bg-gradient-to-t pointer-events-none ${
+                cand.shortlisted
+                  ? "from-indigo-950/95 via-indigo-950/30 to-transparent"
+                  : "from-slate-950/90 via-slate-950/25 to-transparent"
+              }`}
+            />
+
+            {/* Top-Left Status Badge */}
+            <div className="absolute top-2.5 left-2.5 z-10">
+              {cand.shortlisted ? (
+                <div className="w-6 h-6 rounded-full bg-emerald-500 text-white flex items-center justify-center shadow-md ring-2 ring-white/70">
+                  <Check className="w-3 h-3 stroke-[3]" />
+                </div>
+              ) : (
+                <div className="w-6 h-6 rounded-full bg-rose-500 text-white flex items-center justify-center shadow-md">
+                  <X className="w-3 h-3 stroke-[3]" />
+                </div>
+              )}
+            </div>
+
+            {/* Bottom Overlay Info */}
+            <div className="absolute bottom-2.5 left-2.5 right-2.5 z-10 flex flex-col gap-0.5">
+              <div className="flex items-center justify-between">
+                <span className="text-white font-bold text-xs tracking-tight drop-shadow-sm truncate">
+                  {cand.name}
+                </span>
+                <span
+                  className={`px-1.5 py-0.5 rounded-full text-[9px] font-mono font-bold backdrop-blur-md shadow-sm ${
+                    cand.shortlisted
+                      ? "bg-emerald-500 text-white"
+                      : "bg-black/60 text-slate-200 border border-white/10"
+                  }`}
+                >
+                  {cand.score}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] text-white/75 font-medium truncate">
+                  {cand.role}
+                </span>
+                {cand.shortlisted ? (
+                  <span className="text-[9px] font-bold text-emerald-300">
+                    SHORTLISTED
+                  </span>
+                ) : (
+                  <span className="text-[9px] font-semibold text-rose-300/90">
+                    DISQUALIFIED
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -593,6 +806,7 @@ export default function NationalLandingPage() {
                   { id: "features", label: "Features", icon: Sparkles },
                   { id: "industries", label: "Industries", icon: Building },
                   { id: "testimonials", label: "Testimonials", icon: Users },
+                  { id: "faq", label: "FAQs", icon: HelpCircle },
                   { id: "contact", label: "Contact", icon: Mail },
                 ].map((item) => {
                   const Icon = item.icon;
@@ -624,6 +838,7 @@ export default function NationalLandingPage() {
                   { id: "features", label: "Features" },
                   { id: "industries", label: "Industries" },
                   { id: "testimonials", label: "Testimonials" },
+                  { id: "faq", label: "FAQs" },
                   { id: "contact", label: "Contact" },
                 ].map((item) => (
                   <a
@@ -850,7 +1065,9 @@ export default function NationalLandingPage() {
                       Advanced Anti-Cheating
                     </h3>
                     <p className="text-slate-600 leading-relaxed text-sm">
-                      AI proctoring with live gaze monitoring, tab-switch lockouts, and automated integrity validation. Maintain total exam integrity.
+                      AI proctoring with live gaze monitoring, tab-switch
+                      lockouts, and automated integrity validation. Maintain
+                      total exam integrity.
                     </p>
                   </div>
                   <div className="mt-6 flex items-center gap-2 text-xs font-semibold text-indigo-600">
@@ -860,35 +1077,77 @@ export default function NationalLandingPage() {
                 </div>
 
                 {/* Visual Mock: Clean Minimalist Live Proctor Stream */}
-                <div className="relative border border-slate-200/80 bg-slate-900 rounded-2xl overflow-hidden shadow-lg h-52 flex flex-col justify-between p-3 group/cam">
+                <div className="relative border border-slate-200/90 bg-slate-950 rounded-2xl overflow-hidden shadow-xl h-56 flex flex-col justify-between p-3.5 group/cam">
                   {/* Candidate Live Webcam Image Feed */}
                   <img
                     src="/live-proctor-feed.jpg"
                     alt="Live Candidate Assessment Feed"
-                    className="absolute inset-0 w-full h-full object-cover object-top opacity-90 filter contrast-105 brightness-95 transition-transform duration-700 ease-out group-hover/cam:scale-105"
+                    className="absolute inset-0 w-full h-full object-cover object-center transition-transform duration-700 ease-out group-hover/cam:scale-105"
                   />
-                  {/* Smooth subtle vignette */}
-                  <div className="absolute inset-0 bg-gradient-to-t from-slate-950/70 via-transparent to-slate-950/30 pointer-events-none" />
+                  {/* Smooth cinematic gradient for crisp text contrast */}
+                  <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-transparent to-black/55 pointer-events-none" />
 
-                  {/* Top Bar: Clean status pill */}
+                  {/* Top Bar: Ultra-sleek compact glass status pills */}
                   <div className="relative z-10 flex justify-between items-center w-full">
-                    <span className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-950/80 backdrop-blur-md border border-white/10 text-[10px] text-emerald-400 font-medium tracking-wide shadow-sm font-mono">
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                      Live Proctoring
-                    </span>
-                    <span className="px-2.5 py-0.5 rounded-full bg-slate-950/80 border border-white/10 backdrop-blur-md text-[9px] text-slate-300 font-mono">
-                      Cam-01
-                    </span>
+                    <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-black/65 backdrop-blur-md border border-white/15 text-white shadow-md">
+                      <span className="relative flex h-1.5 w-1.5">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-rose-500"></span>
+                      </span>
+                      <span className="text-[8px] font-bold tracking-wider font-mono uppercase text-white">
+                        REC
+                      </span>
+                      <span className="text-white/30 text-[7px]">•</span>
+                      <span className="text-[8.5px] text-emerald-400 font-semibold font-sans">
+                        Live AI Proctor
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-black/65 backdrop-blur-md border border-white/15 text-slate-200 text-[8.5px] font-mono shadow-md">
+                      <Video className="w-2.5 h-2.5 text-indigo-400" />
+                      <span>Cam-01</span>
+                    </div>
                   </div>
 
-                  {/* Bottom: Clean Single Floating Pill */}
-                  <div className="relative z-10 w-full flex items-center justify-between px-3.5 py-2 bg-slate-950/80 backdrop-blur-md rounded-xl border border-white/10 text-[10px] font-mono text-slate-200 shadow-xl">
-                    <span className="flex items-center gap-1.5">
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-                      <span>Gaze: <strong className="text-white font-semibold">98% Locked</strong></span>
-                    </span>
-                    <span className="text-slate-500">•</span>
-                    <span className="text-slate-300">0 Violations</span>
+                  {/* AI Facial Detection Frame: Accurately framed on candidate face */}
+                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10 -translate-y-1.5">
+                    <div
+                      style={{ width: "115px", height: "125px" }}
+                      className="relative rounded-xl border border-cyan-400/30 bg-transparent transition-transform duration-500 group-hover/cam:scale-105"
+                    >
+                      {/* 4 Corner Neon Reticles */}
+                      <span className="absolute -top-1 -left-1 w-3.5 h-3.5 border-t-2 border-l-2 border-cyan-400 rounded-tl-sm shadow-[0_0_8px_rgba(34,211,238,0.6)]" />
+                      <span className="absolute -top-1 -right-1 w-3.5 h-3.5 border-t-2 border-r-2 border-cyan-400 rounded-tr-sm shadow-[0_0_8px_rgba(34,211,238,0.6)]" />
+                      <span className="absolute -bottom-1 -left-1 w-3.5 h-3.5 border-b-2 border-l-2 border-cyan-400 rounded-bl-sm shadow-[0_0_8px_rgba(34,211,238,0.6)]" />
+                      <span className="absolute -bottom-1 -right-1 w-3.5 h-3.5 border-b-2 border-r-2 border-cyan-400 rounded-br-sm shadow-[0_0_8px_rgba(34,211,238,0.6)]" />
+                    </div>
+                  </div>
+
+                  {/* Bottom: Ultra-sleek DJI/Vision Pro frosted telemetry bar */}
+                  <div className="relative z-10 w-full flex items-center justify-between px-3 py-1.5 bg-black/75 backdrop-blur-xl rounded-lg border border-white/15 text-white shadow-xl">
+                    <div className="flex items-center gap-1.5">
+                      <Eye className="w-3 h-3 text-emerald-400" />
+                      <span className="text-slate-300 text-[8.5px]">Gaze:</span>
+                      <span className="font-semibold text-emerald-400 font-mono text-[8.5px]">
+                        98% Locked
+                      </span>
+                    </div>
+                    <span className="h-2.5 w-px bg-white/20" />
+                    <div className="flex items-center gap-1.5">
+                      <Mic className="w-3 h-3 text-indigo-400" />
+                      <span className="text-slate-300 text-[8.5px]">
+                        Audio:
+                      </span>
+                      <span className="font-semibold text-slate-100 text-[8.5px]">
+                        Normal
+                      </span>
+                    </div>
+                    <span className="h-2.5 w-px bg-white/20" />
+                    <div className="flex items-center gap-1.5">
+                      <ShieldCheck className="w-3 h-3 text-emerald-400" />
+                      <span className="font-semibold text-emerald-400 text-[8.5px]">
+                        0 Flags
+                      </span>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -921,7 +1180,8 @@ export default function NationalLandingPage() {
                     Comprehensive Analytics
                   </h3>
                   <p className="text-slate-600 leading-relaxed text-xs sm:text-sm">
-                    Detailed performance insights with customizable reports, psychometric scoring, and exportable cohort data.
+                    Detailed performance insights with customizable reports,
+                    psychometric scoring, and exportable cohort data.
                   </p>
                 </div>
 
@@ -945,8 +1205,13 @@ export default function NationalLandingPage() {
                   </div>
 
                   <div className="flex justify-between items-center text-[10px] font-mono text-slate-500 border-t border-slate-200/80 pt-2">
-                    <span>Accuracy: <strong className="text-slate-800">98.4%</strong></span>
-                    <span className="text-indigo-600 font-semibold">Top 5% Cohort</span>
+                    <span>
+                      Accuracy:{" "}
+                      <strong className="text-slate-800">98.4%</strong>
+                    </span>
+                    <span className="text-indigo-600 font-semibold">
+                      Top 5% Cohort
+                    </span>
                   </div>
                 </div>
               </div>
@@ -967,34 +1232,13 @@ export default function NationalLandingPage() {
                     Real-time Assessment
                   </h3>
                   <p className="text-slate-600 leading-relaxed text-sm">
-                    Instant evaluation with automated test grading and immediate candidate feedback.
+                    Live test session monitoring with real-time candidate
+                    progress tracking and instant scorecard generation.
                   </p>
                 </div>
 
                 {/* Visual Mock: Clean Countdown & Live Grading */}
-                <div className="mt-6 border border-slate-200/80 bg-slate-50/80 rounded-2xl p-4 flex flex-col gap-3 shadow-sm">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <span className="text-[9px] text-slate-400 uppercase font-semibold tracking-wider font-mono block">
-                        Time Remaining
-                      </span>
-                      <span className="text-lg font-mono font-extrabold text-slate-900 tracking-wider">
-                        00:42:15
-                      </span>
-                    </div>
-                    <span className="px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-600 font-semibold text-[10px] border border-emerald-200 flex items-center gap-1.5 shadow-sm">
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                      Auto-Graded
-                    </span>
-                  </div>
-                  <div className="w-full bg-slate-200 rounded-full h-1.5 overflow-hidden">
-                    <div className="bg-gradient-to-r from-indigo-600 to-emerald-500 h-full w-[88%] rounded-full" />
-                  </div>
-                  <div className="flex justify-between text-[10px] font-mono text-slate-500">
-                    <span>Evaluated: 44/50</span>
-                    <span className="text-emerald-600 font-semibold">88% Complete</span>
-                  </div>
-                </div>
+                <RealTimeTimerWidget />
               </div>
             </BentoCard>
 
@@ -1031,7 +1275,8 @@ export default function NationalLandingPage() {
                   Custom Test Builder
                 </h3>
                 <p className="text-slate-600 leading-relaxed text-xs font-medium">
-                  Build assessments with coding challenges, MCQs, and adaptive difficulty.
+                  Build assessments with coding challenges, MCQs, and adaptive
+                  difficulty.
                 </p>
               </div>
             </BentoCard>
@@ -1051,7 +1296,8 @@ export default function NationalLandingPage() {
                     Multi-user Management
                   </h3>
                   <p className="text-slate-600 leading-relaxed text-sm">
-                    Granular role-based access control for administrators, recruiters, trainers, and candidates.
+                    Granular role-based access control for administrators,
+                    recruiters, trainers, and candidates.
                   </p>
                 </div>
 
@@ -1075,7 +1321,9 @@ export default function NationalLandingPage() {
                   </div>
                   <div className="flex justify-between items-center text-[10px] font-mono text-slate-500 border-t border-slate-200/80 pt-2">
                     <span>Admin • Trainer • Student</span>
-                    <span className="text-emerald-600 font-semibold">Ready ✓</span>
+                    <span className="text-emerald-600 font-semibold">
+                      Ready ✓
+                    </span>
                   </div>
                 </div>
               </div>
@@ -1097,7 +1345,9 @@ export default function NationalLandingPage() {
                       Detailed Candidate Reports
                     </h3>
                     <p className="text-slate-600 leading-relaxed text-sm">
-                      Generate comprehensive evaluation dossiers with automated scoring breakdowns, proctoring violation logs, and downloadable audit reports.
+                      Generate comprehensive evaluation dossiers with automated
+                      scoring breakdowns, proctoring violation logs, and
+                      downloadable audit reports.
                     </p>
                   </div>
                   <div className="mt-6 flex items-center gap-2 text-xs font-semibold text-indigo-600">
@@ -1125,16 +1375,28 @@ export default function NationalLandingPage() {
 
                   <div className="grid grid-cols-3 gap-2 bg-slate-100/70 border border-slate-200/70 rounded-xl p-2.5 text-center font-mono">
                     <div>
-                      <span className="text-[8px] text-slate-400 uppercase block">Integrity</span>
-                      <span className="text-[11px] font-bold text-emerald-600">99.4%</span>
+                      <span className="text-[8px] text-slate-400 uppercase block">
+                        Integrity
+                      </span>
+                      <span className="text-[11px] font-bold text-emerald-600">
+                        99.4%
+                      </span>
                     </div>
                     <div>
-                      <span className="text-[8px] text-slate-400 uppercase block">Time</span>
-                      <span className="text-[11px] font-bold text-slate-700">42m 15s</span>
+                      <span className="text-[8px] text-slate-400 uppercase block">
+                        Time
+                      </span>
+                      <span className="text-[11px] font-bold text-slate-700">
+                        42m 15s
+                      </span>
                     </div>
                     <div>
-                      <span className="text-[8px] text-slate-400 uppercase block">Violations</span>
-                      <span className="text-[11px] font-bold text-emerald-600">0 Flags</span>
+                      <span className="text-[8px] text-slate-400 uppercase block">
+                        Violations
+                      </span>
+                      <span className="text-[11px] font-bold text-emerald-600">
+                        0 Flags
+                      </span>
                     </div>
                   </div>
 
@@ -1158,13 +1420,7 @@ export default function NationalLandingPage() {
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-16 items-center">
             {/* Left Column: Interactive Candidate Grid (4 Cards) */}
             <div className="lg:col-span-6">
-              <div className="w-full">
-                <img
-                  src="final-fuss-bg.png"
-                  alt="Find the best candidate. No fuss."
-                  className="w-full h-auto rounded-2xl shadow-sm"
-                />
-              </div>
+              <CandidateFilterShowcase />
             </div>
 
             {/* Right Column: Copy & Actions */}
@@ -1183,9 +1439,9 @@ export default function NationalLandingPage() {
                 </h2>
 
                 <p className="text-base md:text-lg text-slate-600 leading-relaxed">
-                  Evalart’s online evaluations can pre-filter candidates to
-                  identify the best applicants and significantly reduce the
-                  number of candidates who require an interview.
+                  Our AI-powered online evaluations pre-filter candidates to
+                  identify top performers and significantly reduce the number of
+                  applicants who require manual interviews.
                 </p>
 
                 <p className="text-base md:text-lg text-slate-900 leading-relaxed">
@@ -1672,7 +1928,7 @@ export default function NationalLandingPage() {
           >
             {/* The entire graphic image set as full background without cover clipping */}
             <img
-              src="/skill-track-footer-idea.avif"
+              src="/footer-banner-indigo.png"
               alt="Footer illustration"
               className="w-full h-auto block object-contain select-none pointer-events-none"
             />
@@ -1698,6 +1954,64 @@ export default function NationalLandingPage() {
                 </Button>
               </div>
             </div>
+          </motion.div>
+        </div>
+      </section>
+
+      {/* AI Proctoring & Candidate FAQs Section */}
+      <section
+        id="faq"
+        className="py-24 relative overflow-hidden bg-white border-b border-slate-200/80"
+      >
+        {/* Subtle Ambient Background */}
+        <div className="absolute top-1/3 right-1/4 w-[500px] h-[350px] bg-gradient-to-br from-indigo-500/5 to-transparent rounded-full blur-[120px] pointer-events-none -z-10" />
+
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+          <div className="text-center mb-14">
+            <motion.div
+              initial={{ opacity: 0, y: 15 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.5 }}
+            >
+              <h2 className="text-3xl md:text-5xl font-heading font-extrabold text-slate-900 tracking-tight">
+                Frequently Asked Questions
+              </h2>
+              <p className="text-base sm:text-lg text-slate-600 max-w-2xl mx-auto mt-3">
+                Clear answers regarding AI proctoring intelligence, student data privacy, offline auto-recovery, and academic integrity.
+              </p>
+            </motion.div>
+          </div>
+
+          {/* Accordion List */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.6, delay: 0.1 }}
+            className="rounded-2xl border border-slate-200/90 bg-slate-50/50 p-4 sm:p-6 shadow-xs divide-y divide-slate-200/70"
+          >
+            <Accordion
+              type="single"
+              collapsible
+              defaultValue="landing-faq-1"
+              className="w-full"
+            >
+              {proctoringFaqs.map((faq) => (
+                <AccordionItem
+                  key={faq.id}
+                  value={faq.id}
+                  className="border-b border-slate-200/70 last:border-0 py-2"
+                >
+                  <AccordionTrigger className="text-left font-bold text-base sm:text-lg text-slate-900 hover:text-indigo-600 transition-colors hover:no-underline py-3">
+                    <span className="pr-2">{faq.question}</span>
+                  </AccordionTrigger>
+                  <AccordionContent className="text-sm sm:text-base text-slate-600 leading-relaxed pl-1 pb-4">
+                    <p>{faq.answer}</p>
+                  </AccordionContent>
+                </AccordionItem>
+              ))}
+            </Accordion>
           </motion.div>
         </div>
       </section>
@@ -1998,10 +2312,10 @@ export default function NationalLandingPage() {
                 </li>
                 <li>
                   <a
-                    href="#"
+                    href="#faq"
                     className="hover:text-primary transition-colors duration-200"
                   >
-                    Pricing
+                    FAQs & Proctoring
                   </a>
                 </li>
                 <li>
@@ -2072,7 +2386,7 @@ export default function NationalLandingPage() {
               <ul className="space-y-3 text-sm">
                 <li>
                   <a
-                    href="#"
+                    href="/help"
                     className="hover:text-primary transition-colors duration-200"
                   >
                     Help Center
@@ -2080,7 +2394,7 @@ export default function NationalLandingPage() {
                 </li>
                 <li>
                   <a
-                    href="#"
+                    href="/help?category=developer"
                     className="hover:text-primary transition-colors duration-200"
                   >
                     Documentation
@@ -2088,17 +2402,18 @@ export default function NationalLandingPage() {
                 </li>
                 <li>
                   <a
-                    href="#"
+                    href="/help?tab=faqs"
                     className="hover:text-primary transition-colors duration-200"
                   >
-                    Community
+                    Community & FAQs
                   </a>
                 </li>
                 <li>
                   <a
-                    href="#"
-                    className="hover:text-primary transition-colors duration-200"
+                    href="/status"
+                    className="hover:text-primary transition-colors duration-200 flex items-center gap-1.5"
                   >
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
                     Platform Status
                   </a>
                 </li>
@@ -2109,8 +2424,8 @@ export default function NationalLandingPage() {
           {/* Bottom Copyright Bar */}
           <div className="border-t border-slate-900 mt-12 pt-8 flex flex-col md:flex-row items-center justify-between gap-4 text-xs text-slate-500">
             <p className="order-2 md:order-1">
-              &copy; 2026 Gryphon 360. All rights reserved. Made with ❤️ for India's
-              education sector.
+              &copy; 2026 Gryphon 360. All rights reserved. Made with ❤️ for
+              India's education sector.
             </p>
             <div className="flex gap-6 order-1 md:order-2">
               <a href="#" className="hover:text-slate-400 transition-colors">
