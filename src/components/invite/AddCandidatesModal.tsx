@@ -161,17 +161,26 @@ export function AddCandidatesModal({
     });
   };
 
+  const handleRemoveBulkFile = () => {
+    setBulkFile(null);
+    setBulkError(null);
+    setParsedBulkCandidates([]);
+    setBulkStep("upload");
+  };
+
   const handleBulkFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selected = e.target.files?.[0];
     if (selected) {
       const ext = selected.name.substring(selected.name.lastIndexOf(".")).toLowerCase();
       if (![".csv", ".xlsx", ".xls"].includes(ext)) {
         setBulkError("Please upload a valid CSV or Excel file (.xlsx, .xls, .csv).");
-        setBulkFile(null);
+        handleRemoveBulkFile();
         return;
       }
       setBulkFile(selected);
       setBulkError(null);
+      setParsedBulkCandidates([]);
+      setBulkStep("upload");
     }
   };
 
@@ -207,28 +216,134 @@ export function AddCandidatesModal({
       const ws = wb.Sheets[wb.SheetNames[0]];
       const rows: Record<string, unknown>[] = XLSX.utils.sheet_to_json(ws);
 
-      const parsed = rows
-        .map((r) => {
-          const name = String(r["Name"] || r["name"] || r["Full Name"] || "");
-          const email = String(r["Email"] || r["email"] || r["EMAIL"] || "").trim();
-          const phoneNumber = String(r["PhoneNumber"] || r["Phone"] || r["phone"] || "");
-          return { name, email, phoneNumber, status: "SUCCESS" as const };
-        })
-        .filter((c) => Boolean(c.email));
+      const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      const validCandidates: Array<{ name: string; email: string; phoneNumber?: string; status: "SUCCESS" | "FAILED"; errorMessage?: string }> = [];
+      let localOmittedCount = 0;
 
-      if (parsed.length === 0) {
-        throw new Error("No candidate rows with valid email addresses found.");
+      for (const r of rows) {
+        const entries = Object.entries(r);
+        let name = "";
+        let rawEmail = "";
+        let phoneNumber = "";
+
+        // 1. Check normalized column headers (case/space/punctuation-insensitive)
+        for (const [key, val] of entries) {
+          const normKey = key.trim().toLowerCase().replace(/[\s_\-\.]+/g, "");
+          const strVal = String(val ?? "").trim();
+          if (!strVal) continue;
+
+          if (
+            !rawEmail &&
+            (normKey === "email" ||
+              normKey === "emailid" ||
+              normKey === "emailaddress" ||
+              normKey === "candidateemail" ||
+              normKey === "studentemail" ||
+              normKey === "mail" ||
+              normKey === "useremail")
+          ) {
+            rawEmail = strVal;
+          } else if (
+            !name &&
+            (normKey === "name" ||
+              normKey === "fullname" ||
+              normKey === "candidatename" ||
+              normKey === "studentname" ||
+              normKey === "firstname" ||
+              normKey === "nameofstudent" ||
+              normKey === "nameofcandidate" ||
+              normKey === "username")
+          ) {
+            name = strVal;
+          } else if (
+            !phoneNumber &&
+            (normKey === "phone" ||
+              normKey === "phonenumber" ||
+              normKey === "mobile" ||
+              normKey === "mobilenumber" ||
+              normKey === "mobileno" ||
+              normKey === "contact" ||
+              normKey === "contactnumber" ||
+              normKey === "contactno")
+          ) {
+            phoneNumber = strVal;
+          }
+        }
+
+        // 2. Fallback email value auto-detection (scan cell values)
+        if (!rawEmail) {
+          for (const [, val] of entries) {
+            const strVal = String(val ?? "").trim();
+            if (strVal.includes("@") && strVal.includes(".")) {
+              const cleaned = strVal.replace(/\s+/g, "");
+              if (EMAIL_REGEX.test(cleaned)) {
+                rawEmail = cleaned;
+                break;
+              }
+            }
+          }
+        }
+
+        // Sanitize internal whitespace in email (e.g. "user@ domain.com")
+        const email = rawEmail ? rawEmail.replace(/\s+/g, "") : "";
+
+        // 3. Fallback name: first non-email text cell or email prefix
+        if (!name && email) {
+          for (const [, val] of entries) {
+            const strVal = String(val ?? "").trim();
+            if (strVal && !strVal.includes("@") && strVal !== phoneNumber && isNaN(Number(strVal))) {
+              name = strVal;
+              break;
+            }
+          }
+          if (!name) {
+            name = email.split("@")[0];
+          }
+        }
+
+        // Skip completely blank rows
+        if (!name && !email) {
+          continue;
+        }
+
+        // Omit rows with invalid email
+        if (!email || !EMAIL_REGEX.test(email)) {
+          localOmittedCount++;
+          continue;
+        }
+
+        validCandidates.push({
+          name: name || email.split("@")[0],
+          email,
+          phoneNumber: phoneNumber || undefined,
+          status: "SUCCESS" as const,
+        });
+      }
+
+      if (validCandidates.length === 0) {
+        throw new Error("No valid candidate rows found. Please ensure at least Name and a valid Email address are provided.");
       }
 
       const formData = new FormData();
       formData.append("file", bulkFile);
       formData.append("organisationId", orgId);
 
-      await apiClient.post("/candidates/bulk-upload", formData, {
+      const uploadRes = await apiClient.post("/candidates/bulk-upload", formData, {
         headers: { "Content-Type": "multipart/form-data" },
       });
 
-      setParsedBulkCandidates(parsed);
+      const responseData = uploadRes.data?.data || uploadRes.data;
+      const backendFailCount = responseData?.failCount || 0;
+      const totalOmitted = Math.max(localOmittedCount, backendFailCount);
+
+      if (totalOmitted > 0) {
+        toast({
+          title: "Import Completed with Omissions",
+          description: `Loaded ${validCandidates.length} valid candidate(s). ${totalOmitted} invalid row(s) were omitted.`,
+        });
+      }
+
+      setParsedBulkCandidates(validCandidates);
       setBulkStep("review");
     } catch (err) {
       const errorObj = err as { response?: { data?: { message?: string } }; message?: string };
@@ -1050,7 +1165,7 @@ export function AddCandidatesModal({
                           </div>
                           <button
                             type="button"
-                            onClick={() => setBulkFile(null)}
+                            onClick={handleRemoveBulkFile}
                             className="text-xs font-medium text-red-600 hover:underline shrink-0 ml-2"
                           >
                             Remove
