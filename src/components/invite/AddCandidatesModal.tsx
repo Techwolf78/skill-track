@@ -38,7 +38,6 @@ import {
   ChevronsRight,
   Plus,
   Trash2,
-  KeyRound,
   CheckCircle2,
   AlertTriangle,
   RefreshCw,
@@ -392,7 +391,6 @@ export function AddCandidatesModal({
   const [createForm, setCreateForm] = useState({
     name: "",
     email: "",
-    password: "",
     phoneNumber: "",
   });
   const [customFields, setCustomFields] = useState<Array<{ key: string; value: string }>>([]);
@@ -519,13 +517,21 @@ export function AddCandidatesModal({
   };
 
   // Generate random strong password
-  const generatePassword = () => {
-    const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%";
+  const generateSecurePassword = () => {
+    const upper = "ABCDEFGHJKLMNPQRSTUVWXYZ";
+    const lower = "abcdefghijkmnopqrstuvwxyz";
+    const digits = "23456789";
+    const specials = "!@#$%";
+    const all = upper + lower + digits + specials;
     let pwd = "";
-    for (let i = 0; i < 10; i++) {
-      pwd += chars.charAt(Math.floor(Math.random() * chars.length));
+    pwd += upper[Math.floor(Math.random() * upper.length)];
+    pwd += lower[Math.floor(Math.random() * lower.length)];
+    pwd += digits[Math.floor(Math.random() * digits.length)];
+    pwd += specials[Math.floor(Math.random() * specials.length)];
+    for (let i = 4; i < 12; i++) {
+      pwd += all[Math.floor(Math.random() * all.length)];
     }
-    setCreateForm((prev) => ({ ...prev, password: pwd }));
+    return pwd.split("").sort(() => 0.5 - Math.random()).join("");
   };
 
   // Add custom extra field
@@ -548,10 +554,10 @@ export function AddCandidatesModal({
   // Handle Create Candidate + Invite
   const handleCreateAndInvite = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!createForm.name || !createForm.email || !createForm.password) {
+    if (!createForm.name.trim() || !createForm.email.trim()) {
       toast({
         title: "Validation Error",
-        description: "Please fill in Name, Email, and Password.",
+        description: "Please fill in Name and Email Address.",
         variant: "destructive",
       });
       return;
@@ -577,11 +583,13 @@ export function AddCandidatesModal({
         }
       });
 
+      const autoPassword = generateSecurePassword();
+
       // 1. Create candidate
       const candidateId = await candidateService.createCandidate({
         name: createForm.name.trim(),
         email: createForm.email.trim(),
-        password: createForm.password,
+        password: autoPassword,
         phoneNumber: createForm.phoneNumber.trim() || undefined,
         organisationId: orgId,
         extraFields: Object.keys(extraFieldsMap).length > 0 ? extraFieldsMap : undefined,
@@ -598,7 +606,7 @@ export function AddCandidatesModal({
         description: `Successfully added ${createForm.name} and issued test invitation.`,
       });
 
-      setCreateForm({ name: "", email: "", password: "", phoneNumber: "" });
+      setCreateForm({ name: "", email: "", phoneNumber: "" });
       setCustomFields([]);
       onSuccess();
       onOpenChange(false);
@@ -967,36 +975,9 @@ export function AddCandidatesModal({
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-1.5">
-                      <div className="flex items-center justify-between h-5">
-                        <Label htmlFor="password" className="text-xs font-semibold text-slate-700">
-                          Account Password <span className="text-red-500">*</span>
-                        </Label>
-                        <button
-                          type="button"
-                          onClick={generatePassword}
-                          className="text-[11px] text-emerald-600 hover:text-emerald-700 font-semibold flex items-center gap-1 cursor-pointer transition-colors"
-                        >
-                          <KeyRound className="w-3 h-3" />
-                          Auto-generate
-                        </button>
-                      </div>
-                      <Input
-                        id="password"
-                        type="text"
-                        placeholder="Create a password"
-                        value={createForm.password}
-                        onChange={(e) => setCreateForm((prev) => ({ ...prev, password: e.target.value }))}
-                        required
-                        className="h-10 text-xs font-mono bg-white border border-slate-200 rounded-xl text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
-                      />
-                    </div>
-
-                    <div className="space-y-1.5">
-                      <div className="flex items-center h-5">
-                        <Label htmlFor="phoneNumber" className="text-xs font-semibold text-slate-700">
-                          Phone Number <span className="text-slate-400 font-normal">(Optional)</span>
-                        </Label>
-                      </div>
+                      <Label htmlFor="phoneNumber" className="text-xs font-semibold text-slate-700">
+                        Phone Number <span className="text-slate-400 font-normal">(Optional)</span>
+                      </Label>
                       <Input
                         id="phoneNumber"
                         placeholder="e.g. +91 9876543210"

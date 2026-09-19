@@ -13,7 +13,6 @@ import {
   ChevronLeft,
   ChevronRight,
   Clock,
-  ArrowUpDown,
   Sparkles,
   ShoppingCart,
   Files,
@@ -24,7 +23,6 @@ import {
   FileCode,
   CheckCircle2,
   AlertCircle,
-  Terminal,
   Info,
   Save,
   Copy,
@@ -68,7 +66,6 @@ type ProblemType =
   | "TRUE_FALSE"
   | "ASSERTION_REASON"
   | "FILL_IN_THE_BLANK";
-type SortOption = "NEWEST" | "OLDEST";
 
 interface FormState {
   questionType: "MCQ";
@@ -766,7 +763,6 @@ export default function NewAdminLibrary() {
 
   const [selectedLibrary, setSelectedLibrary] = useState<LibraryType>("PUBLIC");
   const [problemType, setProblemType] = useState<ProblemType>("ALL");
-  const [sortBy, setSortBy] = useState<SortOption>("NEWEST");
   const [searchQuery, setSearchQuery] = useState("");
   const [techSearch, setTechSearch] = useState("");
   const [tagSearch, setTagSearch] = useState("");
@@ -801,7 +797,7 @@ export default function NewAdminLibrary() {
   // Reset page when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [selectedLibrary, problemType, selectedLevel, techSearch, tagSearch, searchQuery, sortBy, pageSize]);
+  }, [selectedLibrary, problemType, selectedLevel, techSearch, tagSearch, searchQuery, pageSize]);
 
   // Map UI filters to backend query params
   const queryParams = useMemo(() => {
@@ -820,7 +816,6 @@ export default function NewAdminLibrary() {
       mcqTypeParam = problemType;
     }
 
-    const sortParam = sortBy === "OLDEST" ? "created_at,asc" : undefined;
     const searchCombined = searchQuery.trim() || techSearch.trim() || undefined;
 
     return {
@@ -833,7 +828,6 @@ export default function NewAdminLibrary() {
       difficulty: selectedLevel !== "ALL" ? selectedLevel : undefined,
       search: searchCombined,
       tag: tagSearch.trim() || undefined,
-      sort: sortParam,
     };
   }, [
     currentPage,
@@ -844,7 +838,6 @@ export default function NewAdminLibrary() {
     searchQuery,
     techSearch,
     tagSearch,
-    sortBy,
   ]);
 
   const { data: pageData, isLoading, isError, refetch } = useQuestionsPageQuery(queryParams);
@@ -1042,19 +1035,6 @@ export default function NewAdminLibrary() {
             )}
           </div>
 
-          {/* Sort Dropdown Button */}
-          <div className="relative flex items-center border border-slate-200/90 px-3 py-1.5 bg-white text-xs text-slate-700 font-normal hover:bg-slate-50/50 transition-colors">
-            <ArrowUpDown className="w-3.5 h-3.5 text-slate-500 mr-2 shrink-0" />
-            <select
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value as SortOption)}
-              className="appearance-none bg-transparent pr-1 text-xs text-slate-700 font-normal focus:outline-none cursor-pointer"
-            >
-              <option value="NEWEST">Newest first</option>
-              <option value="OLDEST">Oldest first</option>
-            </select>
-          </div>
-
           {/* Import Questions Button */}
           <button
             onClick={() => setImportOpen(true)}
@@ -1132,15 +1112,6 @@ export default function NewAdminLibrary() {
                             title="Edit Question"
                           >
                             <Edit className="w-4 h-4" />
-                          </button>
-                        )}
-                        {isCoding && (
-                          <button
-                            onClick={() => navigate(`/admin/playground/${q.id}`)}
-                            className="p-0.5 hover:text-indigo-600 transition-colors cursor-pointer"
-                            title="Open Playground"
-                          >
-                            <Terminal className="w-4 h-4" />
                           </button>
                         )}
                         <button
