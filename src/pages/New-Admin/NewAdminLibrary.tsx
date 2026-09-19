@@ -51,6 +51,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { CreateProblemModal } from "@/components/admin/CreateProblemModal";
+import { ManageSubjectsModal } from "@/components/admin/ManageSubjectsModal";
 import { formatPlainTextExcerpt } from "@/lib/html-utils";
 
 
@@ -769,6 +770,7 @@ export default function NewAdminLibrary() {
   const [selectedLevel, setSelectedLevel] = useState<"ALL" | "EASY" | "MEDIUM" | "HARD">("ALL");
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
+  const [manageSubjectsOpen, setManageSubjectsOpen] = useState(false);
   const location = useLocation();
   const [currentPage, setCurrentPage] = useState<number>(() => {
     const fromState = location.state?.page || location.state?.returnPage;
@@ -1035,6 +1037,15 @@ export default function NewAdminLibrary() {
             )}
           </div>
 
+          {/* Manage Subjects Button */}
+          <button
+            onClick={() => setManageSubjectsOpen(true)}
+            className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold border border-slate-200/90 text-slate-700 bg-white hover:bg-slate-50 transition-all shadow-none cursor-pointer"
+          >
+            <FolderTree className="w-3.5 h-3.5 text-slate-500" />
+            <span>Manage Subjects</span>
+          </button>
+
           {/* Import Questions Button */}
           <button
             onClick={() => setImportOpen(true)}
@@ -1286,8 +1297,14 @@ export default function NewAdminLibrary() {
         onClose={() => setImportOpen(false)}
         onImportSuccess={() => {
           setSelectedLibrary("ORG_OWNED");
-          setSortBy("NEWEST");
         }}
+      />
+
+      {/* Manage Subjects Modal */}
+      <ManageSubjectsModal
+        isOpen={manageSubjectsOpen}
+        onClose={() => setManageSubjectsOpen(false)}
+        onRefresh={() => refetch()}
       />
     </div>
   );

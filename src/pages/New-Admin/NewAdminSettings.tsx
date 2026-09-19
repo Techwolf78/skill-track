@@ -271,29 +271,23 @@ export default function NewAdminSettings() {
 
   return (
     <div className="w-full max-w-5xl mx-auto py-4 px-2 md:px-6 space-y-4">
-      {/* Top Bar: Back to Home Button & Page Header */}
-      <div className="flex items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl md:text-3xl font-bold text-slate-800 tracking-tight">
-            Account & Quota Settings
-          </h1>
-          <p className="text-xs md:text-sm text-slate-500 mt-1">
-            Manage your profile, login security, and live assessment PIN quotas.
-          </p>
-        </div>
-        <Button
-          type="button"
-          variant="outline"
-          onClick={() => navigate("/admin/home")}
-          className="border-slate-300 text-slate-700 hover:bg-slate-100 hover:text-slate-900 text-xs font-semibold px-3.5 py-2 h-auto rounded-sm gap-1.5 shrink-0 shadow-none"
-        >
-          <ChevronLeft className="w-4 h-4" />
-          Back to Home
-        </Button>
-      </div>
-
       {/* Main Box Container */}
       <div className="bg-white border border-slate-200 rounded-sm shadow-sm overflow-hidden">
+        {/* Top Header Row inside the Box */}
+        <div className="px-6 pt-6 pb-2 flex items-center gap-2.5">
+          <button
+            type="button"
+            onClick={() => navigate("/admin/home")}
+            className="p-1 -ml-1 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-sm transition-colors cursor-pointer"
+            title="Back to Home"
+          >
+            <ChevronLeft className="w-5 h-5 text-slate-700" />
+          </button>
+          <h1 className="text-xl md:text-2xl font-bold text-slate-800 tracking-tight">
+            Account & Quota Settings
+          </h1>
+        </div>
+
         {/* Tab Navigation Header */}
         <div className="border-b border-slate-200 px-6 pt-3 flex items-center gap-8 bg-white">
           <button
@@ -335,13 +329,6 @@ export default function NewAdminSettings() {
         {/* Tab 1: Account Information */}
         {activeTab === "account" && (
           <div className="p-6 md:p-10">
-            {/* Info Notice Box */}
-            <div className="bg-[#f8f9fa] border border-slate-200 rounded-sm p-3.5 mb-6 flex items-start gap-2.5 text-xs text-slate-600">
-              <Info className="w-4 h-4 text-slate-400 shrink-0 mt-0.5" />
-              <span>
-                To delete or modify your account organization access, please contact your administrator.
-              </span>
-            </div>
 
             <form onSubmit={handleUpdateProfile} className="space-y-8">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
@@ -435,13 +422,6 @@ export default function NewAdminSettings() {
         {/* Tab 2: Change Password */}
         {activeTab === "password" && (
           <div className="p-6 md:p-10">
-            {/* Info Notice Box */}
-            <div className="bg-[#f8f9fa] border border-slate-200 rounded-sm p-3.5 mb-6 flex items-start gap-2.5 text-xs text-slate-600">
-              <Info className="w-4 h-4 text-slate-400 shrink-0 mt-0.5" />
-              <span>
-                To delete or modify your account organization access, please contact your administrator.
-              </span>
-            </div>
 
             <form onSubmit={handleUpdatePassword} className="space-y-6 max-w-2xl">
               {/* Current Password */}
