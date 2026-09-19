@@ -38,7 +38,6 @@ import {
   ChevronsRight,
   Plus,
   Trash2,
-  KeyRound,
   CheckCircle2,
   AlertTriangle,
   RefreshCw,
@@ -161,17 +160,26 @@ export function AddCandidatesModal({
     });
   };
 
+  const handleRemoveBulkFile = () => {
+    setBulkFile(null);
+    setBulkError(null);
+    setParsedBulkCandidates([]);
+    setBulkStep("upload");
+  };
+
   const handleBulkFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selected = e.target.files?.[0];
     if (selected) {
       const ext = selected.name.substring(selected.name.lastIndexOf(".")).toLowerCase();
       if (![".csv", ".xlsx", ".xls"].includes(ext)) {
         setBulkError("Please upload a valid CSV or Excel file (.xlsx, .xls, .csv).");
-        setBulkFile(null);
+        handleRemoveBulkFile();
         return;
       }
       setBulkFile(selected);
       setBulkError(null);
+      setParsedBulkCandidates([]);
+      setBulkStep("upload");
     }
   };
 
@@ -207,28 +215,134 @@ export function AddCandidatesModal({
       const ws = wb.Sheets[wb.SheetNames[0]];
       const rows: Record<string, unknown>[] = XLSX.utils.sheet_to_json(ws);
 
-      const parsed = rows
-        .map((r) => {
-          const name = String(r["Name"] || r["name"] || r["Full Name"] || "");
-          const email = String(r["Email"] || r["email"] || r["EMAIL"] || "").trim();
-          const phoneNumber = String(r["PhoneNumber"] || r["Phone"] || r["phone"] || "");
-          return { name, email, phoneNumber, status: "SUCCESS" as const };
-        })
-        .filter((c) => Boolean(c.email));
+      const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      const validCandidates: Array<{ name: string; email: string; phoneNumber?: string; status: "SUCCESS" | "FAILED"; errorMessage?: string }> = [];
+      let localOmittedCount = 0;
 
-      if (parsed.length === 0) {
-        throw new Error("No candidate rows with valid email addresses found.");
+      for (const r of rows) {
+        const entries = Object.entries(r);
+        let name = "";
+        let rawEmail = "";
+        let phoneNumber = "";
+
+        // 1. Check normalized column headers (case/space/punctuation-insensitive)
+        for (const [key, val] of entries) {
+          const normKey = key.trim().toLowerCase().replace(/[\s_\-\.]+/g, "");
+          const strVal = String(val ?? "").trim();
+          if (!strVal) continue;
+
+          if (
+            !rawEmail &&
+            (normKey === "email" ||
+              normKey === "emailid" ||
+              normKey === "emailaddress" ||
+              normKey === "candidateemail" ||
+              normKey === "studentemail" ||
+              normKey === "mail" ||
+              normKey === "useremail")
+          ) {
+            rawEmail = strVal;
+          } else if (
+            !name &&
+            (normKey === "name" ||
+              normKey === "fullname" ||
+              normKey === "candidatename" ||
+              normKey === "studentname" ||
+              normKey === "firstname" ||
+              normKey === "nameofstudent" ||
+              normKey === "nameofcandidate" ||
+              normKey === "username")
+          ) {
+            name = strVal;
+          } else if (
+            !phoneNumber &&
+            (normKey === "phone" ||
+              normKey === "phonenumber" ||
+              normKey === "mobile" ||
+              normKey === "mobilenumber" ||
+              normKey === "mobileno" ||
+              normKey === "contact" ||
+              normKey === "contactnumber" ||
+              normKey === "contactno")
+          ) {
+            phoneNumber = strVal;
+          }
+        }
+
+        // 2. Fallback email value auto-detection (scan cell values)
+        if (!rawEmail) {
+          for (const [, val] of entries) {
+            const strVal = String(val ?? "").trim();
+            if (strVal.includes("@") && strVal.includes(".")) {
+              const cleaned = strVal.replace(/\s+/g, "");
+              if (EMAIL_REGEX.test(cleaned)) {
+                rawEmail = cleaned;
+                break;
+              }
+            }
+          }
+        }
+
+        // Sanitize internal whitespace in email (e.g. "user@ domain.com")
+        const email = rawEmail ? rawEmail.replace(/\s+/g, "") : "";
+
+        // 3. Fallback name: first non-email text cell or email prefix
+        if (!name && email) {
+          for (const [, val] of entries) {
+            const strVal = String(val ?? "").trim();
+            if (strVal && !strVal.includes("@") && strVal !== phoneNumber && isNaN(Number(strVal))) {
+              name = strVal;
+              break;
+            }
+          }
+          if (!name) {
+            name = email.split("@")[0];
+          }
+        }
+
+        // Skip completely blank rows
+        if (!name && !email) {
+          continue;
+        }
+
+        // Omit rows with invalid email
+        if (!email || !EMAIL_REGEX.test(email)) {
+          localOmittedCount++;
+          continue;
+        }
+
+        validCandidates.push({
+          name: name || email.split("@")[0],
+          email,
+          phoneNumber: phoneNumber || undefined,
+          status: "SUCCESS" as const,
+        });
+      }
+
+      if (validCandidates.length === 0) {
+        throw new Error("No valid candidate rows found. Please ensure at least Name and a valid Email address are provided.");
       }
 
       const formData = new FormData();
       formData.append("file", bulkFile);
       formData.append("organisationId", orgId);
 
-      await apiClient.post("/candidates/bulk-upload", formData, {
+      const uploadRes = await apiClient.post("/candidates/bulk-upload", formData, {
         headers: { "Content-Type": "multipart/form-data" },
       });
 
-      setParsedBulkCandidates(parsed);
+      const responseData = uploadRes.data?.data || uploadRes.data;
+      const backendFailCount = responseData?.failCount || 0;
+      const totalOmitted = Math.max(localOmittedCount, backendFailCount);
+
+      if (totalOmitted > 0) {
+        toast({
+          title: "Import Completed with Omissions",
+          description: `Loaded ${validCandidates.length} valid candidate(s). ${totalOmitted} invalid row(s) were omitted.`,
+        });
+      }
+
+      setParsedBulkCandidates(validCandidates);
       setBulkStep("review");
     } catch (err) {
       const errorObj = err as { response?: { data?: { message?: string } }; message?: string };
@@ -277,7 +391,6 @@ export function AddCandidatesModal({
   const [createForm, setCreateForm] = useState({
     name: "",
     email: "",
-    password: "",
     phoneNumber: "",
   });
   const [customFields, setCustomFields] = useState<Array<{ key: string; value: string }>>([]);
@@ -404,13 +517,21 @@ export function AddCandidatesModal({
   };
 
   // Generate random strong password
-  const generatePassword = () => {
-    const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%";
+  const generateSecurePassword = () => {
+    const upper = "ABCDEFGHJKLMNPQRSTUVWXYZ";
+    const lower = "abcdefghijkmnopqrstuvwxyz";
+    const digits = "23456789";
+    const specials = "!@#$%";
+    const all = upper + lower + digits + specials;
     let pwd = "";
-    for (let i = 0; i < 10; i++) {
-      pwd += chars.charAt(Math.floor(Math.random() * chars.length));
+    pwd += upper[Math.floor(Math.random() * upper.length)];
+    pwd += lower[Math.floor(Math.random() * lower.length)];
+    pwd += digits[Math.floor(Math.random() * digits.length)];
+    pwd += specials[Math.floor(Math.random() * specials.length)];
+    for (let i = 4; i < 12; i++) {
+      pwd += all[Math.floor(Math.random() * all.length)];
     }
-    setCreateForm((prev) => ({ ...prev, password: pwd }));
+    return pwd.split("").sort(() => 0.5 - Math.random()).join("");
   };
 
   // Add custom extra field
@@ -433,10 +554,10 @@ export function AddCandidatesModal({
   // Handle Create Candidate + Invite
   const handleCreateAndInvite = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!createForm.name || !createForm.email || !createForm.password) {
+    if (!createForm.name.trim() || !createForm.email.trim()) {
       toast({
         title: "Validation Error",
-        description: "Please fill in Name, Email, and Password.",
+        description: "Please fill in Name and Email Address.",
         variant: "destructive",
       });
       return;
@@ -462,11 +583,13 @@ export function AddCandidatesModal({
         }
       });
 
+      const autoPassword = generateSecurePassword();
+
       // 1. Create candidate
       const candidateId = await candidateService.createCandidate({
         name: createForm.name.trim(),
         email: createForm.email.trim(),
-        password: createForm.password,
+        password: autoPassword,
         phoneNumber: createForm.phoneNumber.trim() || undefined,
         organisationId: orgId,
         extraFields: Object.keys(extraFieldsMap).length > 0 ? extraFieldsMap : undefined,
@@ -483,7 +606,7 @@ export function AddCandidatesModal({
         description: `Successfully added ${createForm.name} and issued test invitation.`,
       });
 
-      setCreateForm({ name: "", email: "", password: "", phoneNumber: "" });
+      setCreateForm({ name: "", email: "", phoneNumber: "" });
       setCustomFields([]);
       onSuccess();
       onOpenChange(false);
@@ -852,36 +975,9 @@ export function AddCandidatesModal({
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-1.5">
-                      <div className="flex items-center justify-between h-5">
-                        <Label htmlFor="password" className="text-xs font-semibold text-slate-700">
-                          Account Password <span className="text-red-500">*</span>
-                        </Label>
-                        <button
-                          type="button"
-                          onClick={generatePassword}
-                          className="text-[11px] text-emerald-600 hover:text-emerald-700 font-semibold flex items-center gap-1 cursor-pointer transition-colors"
-                        >
-                          <KeyRound className="w-3 h-3" />
-                          Auto-generate
-                        </button>
-                      </div>
-                      <Input
-                        id="password"
-                        type="text"
-                        placeholder="Create a password"
-                        value={createForm.password}
-                        onChange={(e) => setCreateForm((prev) => ({ ...prev, password: e.target.value }))}
-                        required
-                        className="h-10 text-xs font-mono bg-white border border-slate-200 rounded-xl text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
-                      />
-                    </div>
-
-                    <div className="space-y-1.5">
-                      <div className="flex items-center h-5">
-                        <Label htmlFor="phoneNumber" className="text-xs font-semibold text-slate-700">
-                          Phone Number <span className="text-slate-400 font-normal">(Optional)</span>
-                        </Label>
-                      </div>
+                      <Label htmlFor="phoneNumber" className="text-xs font-semibold text-slate-700">
+                        Phone Number <span className="text-slate-400 font-normal">(Optional)</span>
+                      </Label>
                       <Input
                         id="phoneNumber"
                         placeholder="e.g. +91 9876543210"
@@ -1050,7 +1146,7 @@ export function AddCandidatesModal({
                           </div>
                           <button
                             type="button"
-                            onClick={() => setBulkFile(null)}
+                            onClick={handleRemoveBulkFile}
                             className="text-xs font-medium text-red-600 hover:underline shrink-0 ml-2"
                           >
                             Remove

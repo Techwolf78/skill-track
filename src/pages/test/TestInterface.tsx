@@ -54,7 +54,7 @@ import { FaceNotVisibleModal } from "@/proctoring/components/FaceNotVisibleModal
 import { Shield, ShieldAlert, ShieldCheck as ShieldCheckIcon, Camera } from "lucide-react";
 import { AnswerStore, computeContentHash } from "@/lib/exam/answerStorage";
 import { detectTimeExtension } from "@/lib/exam/sessionLogic";
-import { decodeHtmlIfNeeded, isHtmlContent, renderFormattedContent } from "@/lib/html-utils";
+import { decodeHtmlIfNeeded, isHtmlContent, renderFormattedContent, sanitizeHtml } from "@/lib/html-utils";
 
 import { mapBackendToFrontendLang } from "../../types/question";
 
@@ -2467,7 +2467,7 @@ useEffect(() => {
                                   {isHtmlContent(optionText) ? (
                                     <span
                                       className="text-sm prose prose-sm max-w-none [&_p]:inline [&_p]:my-0"
-                                      dangerouslySetInnerHTML={{ __html: optionText }}
+                                      dangerouslySetInnerHTML={{ __html: sanitizeHtml(optionText) }}
                                     />
                                   ) : (
                                     <span className="text-sm">{optionText}</span>

@@ -1,0 +1,44 @@
+{
+  "scanDate": "2026-09-18T13:00:00.000Z",
+  "repository": "skill-track",
+  "auditFramework": "cloudflare/security-audit-skill",
+  "summary": {
+    "total": 3,
+    "high": 2,
+    "medium": 1,
+    "low": 0,
+    "status": "remediated"
+  },
+  "findings": [
+    {
+      "id": "SEC-001-XSS-RICHTEXT",
+      "severity": "HIGH",
+      "cwe": "CWE-79",
+      "title": "DOM/Stored Cross-Site Scripting via Unsanitized Rich Text",
+      "target": "src/lib/html-utils.ts",
+      "description": "renderFormattedContent decodes and parses HTML without DOM sanitization before being rendered in dangerouslySetInnerHTML across candidate and admin pages.",
+      "remediation": "Integrate DOMPurify to strip malicious scripts, handlers (onerror/onload), and unsafe protocols.",
+      "status": "remediated"
+    },
+    {
+      "id": "SEC-002-SECRET-CLIENT-LEAK",
+      "severity": "HIGH",
+      "cwe": "CWE-798",
+      "title": "Exposure of Third-Party API Key in Client Environment",
+      "target": ".env",
+      "description": "VITE_RAPIDAPI_KEY is bundled into client JS files, exposing RapidAPI credentials to all frontend users.",
+      "remediation": "Remove secret keys from VITE_ frontend env and proxy third-party operations via backend.",
+      "status": "remediated"
+    },
+    {
+      "id": "SEC-003-SERVER-HEADERS-DOS",
+      "severity": "MEDIUM",
+      "cwe": "CWE-1021",
+      "title": "Missing Security Headers and Uncaught URIError in Node Server",
+      "target": "server.js",
+      "description": "Server lacks anti-clickjacking and nosniff headers, and decodeURI throws uncaught exception on malformed URL encoding.",
+      "remediation": "Add security response headers and wrap decodeURI in safe try-catch handling.",
+      "status": "remediated"
+    }
+  ]
+}
