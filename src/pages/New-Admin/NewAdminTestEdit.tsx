@@ -99,6 +99,7 @@ import {
 import { candidateService, CandidateInvitation } from "@/lib/candidate-service";
 import { PublishTestConfirmationModal } from "@/components/admin/PublishTestConfirmationModal";
 import { ExtendTimeModal, ExtendTimeCandidateSession } from "@/components/admin/ExtendTimeModal";
+import { QuestionPreviewModal } from "@/components/admin/QuestionPreviewModal";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import * as XLSX from "xlsx";
@@ -282,6 +283,10 @@ export default function NewAdminTestEdit() {
   const [editingSectionName, setEditingSectionName] = useState<string | null>(null);
   const [editingSectionValue, setEditingSectionValue] = useState("");
   const [movingSectionFor, setMovingSectionFor] = useState<string | null>(null); // tq.id being moved
+
+  // Question In-Place Preview Modal State
+  const [previewQuestion, setPreviewQuestion] = useState<Question | null>(null);
+  const [previewModalOpen, setPreviewModalOpen] = useState(false);
 
   // Section Settings Modal state (problem shuffle, custom marks, rename, create section)
   const [sectionSettings, setSectionSettings] = useState<Record<string, { shuffleProblems?: boolean; [key: string]: any }>>({});
@@ -3068,7 +3073,18 @@ export default function NewAdminTestEdit() {
                                         className="px-4 py-2.5 hover:bg-slate-50/60 transition-colors space-y-1"
                                       >
                                         <div className="flex items-start justify-between gap-4">
-                                          <h3 className="font-bold text-slate-900 text-xs md:text-sm leading-snug">{qTitle}</h3>
+                                          <h3
+                                            onClick={() => {
+                                              if (q) {
+                                                setPreviewQuestion(q);
+                                                setPreviewModalOpen(true);
+                                              }
+                                            }}
+                                            className="font-bold text-slate-900 text-xs md:text-sm leading-snug cursor-pointer hover:text-indigo-600 transition-colors"
+                                            title="Click to preview question"
+                                          >
+                                            {qTitle}
+                                          </h3>
 
                                           <DropdownMenu>
                                             <DropdownMenuTrigger asChild>
@@ -3079,11 +3095,14 @@ export default function NewAdminTestEdit() {
                                             <DropdownMenuContent align="end" className="w-52 bg-white border border-slate-200 shadow-xl p-1 text-xs">
                                               <DropdownMenuItem
                                                 onClick={() => {
-                                                  if (q) navigate(`/admin/questions/preview/${q.id}`, { state: q });
+                                                  if (q) {
+                                                    setPreviewQuestion(q);
+                                                    setPreviewModalOpen(true);
+                                                  }
                                                 }}
                                                 className="cursor-pointer py-1.5 px-2.5 flex items-center gap-2 text-slate-700 hover:bg-slate-50"
                                               >
-                                                <ExternalLink className="w-3.5 h-3.5 text-slate-500" />
+                                                <Eye className="w-3.5 h-3.5 text-slate-500" />
                                                 <span>Preview Problem</span>
                                               </DropdownMenuItem>
                                               {/* Move to Section */}
@@ -4527,6 +4546,16 @@ export default function NewAdminTestEdit() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* In-Place Question Preview Modal */}
+      <QuestionPreviewModal
+        isOpen={previewModalOpen}
+        question={previewQuestion}
+        onClose={() => {
+          setPreviewModalOpen(false);
+          setPreviewQuestion(null);
+        }}
+      />
     </div>
   );
 }
