@@ -117,7 +117,10 @@ export function useCandidateTimer({
         // Attempt heartbeat endpoint or resume endpoint
         let data: HeartbeatSyncResponse | null = null;
         try {
-          const res = await apiClient.post(`/test-sessions/${sessionId}/heartbeat`, {});
+          const remaining = Math.max(0, Math.floor(prevRemainingRef.current || 0));
+          const res = await apiClient.post(`/test-sessions/${sessionId}/heartbeat`, {
+            timerRemainingSecs: remaining,
+          });
           data = res.data?.data ?? res.data;
         } catch {
           const res = await apiClient.get(`/test-sessions/${sessionId}/resume`);

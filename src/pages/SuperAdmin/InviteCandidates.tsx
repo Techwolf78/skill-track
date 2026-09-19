@@ -226,11 +226,29 @@ export default function InviteCandidates() {
       setSelectedCandidate(null);
       fetchData();
     } catch (error) {
+      const status = (error as { response?: { status?: number } }).response?.status;
+      const code = (error as { response?: { data?: { errorCode?: string } } }).response?.data?.errorCode;
       const msg =
-        (error as { response?: { data?: { message?: string } }; message?: string }).response?.data?.message ||
+        (error as { response?: { data?: { message?: string } } }).response?.data?.message ||
         (error as { message?: string }).message ||
         "Failed to send invitation";
-      toast({ title: "Couldn't send invite", description: msg, variant: "destructive" });
+
+      if (
+        status === 402 ||
+        code === "INSUFFICIENT_PINS" ||
+        /insufficient.*pin/i.test(msg) ||
+        /available pin/i.test(msg)
+      ) {
+        toast({
+          title: "Insufficient Organisation PINs",
+          description:
+            msg ||
+            "The organization does not have enough available PINs to issue this invitation. Please allocate additional PINs in SuperAdmin Organisations.",
+          variant: "destructive",
+        });
+      } else {
+        toast({ title: "Couldn't send invite", description: msg, variant: "destructive" });
+      }
     } finally {
       setSubmitting(false);
     }
@@ -243,18 +261,57 @@ export default function InviteCandidates() {
     }
     if (selectedCandidates.length === 0) return;
     setSubmitting(true);
-    let successCount = 0, failCount = 0;
+    let successCount = 0;
+    let failCount = 0;
+    let insufficientPins = false;
+    let lastErrMsg = "";
+
     for (const candidateId of selectedCandidates) {
       try {
-        await apiClient.post("/candidate-invitations", { scheduleId: selectedSchedule, candidateId, baseUrl: window.location.origin });
+        await apiClient.post("/candidate-invitations", {
+          scheduleId: selectedSchedule,
+          candidateId,
+          baseUrl: window.location.origin,
+        });
         successCount++;
-      } catch { failCount++; }
+      } catch (error) {
+        failCount++;
+        const status = (error as { response?: { status?: number } }).response?.status;
+        const msg =
+          (error as { response?: { data?: { message?: string; errorCode?: string } } }).response?.data?.message ||
+          (error as { message?: string }).message ||
+          "";
+        const code = (error as { response?: { data?: { errorCode?: string } } }).response?.data?.errorCode;
+        if (
+          status === 402 ||
+          code === "INSUFFICIENT_PINS" ||
+          /insufficient.*pin/i.test(msg) ||
+          /available pin/i.test(msg)
+        ) {
+          insufficientPins = true;
+          lastErrMsg = msg;
+        } else if (!lastErrMsg) {
+          lastErrMsg = msg;
+        }
+      }
     }
-    toast({
-      title: failCount === 0 ? "Bulk invite complete" : "Partial success",
-      description: `${successCount} invited.${failCount > 0 ? ` ${failCount} failed.` : ""}`,
-      variant: failCount > 0 && successCount === 0 ? "destructive" : "default",
-    });
+
+    if (insufficientPins) {
+      toast({
+        title: "Insufficient Organisation PINs",
+        description:
+          lastErrMsg ||
+          "The organization does not have enough available PINs to issue these invitations. Please allocate additional PINs in SuperAdmin Organisations.",
+        variant: "destructive",
+      });
+    } else {
+      toast({
+        title: failCount === 0 ? "Bulk invite complete" : "Partial success",
+        description: `${successCount} invited.${failCount > 0 ? ` ${failCount} failed (${lastErrMsg || "unknown error"}).` : ""}`,
+        variant: failCount > 0 && successCount === 0 ? "destructive" : "default",
+      });
+    }
+
     setSelectedCandidates([]);
     fetchData();
     setSubmitting(false);

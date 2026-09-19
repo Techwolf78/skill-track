@@ -1403,7 +1403,10 @@ useEffect(() => {
       try {
         let sessionData: { timerRemainingSecs?: number; remainingSeconds?: number; remainingTimeSecs?: number } | null = null;
         try {
-          const hbRes = await apiClient.post(`/test-sessions/${sessionId}/heartbeat`, {});
+          const remaining = Math.max(0, Math.floor(prevRemainingRef.current || 0));
+          const hbRes = await apiClient.post(`/test-sessions/${sessionId}/heartbeat`, {
+            timerRemainingSecs: remaining,
+          });
           sessionData = hbRes.data?.data ?? hbRes.data;
         } catch {
           const sessionResponse = await apiClient.get(`/test-sessions/${sessionId}/resume`);

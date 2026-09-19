@@ -49,27 +49,61 @@ export function formatDateTime(
 }
 
 /**
- * Formats date portion only (e.g. "15 Sep 2026").
+ * Formats date portion only (e.g. "Apr 1, 2026").
  */
 export function formatDate(dateStr?: string | null): string {
-  if (!dateStr) return "—";
-  return formatDateTime(dateStr, {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
+  if (!dateStr || dateStr.trim() === "" || dateStr === "null" || dateStr === "undefined") {
+    return "—";
+  }
+
+  try {
+    const normalizedStr = dateStr.includes("T")
+      ? dateStr
+      : `${dateStr}T00:00:00`;
+
+    const date = new Date(normalizedStr);
+    if (isNaN(date.getTime())) {
+      return dateStr;
+    }
+
+    return date.toLocaleDateString("en-US", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+      timeZone: "Asia/Kolkata",
+    });
+  } catch {
+    return dateStr;
+  }
 }
 
 /**
  * Formats time portion only (e.g. "02:30 PM").
  */
 export function formatTime(dateStr?: string | null): string {
-  if (!dateStr) return "—";
-  return formatDateTime(dateStr, {
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: true,
-  });
+  if (!dateStr || dateStr.trim() === "" || dateStr === "null" || dateStr === "undefined") {
+    return "—";
+  }
+
+  try {
+    const normalizedStr = dateStr.includes("T")
+      ? dateStr
+      : `${dateStr}T00:00:00`;
+
+    const date = new Date(normalizedStr);
+    if (isNaN(date.getTime())) {
+      return dateStr;
+    }
+
+    return date.toLocaleTimeString("en-US", {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: true,
+      timeZone: "Asia/Kolkata",
+    });
+  } catch {
+    return dateStr;
+  }
 }
 
 /**

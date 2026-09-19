@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useAuth } from "@/lib/auth-context";
 import { GryphonLogo } from "@/components/ui/GryphonLogo";
+import { AdminPinNavWidget } from "@/components/admin/AdminPinNavWidget";
 
 export default function NewAdminLayout() {
   const location = useLocation();
@@ -81,8 +82,9 @@ export default function NewAdminLayout() {
           </div>
         </div>
 
-        {/* Right Side: Profile Dropdown */}
-        <div className="flex items-center space-x-3">
+        {/* Right Side: PIN Widget + Profile Dropdown */}
+        <div className="flex items-center space-x-2.5 sm:space-x-4">
+          <AdminPinNavWidget />
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button className="flex items-center gap-2.5 px-2.5 py-1.5 hover:bg-slate-800/70 transition-colors focus:outline-none cursor-pointer rounded-md">
