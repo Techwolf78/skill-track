@@ -5,29 +5,28 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-} from "@/components/ui/card";
-import {
   Plus,
   Search,
   Building2,
   MoreVertical,
-  Trash2,
   Pencil,
   AlertTriangle,
   Calendar,
   CreditCard,
-  Shield,
-  Zap,
-  CheckCircle2,
   Coins,
-  Users as UsersIcon,
-  Clock,
+  ArrowUpRight,
+  ArrowDownRight,
+  RotateCcw,
   Sparkles,
+  ShieldCheck,
+  Clock,
+  User,
+  FileText,
+  ChevronLeft,
+  ChevronRight,
+  Loader2,
+  History,
+  SlidersHorizontal,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -51,32 +50,182 @@ import {
   TabsTrigger,
 } from "@/components/ui/tabs";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   organisationService,
   type OrganisationResponse,
-  type OrganisationSubscriptionConfig,
 } from "@/lib/organisation-service";
+import {
+  organisationPinService,
+  type PinTransactionType,
+  type PinTransactionResponse,
+} from "@/lib/organisation-pin-service";
 import { useToast } from "@/hooks/use-toast";
+import { formatDateTime } from "@/lib/date-utils";
 
-function formatValidityDate(startDate?: string, endDate?: string) {
-  if (!startDate || !endDate) return "Nov 14, 2025 – Aug 26, 2027";
-  const fmt = (d: string) => {
-    try {
-      const p = new Date(d);
-      if (isNaN(p.getTime())) return d;
-      return p.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
-    } catch {
-      return d;
-    }
-  };
-  return `${fmt(startDate)} – ${fmt(endDate)}`;
+function PinTransactionBadge({ type }: { type: PinTransactionType }) {
+  switch (type) {
+    case "ALLOCATION":
+      return (
+        <Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 text-[10px] font-semibold hover:bg-emerald-50 shadow-none">
+          ALLOCATION
+        </Badge>
+      );
+    case "DEDUCTION":
+      return (
+        <Badge className="bg-slate-100 text-slate-700 border-slate-200 text-[10px] font-semibold hover:bg-slate-100 shadow-none">
+          DEDUCTION
+        </Badge>
+      );
+    case "DEDUCTION_WAIVED":
+      return (
+        <Badge className="bg-amber-50 text-amber-700 border-amber-200 text-[10px] font-semibold hover:bg-amber-50 shadow-none">
+          WAIVED
+        </Badge>
+      );
+    case "REFUND":
+      return (
+        <Badge className="bg-teal-50 text-teal-700 border-teal-200 text-[10px] font-semibold hover:bg-teal-50 shadow-none">
+          REFUND
+        </Badge>
+      );
+    case "ADJUSTMENT":
+      return (
+        <Badge className="bg-sky-50 text-sky-700 border-sky-200 text-[10px] font-semibold hover:bg-sky-50 shadow-none">
+          ADJUSTMENT
+        </Badge>
+      );
+    default:
+      return (
+        <Badge variant="outline" className="text-[10px]">
+          {type}
+        </Badge>
+      );
+  }
+}
+
+interface OrganisationCardProps {
+  org: OrganisationResponse;
+  openPinModal: (org: OrganisationResponse, tab?: string) => void;
+  openAdjustRefundModal: (org: OrganisationResponse, tab?: string) => void;
+  setEditingOrg: (org: OrganisationResponse) => void;
+  setEditName: (name: string) => void;
+  setEditLogo: (logo: string) => void;
+}
+
+function OrganisationCard({
+  org,
+  openPinModal,
+  openAdjustRefundModal,
+  setEditingOrg,
+  setEditName,
+  setEditLogo,
+}: OrganisationCardProps) {
+  const { data: pinSummary, isLoading: isPinLoading } = useQuery({
+    queryKey: ["org-pins-summary", org.id],
+    queryFn: () => organisationPinService.getPinSummary(org.id),
+    staleTime: 30_000,
+  });
+
+  const pinCount = pinSummary?.pinBalance ?? org.pinBalance ?? 0;
+
+  return (
+    <div
+      key={org.id}
+      className="bg-white border border-slate-200/90 rounded-2xl p-5 shadow-xs hover:border-slate-300 hover:shadow-md transition-all duration-200 flex flex-col justify-between"
+    >
+      {/* Top Row: Circular Logo & More Actions */}
+      <div className="flex items-center justify-between">
+        <div className="w-12 h-12 rounded-full border border-slate-200/80 bg-slate-50 flex items-center justify-center overflow-hidden shadow-2xs shrink-0">
+          {org.logoUrl ? (
+            <img src={org.logoUrl} alt={org.name} className="w-full h-full object-cover" />
+          ) : (
+            <Building2 className="w-6 h-6 text-slate-700" />
+          )}
+        </div>
+
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 text-slate-400 hover:text-slate-800 rounded-full hover:bg-slate-100 shrink-0"
+            >
+              <MoreVertical className="w-4 h-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="text-xs">
+            <DropdownMenuItem onClick={() => openPinModal(org, "allocate")}>
+              <Coins className="w-3.5 h-3.5 mr-2 text-indigo-600" />
+              Allocate PINs
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => openAdjustRefundModal(org, "adjust")}>
+              <SlidersHorizontal className="w-3.5 h-3.5 mr-2 text-sky-500" />
+              Adjust & Refund
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => openPinModal(org, "fy-summary")}>
+              <Calendar className="w-3.5 h-3.5 mr-2 text-indigo-500" />
+              FY Summary
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => {
+                setEditingOrg(org);
+                setEditName(org.name);
+                setEditLogo(org.logoUrl || "");
+              }}
+            >
+              <Pencil className="w-3.5 h-3.5 mr-2 text-slate-600" />
+              Edit Details
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+
+      {/* Centre Content: Organisation Name & Subtitle */}
+      <div className="my-4 space-y-1">
+        <h3 className="text-base font-bold text-slate-900 tracking-tight leading-snug line-clamp-1">
+          {org.name}
+        </h3>
+        <p className="text-xs text-slate-400 font-medium">
+          Created {formatDateTime(org.createdAt, { month: "short", day: "numeric", year: "numeric", hour: undefined, minute: undefined })}
+        </p>
+      </div>
+
+      {/* Bottom Row: PIN Balance & Allocate Button */}
+      <div className="border-t border-slate-100 pt-3.5 flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <div className="text-sm font-bold text-slate-900 font-mono tracking-tight leading-none">
+            {isPinLoading ? (
+              <div className="flex items-center gap-1.5 text-slate-400">
+                <Loader2 className="w-3 h-3 animate-spin" />
+                <span className="text-[11px] font-sans">Loading...</span>
+              </div>
+            ) : (
+              <>
+                {pinCount.toLocaleString()}
+                <span className="text-slate-400 font-normal text-xs"> / {(pinSummary?.totalAllocatedPins ?? pinCount).toLocaleString()}</span>
+              </>
+            )}
+          </div>
+          <p className="text-[11px] text-slate-400 font-medium mt-1">User PINs</p>
+        </div>
+
+        <Button
+          onClick={() => openPinModal(org, "allocate")}
+          className="bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold rounded-xl px-4 h-8.5 shadow-2xs shrink-0 transition-all hover:shadow-xs"
+        >
+          Allocate
+        </Button>
+      </div>
+    </div>
+  );
 }
 
 export default function Organisations() {
@@ -96,20 +245,76 @@ export default function Organisations() {
   const [editLogo, setEditLogo] = useState("");
   const [isUpdating, setIsUpdating] = useState(false);
 
-  // Delete Org State
-  const [orgToDelete, setOrgToDelete] = useState<OrganisationResponse | null>(null);
-  const [isDeleting, setIsDeleting] = useState(false);
+  // Manage PINs Modal State
+  const [pinOrg, setPinOrg] = useState<OrganisationResponse | null>(null);
+  const [pinActiveTab, setPinActiveTab] = useState<string>("allocate");
 
-  // Manage Subscription & PINs Dialog State
-  const [subOrg, setSubOrg] = useState<OrganisationResponse | null>(null);
-  const [subConfig, setSubConfig] = useState<OrganisationSubscriptionConfig | null>(null);
-  const [topUpAmount, setTopUpAmount] = useState<number>(0);
-  const [topUpReason, setTopUpReason] = useState<string>("");
-  const [isSavingSub, setIsSavingSub] = useState(false);
+  // Adjust & Refund Modal State
+  const [adjustRefundOrg, setAdjustRefundOrg] = useState<OrganisationResponse | null>(null);
+  const [adjustRefundActiveTab, setAdjustRefundActiveTab] = useState<string>("adjust");
+
+  // Allocation Form State
+  const [allocatePinsCount, setAllocatePinsCount] = useState<number>(0);
+  const [allocateNotes, setAllocateNotes] = useState<string>("");
+  const [isAllocating, setIsAllocating] = useState(false);
+
+  // Adjustment Form State
+  const [adjustType, setAdjustType] = useState<"ADD" | "DEDUCT">("ADD");
+  const [adjustPinsCount, setAdjustPinsCount] = useState<number>(0);
+  const [adjustReason, setAdjustReason] = useState<string>("");
+  const [isAdjusting, setIsAdjusting] = useState(false);
+
+  // Refund Form State
+  const [refundReason, setRefundReason] = useState<string>("");
+  const [refundSessionId, setRefundSessionId] = useState<string>("");
+  const [isRefunding, setIsRefunding] = useState(false);
+
+  // Audit Ledger Pagination State
+  const [txPage, setTxPage] = useState<number>(0);
 
   const { data: organisations = [], isLoading } = useQuery({
     queryKey: ["organisations"],
     queryFn: () => organisationService.getOrganisations(),
+  });
+
+  // PIN Summary Query for Selected Org (Allocate / FY Modal)
+  const {
+    data: pinSummary,
+    isLoading: isSummaryLoading,
+  } = useQuery({
+    queryKey: ["org-pins-summary", pinOrg?.id],
+    queryFn: () => organisationPinService.getPinSummary(pinOrg!.id),
+    enabled: !!pinOrg?.id,
+  });
+
+  // PIN Summary Query for Adjust & Refund Modal
+  const {
+    data: adjustRefundSummary,
+    isLoading: isAdjustRefundSummaryLoading,
+  } = useQuery({
+    queryKey: ["org-pins-summary", adjustRefundOrg?.id],
+    queryFn: () => organisationPinService.getPinSummary(adjustRefundOrg!.id),
+    enabled: !!adjustRefundOrg?.id,
+  });
+
+  // PIN Financial Year Summary Query for Selected Org
+  const {
+    data: fySummaryList = [],
+    isLoading: isFyLoading,
+  } = useQuery({
+    queryKey: ["org-pins-fy-summary", pinOrg?.id],
+    queryFn: () => organisationPinService.getPinSummaryByFinancialYear(pinOrg!.id),
+    enabled: !!pinOrg?.id && pinActiveTab === "fy-summary",
+  });
+
+  // PIN Ledger Transactions Query for Selected Org
+  const {
+    data: txData,
+    isLoading: isTxLoading,
+  } = useQuery({
+    queryKey: ["org-pins-tx", pinOrg?.id, txPage],
+    queryFn: () => organisationPinService.getPinTransactions(pinOrg!.id, txPage, 6),
+    enabled: !!pinOrg?.id && pinActiveTab === "ledger",
   });
 
   const filteredOrgs = (organisations as OrganisationResponse[]).filter((org) =>
@@ -120,11 +325,10 @@ export default function Organisations() {
     e.preventDefault();
     setIsSubmitting(true);
     try {
-      const created = await organisationService.createOrganisation({ name: newOrgName, logoUrl: newOrgLogo || undefined });
-      // Initialize default subscription config
-      if (created?.id) {
-        organisationService.getSubscriptionConfig(created.id);
-      }
+      await organisationService.createOrganisation({
+        name: newOrgName.trim(),
+        logoUrl: newOrgLogo.trim() || undefined,
+      });
       toast({ title: "Organisation Created", description: `${newOrgName} has been added.` });
       setIsAddOpen(false);
       setNewOrgName("");
@@ -143,7 +347,10 @@ export default function Organisations() {
     if (!editingOrg) return;
     setIsUpdating(true);
     try {
-      await organisationService.updateOrganisation(editingOrg.id, { name: editName, logoUrl: editLogo || undefined });
+      await organisationService.updateOrganisation(editingOrg.id, {
+        name: editName.trim(),
+        logoUrl: editLogo.trim() || undefined,
+      });
       toast({ title: "Organisation Updated", description: `${editName} has been updated.` });
       setEditingOrg(null);
       queryClient.invalidateQueries({ queryKey: ["organisations"] });
@@ -156,65 +363,142 @@ export default function Organisations() {
     }
   };
 
-  const handleDelete = async () => {
-    if (!orgToDelete) return;
-    setIsDeleting(true);
+  const openPinModal = (org: OrganisationResponse, tab = "allocate") => {
+    setPinOrg(org);
+    setPinActiveTab(tab);
+    setAllocatePinsCount(0);
+    setAllocateNotes("");
+  };
+
+  const openAdjustRefundModal = (org: OrganisationResponse, tab = "adjust") => {
+    setAdjustRefundOrg(org);
+    setAdjustRefundActiveTab(tab);
+    setAdjustType("ADD");
+    setAdjustPinsCount(0);
+    setAdjustReason("");
+    setRefundReason("");
+    setRefundSessionId("");
+  };
+
+  const handleAllocatePins = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!pinOrg) return;
+    if (allocatePinsCount < 1) {
+      toast({ title: "Invalid PIN amount", description: "Must allocate at least 1 PIN.", variant: "destructive" });
+      return;
+    }
+    setIsAllocating(true);
     try {
-      await organisationService.deleteOrganisation(orgToDelete.id);
-      toast({ title: "Organisation Deleted", description: `${orgToDelete.name} has been removed.` });
-      setOrgToDelete(null);
+      const summary = await organisationPinService.allocatePins(pinOrg.id, {
+        pins: allocatePinsCount,
+        notes: allocateNotes.trim() || undefined,
+      });
+      toast({
+        title: "PINs Allocated Successfully",
+        description: `Added ${allocatePinsCount.toLocaleString()} PINs. New balance: ${summary.pinBalance.toLocaleString()} PINs.`,
+      });
+      setAllocateNotes("");
       queryClient.invalidateQueries({ queryKey: ["organisations"] });
+      queryClient.invalidateQueries({ queryKey: ["org-pins-summary", pinOrg.id] });
+      queryClient.invalidateQueries({ queryKey: ["org-pins-fy-summary", pinOrg.id] });
+      queryClient.invalidateQueries({ queryKey: ["org-pins-tx", pinOrg.id] });
     } catch (error: unknown) {
-      let msg = "Failed to delete organisation.";
+      let msg = "Failed to allocate PINs.";
       if (axios.isAxiosError(error)) msg = error.response?.data?.message || error.message;
-      toast({ title: "Error", description: msg, variant: "destructive" });
+      toast({ title: "Allocation Failed", description: msg, variant: "destructive" });
     } finally {
-      setIsDeleting(false);
+      setIsAllocating(false);
     }
   };
 
-  const openSubscriptionModal = (org: OrganisationResponse) => {
-    setSubOrg(org);
-    const config = organisationService.getSubscriptionConfig(org.id);
-    setSubConfig(config);
-    setTopUpAmount(0);
-    setTopUpReason("");
+  const handleAdjustPins = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!adjustRefundOrg) return;
+    if (adjustPinsCount <= 0) {
+      toast({ title: "Invalid PIN amount", description: "Adjustment amount must be greater than zero.", variant: "destructive" });
+      return;
+    }
+    if (!adjustReason.trim()) {
+      toast({ title: "Reason Required", description: "Audit reason is required for adjustments.", variant: "destructive" });
+      return;
+    }
+    const currentBal = adjustRefundSummary?.pinBalance ?? adjustRefundOrg?.pinBalance ?? 0;
+    const signedAmount = adjustType === "ADD" ? adjustPinsCount : -adjustPinsCount;
+    if (currentBal + signedAmount < 0) {
+      toast({
+        title: "Adjustment Prohibited",
+        description: `Cannot deduct ${adjustPinsCount} PINs. Organisation only has ${currentBal} PINs remaining.`,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsAdjusting(true);
+    try {
+      const summary = await organisationPinService.adjustPins(adjustRefundOrg.id, {
+        amount: signedAmount,
+        reason: adjustReason.trim(),
+      });
+      toast({
+        title: "PIN Balance Adjusted",
+        description: `${adjustType === "ADD" ? `Added +${adjustPinsCount}` : `Deducted -${adjustPinsCount}`} PINs. New balance: ${summary.pinBalance.toLocaleString()} PINs.`,
+      });
+      setAdjustReason("");
+      queryClient.invalidateQueries({ queryKey: ["organisations"] });
+      queryClient.invalidateQueries({ queryKey: ["org-pins-summary", adjustRefundOrg.id] });
+      queryClient.invalidateQueries({ queryKey: ["org-pins-fy-summary", adjustRefundOrg.id] });
+      queryClient.invalidateQueries({ queryKey: ["org-pins-tx", adjustRefundOrg.id] });
+    } catch (error: unknown) {
+      let msg = "Failed to adjust PIN balance.";
+      if (axios.isAxiosError(error)) msg = error.response?.data?.message || error.message;
+      toast({ title: "Adjustment Failed", description: msg, variant: "destructive" });
+    } finally {
+      setIsAdjusting(false);
+    }
   };
 
-  const handleSaveSubscription = () => {
-    if (!subOrg || !subConfig) return;
-    setIsSavingSub(true);
+  const handleRefundPins = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!adjustRefundOrg) return;
+    const cleanSessionId = refundSessionId.trim();
+    if (!cleanSessionId) {
+      toast({ title: "Session ID Required", description: "A valid Test Session UUID is required to issue a refund.", variant: "destructive" });
+      return;
+    }
+    if (!refundReason.trim()) {
+      toast({ title: "Reason Required", description: "Refund reason is mandatory for audit trail.", variant: "destructive" });
+      return;
+    }
+    setIsRefunding(true);
     try {
-      let finalAllocated = subConfig.allocatedPins;
-      const adjustments = [...(subConfig.statementAdjustments || [])];
-
-      if (topUpAmount !== 0) {
-        finalAllocated = Math.max(0, finalAllocated + topUpAmount);
-        adjustments.unshift({
-          id: `adj-${Date.now()}`,
-          date: new Date().toLocaleString(),
-          reason: topUpReason.trim() || (topUpAmount > 0 ? "SuperAdmin Top-up" : "SuperAdmin Adjustment"),
-          pinsChange: topUpAmount,
-          initiatedBy: "SuperAdmin",
-        });
-      }
-
-      organisationService.updateSubscriptionConfig(subOrg.id, {
-        ...subConfig,
-        allocatedPins: finalAllocated,
-        statementAdjustments: adjustments,
+      const summary = await organisationPinService.refundPins(adjustRefundOrg.id, {
+        testSessionId: cleanSessionId,
+        reason: refundReason.trim(),
       });
-
       toast({
-        title: "Subscription & PINs Updated",
-        description: `Plan and PIN allocation saved for ${subOrg.name}.`,
+        title: "PIN Refunded Successfully",
+        description: `Refunded 1 PIN for test session ${cleanSessionId.slice(0, 8)}... New balance: ${summary.pinBalance.toLocaleString()} PINs.`,
       });
-      setSubOrg(null);
+      setRefundReason("");
+      setRefundSessionId("");
       queryClient.invalidateQueries({ queryKey: ["organisations"] });
-    } catch {
-      toast({ title: "Error", description: "Failed to save subscription config.", variant: "destructive" });
+      queryClient.invalidateQueries({ queryKey: ["org-pins-summary", adjustRefundOrg.id] });
+      queryClient.invalidateQueries({ queryKey: ["org-pins-fy-summary", adjustRefundOrg.id] });
+      queryClient.invalidateQueries({ queryKey: ["org-pins-tx", adjustRefundOrg.id] });
+    } catch (error: unknown) {
+      let msg = "Failed to refund PIN.";
+      if (axios.isAxiosError(error)) {
+        if (error.response?.status === 409) {
+          msg = "Conflict: This test session has already been refunded.";
+        } else if (error.response?.status === 400) {
+          msg = error.response?.data?.message || "Invalid request: No PIN deduction was recorded for this test session.";
+        } else {
+          msg = error.response?.data?.message || error.message;
+        }
+      }
+      toast({ title: "Refund Failed", description: msg, variant: "destructive" });
     } finally {
-      setIsSavingSub(false);
+      setIsRefunding(false);
     }
   };
 
@@ -223,9 +507,9 @@ export default function Organisations() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-heading font-bold text-slate-900">Organisations</h1>
+          <h1 className="text-3xl font-heading font-bold text-slate-900 tracking-tight">Organisations</h1>
           <p className="text-muted-foreground mt-1 text-sm">
-            Manage partner organisations, B2B subscriptions, and assessment PIN quotas
+            Manage partner organisations, live PIN quotas, credit balances, and audit ledgers
           </p>
         </div>
         <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
@@ -239,7 +523,7 @@ export default function Organisations() {
             <form onSubmit={handleCreate}>
               <DialogHeader>
                 <DialogTitle>Add Organisation</DialogTitle>
-                <DialogDescription>Create a new partner organisation with subscription quota.</DialogDescription>
+                <DialogDescription>Create a new partner organisation with zero initial PIN balance.</DialogDescription>
               </DialogHeader>
               <div className="grid gap-4 py-4">
                 <div className="space-y-2">
@@ -271,14 +555,14 @@ export default function Organisations() {
         </Dialog>
       </div>
 
-      {/* Search */}
+      {/* Search Bar */}
       <div className="relative max-w-md">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
         <Input
-          placeholder="Search organisations..."
+          placeholder="Search organisations by name..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          className="pl-10 h-11 text-sm"
+          className="pl-10 h-10 text-sm bg-white"
         />
       </div>
 
@@ -291,394 +575,480 @@ export default function Organisations() {
           </div>
         </div>
       ) : filteredOrgs.length === 0 ? (
-        <div className="text-center py-20 text-muted-foreground">
+        <div className="text-center py-20 text-muted-foreground bg-white border border-slate-200/80 rounded-xl p-8">
           <Building2 className="w-12 h-12 mx-auto mb-4 opacity-30" />
-          <p className="text-lg font-medium">No organisations found</p>
-          <p className="text-sm mt-1">Create one using the button above.</p>
+          <p className="text-lg font-medium text-slate-800">No organisations found</p>
+          <p className="text-sm mt-1">Create one using the button above to begin allocating assessment PINs.</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-          {filteredOrgs.map((org) => {
-            const currentSub = organisationService.getSubscriptionConfig(org.id);
-
-            return (
-              <div
-                key={org.id}
-                className="bg-white border border-slate-200/90 rounded-lg p-4 shadow-2xs hover:border-slate-300 transition-all duration-150 flex flex-col justify-between space-y-3.5"
-              >
-                {/* Header */}
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-md bg-slate-900 flex items-center justify-center text-white shrink-0 shadow-2xs">
-                      {org.logoUrl ? (
-                        <img src={org.logoUrl} alt={org.name} className="w-7 h-7 rounded object-cover" />
-                      ) : (
-                        <Building2 className="w-5 h-5 text-white" />
-                      )}
-                    </div>
-                    <div>
-                      <h3 className="text-sm font-bold text-slate-900 leading-snug line-clamp-1">{org.name}</h3>
-                      <p className="text-[11px] text-slate-400 font-mono mt-0.5">
-                        ID: {org.id.slice(0, 8)}...
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-1.5 shrink-0">
-                    <span className="px-2 py-0.5 bg-indigo-50 text-indigo-700 border border-indigo-200 text-[10px] font-semibold rounded shadow-2xs">
-                      {currentSub.planTier || "Standard"}
-                    </span>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-7 w-7 text-slate-400 hover:text-slate-800 rounded">
-                          <MoreVertical className="w-3.5 h-3.5" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="text-xs">
-                        <DropdownMenuItem onClick={() => openSubscriptionModal(org)}>
-                          <CreditCard className="w-3.5 h-3.5 mr-2 text-slate-600" />
-                          Manage Subscription & PINs
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => {
-                          setEditingOrg(org);
-                          setEditName(org.name);
-                          setEditLogo(org.logoUrl || "");
-                        }}>
-                          <Pencil className="w-3.5 h-3.5 mr-2" />
-                          Edit Details
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          className="text-destructive font-medium"
-                          onClick={() => setOrgToDelete(org)}
-                        >
-                          <Trash2 className="w-3.5 h-3.5 mr-2" />
-                          Delete
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </div>
-                </div>
-
-                {/* Quota Info Box */}
-                <div className="bg-slate-50/80 border border-slate-200/70 rounded-md p-2.5 text-xs space-y-1.5">
-                  <div className="flex justify-between items-center">
-                    <span className="text-[11.5px] text-slate-500 flex items-center gap-1.5">
-                      <Coins className="w-3.5 h-3.5 text-indigo-600" />
-                      Allocated PINs
-                    </span>
-                    <span className="font-bold text-slate-900 font-mono text-[11.5px]">
-                      {currentSub.allocatedPins.toLocaleString()} PINs
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center text-[11px] text-slate-400 pt-1.5 border-t border-slate-200/50">
-                    <span>Validity</span>
-                    <span className="text-slate-700 font-medium">
-                      {formatValidityDate(currentSub.subscriptionStartDate, currentSub.subscriptionEndDate)}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Action & Footer */}
-                <div className="space-y-2.5 pt-0.5">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => openSubscriptionModal(org)}
-                    className="w-full h-8 text-xs font-medium border-slate-200 text-slate-700 hover:bg-slate-900 hover:text-white hover:border-slate-900 rounded flex items-center justify-center gap-1.5 transition-all"
-                  >
-                    <CreditCard className="w-3.5 h-3.5" />
-                    <span>Manage Subscription & PINs</span>
-                  </Button>
-
-                  <div className="flex items-center gap-1.5 text-[10.5px] text-slate-400 border-t border-slate-100 pt-2">
-                    <Calendar className="w-3 h-3 text-slate-400" />
-                    <span>Created {new Date(org.createdAt).toLocaleDateString("en-GB")}</span>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          {filteredOrgs.map((org) => (
+            <OrganisationCard
+              key={org.id}
+              org={org}
+              openPinModal={openPinModal}
+              openAdjustRefundModal={openAdjustRefundModal}
+              setEditingOrg={setEditingOrg}
+              setEditName={setEditName}
+              setEditLogo={setEditLogo}
+            />
+          ))}
         </div>
       )}
 
-      {/* ── MANAGE SUBSCRIPTION & PINS MODAL DIALOG ── */}
-      <Dialog open={!!subOrg && !!subConfig} onOpenChange={(open) => !open && setSubOrg(null)}>
-        <DialogContent className="sm:max-w-[560px] bg-white text-slate-900 p-6">
+      {/* ── MANAGE PINS & CREDIT AUDIT LEDGER MODAL ── */}
+      <Dialog open={!!pinOrg} onOpenChange={(open) => !open && setPinOrg(null)}>
+        <DialogContent className="sm:max-w-[640px] bg-white text-slate-900 p-6 max-h-[90vh] overflow-y-auto">
           <DialogHeader className="border-b border-slate-200 pb-4">
             <div className="flex items-center justify-between">
               <div>
                 <DialogTitle className="text-lg font-bold text-slate-900 flex items-center gap-2">
-                  <CreditCard className="w-5 h-5 text-slate-700" />
-                  <span>Subscription & PIN Management</span>
+                  <Coins className="w-5 h-5 text-indigo-600" />
+                  <span>PIN & Credit Management</span>
                 </DialogTitle>
                 <DialogDescription className="text-xs text-slate-500 mt-1">
-                  Configure plan package, PIN allocations, and billing dates for <strong>{subOrg?.name}</strong>
+                  Allocate quotas and inspect fiscal year statements for <strong>{pinOrg?.name}</strong>
                 </DialogDescription>
               </div>
-              <Badge variant="outline" className="bg-indigo-50 text-indigo-700 border-indigo-200 text-xs font-semibold px-2.5 py-0.5">
-                {subConfig?.planTier}
-              </Badge>
             </div>
           </DialogHeader>
 
-          {subConfig && (
-            <Tabs defaultValue="plan" className="pt-2">
-              <TabsList className="grid grid-cols-3 bg-slate-100 p-1 mb-4 text-xs">
-                <TabsTrigger value="plan" className="text-xs font-medium">
-                  Plan & Dates
-                </TabsTrigger>
-                <TabsTrigger value="pins" className="text-xs font-medium">
-                  PIN Allocation
-                </TabsTrigger>
-                <TabsTrigger value="ledger" className="text-xs font-medium">
-                  Audit Ledger
-                </TabsTrigger>
-              </TabsList>
+          {/* Live Metric Banner */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 py-3">
+           
+            <div className="bg-slate-50 border border-slate-200/80 rounded-lg p-2.5">
+              <span className="text-[10px] uppercase font-bold tracking-wider text-emerald-600 block">Purchased PINs</span>
+              <span className="font-mono font-bold text-base text-emerald-700 block mt-0.5">
+                {isSummaryLoading ? "..." : (pinSummary?.totalAllocatedPins ?? 0).toLocaleString()}
+              </span>
+            </div>
+            <div className="bg-slate-50 border border-slate-200/80 rounded-lg p-2.5">
+              <span className="text-[10px] uppercase font-bold tracking-wider text-rose-600 block">Consumed PINs</span>
+              <span className="font-mono font-bold text-base text-rose-700 block mt-0.5">
+                {isSummaryLoading ? "..." : (pinSummary?.totalUsedPins ?? 0).toLocaleString()}
+              </span>
+            </div>
+             <div className="bg-slate-50 border border-slate-200/80 rounded-lg p-2.5">
+              <span className="text-[10px] uppercase font-bold tracking-wider text-slate-500 block">Current Balance</span>
+              <span className="font-mono font-bold text-base text-slate-900 block mt-0.5">
+                {isSummaryLoading ? "..." : (pinSummary?.pinBalance ?? pinOrg?.pinBalance ?? 0).toLocaleString()}
+              </span>
+            </div>
+            <div className="bg-slate-50 border border-slate-200/80 rounded-lg p-2.5">
+              <span className="text-[10px] uppercase font-bold tracking-wider text-slate-500 block">Last Recharge</span>
+              <span className="font-sans text-xs font-medium text-slate-700 block mt-1 truncate" title={pinSummary?.lastAllocatedAt ? formatDateTime(pinSummary.lastAllocatedAt) : "Never"}>
+                {isSummaryLoading ? "..." : pinSummary?.lastAllocatedAt ? formatDateTime(pinSummary.lastAllocatedAt, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "Never"}
+              </span>
+            </div>
+          </div>
 
-              {/* Tab 1: Plan & Validity Dates */}
-              <TabsContent value="plan" className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1.5">
-                    <Label className="text-xs font-semibold text-slate-700">Plan Tier</Label>
-                    <Select
-                      value={subConfig.planTier || "Standard"}
-                      onValueChange={(val) => setSubConfig({ ...subConfig, planTier: val as OrganisationSubscriptionConfig["planTier"] })}
-                    >
-                      <SelectTrigger className="h-9 text-xs">
-                        <SelectValue placeholder="Select Tier" />
-                      </SelectTrigger>
-                      <SelectContent className="text-xs">
-                        <SelectItem value="Standard">Standard</SelectItem>
-                        <SelectItem value="Pro">Pro</SelectItem>
-                        <SelectItem value="Enterprise">Enterprise</SelectItem>
-                      </SelectContent>
-                    </Select>
+          {/* Tabbed Actions */}
+          <Tabs value={pinActiveTab} onValueChange={setPinActiveTab} className="pt-1">
+            <TabsList className="grid grid-cols-2 bg-slate-100 p-1 mb-4 text-xs rounded-lg">
+              <TabsTrigger value="allocate" className="text-xs font-medium gap-1 data-[state=active]:text-indigo-600">
+                <Plus className="w-3.5 h-3.5 text-indigo-600" />
+                <span>Allocate</span>
+              </TabsTrigger>
+              <TabsTrigger value="fy-summary" className="text-xs font-medium gap-1 data-[state=active]:text-indigo-600">
+                <Calendar className="w-3.5 h-3.5 text-indigo-600" />
+                <span>FY Summary</span>
+              </TabsTrigger>
+            </TabsList>
+
+            {/* TAB 1: ALLOCATE PINS */}
+            <TabsContent value="allocate">
+              <form onSubmit={handleAllocatePins} className="space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div className="space-y-1.5 sm:col-span-1">
+                    <Label className="text-xs font-semibold text-slate-700">PIN Amount <span className="text-destructive">*</span></Label>
+                    <Input
+                      type="number"
+                      min={1}
+                      required
+                      value={allocatePinsCount || ""}
+                      onChange={(e) => setAllocatePinsCount(parseInt(e.target.value) || 0)}
+                      className="h-9 text-xs font-mono font-bold"
+                    />
                   </div>
-
-                  <div className="space-y-1.5">
-                    <Label className="text-xs font-semibold text-slate-700">Billing Mode</Label>
-                    <Select
-                      value={subConfig.billingMode || "One-time Subscription"}
-                      onValueChange={(val) => setSubConfig({ ...subConfig, billingMode: val as OrganisationSubscriptionConfig["billingMode"] })}
-                    >
-                      <SelectTrigger className="h-9 text-xs">
-                        <SelectValue placeholder="Select Mode" />
-                      </SelectTrigger>
-                      <SelectContent className="text-xs">
-                        <SelectItem value="One-time Subscription">One-time Subscription</SelectItem>
-                        <SelectItem value="Annual Recurring">Annual Recurring</SelectItem>
-                        <SelectItem value="Monthly">Monthly</SelectItem>
-                      </SelectContent>
-                    </Select>
+                  <div className="space-y-1.5 sm:col-span-2">
+                    <Label className="text-xs font-semibold text-slate-700">Audit Notes </Label>
+                    <Input
+                      placeholder="e.g. Annual contract top-up / Renewal agreement"
+                      value={allocateNotes}
+                      onChange={(e) => setAllocateNotes(e.target.value)}
+                      className="h-9 text-xs"
+                    />
                   </div>
                 </div>
 
-                <div className="border-t border-slate-100 pt-3 space-y-3">
-                  <span className="text-xs font-bold text-slate-800 uppercase tracking-wider block">
-                    Subscription Validity Period
+                {/* Projected Balance Callout */}
+                <div className="bg-slate-50/60 border border-slate-200/80 rounded-lg p-2.5 flex items-center justify-between text-xs">
+                  <span className="text-slate-800 font-medium">Projected Balance:</span>
+                  <span className="font-mono font-bold text-slate-900 text-sm">
+                    {((pinSummary?.pinBalance ?? pinOrg?.pinBalance ?? 0) + (allocatePinsCount > 0 ? allocatePinsCount : 0)).toLocaleString()} PINs
                   </span>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-1.5">
-                      <Label className="text-[11px] text-slate-500">Start Date</Label>
-                      <Input
-                        type="date"
-                        value={subConfig.subscriptionStartDate}
-                        onChange={(e) => setSubConfig({ ...subConfig, subscriptionStartDate: e.target.value })}
-                        className="h-9 text-xs"
-                      />
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label className="text-[11px] text-slate-500">End Date</Label>
-                      <Input
-                        type="date"
-                        value={subConfig.subscriptionEndDate}
-                        onChange={(e) => setSubConfig({ ...subConfig, subscriptionEndDate: e.target.value })}
-                        className="h-9 text-xs"
-                      />
-                    </div>
-                  </div>
                 </div>
 
-                <div className="border-t border-slate-100 pt-3 space-y-3">
-                  <span className="text-xs font-bold text-slate-800 uppercase tracking-wider block">
-                    Current Billing Cycle Period
-                  </span>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-1.5">
-                      <Label className="text-[11px] text-slate-500">Cycle Start Date</Label>
-                      <Input
-                        type="date"
-                        value={subConfig.billingCycleStartDate}
-                        onChange={(e) => setSubConfig({ ...subConfig, billingCycleStartDate: e.target.value })}
-                        className="h-9 text-xs"
-                      />
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label className="text-[11px] text-slate-500">Cycle End Date</Label>
-                      <Input
-                        type="date"
-                        value={subConfig.billingCycleEndDate}
-                        onChange={(e) => setSubConfig({ ...subConfig, billingCycleEndDate: e.target.value })}
-                        className="h-9 text-xs"
-                      />
-                    </div>
-                  </div>
+                <div className="flex justify-end items-center gap-2 pt-3 border-t border-slate-200">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setPinOrg(null)}
+                    className="text-xs font-semibold h-9 px-4 border-slate-200"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="submit"
+                    disabled={isAllocating || allocatePinsCount < 1}
+                    className="bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold h-9 px-5 gap-1.5"
+                  >
+                    {isAllocating ? (
+                      <>
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        <span>Allocating...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Plus className="w-3.5 h-3.5" />
+                        <span>Allocate {allocatePinsCount > 0 ? `${allocatePinsCount.toLocaleString()} ` : ""}PINs</span>
+                      </>
+                    )}
+                  </Button>
                 </div>
-              </TabsContent>
+              </form>
+            </TabsContent>
 
-              {/* Tab 2: PIN Allocation & Top-up */}
-              <TabsContent value="pins" className="space-y-4">
-                <div className="bg-slate-50 border border-slate-200 p-4 space-y-3 rounded-md">
-                  <div className="flex justify-between items-center">
-                    <div>
-                      <Label className="text-xs font-bold text-slate-900">Total Base PINs Allocated</Label>
-                      <p className="text-[11px] text-slate-500">Total invite credits assigned to this organization</p>
-                    </div>
-                    <div className="px-3 py-1.5 bg-white border border-slate-200 rounded text-right font-mono font-bold text-sm text-slate-900 select-none shadow-2xs">
-                      {subConfig.allocatedPins.toLocaleString()} PINs
-                    </div>
-                  </div>
+            {/* TAB 2: FINANCIAL YEAR BREAKDOWN */}
+            <TabsContent value="fy-summary" className="pt-1 space-y-4">
+              {isFyLoading ? (
+                <div className="flex items-center justify-center py-10">
+                  <Loader2 className="w-5 h-5 animate-spin text-slate-400" />
                 </div>
-
-                {/* Instant Top-Up Credit Tool (Clean Neutral Theme) */}
-                <div className="border border-slate-200 bg-slate-50/70 p-4 space-y-3 rounded-md">
-                  <div className="flex items-center gap-1.5 text-xs font-bold text-slate-900">
-                    <Sparkles className="w-4 h-4 text-slate-600" />
-                    <span>Instant PIN Top-Up / Adjustment</span>
-                  </div>
-                  <p className="text-[11px] text-slate-500">
-                    Add or deduct PINs immediately. Positive adds bonus credits; negative deducts.
-                  </p>
-
-                  <div className="flex items-center gap-2">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setTopUpAmount(500)}
-                      className={`text-xs h-7 border transition-colors ${topUpAmount === 500 ? "bg-slate-900 text-white font-semibold" : "bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200"}`}
-                    >
-                      +500 PINs
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setTopUpAmount(1000)}
-                      className={`text-xs h-7 border transition-colors ${topUpAmount === 1000 ? "bg-slate-900 text-white font-semibold" : "bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200"}`}
-                    >
-                      +1,000 PINs
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setTopUpAmount(5000)}
-                      className={`text-xs h-7 border transition-colors ${topUpAmount === 5000 ? "bg-slate-900 text-white font-semibold" : "bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200"}`}
-                    >
-                      +5,000 PINs
-                    </Button>
-                  </div>
-
-                  <div className="grid grid-cols-3 gap-2 pt-1">
-                    <div className="col-span-1">
-                      <Label className="text-[10px] text-slate-600">PIN Adjustment</Label>
-                      <Input
-                        type="number"
-                        placeholder="+/- PINs"
-                        value={topUpAmount || ""}
-                        onChange={(e) => setTopUpAmount(parseInt(e.target.value) || 0)}
-                        className="h-8 text-xs font-mono font-semibold"
-                      />
-                    </div>
-                    <div className="col-span-2">
-                      <Label className="text-[10px] text-slate-600">Reason Note (Audit Trail)</Label>
-                      <Input
-                        placeholder="e.g. Corporate Renewal Top-up"
-                        value={topUpReason}
-                        onChange={(e) => setTopUpReason(e.target.value)}
-                        className="h-8 text-xs"
-                      />
-                    </div>
-                  </div>
+              ) : !fySummaryList || fySummaryList.length === 0 ? (
+                <div className="text-center py-8 text-xs text-slate-400 border border-slate-100 rounded-xl bg-slate-50/50">
+                  No financial year statements recorded yet.
                 </div>
-              </TabsContent>
-
-              {/* Tab 3: Audit Ledger */}
-              <TabsContent value="ledger" className="space-y-3">
-                <div className="border border-slate-200 p-3 bg-slate-50/50 space-y-2 rounded-md">
-                  <span className="text-xs font-bold text-slate-900 block">
-                    PIN Quota Adjustments & Audit Trail
-                  </span>
-                  <p className="text-[11px] text-slate-500">
-                    Chronological record of manual quota changes and top-ups issued by SuperAdmin
-                  </p>
+              ) : (
+                <div className="border border-slate-200/90 rounded-xl overflow-hidden shadow-2xs">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="bg-slate-50/80 hover:bg-slate-50/80 border-b border-slate-200/80 text-[11px] font-semibold text-slate-500">
+                        <TableHead className="h-9 py-2 px-4">Financial Year</TableHead>
+                        <TableHead className="h-9 py-2 px-3 text-right">Allocated</TableHead>
+                        <TableHead className="h-9 py-2 px-3 text-right">Used</TableHead>
+                        <TableHead className="h-9 py-2 px-4 text-right">Net Balance</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody className="text-xs divide-y divide-slate-100">
+                      {fySummaryList.map((fy) => (
+                        <TableRow key={fy.financialYear} className="hover:bg-slate-50/50">
+                          <TableCell className="py-3 px-4 font-semibold text-slate-900">
+                            {fy.financialYear}
+                          </TableCell>
+                          <TableCell className="py-3 px-3 text-right font-mono font-semibold text-emerald-600">
+                            +{fy.allocatedPins.toLocaleString()}
+                          </TableCell>
+                          <TableCell className="py-3 px-3 text-right font-mono text-slate-500">
+                            {fy.usedPins.toLocaleString()}
+                          </TableCell>
+                          <TableCell className="py-3 px-4 text-right font-mono font-bold text-slate-900">
+                            {fy.netChange.toLocaleString()} PINs
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
                 </div>
+              )}
 
-                {(!subConfig.statementAdjustments || subConfig.statementAdjustments.length === 0) ? (
-                  <div className="text-center py-8 text-xs text-slate-400 border border-dashed border-slate-200 rounded-md">
-                    No custom PIN adjustments recorded yet for this organization.
-                  </div>
-                ) : (
-                  <div className="max-h-48 overflow-y-auto border border-slate-200 rounded-md">
-                    <table className="w-full text-[11px] text-left">
-                      <thead className="bg-slate-100 text-slate-600 font-bold border-b border-slate-200">
-                        <tr>
-                          <th className="py-2 px-3">Date</th>
-                          <th className="py-2 px-3">Reason</th>
-                          <th className="py-2 px-3 text-center">Change</th>
-                          <th className="py-2 px-3 text-right">By</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100">
-                        {subConfig.statementAdjustments.map((adj) => (
-                          <tr key={adj.id} className="hover:bg-slate-50">
-                            <td className="py-1.5 px-3 text-slate-500 font-mono">{adj.date}</td>
-                            <td className="py-1.5 px-3 text-slate-800 font-medium">{adj.reason}</td>
-                            <td className="py-1.5 px-3 text-center">
-                              {adj.pinsChange > 0 ? (
-                                <span className="px-1.5 py-0.5 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded font-bold font-mono text-[10px]">
-                                  +{adj.pinsChange}
-                                </span>
-                              ) : (
-                                <span className="px-1.5 py-0.5 bg-slate-100 text-slate-700 border border-slate-200 rounded font-bold font-mono text-[10px]">
-                                  {adj.pinsChange}
-                                </span>
-                              )}
-                            </td>
-                            <td className="py-1.5 px-3 text-right text-slate-500">{adj.initiatedBy}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </TabsContent>
-            </Tabs>
-          )}
-
-          <DialogFooter className="border-t border-slate-200 pt-4 gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setSubOrg(null)}
-              className="text-xs h-8 border-slate-200"
-            >
-              Cancel
-            </Button>
-            <Button
-              type="button"
-              onClick={handleSaveSubscription}
-              disabled={isSavingSub}
-              className="bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold px-4 h-8 rounded"
-            >
-              {isSavingSub ? "Saving..." : "Save Subscription Changes"}
-            </Button>
-          </DialogFooter>
+              <div className="flex justify-end pt-2 border-t border-slate-200">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setPinOrg(null)}
+                  className="text-xs font-semibold h-9 px-4 border-slate-200"
+                >
+                  Cancel
+                </Button>
+              </div>
+            </TabsContent>
+          </Tabs>
         </DialogContent>
       </Dialog>
 
-      {/* Edit Dialog */}
+      {/* ── ADJUST & REFUND PINs MODAL ── */}
+      <Dialog open={!!adjustRefundOrg} onOpenChange={(open) => !open && setAdjustRefundOrg(null)}>
+        <DialogContent className="sm:max-w-[640px] bg-white text-slate-900 p-6 max-h-[90vh] overflow-y-auto">
+          <DialogHeader className="border-b border-slate-200 pb-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <DialogTitle className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                  <SlidersHorizontal className="w-5 h-5 text-indigo-600" />
+                  <span>Adjust & Refund PINs</span>
+                </DialogTitle>
+                <DialogDescription className="text-xs text-slate-500 mt-1">
+                  Correct quotas or issue candidate test session refunds for <strong>{adjustRefundOrg?.name}</strong>
+                </DialogDescription>
+              </div>
+            </div>
+          </DialogHeader>
+
+          {/* Live Metric Banner */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 py-3">
+            <div className="bg-slate-50 border border-slate-200/80 rounded-lg p-2.5">
+              <span className="text-[10px] uppercase font-bold tracking-wider text-emerald-600 block">Purchased PINs</span>
+              <span className="font-mono font-bold text-base text-emerald-700 block mt-0.5">
+                {isAdjustRefundSummaryLoading ? "..." : (adjustRefundSummary?.totalAllocatedPins ?? 0).toLocaleString()}
+              </span>
+            </div>
+            <div className="bg-slate-50 border border-slate-200/80 rounded-lg p-2.5">
+              <span className="text-[10px] uppercase font-bold tracking-wider text-rose-600 block">Consumed PINs</span>
+              <span className="font-mono font-bold text-base text-rose-700 block mt-0.5">
+                {isAdjustRefundSummaryLoading ? "..." : (adjustRefundSummary?.totalUsedPins ?? 0).toLocaleString()}
+              </span>
+            </div>
+            <div className="bg-slate-50 border border-slate-200/80 rounded-lg p-2.5">
+              <span className="text-[10px] uppercase font-bold tracking-wider text-slate-500 block">Current Balance</span>
+              <span className="font-mono font-bold text-base text-slate-900 block mt-0.5">
+                {isAdjustRefundSummaryLoading ? "..." : (adjustRefundSummary?.pinBalance ?? adjustRefundOrg?.pinBalance ?? 0).toLocaleString()}
+              </span>
+            </div>
+            <div className="bg-slate-50 border border-slate-200/80 rounded-lg p-2.5">
+              <span className="text-[10px] uppercase font-bold tracking-wider text-slate-500 block">Last Recharge</span>
+              <span className="font-sans text-xs font-medium text-slate-700 block mt-1 truncate" title={adjustRefundSummary?.lastAllocatedAt ? formatDateTime(adjustRefundSummary.lastAllocatedAt) : "Never"}>
+                {isAdjustRefundSummaryLoading ? "..." : adjustRefundSummary?.lastAllocatedAt ? formatDateTime(adjustRefundSummary.lastAllocatedAt, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "Never"}
+              </span>
+            </div>
+          </div>
+
+          {/* Tabbed Actions */}
+          <Tabs value={adjustRefundActiveTab} onValueChange={setAdjustRefundActiveTab} className="pt-1">
+            <TabsList className="grid grid-cols-2 bg-slate-100 p-1 mb-4 text-xs rounded-lg">
+              <TabsTrigger value="adjust" className="text-xs font-medium gap-1 data-[state=active]:text-indigo-600">
+                <SlidersHorizontal className="w-3.5 h-3.5 text-indigo-600" />
+                <span>Adjust Balance</span>
+              </TabsTrigger>
+              <TabsTrigger value="refund" className="text-xs font-medium gap-1 data-[state=active]:text-indigo-600">
+                <RotateCcw className="w-3.5 h-3.5 text-indigo-600" />
+                <span>Issue Refund</span>
+              </TabsTrigger>
+            </TabsList>
+
+            {/* TAB 1: ADJUST BALANCE */}
+            <TabsContent value="adjust">
+              <form onSubmit={handleAdjustPins} className="space-y-4">
+                {/* Action Type Toggle */}
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-semibold text-slate-700">Adjustment Type</Label>
+                  <div>
+                    <div className="inline-flex bg-slate-100 p-1 rounded-lg gap-1 border border-slate-200/60">
+                      <button
+                        type="button"
+                        onClick={() => setAdjustType("ADD")}
+                        className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-md transition-all ${
+                          adjustType === "ADD"
+                            ? "bg-white text-emerald-700 shadow-2xs"
+                            : "text-slate-600 hover:text-slate-900"
+                        }`}
+                      >
+                        <Plus className="w-3.5 h-3.5 text-emerald-600" />
+                        <span>Credit</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setAdjustType("DEDUCT")}
+                        className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-md transition-all ${
+                          adjustType === "DEDUCT"
+                            ? "bg-white text-rose-700 shadow-2xs"
+                            : "text-slate-600 hover:text-slate-900"
+                        }`}
+                      >
+                        <ArrowDownRight className="w-3.5 h-3.5 text-rose-600" />
+                        <span>Debit</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div className="space-y-1.5 sm:col-span-1">
+                    <Label className="text-xs font-semibold text-slate-700">PIN Amount <span className="text-destructive">*</span></Label>
+                    <Input
+                      type="number"
+                      min={1}
+                      required
+                      placeholder="e.g. 50"
+                      value={adjustPinsCount || ""}
+                      onChange={(e) => setAdjustPinsCount(Math.max(0, parseInt(e.target.value) || 0))}
+                      className="h-9 text-xs font-mono font-bold"
+                    />
+                  </div>
+                  <div className="space-y-1.5 sm:col-span-2">
+                    <Label className="text-xs font-semibold text-slate-700">Audit Reason <span className="text-destructive">*</span></Label>
+                    <Input
+                      required
+                      placeholder="e.g. Quota alignment correction / Invoice adjustment"
+                      value={adjustReason}
+                      onChange={(e) => setAdjustReason(e.target.value)}
+                      className="h-9 text-xs"
+                    />
+                  </div>
+                </div>
+
+                {/* Clear Visual Live Balance Preview */}
+                {(() => {
+                  const currentBal = adjustRefundSummary?.pinBalance ?? adjustRefundOrg?.pinBalance ?? 0;
+                  const signedAmount = adjustType === "ADD" ? adjustPinsCount : -adjustPinsCount;
+                  const finalBal = currentBal + signedAmount;
+                  const isNegative = finalBal < 0;
+
+                  return (
+                    <div
+                      className={`border rounded-xl p-3 text-xs transition-colors ${
+                        isNegative
+                          ? "bg-rose-50 border-rose-200 text-rose-900"
+                          : "bg-slate-50 border-slate-200/80 text-slate-700"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="space-y-0.5">
+                          <span className="text-[10.5px] uppercase font-bold text-slate-400 tracking-wider">Current</span>
+                          <p className="font-mono font-bold text-slate-800 text-sm">{currentBal.toLocaleString()} PINs</p>
+                        </div>
+                        <div className="text-center space-y-0.5">
+                          <span className="text-[10.5px] uppercase font-bold text-slate-400 tracking-wider">Adjustment</span>
+                          <p className={`font-mono font-bold text-sm ${adjustType === "ADD" ? "text-emerald-600" : "text-rose-600"}`}>
+                            {adjustType === "ADD" ? `+${adjustPinsCount.toLocaleString()}` : `-${adjustPinsCount.toLocaleString()}`} PINs
+                          </p>
+                        </div>
+                        <div className="text-right space-y-0.5">
+                          <span className="text-[10.5px] uppercase font-bold text-slate-400 tracking-wider">New Balance</span>
+                          <p className={`font-mono font-bold text-sm ${isNegative ? "text-rose-600" : "text-slate-900"}`}>
+                            {isNegative ? "Insufficient PINs" : `${finalBal.toLocaleString()} PINs`}
+                          </p>
+                        </div>
+                      </div>
+                      {isNegative && (
+                        <p className="text-[11px] text-rose-600 font-medium mt-2 pt-2 border-t border-rose-200/60">
+                          ⚠️ Balance cannot fall below 0. Maximum possible deduction is {currentBal.toLocaleString()} PINs.
+                        </p>
+                      )}
+                    </div>
+                  );
+                })()}
+
+                <div className="flex justify-end items-center gap-2 pt-3 border-t border-slate-200">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setAdjustRefundOrg(null)}
+                    className="text-xs font-semibold h-9 px-4 border-slate-200"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="submit"
+                    disabled={
+                      isAdjusting ||
+                      adjustPinsCount <= 0 ||
+                      !adjustReason.trim() ||
+                      (adjustType === "DEDUCT" &&
+                        ((adjustRefundSummary?.pinBalance ?? adjustRefundOrg?.pinBalance ?? 0) - adjustPinsCount < 0))
+                    }
+                    className="bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold h-9 px-5 gap-1.5"
+                  >
+                    {isAdjusting ? (
+                      <>
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        <span>Applying...</span>
+                      </>
+                    ) : (
+                      <>
+                        <SlidersHorizontal className="w-3.5 h-3.5" />
+                        <span>
+                          {adjustType === "ADD"
+                            ? `Credit +${adjustPinsCount > 0 ? adjustPinsCount.toLocaleString() : "0"} PINs`
+                            : `Debit -${adjustPinsCount > 0 ? adjustPinsCount.toLocaleString() : "0"} PINs`}
+                        </span>
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </form>
+            </TabsContent>
+
+            {/* TAB 2: REFUND PINS */}
+            <TabsContent value="refund">
+              <form onSubmit={handleRefundPins} className="space-y-4">
+                <div className="space-y-3">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-semibold text-slate-700">Test Session ID (UUID) <span className="text-destructive">*</span></Label>
+                    <Input
+                      required
+                      placeholder="e.g. 123e4567-e89b-12d3-a456-426614174000"
+                      value={refundSessionId}
+                      onChange={(e) => setRefundSessionId(e.target.value)}
+                      className="h-9 text-xs font-mono"
+                    />
+                    <p className="text-[10.5px] text-slate-400">
+                      Must correspond to a test session where a PIN deduction was previously recorded.
+                    </p>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-semibold text-slate-700">Refund Reason <span className="text-destructive">*</span></Label>
+                    <Input
+                      required
+                      placeholder="e.g. Session voided due to proctoring network error"
+                      value={refundReason}
+                      onChange={(e) => setRefundReason(e.target.value)}
+                      className="h-9 text-xs"
+                    />
+                  </div>
+                </div>
+
+                <div className="bg-slate-50/60 border border-slate-200/80 rounded-lg p-2.5 flex items-center justify-between text-xs">
+                  <span className="text-slate-600 font-medium">Refund Amount:</span>
+                  <span className="font-mono font-bold text-emerald-700 text-sm">
+                    +1 PIN Credit
+                  </span>
+                </div>
+
+                <div className="flex justify-end items-center gap-2 pt-3 border-t border-slate-200">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setAdjustRefundOrg(null)}
+                    className="text-xs font-semibold h-9 px-4 border-slate-200"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="submit"
+                    disabled={isRefunding || !refundSessionId.trim() || !refundReason.trim()}
+                    className="bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold h-9 px-5 gap-1.5"
+                  >
+                    {isRefunding ? (
+                      <>
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        <span>Refunding...</span>
+                      </>
+                    ) : (
+                      <>
+                        <RotateCcw className="w-3.5 h-3.5" />
+                        <span>Issue Refund (1 PIN)</span>
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </form>
+            </TabsContent>
+          </Tabs>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── EDIT ORGANISATION DIALOG ── */}
       <Dialog open={!!editingOrg} onOpenChange={(open) => !open && setEditingOrg(null)}>
         <DialogContent className="sm:max-w-[420px]">
           <DialogHeader>
@@ -697,29 +1067,8 @@ export default function Organisations() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setEditingOrg(null)}>Cancel</Button>
-            <Button variant="hero" onClick={handleUpdate} disabled={isUpdating} className="bg-indigo-600 hover:bg-indigo-700 text-white">
+            <Button onClick={handleUpdate} disabled={isUpdating} className="bg-slate-900 hover:bg-slate-800 text-white">
               {isUpdating ? "Saving..." : "Save Changes"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Delete Confirmation Dialog */}
-      <Dialog open={!!orgToDelete} onOpenChange={(open) => !open && setOrgToDelete(null)}>
-        <DialogContent className="sm:max-w-[400px]">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-destructive">
-              <AlertTriangle className="w-5 h-5" />
-              Delete Organisation
-            </DialogTitle>
-            <DialogDescription>
-              Are you sure you want to delete <strong>{orgToDelete?.name}</strong>? All linked users and data may be affected.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setOrgToDelete(null)}>Cancel</Button>
-            <Button variant="destructive" onClick={handleDelete} disabled={isDeleting}>
-              {isDeleting ? "Deleting..." : "Delete Permanently"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -727,4 +1076,3 @@ export default function Organisations() {
     </div>
   );
 }
-

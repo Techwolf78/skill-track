@@ -77,7 +77,10 @@ const server = http.createServer((req, res) => {
     };
 
     const proxyReq = backendClient.request(proxyReqOptions, (proxyRes) => {
-      res.writeHead(proxyRes.statusCode || 500, proxyRes.headers);
+      res.writeHead(proxyRes.statusCode || 500, {
+        ...proxyRes.headers,
+        ...SECURITY_HEADERS,
+      });
       proxyRes.pipe(res);
     });
 

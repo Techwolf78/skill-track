@@ -1,11 +1,7 @@
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
 } from "@/components/ui/dialog";
 import {
   Table,
@@ -18,27 +14,19 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth-context";
-import { candidateService, Candidate, SpringPage } from "@/lib/candidate-service";
+import { candidateService, Candidate } from "@/lib/candidate-service";
 import { cn } from "@/lib/utils";
 import { apiClient } from "@/lib/api-client";
 import * as XLSX from "xlsx";
 import {
-  Search,
   Loader2,
   Send,
   UserPlus,
-  Users,
-  ChevronLeft,
-  ChevronRight,
-  ChevronsLeft,
-  ChevronsRight,
   Plus,
   Trash2,
-  KeyRound,
   CheckCircle2,
   AlertTriangle,
   RefreshCw,
@@ -46,8 +34,6 @@ import {
   FileSpreadsheet,
   Download,
   Upload,
-  GripVertical,
-  Check,
   ArrowRight,
 } from "lucide-react";
 
@@ -72,37 +58,19 @@ export function AddCandidatesModal({
 }: AddCandidatesModalProps) {
   const { toast } = useToast();
   const { user } = useAuth();
-  const [activeTab, setActiveTab] = useState<"pick" | "create" | "bulk">("pick");
+  const [activeTab, setActiveTab] = useState<"create" | "bulk">("create");
 
-  // Tab 1: Pick Existing Candidates state (Server-Side Pagination & Search)
-  const [searchTerm, setSearchTerm] = useState("");
-  const [debouncedSearch, setDebouncedSearch] = useState("");
-  const [page, setPage] = useState(0);
-  const [pageSize] = useState(15);
-  const [loadingCandidates, setLoadingCandidates] = useState(false);
-  const [pageData, setPageData] = useState<SpringPage<Candidate>>({
-    content: [],
-    totalElements: 0,
-    totalPages: 1,
-    size: 15,
-    number: 0,
-    first: true,
-    last: true,
-    empty: true,
+  // Tab 1: Create / Add Candidate Form state
+  const [createForm, setCreateForm] = useState({
+    name: "",
+    email: "",
   });
-  const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const [inviting, setInviting] = useState(false);
-  const [lastFailedCount, setLastFailedCount] = useState(0);
+  const [customFields, setCustomFields] = useState<Array<{ key: string; value: string }>>([]);
+  const [creating, setCreating] = useState(false);
+  const [checkingEmail, setCheckingEmail] = useState(false);
+  const [existingCandidate, setExistingCandidate] = useState<Candidate | null>(null);
 
-  // Tab 3: Bulk Import state
-  const [bulkCustomFields, setBulkCustomFields] = useState<Array<{ id: string; name: string; required: boolean }>>([
-    { id: "std_name", name: "Name", required: true },
-    { id: "std_email", name: "Email", required: true },
-    { id: "std_password", name: "Password", required: true },
-    { id: "std_phone", name: "PhoneNumber", required: false },
-  ]);
-  const [newFieldName, setNewFieldName] = useState("");
-  const [newFieldRequired, setNewFieldRequired] = useState(false);
+  // Tab 2: Bulk Import state
   const [bulkFile, setBulkFile] = useState<File | null>(null);
   const [processingBulkFile, setProcessingBulkFile] = useState(false);
   const [bulkError, setBulkError] = useState<string | null>(null);
@@ -110,25 +78,16 @@ export function AddCandidatesModal({
     Array<{ name: string; email: string; phoneNumber?: string; status?: "SUCCESS" | "FAILED"; errorMessage?: string }>
   >([]);
   const [bulkStep, setBulkStep] = useState<"upload" | "review">("upload");
+  const [inviting, setInviting] = useState(false);
 
-  // Debounce search input by 300ms
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setDebouncedSearch(searchTerm);
-      setPage(0);
-    }, 300);
-    return () => clearTimeout(timer);
-  }, [searchTerm]);
-
-  // Reset errors and selections when dialog opens/closes
+  // Reset errors and form state when dialog opens/closes
   useEffect(() => {
     if (!open) {
-      setLastFailedCount(0);
-      setSelectedIds([]);
-      setSearchTerm("");
-      setDebouncedSearch("");
-      setPage(0);
-      setActiveTab("pick");
+      setActiveTab("create");
+      setCreateForm({ name: "", email: "" });
+      setCustomFields([]);
+      setExistingCandidate(null);
+      setCheckingEmail(false);
       setBulkFile(null);
       setBulkError(null);
       setParsedBulkCandidates([]);
@@ -136,17 +95,215 @@ export function AddCandidatesModal({
     }
   }, [open]);
 
-  // Bulk Template Download
-  const downloadBulkTemplate = (format: "xlsx" | "csv" = "xlsx") => {
-    const headers = bulkCustomFields.map((f) => f.name);
-    const sampleRow = bulkCustomFields.map((f) => {
-      const lower = f.name.toLowerCase();
-      if (lower.includes("name") && !lower.includes("college")) return "Jane Doe";
-      if (lower.includes("email")) return "jane.doe@example.com";
-      if (lower.includes("password")) return "SecurePass@123";
-      if (lower.includes("phone")) return "+91 9876543210";
-      return `Sample ${f.name}`;
+  // Debounced auto-lookup for existing candidate when user types/pastes email
+  useEffect(() => {
+    const trimmedEmail = createForm.email.trim().toLowerCase();
+    const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+    if (!trimmedEmail || !EMAIL_REGEX.test(trimmedEmail)) {
+      setExistingCandidate(null);
+      return;
+    }
+
+    let isMounted = true;
+    const timer = setTimeout(async () => {
+      try {
+        setCheckingEmail(true);
+        const orgId = user?.organisationData?.id;
+        const res = await candidateService.getCandidatesPage(0, 5, trimmedEmail, orgId);
+        if (!isMounted) return;
+
+        const match = res.content.find(
+          (c) =>
+            c.user?.email?.toLowerCase() === trimmedEmail ||
+            c.email?.toLowerCase() === trimmedEmail
+        );
+
+        if (match) {
+          setExistingCandidate(match);
+          // Auto-fill name if not already manually typed
+          setCreateForm((prev) => ({
+            ...prev,
+            name: prev.name.trim() ? prev.name : match.user?.name || match.name || "",
+          }));
+        } else {
+          setExistingCandidate(null);
+        }
+      } catch (err) {
+        console.warn("Background email lookup error:", err);
+      } finally {
+        if (isMounted) setCheckingEmail(false);
+      }
+    }, 350);
+
+    return () => {
+      isMounted = false;
+      clearTimeout(timer);
+    };
+  }, [createForm.email, user?.organisationData?.id]);
+
+  // Generate random strong password for new candidate creation
+  const generateSecurePassword = () => {
+    const upper = "ABCDEFGHJKLMNPQRSTUVWXYZ";
+    const lower = "abcdefghijkmnopqrstuvwxyz";
+    const digits = "23456789";
+    const specials = "!@#$%";
+    const all = upper + lower + digits + specials;
+    let pwd = "";
+    pwd += upper[Math.floor(Math.random() * upper.length)];
+    pwd += lower[Math.floor(Math.random() * lower.length)];
+    pwd += digits[Math.floor(Math.random() * digits.length)];
+    pwd += specials[Math.floor(Math.random() * specials.length)];
+    for (let i = 4; i < 12; i++) {
+      pwd += all[Math.floor(Math.random() * all.length)];
+    }
+    return pwd.split("").sort(() => 0.5 - Math.random()).join("");
+  };
+
+  // Add custom extra field
+  const addCustomField = () => {
+    setCustomFields((prev) => [...prev, { key: "", value: "" }]);
+  };
+
+  const updateCustomField = (index: number, field: "key" | "value", val: string) => {
+    setCustomFields((prev) => {
+      const copy = [...prev];
+      copy[index][field] = val;
+      return copy;
     });
+  };
+
+  const removeCustomField = (index: number) => {
+    setCustomFields((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  // Handle Create/Add Candidate + Invite (Merged Logic)
+  const handleCreateAndInvite = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const trimmedName = createForm.name.trim();
+    const trimmedEmail = createForm.email.trim().toLowerCase();
+
+    if (!trimmedName || !trimmedEmail) {
+      toast({
+        title: "Validation Error",
+        description: "Please fill in Name and Email Address.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!EMAIL_REGEX.test(trimmedEmail)) {
+      toast({
+        title: "Invalid Email",
+        description: "Please provide a valid email address.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Check if candidate is already invited to this schedule
+    if (existingCandidate && alreadyInvitedIds.has(existingCandidate.id)) {
+      toast({
+        title: "Already Invited",
+        description: "This candidate has already been invited to this test schedule.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const orgId = user?.organisationData?.id;
+    if (!orgId) {
+      toast({
+        title: "Organisation Error",
+        description: "No organisation ID found for current user.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      setCreating(true);
+
+      const extraFieldsMap: Record<string, unknown> = {};
+      customFields.forEach(({ key, value }) => {
+        if (key.trim()) {
+          extraFieldsMap[key.trim()] = value.trim();
+        }
+      });
+
+      let candidateId: string | undefined = existingCandidate?.id;
+      let isExisting = Boolean(existingCandidate);
+
+      // 1. If candidate is not already known, attempt to create in DB
+      if (!candidateId) {
+        try {
+          const autoPassword = generateSecurePassword();
+          candidateId = await candidateService.createCandidate({
+            name: trimmedName,
+            email: trimmedEmail,
+            password: autoPassword,
+            organisationId: orgId,
+            extraFields: Object.keys(extraFieldsMap).length > 0 ? extraFieldsMap : undefined,
+          });
+        } catch (createErr) {
+          const cErr = createErr as { response?: { data?: { message?: string } }; message?: string };
+          const cErrMsg = cErr.response?.data?.message || cErr.message || "";
+          if (/email.*already.*exists/i.test(cErrMsg) || /conflict/i.test(cErrMsg)) {
+            console.log("Candidate email already exists in DB, proceeding to send invitation:", trimmedEmail);
+            isExisting = true;
+          } else {
+            throw createErr;
+          }
+        }
+      }
+
+      // 2. Send test invitation
+      await candidateService.createInvitation({
+        scheduleId,
+        candidateId: candidateId || undefined,
+        candidateEmail: trimmedEmail,
+      });
+
+      toast({
+        title: isExisting ? "Existing Candidate Added & Invited" : "Candidate Created & Invited",
+        description: isExisting
+          ? `${trimmedName || trimmedEmail} was found in the system and successfully added to the test.`
+          : `Successfully added ${trimmedName} and issued test invitation.`,
+      });
+
+      setCreateForm({ name: "", email: "" });
+      setCustomFields([]);
+      setExistingCandidate(null);
+      onSuccess();
+      onOpenChange(false);
+    } catch (error) {
+      console.error("Create and invite error:", error);
+      const err = error as { response?: { data?: { message?: string } }; message?: string };
+      const errMsg = err.response?.data?.message || err.message || "An error occurred.";
+
+      if (/already.*invited/i.test(errMsg) || /invitation.*already.*exists/i.test(errMsg)) {
+        toast({
+          title: "Already Invited",
+          description: "This candidate has already been invited to this test schedule.",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Failed to Add Candidate",
+          description: errMsg,
+          variant: "destructive",
+        });
+      }
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  // Bulk Template Download (Name and Email headers)
+  const downloadBulkTemplate = (format: "xlsx" | "csv" = "xlsx") => {
+    const headers = ["Name", "Email"];
+    const sampleRow = ["Jane Doe", "jane.doe@example.com"];
 
     const ws = XLSX.utils.aoa_to_sheet([headers, sampleRow]);
     const wb = XLSX.utils.book_new();
@@ -157,8 +314,15 @@ export function AddCandidatesModal({
 
     toast({
       title: "Template Downloaded",
-      description: `Downloaded "${fileName}" with ${bulkCustomFields.length} column(s).`,
+      description: `Downloaded "${fileName}" template.`,
     });
+  };
+
+  const handleRemoveBulkFile = () => {
+    setBulkFile(null);
+    setBulkError(null);
+    setParsedBulkCandidates([]);
+    setBulkStep("upload");
   };
 
   const handleBulkFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -167,27 +331,14 @@ export function AddCandidatesModal({
       const ext = selected.name.substring(selected.name.lastIndexOf(".")).toLowerCase();
       if (![".csv", ".xlsx", ".xls"].includes(ext)) {
         setBulkError("Please upload a valid CSV or Excel file (.xlsx, .xls, .csv).");
-        setBulkFile(null);
+        handleRemoveBulkFile();
         return;
       }
       setBulkFile(selected);
       setBulkError(null);
+      setParsedBulkCandidates([]);
+      setBulkStep("upload");
     }
-  };
-
-  const handleAddBulkField = () => {
-    const trimmed = newFieldName.trim();
-    if (!trimmed) return;
-    if (bulkCustomFields.some((f) => f.name.toLowerCase() === trimmed.toLowerCase())) {
-      toast({ title: "Field Exists", description: `"${trimmed}" is already in the list.`, variant: "destructive" });
-      return;
-    }
-    setBulkCustomFields((prev) => [
-      ...prev,
-      { id: "cf_" + Math.random().toString(36).substring(2, 9), name: trimmed, required: newFieldRequired },
-    ]);
-    setNewFieldName("");
-    setNewFieldRequired(false);
   };
 
   const handleProcessBulkFile = async () => {
@@ -207,28 +358,133 @@ export function AddCandidatesModal({
       const ws = wb.Sheets[wb.SheetNames[0]];
       const rows: Record<string, unknown>[] = XLSX.utils.sheet_to_json(ws);
 
-      const parsed = rows
-        .map((r) => {
-          const name = String(r["Name"] || r["name"] || r["Full Name"] || "");
-          const email = String(r["Email"] || r["email"] || r["EMAIL"] || "").trim();
-          const phoneNumber = String(r["PhoneNumber"] || r["Phone"] || r["phone"] || "");
-          return { name, email, phoneNumber, status: "SUCCESS" as const };
-        })
-        .filter((c) => Boolean(c.email));
+      const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      const validCandidates: Array<{ name: string; email: string; phoneNumber?: string; status: "SUCCESS" | "FAILED"; errorMessage?: string }> = [];
+      let localOmittedCount = 0;
 
-      if (parsed.length === 0) {
-        throw new Error("No candidate rows with valid email addresses found.");
+      for (const r of rows) {
+        const entries = Object.entries(r);
+        let name = "";
+        let rawEmail = "";
+        let phoneNumber = "";
+
+        // 1. Check normalized column headers
+        for (const [key, val] of entries) {
+          const normKey = key.trim().toLowerCase().replace(/[\s_\-\.]+/g, "");
+          const strVal = String(val ?? "").trim();
+          if (!strVal) continue;
+
+          if (
+            !rawEmail &&
+            (normKey === "email" ||
+              normKey === "emailid" ||
+              normKey === "emailaddress" ||
+              normKey === "candidateemail" ||
+              normKey === "studentemail" ||
+              normKey === "mail" ||
+              normKey === "useremail")
+          ) {
+            rawEmail = strVal;
+          } else if (
+            !name &&
+            (normKey === "name" ||
+              normKey === "fullname" ||
+              normKey === "candidatename" ||
+              normKey === "studentname" ||
+              normKey === "firstname" ||
+              normKey === "nameofstudent" ||
+              normKey === "nameofcandidate" ||
+              normKey === "username")
+          ) {
+            name = strVal;
+          } else if (
+            !phoneNumber &&
+            (normKey === "phone" ||
+              normKey === "phonenumber" ||
+              normKey === "mobile" ||
+              normKey === "mobilenumber" ||
+              normKey === "mobileno" ||
+              normKey === "contact" ||
+              normKey === "contactnumber" ||
+              normKey === "contactno")
+          ) {
+            phoneNumber = strVal;
+          }
+        }
+
+        // 2. Fallback email value auto-detection
+        if (!rawEmail) {
+          for (const [, val] of entries) {
+            const strVal = String(val ?? "").trim();
+            if (strVal.includes("@") && strVal.includes(".")) {
+              const cleaned = strVal.replace(/\s+/g, "");
+              if (EMAIL_REGEX.test(cleaned)) {
+                rawEmail = cleaned;
+                break;
+              }
+            }
+          }
+        }
+
+        const email = rawEmail ? rawEmail.replace(/\s+/g, "") : "";
+
+        // 3. Fallback name
+        if (!name && email) {
+          for (const [, val] of entries) {
+            const strVal = String(val ?? "").trim();
+            if (strVal && !strVal.includes("@") && strVal !== phoneNumber && isNaN(Number(strVal))) {
+              name = strVal;
+              break;
+            }
+          }
+          if (!name) {
+            name = email.split("@")[0];
+          }
+        }
+
+        // Skip completely blank rows
+        if (!name && !email) {
+          continue;
+        }
+
+        // Omit rows with invalid email
+        if (!email || !EMAIL_REGEX.test(email)) {
+          localOmittedCount++;
+          continue;
+        }
+
+        validCandidates.push({
+          name: name || email.split("@")[0],
+          email,
+          phoneNumber: phoneNumber || undefined,
+          status: "SUCCESS" as const,
+        });
+      }
+
+      if (validCandidates.length === 0) {
+        throw new Error("No valid candidate rows found. Please ensure at least Name and a valid Email address are provided.");
       }
 
       const formData = new FormData();
       formData.append("file", bulkFile);
       formData.append("organisationId", orgId);
 
-      await apiClient.post("/candidates/bulk-upload", formData, {
+      const uploadRes = await apiClient.post("/candidates/bulk-upload", formData, {
         headers: { "Content-Type": "multipart/form-data" },
       });
 
-      setParsedBulkCandidates(parsed);
+      const responseData = uploadRes.data?.data || uploadRes.data;
+      const backendFailCount = responseData?.failCount || 0;
+      const totalOmitted = Math.max(localOmittedCount, backendFailCount);
+
+      if (totalOmitted > 0) {
+        toast({
+          title: "Import Completed with Omissions",
+          description: `Loaded ${validCandidates.length} valid candidate(s). ${totalOmitted} invalid row(s) were omitted.`,
+        });
+      }
+
+      setParsedBulkCandidates(validCandidates);
       setBulkStep("review");
     } catch (err) {
       const errorObj = err as { response?: { data?: { message?: string } }; message?: string };
@@ -267,238 +523,9 @@ export function AddCandidatesModal({
     }
   };
 
-  const effectiveOrgName =
-    organisationName ||
-    user?.organisationData?.name ||
-    (user as { organisationName?: string })?.organisationName ||
-    "Gryphon 360";
-
-  // Tab 2: Create Candidate Form state
-  const [createForm, setCreateForm] = useState({
-    name: "",
-    email: "",
-    password: "",
-    phoneNumber: "",
-  });
-  const [customFields, setCustomFields] = useState<Array<{ key: string; value: string }>>([]);
-  const [creating, setCreating] = useState(false);
-
-  // Server-side paginated fetch with backend search
-  const fetchPage = useCallback(async () => {
-    if (!open) return;
-    try {
-      setLoadingCandidates(true);
-      const res = await candidateService.getCandidatesPage(page, pageSize, debouncedSearch);
-      setPageData(res);
-    } catch (error) {
-      console.error("Failed to fetch candidates page:", error);
-      toast({
-        title: "Error",
-        description: "Failed to load candidate list.",
-        variant: "destructive",
-      });
-    } finally {
-      setLoadingCandidates(false);
-    }
-  }, [open, page, pageSize, debouncedSearch, toast]);
-
-  useEffect(() => {
-    if (open) {
-      fetchPage();
-    }
-  }, [open, fetchPage]);
-
-  // Sort candidate list on the active page: non-invited first, already-invited at bottom
-  const sortedContent = useMemo(() => {
-    const list = pageData.content ?? [];
-    const uninvited = list.filter((c) => !alreadyInvitedIds.has(c.id));
-    const invited = list.filter((c) => alreadyInvitedIds.has(c.id));
-    return [...uninvited, ...invited];
-  }, [pageData.content, alreadyInvitedIds]);
-
-  // Select all selectable on current page
-  const selectableOnPage = useMemo(() => {
-    return sortedContent.filter((c) => !alreadyInvitedIds.has(c.id)).map((c) => c.id);
-  }, [sortedContent, alreadyInvitedIds]);
-
-  const isAllSelectableChecked =
-    selectableOnPage.length > 0 &&
-    selectableOnPage.every((id) => selectedIds.includes(id));
-
-  const toggleSelectAll = (checked: boolean) => {
-    if (checked) {
-      setSelectedIds((prev) => Array.from(new Set([...prev, ...selectableOnPage])));
-    } else {
-      const pageSet = new Set(selectableOnPage);
-      setSelectedIds((prev) => prev.filter((id) => !pageSet.has(id)));
-    }
-  };
-
-  const toggleCandidate = (id: string, checked: boolean) => {
-    if (checked) {
-      setSelectedIds((prev) => [...prev, id]);
-    } else {
-      setSelectedIds((prev) => prev.filter((item) => item !== id));
-    }
-  };
-
-  // Bulk invite selected with partial-failure handling
-  const handleInviteSelected = async () => {
-    if (selectedIds.length === 0 || !scheduleId) return;
-    try {
-      setInviting(true);
-      let successCount = 0;
-      const failedIds: string[] = [];
-
-      for (const candidateId of selectedIds) {
-        try {
-          await candidateService.createInvitation({
-            scheduleId,
-            candidateId,
-          });
-          successCount++;
-        } catch (err) {
-          console.error(`Failed to invite candidate ${candidateId}:`, err);
-          failedIds.push(candidateId);
-        }
-      }
-
-      setLastFailedCount(failedIds.length);
-
-      if (failedIds.length === 0) {
-        // Complete success
-        toast({
-          title: "Invitations Sent",
-          description: `Successfully invited all ${successCount} candidate${successCount === 1 ? "" : "s"}.`,
-        });
-        setSelectedIds([]);
-        setLastFailedCount(0);
-        onSuccess();
-        onOpenChange(false);
-      } else {
-        // Partial failure: Keep modal open and retain only failed IDs for retry
-        if (successCount > 0) {
-          onSuccess();
-          fetchPage();
-        }
-        setSelectedIds(failedIds);
-
-        toast({
-          title: successCount > 0 ? "Partial Invitations Sent" : "Invitations Failed",
-          description: successCount > 0
-            ? `${successCount} candidate${successCount === 1 ? "" : "s"} invited successfully, but ${failedIds.length} failed. The failed candidates remain selected below so you can retry.`
-            : `Failed to invite ${failedIds.length} candidate${failedIds.length === 1 ? "" : "s"}. The selections have been retained for you to retry.`,
-          variant: "destructive",
-        });
-      }
-    } catch (error) {
-      console.error("Bulk invite error:", error);
-      toast({
-        title: "Error",
-        description: "An unexpected error occurred while sending invitations.",
-        variant: "destructive",
-      });
-    } finally {
-      setInviting(false);
-    }
-  };
-
-  // Generate random strong password
-  const generatePassword = () => {
-    const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%";
-    let pwd = "";
-    for (let i = 0; i < 10; i++) {
-      pwd += chars.charAt(Math.floor(Math.random() * chars.length));
-    }
-    setCreateForm((prev) => ({ ...prev, password: pwd }));
-  };
-
-  // Add custom extra field
-  const addCustomField = () => {
-    setCustomFields((prev) => [...prev, { key: "", value: "" }]);
-  };
-
-  const updateCustomField = (index: number, field: "key" | "value", val: string) => {
-    setCustomFields((prev) => {
-      const copy = [...prev];
-      copy[index][field] = val;
-      return copy;
-    });
-  };
-
-  const removeCustomField = (index: number) => {
-    setCustomFields((prev) => prev.filter((_, i) => i !== index));
-  };
-
-  // Handle Create Candidate + Invite
-  const handleCreateAndInvite = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!createForm.name || !createForm.email || !createForm.password) {
-      toast({
-        title: "Validation Error",
-        description: "Please fill in Name, Email, and Password.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    const orgId = user?.organisationData?.id;
-    if (!orgId) {
-      toast({
-        title: "Organisation Error",
-        description: "No organisation ID found for current user.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    try {
-      setCreating(true);
-
-      const extraFieldsMap: Record<string, unknown> = {};
-      customFields.forEach(({ key, value }) => {
-        if (key.trim()) {
-          extraFieldsMap[key.trim()] = value.trim();
-        }
-      });
-
-      // 1. Create candidate
-      const candidateId = await candidateService.createCandidate({
-        name: createForm.name.trim(),
-        email: createForm.email.trim(),
-        password: createForm.password,
-        phoneNumber: createForm.phoneNumber.trim() || undefined,
-        organisationId: orgId,
-        extraFields: Object.keys(extraFieldsMap).length > 0 ? extraFieldsMap : undefined,
-      });
-
-      // 2. Send invitation
-      await candidateService.createInvitation({
-        scheduleId,
-        candidateId,
-      });
-
-      toast({
-        title: "Candidate Created & Invited",
-        description: `Successfully added ${createForm.name} and issued test invitation.`,
-      });
-
-      setCreateForm({ name: "", email: "", password: "", phoneNumber: "" });
-      setCustomFields([]);
-      onSuccess();
-      onOpenChange(false);
-    } catch (error) {
-      console.error("Create and invite error:", error);
-      const err = error as { response?: { data?: { message?: string } }; message?: string };
-      toast({
-        title: "Failed to Add Candidate",
-        description: err.response?.data?.message || err.message || "An error occurred.",
-        variant: "destructive",
-      });
-    } finally {
-      setCreating(false);
-    }
-  };
+  const isCandidateAlreadyInvited = Boolean(
+    existingCandidate && alreadyInvitedIds.has(existingCandidate.id)
+  );
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -528,24 +555,11 @@ export function AddCandidatesModal({
 
         {/* Main Content: Split Grid Layout */}
         <div className="grid grid-cols-1 lg:grid-cols-12 flex-1 min-h-0 overflow-hidden">
-          {/* ──── LEFT COLUMN: Candidate Selection / Creation (7 cols) ──── */}
+          {/* ──── LEFT COLUMN: Candidate Creation / Bulk Import (7 cols) ──── */}
           <div className="lg:col-span-7 flex flex-col h-full overflow-hidden border-b lg:border-b-0 lg:border-r border-slate-200 bg-white">
-            {/* Top Navigation Tabs */}
+            {/* Top Navigation Tabs (2 Tabs: Create New & Bulk Import) */}
             <div className="p-4 pb-2 border-b border-slate-100 shrink-0">
-              <div className="grid grid-cols-3 p-1 bg-slate-100 rounded-lg text-xs font-medium gap-1">
-                <button
-                  type="button"
-                  onClick={() => setActiveTab("pick")}
-                  className={cn(
-                    "py-2 px-2 rounded-md flex items-center justify-center gap-1.5 transition-all cursor-pointer text-center",
-                    activeTab === "pick"
-                      ? "bg-white text-slate-900 shadow-xs font-semibold"
-                      : "text-slate-600 hover:text-slate-900"
-                  )}
-                >
-                  <Users className="w-3.5 h-3.5 text-slate-500 shrink-0" />
-                  <span className="truncate">Select Existing</span>
-                </button>
+              <div className="grid grid-cols-2 p-1 bg-slate-100 rounded-lg text-xs font-medium gap-1">
                 <button
                   type="button"
                   onClick={() => setActiveTab("create")}
@@ -556,7 +570,7 @@ export function AddCandidatesModal({
                       : "text-slate-600 hover:text-slate-900"
                   )}
                 >
-                  <Plus className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                  <UserPlus className="w-3.5 h-3.5 text-slate-500 shrink-0" />
                   <span className="truncate">Create New</span>
                 </button>
                 <button
@@ -575,255 +589,22 @@ export function AddCandidatesModal({
               </div>
             </div>
 
-            {/* TAB 1: Select Existing Candidates */}
-            {activeTab === "pick" && (
-              <div className="flex-1 flex flex-col min-h-0 overflow-hidden p-5 pt-3 space-y-3">
-                {/* Failure Alert Banner */}
-                {lastFailedCount > 0 && (
-                  <div className="flex items-center justify-between p-2.5 rounded-lg border border-red-200 bg-red-50 text-red-700 text-xs shrink-0">
-                    <div className="flex items-center gap-2">
-                      <AlertTriangle className="w-4 h-4 shrink-0 text-red-600" />
-                      <span>
-                        <strong>{lastFailedCount} invitation{lastFailedCount === 1 ? "" : "s"} failed.</strong> The failed candidates remain selected for retry.
-                      </span>
-                    </div>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setLastFailedCount(0)}
-                      className="h-6 px-2 text-[11px] text-red-700 hover:bg-red-100"
-                    >
-                      Dismiss
-                    </Button>
-                  </div>
-                )}
-
-                {/* Search Input with Server Debounce */}
-                <div className="relative shrink-0">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                  <Input
-                    placeholder="Search candidates by name, email, or phone..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-9 h-9 text-xs bg-white border border-slate-200 rounded-lg text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
-                  />
-                </div>
-
-                {/* Candidates Selection Table (Fills full height) */}
-                <div className="flex-1 border border-slate-200 rounded-lg overflow-y-auto bg-white min-h-0">
-                  <Table>
-                    <TableHeader className="bg-slate-50/90 sticky top-0 z-10 border-b border-slate-200">
-                      <TableRow className="border-b border-slate-200 hover:bg-transparent">
-                        <TableHead className="w-[42px] py-2 px-3">
-                          <Checkbox
-                            checked={isAllSelectableChecked}
-                            onCheckedChange={(c) => toggleSelectAll(Boolean(c))}
-                            disabled={selectableOnPage.length === 0}
-                            className="data-[state=checked]:bg-indigo-600 data-[state=checked]:border-indigo-600 border-slate-300"
-                          />
-                        </TableHead>
-                        <TableHead className="text-xs font-semibold text-slate-600 py-2">Candidate</TableHead>
-                        <TableHead className="text-xs font-semibold text-slate-600 py-2">Contact</TableHead>
-                        <TableHead className="text-right text-xs font-semibold text-slate-600 py-2 pr-4">Status</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {loadingCandidates ? (
-                        <TableRow>
-                          <TableCell colSpan={4} className="text-center py-16">
-                            <Loader2 className="w-6 h-6 animate-spin mx-auto text-indigo-600 mb-2" />
-                            <p className="text-xs text-slate-500">Loading candidates from server...</p>
-                          </TableCell>
-                        </TableRow>
-                      ) : sortedContent.length === 0 ? (
-                        <TableRow>
-                          <TableCell colSpan={4} className="text-center py-16 text-slate-500">
-                            <Users className="w-8 h-8 mx-auto text-slate-300 mb-2" />
-                            <p className="text-sm font-medium text-slate-700">No candidates found</p>
-                            <p className="text-xs text-slate-400">
-                              {debouncedSearch
-                                ? `No candidates matched "${debouncedSearch}".`
-                                : "No candidates registered in your organisation."}
-                            </p>
-                          </TableCell>
-                        </TableRow>
-                      ) : (
-                        sortedContent.map((c) => {
-                          const isAlreadyInvited = alreadyInvitedIds.has(c.id);
-                          const isChecked = selectedIds.includes(c.id);
-
-                          return (
-                            <TableRow
-                              key={c.id}
-                              className={cn(
-                                "transition-colors border-b border-slate-100",
-                                isAlreadyInvited
-                                  ? "opacity-50 bg-slate-50/50 cursor-not-allowed"
-                                  : isChecked
-                                  ? "bg-emerald-50/40 hover:bg-emerald-50/60"
-                                  : "hover:bg-slate-50/80"
-                              )}
-                            >
-                              <TableCell className="py-2.5 px-3">
-                                <Checkbox
-                                  checked={isChecked}
-                                  onCheckedChange={(checked) => toggleCandidate(c.id, Boolean(checked))}
-                                  disabled={isAlreadyInvited}
-                                  className="data-[state=checked]:bg-indigo-600 data-[state=checked]:border-indigo-600 border-slate-300"
-                                />
-                              </TableCell>
-                              <TableCell className="py-2.5">
-                                <div className="flex items-center gap-2.5">
-                                  <div
-                                    className={cn(
-                                      "w-7 h-7 rounded-full flex items-center justify-center font-bold text-xs shrink-0 border",
-                                      isChecked
-                                        ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                                        : "bg-slate-100 text-slate-700 border-slate-200"
-                                    )}
-                                  >
-                                    {c.user.name
-                                      ?.split(" ")
-                                      .map((n) => n[0])
-                                      .join("")
-                                      .toUpperCase()
-                                      .slice(0, 2) || "C"}
-                                  </div>
-                                  <div className="min-w-0">
-                                    <p className="font-semibold text-xs text-slate-900 truncate">{c.user.name}</p>
-                                    <p className="text-[10px] text-slate-400 font-mono">ID: {c.id.slice(0, 8)}</p>
-                                  </div>
-                                </div>
-                              </TableCell>
-                              <TableCell className="py-2.5">
-                                <div className="text-xs text-slate-700 truncate max-w-[170px]">{c.user.email}</div>
-                                <div className="text-[10px] text-slate-400">{c.user.phoneNumber || "—"}</div>
-                              </TableCell>
-                              <TableCell className="text-right py-2.5 pr-4">
-                                {isAlreadyInvited ? (
-                                  <Badge variant="outline" className="text-[10px] border-slate-200 text-slate-400 font-normal">
-                                    Already Invited
-                                  </Badge>
-                                ) : isChecked ? (
-                                  <Badge className="text-[10px] bg-emerald-50 text-emerald-700 border border-emerald-200 font-medium">
-                                    Selected
-                                  </Badge>
-                                ) : (
-                                  <span className="text-[11px] text-slate-400 font-medium">Available</span>
-                                )}
-                              </TableCell>
-                            </TableRow>
-                          );
-                        })
-                      )}
-                    </TableBody>
-                  </Table>
-                </div>
-
-                {/* Server-Side Pagination Controls */}
-                <div className="flex items-center justify-between pt-1 text-xs text-slate-500 shrink-0">
-                  <span>
-                    Showing <strong>{pageData.totalElements === 0 ? 0 : page * pageSize + 1}</strong> to{" "}
-                    <strong>{Math.min((page + 1) * pageSize, pageData.totalElements)}</strong> of{" "}
-                    <strong>{pageData.totalElements}</strong> candidates
-                  </span>
-
-                  <div className="flex items-center gap-1">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setPage(0)}
-                      disabled={page === 0 || loadingCandidates}
-                      className="h-7 w-7 p-0 border-slate-200 text-slate-600 hover:bg-slate-100 hover:text-slate-900 rounded-md"
-                    >
-                      <ChevronsLeft className="h-3.5 w-3.5" />
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setPage((p) => Math.max(0, p - 1))}
-                      disabled={page === 0 || loadingCandidates}
-                      className="h-7 w-7 p-0 border-slate-200 text-slate-600 hover:bg-slate-100 hover:text-slate-900 rounded-md"
-                    >
-                      <ChevronLeft className="h-3.5 w-3.5" />
-                    </Button>
-                    <span className="px-2 font-semibold text-slate-800">
-                      Page {pageData.totalPages === 0 ? 1 : page + 1} of {Math.max(1, pageData.totalPages)}
-                    </span>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setPage((p) => Math.min(pageData.totalPages - 1, p + 1))}
-                      disabled={page >= pageData.totalPages - 1 || loadingCandidates}
-                      className="h-7 w-7 p-0 border-slate-200 text-slate-600 hover:bg-slate-100 hover:text-slate-900 rounded-md"
-                    >
-                      <ChevronRight className="h-3.5 w-3.5" />
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setPage(Math.max(0, pageData.totalPages - 1))}
-                      disabled={page >= pageData.totalPages - 1 || loadingCandidates}
-                      className="h-7 w-7 p-0 border-slate-200 text-slate-600 hover:bg-slate-100 hover:text-slate-900 rounded-md"
-                    >
-                      <ChevronsRight className="h-3.5 w-3.5" />
-                    </Button>
-                  </div>
-                </div>
-
-                {/* Action Footer for Tab 1 */}
-                <div className="pt-3 border-t border-slate-100 mt-auto flex items-center justify-end gap-2 shrink-0">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => onOpenChange(false)}
-                    disabled={inviting}
-                    className="text-xs font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100 border-slate-200 rounded-lg px-4 py-2"
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    type="button"
-                    onClick={handleInviteSelected}
-                    disabled={selectedIds.length === 0 || inviting}
-                    className={cn(
-                      "text-xs font-semibold rounded-lg px-5 py-2 shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed",
-                      lastFailedCount > 0
-                        ? "bg-red-600 hover:bg-red-700 text-white"
-                        : "bg-indigo-600 hover:bg-indigo-700 text-white"
-                    )}
-                  >
-                    {inviting ? (
-                      <>
-                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                        {lastFailedCount > 0 ? "Retrying..." : "Sending Invitations..."}
-                      </>
-                    ) : lastFailedCount > 0 ? (
-                      <>
-                        <RefreshCw className="w-3.5 h-3.5" />
-                        Retry Failed Invitations ({selectedIds.length})
-                      </>
-                    ) : (
-                      <>
-                        <Send className="w-3.5 h-3.5" />
-                        Send Invitations {selectedIds.length > 0 ? `(${selectedIds.length})` : ""}
-                      </>
-                    )}
-                  </Button>
-                </div>
-              </div>
-            )}
-
-            {/* TAB 2: Create New Candidate (Same fixed height container with internal scroll) */}
+            {/* TAB 1: Create New / Add Candidate */}
             {activeTab === "create" && (
               <div className="flex-1 flex flex-col min-h-0 overflow-y-auto p-6 pt-4">
                 <form onSubmit={handleCreateAndInvite} className="flex-1 flex flex-col space-y-4">
+                  {/* Informational text */}
+                  <p className="text-xs text-slate-500 leading-relaxed">
+                    Enter candidate details below. If the candidate already exists in the system, they will be automatically linked to this test without duplication.
+                  </p>
+
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-1.5">
-                      <Label htmlFor="name" className="text-xs font-semibold text-slate-700">
-                        Full Name <span className="text-red-500">*</span>
-                      </Label>
+                      <div className="h-5 flex items-center">
+                        <Label htmlFor="name" className="text-xs font-semibold text-slate-700">
+                          Full Name <span className="text-red-500">*</span>
+                        </Label>
+                      </div>
                       <Input
                         id="name"
                         placeholder="e.g. Jane Doe"
@@ -835,9 +616,16 @@ export function AddCandidatesModal({
                     </div>
 
                     <div className="space-y-1.5">
-                      <Label htmlFor="email" className="text-xs font-semibold text-slate-700">
-                        Email Address <span className="text-red-500">*</span>
-                      </Label>
+                      <div className="h-5 flex items-center justify-between">
+                        <Label htmlFor="email" className="text-xs font-semibold text-slate-700">
+                          Email Address <span className="text-red-500">*</span>
+                        </Label>
+                        {checkingEmail && (
+                          <span className="text-[10px] text-slate-400 flex items-center gap-1">
+                            <Loader2 className="w-3 h-3 animate-spin text-indigo-500" /> Checking...
+                          </span>
+                        )}
+                      </div>
                       <Input
                         id="email"
                         type="email"
@@ -847,50 +635,25 @@ export function AddCandidatesModal({
                         required
                         className="h-10 text-xs bg-white border border-slate-200 rounded-xl text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
                       />
+                      {/* Existing candidate detection pill */}
+                      {existingCandidate && (
+                        <div className="pt-1">
+                          {isCandidateAlreadyInvited ? (
+                            <Badge className="text-[10px] bg-amber-50 text-amber-700 border border-amber-200 font-medium flex items-center gap-1 py-0.5 px-2">
+                              <AlertTriangle className="w-3 h-3 text-amber-600" />
+                              Already invited to this test schedule
+                            </Badge>
+                          ) : (
+                            <Badge className="text-[10px] bg-emerald-50 text-emerald-700 border border-emerald-200 font-medium flex items-center gap-1 py-0.5 px-2">
+                              <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                              Existing Candidate Detected (will be added directly)
+                            </Badge>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-1.5">
-                      <div className="flex items-center justify-between h-5">
-                        <Label htmlFor="password" className="text-xs font-semibold text-slate-700">
-                          Account Password <span className="text-red-500">*</span>
-                        </Label>
-                        <button
-                          type="button"
-                          onClick={generatePassword}
-                          className="text-[11px] text-emerald-600 hover:text-emerald-700 font-semibold flex items-center gap-1 cursor-pointer transition-colors"
-                        >
-                          <KeyRound className="w-3 h-3" />
-                          Auto-generate
-                        </button>
-                      </div>
-                      <Input
-                        id="password"
-                        type="text"
-                        placeholder="Create a password"
-                        value={createForm.password}
-                        onChange={(e) => setCreateForm((prev) => ({ ...prev, password: e.target.value }))}
-                        required
-                        className="h-10 text-xs font-mono bg-white border border-slate-200 rounded-xl text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
-                      />
-                    </div>
-
-                    <div className="space-y-1.5">
-                      <div className="flex items-center h-5">
-                        <Label htmlFor="phoneNumber" className="text-xs font-semibold text-slate-700">
-                          Phone Number <span className="text-slate-400 font-normal">(Optional)</span>
-                        </Label>
-                      </div>
-                      <Input
-                        id="phoneNumber"
-                        placeholder="e.g. +91 9876543210"
-                        value={createForm.phoneNumber}
-                        onChange={(e) => setCreateForm((prev) => ({ ...prev, phoneNumber: e.target.value }))}
-                        className="h-10 text-xs bg-white border border-slate-200 rounded-xl text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
-                      />
-                    </div>
-                  </div>
 
                   {/* Dynamic Extra Custom Fields */}
                   <div className="space-y-2 pt-2 border-t border-slate-100 flex-1">
@@ -944,7 +707,7 @@ export function AddCandidatesModal({
                     )}
                   </div>
 
-                  {/* Action Footer for Tab 2 */}
+                  {/* Action Footer for Tab 1 */}
                   <div className="pt-4 border-t border-slate-100 mt-auto flex items-center justify-end gap-2 shrink-0">
                     <Button
                       type="button"
@@ -957,18 +720,18 @@ export function AddCandidatesModal({
                     </Button>
                     <Button
                       type="submit"
-                      disabled={creating}
+                      disabled={creating || isCandidateAlreadyInvited}
                       className="text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg px-5 py-2 shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
                     >
                       {creating ? (
                         <>
                           <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                          Creating...
+                          Processing...
                         </>
                       ) : (
                         <>
                           <CheckCircle2 className="w-3.5 h-3.5" />
-                          Create & Invite Candidate
+                          {existingCandidate ? "Add & Invite Candidate" : "Create & Invite Candidate"}
                         </>
                       )}
                     </Button>
@@ -977,16 +740,16 @@ export function AddCandidatesModal({
               </div>
             )}
 
-            {/* TAB 3: Bulk Import */}
+            {/* TAB 2: Bulk Import */}
             {activeTab === "bulk" && (
               <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
                 <div className="flex-1 overflow-y-auto p-5 space-y-5">
-                  {/* Top Card: Template & Custom Fields with Excel & CSV download buttons */}
+                  {/* Top Card: Template Download & File Upload */}
                   <div className="border border-slate-200 rounded-xl p-4 bg-white shadow-2xs space-y-4">
                     <div className="flex items-center justify-between pb-3 border-b border-slate-100">
                       <div>
-                        <h4 className="text-xs font-bold text-slate-900">Template & Custom Fields</h4>
-                        <p className="text-[11px] text-slate-500">Configure columns and download template</p>
+                        <h4 className="text-xs font-bold text-slate-900">Download Template</h4>
+                        <p className="text-[11px] text-slate-500">Get a pre-formatted candidate spreadsheet</p>
                       </div>
                       <div className="flex items-center gap-2">
                         <Button
@@ -1019,7 +782,7 @@ export function AddCandidatesModal({
                         <span>Upload Completed File</span>
                       </div>
                       <p className="text-[11px] text-slate-500">
-                        Select your completed Excel or CSV file.
+                        Select your completed Excel or CSV file. <span className="font-semibold text-slate-700">Name</span> and <span className="font-semibold text-slate-700">Email</span> are required. Any additional columns in your spreadsheet will automatically be imported as custom attributes.
                       </p>
 
                       <label className="flex flex-col items-center justify-center w-full py-5 px-4 border-2 border-dashed border-slate-200 hover:border-slate-300 rounded-xl cursor-pointer bg-slate-50/50 hover:bg-slate-50 transition-colors">
@@ -1050,7 +813,7 @@ export function AddCandidatesModal({
                           </div>
                           <button
                             type="button"
-                            onClick={() => setBulkFile(null)}
+                            onClick={handleRemoveBulkFile}
                             className="text-xs font-medium text-red-600 hover:underline shrink-0 ml-2"
                           >
                             Remove
@@ -1064,114 +827,6 @@ export function AddCandidatesModal({
                           <span>{bulkError}</span>
                         </div>
                       )}
-                    </div>
-
-                    {/* Standard Fields: Name, Email, Password, PhoneNumber */}
-                    <div className="space-y-2 pt-2 border-t border-slate-100">
-                      <div className="space-y-1.5">
-                        <div className="flex items-center gap-2 py-1.5 px-2 rounded-md hover:bg-slate-50 text-xs">
-                          <GripVertical className="w-3.5 h-3.5 text-slate-400 cursor-grab" />
-                          <span className="font-semibold text-slate-800">Name</span>
-                          <span className="text-red-500 font-bold">*</span>
-                        </div>
-                        <div className="flex items-center gap-2 py-1.5 px-2 rounded-md hover:bg-slate-50 text-xs">
-                          <GripVertical className="w-3.5 h-3.5 text-slate-400 cursor-grab" />
-                          <span className="font-semibold text-slate-800">Email</span>
-                          <span className="text-red-500 font-bold">*</span>
-                        </div>
-                        <div className="flex items-center gap-2 py-1.5 px-2 rounded-md hover:bg-slate-50 text-xs">
-                          <GripVertical className="w-3.5 h-3.5 text-slate-400 cursor-grab" />
-                          <span className="font-semibold text-slate-800">Password</span>
-                          <span className="text-red-500 font-bold">*</span>
-                        </div>
-                        <div className="flex items-center gap-2 py-1.5 px-2 rounded-md hover:bg-slate-50 text-xs">
-                          <GripVertical className="w-3.5 h-3.5 text-slate-400 cursor-grab" />
-                          <span className="font-semibold text-slate-800">PhoneNumber</span>
-                        </div>
-                      </div>
-
-                      {/* Additional Custom Fields if user added any */}
-                      {bulkCustomFields.filter((f) => !["std_name", "std_email", "std_password", "std_phone"].includes(f.id)).length > 0 && (
-                        <div className="space-y-1.5 pt-1 border-t border-slate-100">
-                          {bulkCustomFields
-                            .filter((f) => !["std_name", "std_email", "std_password", "std_phone"].includes(f.id))
-                            .map((f) => (
-                              <div key={f.id} className="flex items-center justify-between py-1.5 px-2 rounded-md hover:bg-slate-50 text-xs">
-                                <div className="flex items-center gap-2">
-                                  <GripVertical className="w-3.5 h-3.5 text-slate-400" />
-                                  <span className="font-semibold text-slate-800">{f.name}</span>
-                                  {f.required && <span className="text-red-500 font-bold">*</span>}
-                                </div>
-                                <button
-                                  type="button"
-                                  onClick={() => setBulkCustomFields((prev) => prev.filter((field) => field.id !== f.id))}
-                                  className="text-slate-400 hover:text-red-500"
-                                >
-                                  <Trash2 className="w-3.5 h-3.5" />
-                                </button>
-                              </div>
-                            ))}
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Custom fields addition section */}
-                    <div className="space-y-3 pt-3 border-t border-slate-100">
-                      <div>
-                        <h5 className="text-xs font-bold text-slate-900">Custom fields</h5>
-                        <p className="text-[11px] text-slate-500">Customize fields / questions to be asked.</p>
-                      </div>
-
-                      {/* Unified connected field name + Required checkbox container */}
-                      <div className="flex items-center bg-slate-50 border border-slate-200 rounded-lg overflow-hidden focus-within:ring-1 focus-within:ring-indigo-500 focus-within:border-indigo-500 transition-all">
-                        <input
-                          type="text"
-                          placeholder="Field name"
-                          value={newFieldName}
-                          onChange={(e) => setNewFieldName(e.target.value)}
-                          className="h-9 px-3 text-xs bg-transparent border-none outline-none flex-1 text-slate-800 placeholder:text-slate-400 font-medium"
-                        />
-                        <div className="h-5 w-px bg-slate-200 shrink-0" />
-                        <label
-                          htmlFor="bulk-new-field-required"
-                          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-100/80 cursor-pointer select-none shrink-0 transition-colors"
-                        >
-                          <input
-                            type="checkbox"
-                            id="bulk-new-field-required"
-                            checked={newFieldRequired}
-                            onChange={(e) => setNewFieldRequired(e.target.checked)}
-                            className="w-3.5 h-3.5 rounded border-slate-300 text-orange-500 focus:ring-0 cursor-pointer accent-orange-500"
-                          />
-                          <span className="text-[11px] text-slate-600">Required</span>
-                        </label>
-                      </div>
-
-                      {/* Action buttons below */}
-                      <div className="flex items-center gap-2 pt-1">
-                        <Button
-                          type="button"
-                          onClick={handleAddBulkField}
-                          size="sm"
-                          className="h-8 px-4 text-[11px] font-bold uppercase tracking-wider bg-slate-900 hover:bg-slate-800 text-white rounded-lg gap-1.5 cursor-pointer shadow-2xs"
-                        >
-                          <Plus className="w-3.5 h-3.5" />
-                          Add Field
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          onClick={() => {
-                            setNewFieldName("");
-                            setNewFieldRequired(false);
-                          }}
-                          size="sm"
-                          className="h-8 px-3 text-[11px] font-bold uppercase tracking-wider text-slate-500 hover:text-slate-900 rounded-lg gap-1.5 cursor-pointer"
-                        >
-                          <RefreshCw className="w-3 h-3" />
-                          Clear Field
-                        </Button>
-                      </div>
                     </div>
                   </div>
 
@@ -1284,7 +939,7 @@ export function AddCandidatesModal({
                 <div className="space-y-2.5 text-xs leading-relaxed text-slate-600">
                   <p className="text-xs font-semibold text-slate-800">Hello,</p>
                   <p className="text-slate-600 text-xs leading-normal">
-                    You have been invited to complete a proctored assessment on <span className="text-slate-900 font-semibold">Gryphon 360</span>. Click the button below to start or resume your assessment session securely.
+                    You have been invited to complete a proctored assessment on <span className="text-slate-900 font-semibold">{organisationName || user?.organisationData?.name || "Gryphon 360"}</span>. Click the button below to start or resume your assessment session securely.
                   </p>
                 </div>
 

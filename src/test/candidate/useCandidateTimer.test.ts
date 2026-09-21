@@ -1,11 +1,20 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { renderHook, act } from "@testing-library/react";
-import { useCandidateTimer } from "../../hooks/useCandidateTimer";
 import { detectTimeExtension, formatSeconds } from "../../lib/exam/sessionLogic";
+import { useCandidateTimer } from "../../hooks/useCandidateTimer";
+import { apiClient } from "../../lib/api-client";
+
+vi.mock("../../lib/api-client", () => ({
+  apiClient: {
+    post: vi.fn(),
+    get: vi.fn(),
+  },
+}));
 
 describe("Candidate Timer & Time Extension Logic", () => {
   beforeEach(() => {
     vi.useFakeTimers();
+    vi.clearAllMocks();
   });
 
   afterEach(() => {

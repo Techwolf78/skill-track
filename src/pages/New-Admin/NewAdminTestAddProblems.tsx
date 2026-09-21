@@ -15,6 +15,7 @@ import {
   Files,
   Monitor,
   Terminal,
+  Eye,
   ArrowLeft,
   LogOut,
   User as UserIcon,
@@ -30,10 +31,12 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useAuth } from "@/lib/auth-context";
 import { GryphonLogo } from "@/components/ui/GryphonLogo";
+import { AdminPinNavWidget } from "@/components/admin/AdminPinNavWidget";
 import { useQuestionsPageQuery } from "@/hooks/use-query-hooks";
 import { testService, Question, Test } from "@/lib/test-service";
 import { toast } from "sonner";
 import { formatPlainTextExcerpt } from "@/lib/html-utils";
+import { QuestionPreviewModal } from "@/components/admin/QuestionPreviewModal";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -141,6 +144,10 @@ export default function NewAdminTestAddProblems() {
   const [addingIds, setAddingIds] = useState<Set<string>>(new Set());
   const [removingIds, setRemovingIds] = useState<Set<string>>(new Set());
   const [loadingTest, setLoadingTest] = useState(Boolean(id));
+
+  // Question In-Place Preview Modal State
+  const [previewQuestion, setPreviewQuestion] = useState<Question | null>(null);
+  const [previewModalOpen, setPreviewModalOpen] = useState(false);
 
   // Library States
 
@@ -431,8 +438,9 @@ export default function NewAdminTestAddProblems() {
           </div>
         </div>
 
-        {/* Right Side: User Profile */}
-        <div className="flex items-center space-x-3 shrink-0">
+        {/* Right Side: Pins & User Profile */}
+        <div className="flex items-center space-x-2.5 sm:space-x-4 shrink-0">
+          <AdminPinNavWidget />
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button className="flex items-center gap-2.5 px-2.5 py-1.5 hover:bg-slate-800/70 transition-colors focus:outline-none cursor-pointer rounded-md">
@@ -728,11 +736,30 @@ export default function NewAdminTestAddProblems() {
                       <div key={q.id} className="px-5 py-3 space-y-1.5 hover:bg-slate-50/50 transition-colors">
                         {/* Header Row: Title & Action Icons (+ Add / Remove Buttons) */}
                         <div className="flex items-start justify-between gap-4">
-                          <h3 className="font-bold text-slate-900 text-sm leading-snug">
+                          <h3 
+                            onClick={() => {
+                              setPreviewQuestion(q);
+                              setPreviewModalOpen(true);
+                            }}
+                            className="font-bold text-slate-900 text-sm leading-snug cursor-pointer hover:text-indigo-600 transition-colors"
+                            title="Click to preview question"
+                          >
                             {q.title || "Untitled Problem"}
                           </h3>
 
                           <div className="flex items-center gap-1.5 shrink-0">
+                            {/* Preview Eye Button */}
+                            <button
+                              onClick={() => {
+                                setPreviewQuestion(q);
+                                setPreviewModalOpen(true);
+                              }}
+                              className="p-1 bg-white hover:bg-slate-100 text-slate-500 hover:text-slate-800 border border-slate-200 text-xs font-semibold transition-all inline-flex items-center justify-center cursor-pointer"
+                              title="Preview Problem"
+                            >
+                              <Eye className="w-3.5 h-3.5" />
+                            </button>
+
                             {/* ── Add / Remove Action Buttons ── */}
                             {isAlreadyAdded ? (
                               <>
@@ -919,6 +946,21 @@ export default function NewAdminTestAddProblems() {
           </section>
         </div>
       </main>
+
+      {/* In-Place Question Preview Modal */}
+      <QuestionPreviewModal
+        isOpen={previewModalOpen}
+        question={previewQuestion}
+        onClose={() => {
+          setPreviewModalOpen(false);
+          setPreviewQuestion(null);
+        }}
+        onAddQuestion={handleAddQuestion}
+        onRemoveQuestion={handleRemoveQuestion}
+        isAdded={previewQuestion ? addedQuestionIds.has(previewQuestion.id) : false}
+        isAdding={previewQuestion ? addingIds.has(previewQuestion.id) : false}
+        isRemoving={previewQuestion ? removingIds.has(previewQuestion.id) : false}
+      />
     </div>
   );
 }

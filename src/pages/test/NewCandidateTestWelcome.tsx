@@ -413,7 +413,6 @@ export default function NewCandidateTestWelcome({
         setLoading(false);
       }
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     [routeId, routeToken, isCandidateAuthenticated, loginToContext]
   );
 

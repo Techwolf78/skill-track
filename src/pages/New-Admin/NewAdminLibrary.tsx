@@ -13,7 +13,6 @@ import {
   ChevronLeft,
   ChevronRight,
   Clock,
-  ArrowUpDown,
   Sparkles,
   ShoppingCart,
   Files,
@@ -24,7 +23,6 @@ import {
   FileCode,
   CheckCircle2,
   AlertCircle,
-  Terminal,
   Info,
   Save,
   Copy,
@@ -53,6 +51,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { CreateProblemModal } from "@/components/admin/CreateProblemModal";
+import { ManageSubjectsModal } from "@/components/admin/ManageSubjectsModal";
 import { formatPlainTextExcerpt } from "@/lib/html-utils";
 
 
@@ -68,7 +67,6 @@ type ProblemType =
   | "TRUE_FALSE"
   | "ASSERTION_REASON"
   | "FILL_IN_THE_BLANK";
-type SortOption = "NEWEST" | "OLDEST";
 
 interface FormState {
   questionType: "MCQ";
@@ -766,13 +764,13 @@ export default function NewAdminLibrary() {
 
   const [selectedLibrary, setSelectedLibrary] = useState<LibraryType>("PUBLIC");
   const [problemType, setProblemType] = useState<ProblemType>("ALL");
-  const [sortBy, setSortBy] = useState<SortOption>("NEWEST");
   const [searchQuery, setSearchQuery] = useState("");
   const [techSearch, setTechSearch] = useState("");
   const [tagSearch, setTagSearch] = useState("");
   const [selectedLevel, setSelectedLevel] = useState<"ALL" | "EASY" | "MEDIUM" | "HARD">("ALL");
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
+  const [manageSubjectsOpen, setManageSubjectsOpen] = useState(false);
   const location = useLocation();
   const [currentPage, setCurrentPage] = useState<number>(() => {
     const fromState = location.state?.page || location.state?.returnPage;
@@ -801,7 +799,7 @@ export default function NewAdminLibrary() {
   // Reset page when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [selectedLibrary, problemType, selectedLevel, techSearch, tagSearch, searchQuery, sortBy, pageSize]);
+  }, [selectedLibrary, problemType, selectedLevel, techSearch, tagSearch, searchQuery, pageSize]);
 
   // Map UI filters to backend query params
   const queryParams = useMemo(() => {
@@ -820,7 +818,6 @@ export default function NewAdminLibrary() {
       mcqTypeParam = problemType;
     }
 
-    const sortParam = sortBy === "OLDEST" ? "created_at,asc" : undefined;
     const searchCombined = searchQuery.trim() || techSearch.trim() || undefined;
 
     return {
@@ -833,7 +830,6 @@ export default function NewAdminLibrary() {
       difficulty: selectedLevel !== "ALL" ? selectedLevel : undefined,
       search: searchCombined,
       tag: tagSearch.trim() || undefined,
-      sort: sortParam,
     };
   }, [
     currentPage,
@@ -844,7 +840,6 @@ export default function NewAdminLibrary() {
     searchQuery,
     techSearch,
     tagSearch,
-    sortBy,
   ]);
 
   const { data: pageData, isLoading, isError, refetch } = useQuestionsPageQuery(queryParams);
@@ -1042,18 +1037,14 @@ export default function NewAdminLibrary() {
             )}
           </div>
 
-          {/* Sort Dropdown Button */}
-          <div className="relative flex items-center border border-slate-200/90 px-3 py-1.5 bg-white text-xs text-slate-700 font-normal hover:bg-slate-50/50 transition-colors">
-            <ArrowUpDown className="w-3.5 h-3.5 text-slate-500 mr-2 shrink-0" />
-            <select
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value as SortOption)}
-              className="appearance-none bg-transparent pr-1 text-xs text-slate-700 font-normal focus:outline-none cursor-pointer"
-            >
-              <option value="NEWEST">Newest first</option>
-              <option value="OLDEST">Oldest first</option>
-            </select>
-          </div>
+          {/* Manage Subjects Button */}
+          <button
+            onClick={() => setManageSubjectsOpen(true)}
+            className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold border border-slate-200/90 text-slate-700 bg-white hover:bg-slate-50 transition-all shadow-none cursor-pointer"
+          >
+            <FolderTree className="w-3.5 h-3.5 text-slate-500" />
+            <span>Manage Subjects</span>
+          </button>
 
           {/* Import Questions Button */}
           <button
@@ -1132,15 +1123,6 @@ export default function NewAdminLibrary() {
                             title="Edit Question"
                           >
                             <Edit className="w-4 h-4" />
-                          </button>
-                        )}
-                        {isCoding && (
-                          <button
-                            onClick={() => navigate(`/admin/playground/${q.id}`)}
-                            className="p-0.5 hover:text-indigo-600 transition-colors cursor-pointer"
-                            title="Open Playground"
-                          >
-                            <Terminal className="w-4 h-4" />
                           </button>
                         )}
                         <button
@@ -1315,8 +1297,14 @@ export default function NewAdminLibrary() {
         onClose={() => setImportOpen(false)}
         onImportSuccess={() => {
           setSelectedLibrary("ORG_OWNED");
-          setSortBy("NEWEST");
         }}
+      />
+
+      {/* Manage Subjects Modal */}
+      <ManageSubjectsModal
+        isOpen={manageSubjectsOpen}
+        onClose={() => setManageSubjectsOpen(false)}
+        onRefresh={() => refetch()}
       />
     </div>
   );
