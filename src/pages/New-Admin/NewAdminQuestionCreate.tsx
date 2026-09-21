@@ -44,6 +44,7 @@ import { toast } from "sonner";
 import { RichTextEditor } from "@/components/ui/RichTextEditor";
 import { ImageUploadButton } from "@/components/ui/ImageUploadButton";
 import { GryphonLogo } from "@/components/ui/GryphonLogo";
+import { AdminPinNavWidget } from "@/components/admin/AdminPinNavWidget";
 import Editor from "@monaco-editor/react";
 
 const mapLanguageToMonaco = (lang: string): string => {
@@ -796,8 +797,9 @@ export default function NewAdminQuestionCreate() {
           </div>
         </div>
 
-        {/* Right Side: Profile Section */}
-        <div className="flex items-center space-x-3">
+        {/* Right Side: Pins & Profile Section */}
+        <div className="flex items-center space-x-2.5 sm:space-x-4">
+          <AdminPinNavWidget />
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button className="flex items-center gap-2.5 px-2.5 py-1.5 hover:bg-slate-800/70 transition-colors focus:outline-none cursor-pointer rounded-md">

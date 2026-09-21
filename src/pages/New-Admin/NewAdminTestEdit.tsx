@@ -54,14 +54,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
-  Card,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-  CardContent,
-  CardFooter,
-} from "@/components/ui/card";
-import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -105,6 +97,7 @@ import autoTable from "jspdf-autotable";
 import * as XLSX from "xlsx";
 import { toast } from "sonner";
 import { GryphonLogo } from "@/components/ui/GryphonLogo";
+import { AdminPinNavWidget } from "@/components/admin/AdminPinNavWidget";
 import { formatDateTime, toBackendDateTime, parseBackendDateTime, getTodayDateString } from "@/lib/date-utils";
 
 type JsPDFWithAutoTable = jsPDF & { lastAutoTable: { finalY: number } };
@@ -237,6 +230,8 @@ const getProctoringPreset = (mode: ProctoringMode) => {
   return defaults;
 };
 
+const DEFAULT_CANDIDATE_INSTRUCTIONS = `<p><strong>General Assessment Guidelines:</strong></p><ul><li>Ensure a stable internet connection throughout the test.</li><li>Read all questions carefully before submitting answers.</li><li>Do not refresh or navigate away from the test window during the session.</li></ul>`;
+
 export default function NewAdminTestEdit() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -305,7 +300,7 @@ export default function NewAdminTestEdit() {
   const [difficulty, setDifficulty] = useState<"EASY" | "MEDIUM" | "HARD">("MEDIUM");
   const [status, setStatus] = useState<"DRAFT" | "PUBLISHED" | "ARCHIVED">("PUBLISHED");
   const [description, setDescription] = useState("");
-  const [instructions, setInstructions] = useState("");
+  const [instructions, setInstructions] = useState(DEFAULT_CANDIDATE_INSTRUCTIONS);
   const [savingGeneralSettings, setSavingGeneralSettings] = useState(false);
   const [publishModalOpen, setPublishModalOpen] = useState(false);
   const [unverifiedQuestionsForPublish, setUnverifiedQuestionsForPublish] = useState<
@@ -409,12 +404,12 @@ export default function NewAdminTestEdit() {
         setDescription(testData.description || "");
 
         const inst = testData.instructions;
-        if (typeof inst === "string") {
+        if (typeof inst === "string" && inst.trim().length > 0) {
           setInstructions(inst);
-        } else if (inst && typeof inst === "object" && "text" in inst) {
+        } else if (inst && typeof inst === "object" && "text" in inst && String((inst as any).text || "").trim().length > 0) {
           setInstructions(String((inst as any).text || ""));
         } else {
-          setInstructions("");
+          setInstructions(DEFAULT_CANDIDATE_INSTRUCTIONS);
         }
 
         setSectionSettings(testData.sectionSettings || {});
@@ -2686,8 +2681,9 @@ export default function NewAdminTestEdit() {
           </div>
         </div>
 
-        {/* Right Side: User Profile */}
-        <div className="flex items-center space-x-3 shrink-0">
+        {/* Right Side: Pins & User Profile */}
+        <div className="flex items-center space-x-2.5 sm:space-x-4 shrink-0">
+          <AdminPinNavWidget />
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button className="flex items-center gap-2.5 px-2.5 py-1.5 hover:bg-slate-800/70 transition-colors focus:outline-none cursor-pointer rounded-md">
@@ -2732,7 +2728,7 @@ export default function NewAdminTestEdit() {
       </header>
 
       {/* ── 2. Main Content Workspace ── */}
-      <main className="max-w-7xl mx-auto px-4 md:px-8 py-3.5 w-full space-y-3">
+      <main className="max-w-7xl mx-auto px-4 md:px-8 pt-6 pb-12 w-full space-y-5 md:space-y-6">
         {/* Top Header Row: Test Name + Duration */}
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2.5">
@@ -2861,22 +2857,22 @@ export default function NewAdminTestEdit() {
         <div>
           {/* ── PROBLEMS TAB ── */}
           {activeTab === "PROBLEMS" && (
-            <div className="space-y-3">
+            <div className="space-y-4">
 
               {/* Problems — section-grouped list */}
               {questions.length === 0 && sectionOrder.length === 0 ? (
-                <div className="bg-white border border-slate-200/90 shadow-xs py-10 px-4 text-center text-slate-400 text-xs space-y-2">
+                <div className="bg-white border border-slate-200/90 shadow-sm py-10 px-5 text-center text-slate-400 text-xs space-y-2">
                   <p>No problems added to this test yet.</p>
                   <button
                     onClick={() => navigate(id ? `/admin/tests/${id}/add-problems` : "/admin/library")}
-                    className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-none transition-colors cursor-pointer inline-flex items-center gap-1.5"
+                    className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold tracking-wider uppercase rounded-none transition-colors cursor-pointer inline-flex items-center gap-1.5 shadow-xs"
                   >
                     <Plus className="w-3.5 h-3.5" />
                     <span>Add from Library</span>
                   </button>
                 </div>
               ) : (
-                <div className="space-y-3">
+                <div className="space-y-4">
                   {sectionOrder
                     .filter((section) => {
                       if (section === "Ungrouped") {
@@ -2895,10 +2891,10 @@ export default function NewAdminTestEdit() {
                       return (
                         <div
                           key={section}
-                          className="bg-white border border-slate-200/90 shadow-xs overflow-hidden"
+                          className="bg-white border border-slate-200/90 shadow-sm overflow-hidden"
                         >
                           {/* 1. Section Header Bar */}
-                          <div className="flex items-center justify-between px-4 py-2 bg-slate-50/80 border-b border-slate-200">
+                          <div className="flex items-center justify-between px-5 py-2.5 bg-slate-50/80 border-b border-slate-200">
                             {/* Left: Section Title */}
                             <div className="flex items-center gap-2 flex-1 min-w-0">
                               {isEditingThisSection ? (
@@ -3034,7 +3030,7 @@ export default function NewAdminTestEdit() {
                           </div>
 
                           {/* 2. Sub-Header: Using X of X problems banner */}
-                          <div className="px-4 py-1.5 bg-slate-50/40 border-b border-slate-100 flex items-center gap-2 text-xs text-slate-500">
+                          <div className="px-5 py-2 bg-slate-50/40 border-b border-slate-100 flex items-center gap-2 text-xs text-slate-500">
                             <span className="text-slate-400 font-serif italic text-xs">ⓘ</span>
                             <span>
                               Using {totalSectionCount} of {totalSectionCount} problems in this section.
@@ -3045,7 +3041,7 @@ export default function NewAdminTestEdit() {
                           {!isCollapsed && (
                             <div>
                               {sectionQs.length === 0 ? (
-                                <div className="py-8 px-4 text-center space-y-2">
+                                <div className="py-8 px-5 text-center space-y-2">
                                   <p className="text-xs text-slate-500 font-medium">No problems added yet.</p>
                                   <button
                                     onClick={() => navigate(`/admin/tests/${id}/add-problems?section=${encodeURIComponent(section)}`)}
@@ -3070,7 +3066,7 @@ export default function NewAdminTestEdit() {
                                     return (
                                       <div
                                         key={tq.id || index}
-                                        className="px-4 py-2.5 hover:bg-slate-50/60 transition-colors space-y-1"
+                                        className="px-5 py-2.5 hover:bg-slate-50/60 transition-colors space-y-1"
                                       >
                                         <div className="flex items-start justify-between gap-4">
                                           <h3
@@ -3187,7 +3183,7 @@ export default function NewAdminTestEdit() {
 
           {/* ── GENERAL SETTINGS TAB ── */}
           {activeTab === "GENERAL_SETTINGS" && (
-            <div className="border border-slate-200/90 shadow-sm bg-white p-6 md:p-8 space-y-7">
+            <div className="border border-slate-200/90 shadow-sm bg-white p-5 md:p-6 space-y-4">
               {/* 1. Test Name */}
               <div className="space-y-1">
                 <label className="block text-xs font-semibold text-slate-700">
@@ -3204,7 +3200,7 @@ export default function NewAdminTestEdit() {
               </div>
 
               {/* 2. Duration & Passing Mark */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-1">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-0.5">
                 {/* Duration */}
                 <div className="space-y-1">
                   <label className="block text-xs font-semibold text-slate-700">
@@ -3240,12 +3236,12 @@ export default function NewAdminTestEdit() {
               </div>
 
               {/* 3. Difficulty Level */}
-              <div className="space-y-2 pt-1 w-full">
+              <div className="space-y-1 pt-0.5 w-full">
                 <label className="block text-xs font-semibold text-slate-700">
                   Difficulty level
                 </label>
                 <p className="text-[11px] text-slate-400">Appropriate difficulty level calibrates recommendations and candidate expectations.</p>
-                <div className="grid grid-cols-3 w-full pt-1.5">
+                <div className="grid grid-cols-3 w-full pt-1">
                   {(["EASY", "MEDIUM", "HARD"] as const).map((lvl) => (
                     <label key={lvl} className="flex items-center gap-3 cursor-pointer text-sm font-medium text-slate-700">
                       <input
@@ -3263,22 +3259,22 @@ export default function NewAdminTestEdit() {
               </div>
 
               {/* 4. Description */}
-              <div className="space-y-1 pt-1">
+              <div className="space-y-1 pt-0.5">
                 <label className="block text-xs font-semibold text-slate-700">
                   Description
                 </label>
-                <textarea
-                  rows={4}
+                <input
+                  type="text"
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   placeholder="Provide an overview, target skills, or objectives for this test..."
-                  className="w-full border border-slate-200 p-3.5 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-indigo-600 leading-relaxed"
+                  className="w-full border-b border-slate-200 focus:border-indigo-600 py-1.5 text-sm text-slate-800 focus:outline-none bg-transparent"
                 />
                 <p className="text-[11px] text-slate-400">Brief summary of the test curriculum and intended evaluation areas.</p>
               </div>
 
               {/* 5. Candidate Instructions */}
-              <div className="space-y-1.5 pt-1">
+              <div className="space-y-1.5 pt-0.5">
                 <label className="block text-xs font-semibold text-slate-700">
                   Instructions for candidates
                 </label>
@@ -3286,13 +3282,13 @@ export default function NewAdminTestEdit() {
                   content={instructions}
                   onChange={setInstructions}
                   placeholder="e.g. Ensure a stable internet connection. All tests are timed and monitored..."
-                  minHeight="140px"
+                  minHeight="90px"
                 />
                 <p className="text-[11px] text-slate-400">Instructions will be displayed to candidates on the assessment landing screen before starting.</p>
               </div>
 
               {/* 6. Save Action Button */}
-              <div className="pt-4 border-t border-slate-100 flex items-center justify-end">
+              <div className="pt-3.5 flex items-center justify-end">
                 <button
                   onClick={handleSaveGeneralSettings}
                   disabled={savingGeneralSettings}
@@ -3316,204 +3312,204 @@ export default function NewAdminTestEdit() {
 
           {/* ── ADVANCED SETTINGS TAB (Exact Admin Section Match) ── */}
           {activeTab === "ADVANCED_SETTINGS" && (
-            <div className="space-y-6">
+            <div className="space-y-4">
               {/* 1. Test Schedule Card */}
-              <Card>
-                <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="text-xl font-bold text-slate-900 font-heading">
+              <div className="border border-slate-200/90 shadow-sm bg-white p-5 md:p-6 space-y-4">
+                <div className="flex items-center justify-between pb-1">
+                  <div>
+                    <h3 className="text-xs font-semibold text-slate-800 uppercase tracking-wider">
                       Test Schedule
-                    </CardTitle>
-                    <span className="inline-flex items-center gap-1.5 font-medium text-slate-600 bg-slate-100 px-2.5 py-1 rounded text-xs border border-slate-200">
-                      <Clock className="w-3.5 h-3.5 text-slate-400" />
-                      <span>Duration: {durationStr}</span>
-                    </span>
+                    </h3>
+                    <p className="text-[11px] text-slate-400 mt-0.5">
+                      Set the availability window for this test (Organisation is set to your Admin home by default).
+                    </p>
                   </div>
-                  <CardDescription className="text-xs text-slate-500">
-                    Set the availability window for this test (Organisation is set to your Admin home by default)
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {/* Starting Time */}
-                    <div className="space-y-2">
-                      <Label className="text-sm font-semibold text-slate-900">Starting time</Label>
-                      <p className="text-xs text-muted-foreground">
-                        This test would not be accessible before this.
-                      </p>
-                      <div className="flex gap-4 items-center mt-1">
-                        <div className="flex-1">
-                          <button
-                            type="button"
-                            onClick={() => setStartDatePickerOpen(true)}
-                            className="w-full flex items-center justify-between px-3 py-2 border rounded-md text-sm text-slate-700 bg-white hover:bg-slate-50 cursor-pointer h-10 select-none"
-                          >
-                            <span className="flex items-center gap-2">
-                              <Calendar className="w-4 h-4 text-slate-400" />
-                              {parseBackendDateTime(scheduleStartTime).date || "Select Date"}
-                            </span>
-                          </button>
-                          <MaterialDatePickerDialog
-                            isOpen={startDatePickerOpen}
-                            onClose={() => setStartDatePickerOpen(false)}
-                            value={parseBackendDateTime(scheduleStartTime).date}
-                            onChange={(date) => {
-                              const current = parseBackendDateTime(scheduleStartTime);
-                              setScheduleStartTime(date ? toBackendDateTime(date, current.time || "00:00") : "");
-                            }}
-                          />
-                        </div>
-                        <div className="flex-1">
-                          <button
-                            type="button"
-                            onClick={() => setStartTimePickerOpen(true)}
-                            className="w-full flex items-center justify-between px-3 py-2 border rounded-md text-sm text-slate-700 bg-white hover:bg-slate-50 cursor-pointer h-10 select-none"
-                          >
-                            <span className="flex items-center gap-2">
-                              <Clock className="w-4 h-4 text-slate-400" />
-                              {parseBackendDateTime(scheduleStartTime).time || "Select Time"}
-                            </span>
-                          </button>
-                          <MaterialTimePickerDialog
-                            isOpen={startTimePickerOpen}
-                            onClose={() => setStartTimePickerOpen(false)}
-                            value={parseBackendDateTime(scheduleStartTime).time}
-                            onChange={(time) => {
-                              const current = parseBackendDateTime(scheduleStartTime);
-                              const date = current.date || getTodayDateString();
-                              setScheduleStartTime(toBackendDateTime(date, time));
-                            }}
-                          />
-                        </div>
-                      </div>
-                    </div>
+                  <span className="inline-flex items-center gap-1.5 font-medium text-slate-600 bg-slate-50 px-2.5 py-1 text-xs border border-slate-200">
+                    <Clock className="w-3.5 h-3.5 text-slate-400" />
+                    <span>Duration: {durationStr}</span>
+                  </span>
+                </div>
 
-                    {/* Ending Time */}
-                    <div className="space-y-2">
-                      <Label className="text-sm font-semibold text-slate-900">Ending time</Label>
-                      <p className="text-xs text-muted-foreground">
-                        This test would not be accessible after this.
-                      </p>
-                      <div className="flex gap-4 items-center mt-1">
-                        <div className="flex-1">
-                          <button
-                            type="button"
-                            onClick={() => setEndDatePickerOpen(true)}
-                            className="w-full flex items-center justify-between px-3 py-2 border rounded-md text-sm text-slate-700 bg-white hover:bg-slate-50 cursor-pointer h-10 select-none"
-                          >
-                            <span className="flex items-center gap-2">
-                              <Calendar className="w-4 h-4 text-slate-400" />
-                              {parseBackendDateTime(scheduleEndTime).date || "Select Date"}
-                            </span>
-                          </button>
-                          <MaterialDatePickerDialog
-                            isOpen={endDatePickerOpen}
-                            onClose={() => setEndDatePickerOpen(false)}
-                            value={parseBackendDateTime(scheduleEndTime).date}
-                            onChange={(date) => {
-                              const current = parseBackendDateTime(scheduleEndTime);
-                              setScheduleEndTime(date ? toBackendDateTime(date, current.time || "00:00") : "");
-                            }}
-                          />
-                        </div>
-                        <div className="flex-1">
-                          <button
-                            type="button"
-                            onClick={() => setEndTimePickerOpen(true)}
-                            className="w-full flex items-center justify-between px-3 py-2 border rounded-md text-sm text-slate-700 bg-white hover:bg-slate-50 cursor-pointer h-10 select-none"
-                          >
-                            <span className="flex items-center gap-2">
-                              <Clock className="w-4 h-4 text-slate-400" />
-                              {parseBackendDateTime(scheduleEndTime).time || "Select Time"}
-                            </span>
-                          </button>
-                          <MaterialTimePickerDialog
-                            isOpen={endTimePickerOpen}
-                            onClose={() => setEndTimePickerOpen(false)}
-                            value={parseBackendDateTime(scheduleEndTime).time}
-                            onChange={(time) => {
-                              const current = parseBackendDateTime(scheduleEndTime);
-                              const date = current.date || getTodayDateString();
-                              setScheduleEndTime(toBackendDateTime(date, time));
-                            }}
-                          />
-                        </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-0.5">
+                  {/* Starting Time */}
+                  <div className="space-y-1">
+                    <label className="block text-xs font-semibold text-slate-700">Starting time</label>
+                    <p className="text-[11px] text-slate-400">
+                      This test would not be accessible before this.
+                    </p>
+                    <div className="flex gap-4 items-center pt-1">
+                      <div className="flex-1">
+                        <button
+                          type="button"
+                          onClick={() => setStartDatePickerOpen(true)}
+                          className="w-full flex items-center justify-between px-3 py-1.5 border-b border-slate-200 focus-within:border-indigo-600 text-xs text-slate-800 bg-transparent hover:bg-slate-50/50 cursor-pointer select-none transition-colors"
+                        >
+                          <span className="flex items-center gap-2">
+                            <Calendar className="w-4 h-4 text-slate-400" />
+                            {parseBackendDateTime(scheduleStartTime).date || "Select Date"}
+                          </span>
+                        </button>
+                        <MaterialDatePickerDialog
+                          isOpen={startDatePickerOpen}
+                          onClose={() => setStartDatePickerOpen(false)}
+                          value={parseBackendDateTime(scheduleStartTime).date}
+                          onChange={(date) => {
+                            const current = parseBackendDateTime(scheduleStartTime);
+                            setScheduleStartTime(date ? toBackendDateTime(date, current.time || "00:00") : "");
+                          }}
+                        />
+                      </div>
+                      <div className="flex-1">
+                        <button
+                          type="button"
+                          onClick={() => setStartTimePickerOpen(true)}
+                          className="w-full flex items-center justify-between px-3 py-1.5 border-b border-slate-200 focus-within:border-indigo-600 text-xs text-slate-800 bg-transparent hover:bg-slate-50/50 cursor-pointer select-none transition-colors"
+                        >
+                          <span className="flex items-center gap-2">
+                            <Clock className="w-4 h-4 text-slate-400" />
+                            {parseBackendDateTime(scheduleStartTime).time || "Select Time"}
+                          </span>
+                        </button>
+                        <MaterialTimePickerDialog
+                          isOpen={startTimePickerOpen}
+                          onClose={() => setStartTimePickerOpen(false)}
+                          value={parseBackendDateTime(scheduleStartTime).time}
+                          onChange={(time) => {
+                            const current = parseBackendDateTime(scheduleStartTime);
+                            const date = current.date || getTodayDateString();
+                            setScheduleStartTime(toBackendDateTime(date, time));
+                          }}
+                        />
                       </div>
                     </div>
                   </div>
-                </CardContent>
-                <CardFooter className="flex justify-end gap-2 border-t px-6 py-4 bg-muted/20">
-                  {isScheduleDirty && (
-                    <span className="text-xs text-muted-foreground self-center mr-auto">
-                      You have unsaved schedule changes
-                    </span>
-                  )}
-                  <Button
+
+                  {/* Ending Time */}
+                  <div className="space-y-1">
+                    <label className="block text-xs font-semibold text-slate-700">Ending time</label>
+                    <p className="text-[11px] text-slate-400">
+                      This test would not be accessible after this.
+                    </p>
+                    <div className="flex gap-4 items-center pt-1">
+                      <div className="flex-1">
+                        <button
+                          type="button"
+                          onClick={() => setEndDatePickerOpen(true)}
+                          className="w-full flex items-center justify-between px-3 py-1.5 border-b border-slate-200 focus-within:border-indigo-600 text-xs text-slate-800 bg-transparent hover:bg-slate-50/50 cursor-pointer select-none transition-colors"
+                        >
+                          <span className="flex items-center gap-2">
+                            <Calendar className="w-4 h-4 text-slate-400" />
+                            {parseBackendDateTime(scheduleEndTime).date || "Select Date"}
+                          </span>
+                        </button>
+                        <MaterialDatePickerDialog
+                          isOpen={endDatePickerOpen}
+                          onClose={() => setEndDatePickerOpen(false)}
+                          value={parseBackendDateTime(scheduleEndTime).date}
+                          onChange={(date) => {
+                            const current = parseBackendDateTime(scheduleEndTime);
+                            setScheduleEndTime(date ? toBackendDateTime(date, current.time || "00:00") : "");
+                          }}
+                        />
+                      </div>
+                      <div className="flex-1">
+                        <button
+                          type="button"
+                          onClick={() => setEndTimePickerOpen(true)}
+                          className="w-full flex items-center justify-between px-3 py-1.5 border-b border-slate-200 focus-within:border-indigo-600 text-xs text-slate-800 bg-transparent hover:bg-slate-50/50 cursor-pointer select-none transition-colors"
+                        >
+                          <span className="flex items-center gap-2">
+                            <Clock className="w-4 h-4 text-slate-400" />
+                            {parseBackendDateTime(scheduleEndTime).time || "Select Time"}
+                          </span>
+                        </button>
+                        <MaterialTimePickerDialog
+                          isOpen={endTimePickerOpen}
+                          onClose={() => setEndTimePickerOpen(false)}
+                          value={parseBackendDateTime(scheduleEndTime).time}
+                          onChange={(time) => {
+                            const current = parseBackendDateTime(scheduleEndTime);
+                            const date = current.date || getTodayDateString();
+                            setScheduleEndTime(toBackendDateTime(date, time));
+                          }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Footer Save Row */}
+                <div className="pt-3.5 flex items-center justify-between">
+                  <div>
+                    {isScheduleDirty && (
+                      <span className="text-[11px] text-amber-600 font-medium">
+                        You have unsaved schedule changes
+                      </span>
+                    )}
+                  </div>
+                  <button
                     type="button"
                     onClick={handleSaveSchedule}
                     disabled={savingSchedule || !isScheduleDirty}
-                    size="sm"
-                    className="bg-indigo-600 hover:bg-indigo-700 text-white"
+                    className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-xs font-bold tracking-wider uppercase shadow-xs transition-colors rounded-none cursor-pointer inline-flex items-center gap-2"
                   >
                     {savingSchedule ? (
                       <>
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        Saving Schedule...
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <span>Saving Schedule...</span>
                       </>
                     ) : (
                       <>
-                        <Save className="w-4 h-4 mr-2" />
-                        Save Schedule
+                        <Save className="w-4 h-4" />
+                        <span>Save Schedule</span>
                       </>
                     )}
-                  </Button>
-                </CardFooter>
-              </Card>
+                  </button>
+                </div>
+              </div>
 
               {/* 2. Proctoring Settings Card */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-xl font-bold text-slate-900 font-heading">
+              <div className="border border-slate-200/90 shadow-sm bg-white p-5 md:p-6 space-y-4">
+                <div className="pb-1">
+                  <h3 className="text-xs font-semibold text-slate-800 uppercase tracking-wider">
                     Proctoring Settings
-                  </CardTitle>
-                  <CardDescription className="text-xs text-slate-500">
-                    Configure anti-cheating and monitoring rules for this assessment
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  <div className="space-y-2">
-                    <Label htmlFor="proctoringMode" className="text-sm font-semibold text-slate-900">
+                  </h3>
+                  <p className="text-[11px] text-slate-400 mt-0.5">
+                    Configure anti-cheating and monitoring rules for this assessment.
+                  </p>
+                </div>
+
+                <div className="space-y-3">
+                  <div className="space-y-1">
+                    <label htmlFor="proctoringMode" className="block text-xs font-semibold text-slate-700">
                       Proctoring Mode
-                    </Label>
-                    <Select
+                    </label>
+                    <select
+                      id="proctoringMode"
                       value={proctoringMode}
-                      onValueChange={(val) => handleProctoringModeChange(val as ProctoringMode)}
+                      onChange={(e) => handleProctoringModeChange(e.target.value as ProctoringMode)}
+                      className="w-full border-b border-slate-200 focus:border-indigo-600 py-1.5 text-xs text-slate-800 focus:outline-none bg-transparent cursor-pointer rounded-none transition-colors"
                     >
-                      <SelectTrigger className="bg-white">
-                        <SelectValue placeholder="Select proctoring mode" />
-                      </SelectTrigger>
-                      <SelectContent className="bg-white">
-                        <SelectItem value="NONE">No Proctoring</SelectItem>
-                        <SelectItem value="LOW">Low Proctoring</SelectItem>
-                        <SelectItem value="MEDIUM">Medium Proctoring</SelectItem>
-                        <SelectItem value="HIGH">High Proctoring</SelectItem>
-                      </SelectContent>
-                    </Select>
+                      <option value="NONE">No Proctoring</option>
+                      <option value="LOW">Low Proctoring</option>
+                      <option value="MEDIUM">Medium Proctoring</option>
+                      <option value="HIGH">High Proctoring</option>
+                    </select>
                   </div>
 
                   {proctoringMode === "NONE" ? (
-                    <div className="p-4 rounded-xl bg-slate-50 border border-slate-200/80 text-sm text-slate-500">
-                      <p className="font-semibold text-slate-800 mb-1">No Proctoring Active</p>
-                      <p>This assessment runs without restrictions. Candidates will not be prompted for camera, microphone, or fullscreen permissions.</p>
+                    <div className="p-3.5 bg-slate-50 border border-slate-200/80 text-xs text-slate-600">
+                      <p className="font-semibold text-slate-800 mb-0.5">No Proctoring Active</p>
+                      <p className="text-slate-500">This assessment runs without restrictions. Candidates will not be prompted for camera, microphone, or fullscreen permissions.</p>
                     </div>
                   ) : proctoringMode === "LOW" ? (
-                    <div className="space-y-3 p-4 rounded-xl bg-slate-50 border border-slate-200/80 text-xs text-slate-600">
-                      <div className="flex items-center gap-2 text-sm font-semibold text-slate-900">
+                    <div className="space-y-2.5 p-3.5 bg-slate-50 border border-slate-200/80 text-xs text-slate-600">
+                      <div className="flex items-center gap-2 font-semibold text-slate-900">
                         <span className="w-2 h-2 rounded-full bg-amber-500" />
                         <span>Low Proctoring Rules</span>
                       </div>
-                      <p className="text-slate-500">Browser & shell security only. No webcam or microphone required.</p>
-                      <ul className="grid grid-cols-1 md:grid-cols-2 gap-2 pt-1 font-medium text-slate-700">
+                      <p className="text-slate-500 text-[11px]">Browser & shell security only. No webcam or microphone required.</p>
+                      <ul className="grid grid-cols-1 md:grid-cols-2 gap-2 pt-0.5 font-medium text-slate-700">
                         <li className="flex items-center gap-2">✓ Fullscreen Required (Warning on Exit)</li>
                         <li className="flex items-center gap-2">✓ Tab Switch & Window Blur Tracking</li>
                         <li className="flex items-center gap-2">✓ Developer Tools & Inspect Blocked</li>
@@ -3521,13 +3517,13 @@ export default function NewAdminTestEdit() {
                       </ul>
                     </div>
                   ) : proctoringMode === "MEDIUM" ? (
-                    <div className="space-y-3 p-4 rounded-xl bg-slate-50 border border-slate-200/80 text-xs text-slate-600">
-                      <div className="flex items-center gap-2 text-sm font-semibold text-slate-900">
+                    <div className="space-y-2.5 p-3.5 bg-slate-50 border border-slate-200/80 text-xs text-slate-600">
+                      <div className="flex items-center gap-2 font-semibold text-slate-900">
                         <span className="w-2 h-2 rounded-full bg-orange-500" />
                         <span>Medium Proctoring Rules</span>
                       </div>
-                      <p className="text-slate-500">Includes all Low Proctoring protections plus real-time AI webcam facial monitoring.</p>
-                      <ul className="grid grid-cols-1 md:grid-cols-2 gap-2 pt-1 font-medium text-slate-700">
+                      <p className="text-slate-500 text-[11px]">Includes all Low Proctoring protections plus real-time AI webcam facial monitoring.</p>
+                      <ul className="grid grid-cols-1 md:grid-cols-2 gap-2 pt-0.5 font-medium text-slate-700">
                         <li className="flex items-center gap-2">✓ All Low Proctoring Restrictions</li>
                         <li className="flex items-center gap-2">✓ Mandatory Webcam Video Stream</li>
                         <li className="flex items-center gap-2">✓ AI Facial Look-Away & Absence</li>
@@ -3537,13 +3533,13 @@ export default function NewAdminTestEdit() {
                       </ul>
                     </div>
                   ) : (
-                    <div className="space-y-3 p-4 rounded-xl bg-slate-50 border border-slate-200/80 text-xs text-slate-600">
-                      <div className="flex items-center gap-2 text-sm font-semibold text-slate-900">
+                    <div className="space-y-2.5 p-3.5 bg-slate-50 border border-slate-200/80 text-xs text-slate-600">
+                      <div className="flex items-center gap-2 font-semibold text-slate-900">
                         <span className="w-2 h-2 rounded-full bg-red-500" />
                         <span>High Proctoring Rules</span>
                       </div>
-                      <p className="text-slate-500">Full lockdown assessment with audio transcription, mandatory screen share, and auto-submission.</p>
-                      <ul className="grid grid-cols-1 md:grid-cols-2 gap-2 pt-1 font-medium text-slate-700">
+                      <p className="text-slate-500 text-[11px]">Full lockdown assessment with audio transcription, mandatory screen share, and auto-submission.</p>
+                      <ul className="grid grid-cols-1 md:grid-cols-2 gap-2 pt-0.5 font-medium text-slate-700">
                         <li className="flex items-center gap-2">✓ All Low & Medium Restrictions</li>
                         <li className="flex items-center gap-2">✓ Microphone & Audio Keyword Monitoring</li>
                         <li className="flex items-center gap-2">✓ Mandatory Entire Screen Share</li>
@@ -3553,43 +3549,46 @@ export default function NewAdminTestEdit() {
                       </ul>
                     </div>
                   )}
-                </CardContent>
-                <CardFooter className="flex justify-end gap-2 border-t px-6 py-4 bg-muted/20">
-                  {isProctoringDirty && (
-                    <span className="text-xs text-muted-foreground self-center mr-auto">
-                      You have unsaved proctoring changes
-                    </span>
-                  )}
-                  <Button
+                </div>
+
+                {/* Footer Save Row */}
+                <div className="pt-3.5 flex items-center justify-between">
+                  <div>
+                    {isProctoringDirty && (
+                      <span className="text-[11px] text-amber-600 font-medium">
+                        You have unsaved proctoring changes
+                      </span>
+                    )}
+                  </div>
+                  <button
                     type="button"
                     onClick={handleSaveProctoring}
                     disabled={savingProctoring || !isProctoringDirty}
-                    size="sm"
-                    className="bg-indigo-600 hover:bg-indigo-700 text-white"
+                    className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-xs font-bold tracking-wider uppercase shadow-xs transition-colors rounded-none cursor-pointer inline-flex items-center gap-2"
                   >
                     {savingProctoring ? (
                       <>
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        Saving Proctoring...
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <span>Saving Proctoring...</span>
                       </>
                     ) : (
                       <>
-                        <Save className="w-4 h-4 mr-2" />
-                        Save Proctoring Settings
+                        <Save className="w-4 h-4" />
+                        <span>Save Proctoring Settings</span>
                       </>
                     )}
-                  </Button>
-                </CardFooter>
-              </Card>
+                  </button>
+                </div>
+              </div>
             </div>
           )}
 
           {/* ── CANDIDATES (Merged Reports & Invitations) ── */}
           {activeTab === "CANDIDATES" && (
-            <div className="space-y-5">
+            <div className="space-y-4">
               {/* 1. Schedule Status Banner & Workflow Guide */}
               {!selectedScheduleId || !scheduleStartTime || !scheduleEndTime ? (
-                <div className="p-4 bg-amber-50 border border-amber-200 text-amber-900 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-xs">
+                <div className="p-4 bg-amber-50 border border-amber-200 text-amber-900 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-sm">
                   <div className="space-y-1">
                     <h4 className="text-xs font-bold uppercase tracking-wider text-amber-950">
                       Test Not Scheduled Yet
@@ -3600,14 +3599,14 @@ export default function NewAdminTestEdit() {
                   </div>
                   <button
                     onClick={() => setActiveTab("ADVANCED_SETTINGS")}
-                    className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold tracking-wider uppercase inline-flex items-center gap-2 transition-colors cursor-pointer shrink-0 shadow-xs"
+                    className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold tracking-wider uppercase inline-flex items-center gap-2 transition-colors cursor-pointer shrink-0 shadow-xs rounded-none"
                   >
                     <Calendar className="w-3.5 h-3.5" />
                     <span>Configure Schedule</span>
                   </button>
                 </div>
               ) : (
-                <div className="p-3.5 bg-slate-50 border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+                <div className="p-3.5 bg-slate-50 border border-slate-200/90 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
                   <div className="flex flex-wrap items-center gap-2.5 text-slate-700">
                     <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0"></span>
                     <span className="font-bold text-slate-900">Active Test Schedule:</span>
@@ -3615,7 +3614,7 @@ export default function NewAdminTestEdit() {
                       {formatDateTime(scheduleStartTime)} — {formatDateTime(scheduleEndTime)}
                     </span>
                     <span className="text-slate-300">|</span>
-                    <span className="inline-flex items-center gap-1 font-medium text-slate-600 bg-white px-2 py-0.5 border border-slate-200 rounded text-[11px]">
+                    <span className="inline-flex items-center gap-1 font-medium text-slate-600 bg-white px-2 py-0.5 border border-slate-200 rounded-none text-[11px]">
                       <Clock className="w-3 h-3 text-slate-400" />
                       <span>Duration: {durationStr}</span>
                     </span>
@@ -3633,9 +3632,9 @@ export default function NewAdminTestEdit() {
               {/* 2. Main Filter & Candidate Table Area */}
               <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 items-start">
                 {/* Left Filter Sidebar */}
-                <div className="lg:col-span-1 border border-slate-200 bg-white shadow-xs p-5 space-y-5">
+                <div className="lg:col-span-1 border border-slate-200/90 bg-white shadow-sm p-5 space-y-4">
                   <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                    <h3 className="text-sm font-bold text-slate-900">Filters</h3>
+                    <h3 className="text-xs font-semibold text-slate-800 uppercase tracking-wider">Filters</h3>
                     <button
                       onClick={() => {
                         setCandidateStatusFilter("ALL");
@@ -3694,7 +3693,7 @@ export default function NewAdminTestEdit() {
                 </div>
 
                 {/* Right Main Table & Actions Area */}
-                <div className="lg:col-span-3 border border-slate-200 bg-white shadow-xs">
+                <div className="lg:col-span-3 border border-slate-200/90 bg-white shadow-sm">
                   {/* 1. Search Bar & Action Buttons */}
                   <div className="p-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     <div className="relative flex-1 max-w-md">
@@ -3721,7 +3720,7 @@ export default function NewAdminTestEdit() {
                           }
                           setIsAddCandidatesOpen(true);
                         }}
-                        className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold tracking-wider uppercase inline-flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs"
+                        className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold tracking-wider uppercase inline-flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs rounded-none"
                       >
                         <Plus className="w-3.5 h-3.5" />
                         <span>Add Candidates</span>
@@ -3729,7 +3728,7 @@ export default function NewAdminTestEdit() {
 
                       <button
                         onClick={handleDownloadReport}
-                        className="px-4 py-2 border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 hover:text-slate-900 text-xs font-bold tracking-wider uppercase inline-flex items-center gap-2 transition-colors cursor-pointer shadow-xs"
+                        className="px-4 py-2 border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 hover:text-slate-900 text-xs font-bold tracking-wider uppercase inline-flex items-center gap-2 transition-colors cursor-pointer shadow-xs rounded-none"
                       >
                         <CloudDownload className="w-4 h-4 text-indigo-600" />
                         <span>Download Report</span>
@@ -4049,8 +4048,8 @@ export default function NewAdminTestEdit() {
                             return (
                               <tr
                                 key={inv.id}
-                                className={`hover:bg-amber-50/40 transition-colors ${
-                                  selectedCandidateIds.includes(inv.id) ? "bg-amber-50/50" : ""
+                                className={`hover:bg-slate-50/60 transition-colors ${
+                                  selectedCandidateIds.includes(inv.id) ? "bg-slate-50/80" : ""
                                 }`}
                               >
                                 {/* Checkbox */}
@@ -4067,7 +4066,7 @@ export default function NewAdminTestEdit() {
                                 <td className="py-3.5 px-4">
                                   <div className="flex items-center gap-3">
                                     <Avatar className="w-8 h-8 border border-slate-200">
-                                      <AvatarFallback className="bg-amber-100 text-amber-800 text-xs font-bold">
+                                      <AvatarFallback className="bg-slate-100 text-slate-700 text-xs font-bold">
                                         {name.slice(0, 2).toUpperCase()}
                                       </AvatarFallback>
                                     </Avatar>

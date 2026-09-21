@@ -40,8 +40,8 @@ import { apiClient } from "@/lib/api-client";
 import { mapFrontendToBackendLang } from "@/types/question";
 import { renderFormattedContent, decodeHtmlIfNeeded, sanitizeHtml } from "@/lib/html-utils";
 import { QuestionImage } from "@/components/ui/QuestionImage";
-import { toast } from "sonner";
 import { GryphonLogo } from "@/components/ui/GryphonLogo";
+import { AdminPinNavWidget } from "@/components/admin/AdminPinNavWidget";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -563,8 +563,9 @@ export default function NewAdminQuestionPreview() {
           </div>
         </div>
 
-        {/* Right Side: User Profile Section */}
-        <div className="flex items-center space-x-3 shrink-0">
+        {/* Right Side: Pins & User Profile Section */}
+        <div className="flex items-center space-x-2.5 sm:space-x-4 shrink-0">
+          <AdminPinNavWidget />
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button className="flex items-center gap-2.5 px-2.5 py-1.5 hover:bg-slate-800/70 transition-colors focus:outline-none cursor-pointer rounded-md">

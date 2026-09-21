@@ -31,6 +31,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useAuth } from "@/lib/auth-context";
 import { GryphonLogo } from "@/components/ui/GryphonLogo";
+import { AdminPinNavWidget } from "@/components/admin/AdminPinNavWidget";
 import { useQuestionsPageQuery } from "@/hooks/use-query-hooks";
 import { testService, Question, Test } from "@/lib/test-service";
 import { toast } from "sonner";
@@ -437,8 +438,9 @@ export default function NewAdminTestAddProblems() {
           </div>
         </div>
 
-        {/* Right Side: User Profile */}
-        <div className="flex items-center space-x-3 shrink-0">
+        {/* Right Side: Pins & User Profile */}
+        <div className="flex items-center space-x-2.5 sm:space-x-4 shrink-0">
+          <AdminPinNavWidget />
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button className="flex items-center gap-2.5 px-2.5 py-1.5 hover:bg-slate-800/70 transition-colors focus:outline-none cursor-pointer rounded-md">
