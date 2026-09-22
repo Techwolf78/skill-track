@@ -79,6 +79,7 @@ import {
 import { AddCandidatesModal } from "@/components/invite/AddCandidatesModal";
 import { RichTextEditor } from "@/components/ui/RichTextEditor";
 import { useAuth } from "@/lib/auth-context";
+import { useQueryClient } from "@tanstack/react-query";
 import { apiClient } from "@/lib/api-client";
 import {
   testService,
@@ -236,6 +237,8 @@ export default function NewAdminTestEdit() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user, logout } = useAuth();
+  const queryClient = useQueryClient();
+  const orgId = user?.organisationData?.id;
   const [searchParams, setSearchParams] = useSearchParams();
 
   const getInitialTab = (): TabType => {
@@ -1409,12 +1412,22 @@ export default function NewAdminTestEdit() {
     }
     if (!confirm(`Revoke ${selectedCandidateIds.length} candidate invitations?`)) return;
     try {
+      const count = selectedCandidateIds.length;
       await Promise.all(
         selectedCandidateIds.map((invId) => candidateService.deleteInvitation(invId))
       );
+      if (orgId) {
+        queryClient.invalidateQueries({ queryKey: ["admin-nav-pin-summary", orgId] });
+        queryClient.invalidateQueries({ queryKey: ["org-admin-pins-summary", orgId] });
+        queryClient.invalidateQueries({ queryKey: ["admin-nav-pin-fy", orgId] });
+        queryClient.invalidateQueries({ queryKey: ["org-admin-pins-fy-summary", orgId] });
+        queryClient.invalidateQueries({ queryKey: ["org-admin-pins-tx", orgId] });
+      }
       setInvitations((prev) => prev.filter((i) => !selectedCandidateIds.includes(i.id)));
       setSelectedCandidateIds([]);
-      toast.success("Candidate invitations revoked successfully.");
+      toast.success(
+        `${count} candidate invitation${count === 1 ? "" : "s"} revoked. ${count} PIN${count === 1 ? "" : "s"} refunded to your organisation balance.`
+      );
     } catch {
       toast.error("Failed to revoke invitations.");
     }
@@ -1448,8 +1461,15 @@ export default function NewAdminTestEdit() {
     try {
       setRevoking(true);
       await candidateService.deleteInvitation(candidateToRevoke.id);
+      if (orgId) {
+        queryClient.invalidateQueries({ queryKey: ["admin-nav-pin-summary", orgId] });
+        queryClient.invalidateQueries({ queryKey: ["org-admin-pins-summary", orgId] });
+        queryClient.invalidateQueries({ queryKey: ["admin-nav-pin-fy", orgId] });
+        queryClient.invalidateQueries({ queryKey: ["org-admin-pins-fy-summary", orgId] });
+        queryClient.invalidateQueries({ queryKey: ["org-admin-pins-tx", orgId] });
+      }
       setInvitations((prev) => prev.filter((i) => i.id !== candidateToRevoke.id));
-      toast.success("Candidate invitation revoked successfully.");
+      toast.success("Candidate invitation revoked. 1 PIN has been refunded to your organisation balance.");
       setIsRevokeModalOpen(false);
       setCandidateToRevoke(null);
     } catch {

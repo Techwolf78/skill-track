@@ -197,16 +197,20 @@ export function AdminPinNavWidget() {
         {/* Deduction Logic Policy */}
         <div className="px-3.5 py-2.5 bg-slate-50/70 border-t border-slate-100 text-[11px] text-slate-600 space-y-1">
           <div className="text-[10.5px] font-semibold text-slate-700">
-            PIN Deduction Policy:
+            PIN Policy:
           </div>
           <ul className="space-y-1 text-slate-500 text-[10.5px]">
             <li className="flex items-start gap-1.5">
               <span className="text-indigo-600 font-bold">•</span>
-              <span><strong>1 PIN</strong> deducted per completed candidate assessment.</span>
+              <span><strong>1 PIN</strong> reserved per invited candidate at invite time.</span>
             </li>
             <li className="flex items-start gap-1.5">
               <span className="text-indigo-600 font-bold">•</span>
-              <span>Voided or cancelled test sessions are refunded.</span>
+              <span>Unstarted no-shows are automatically refunded after the schedule ends (+3h grace period).</span>
+            </li>
+            <li className="flex items-start gap-1.5">
+              <span className="text-indigo-600 font-bold">•</span>
+              <span>Revoking an unstarted invitation refunds 1 PIN immediately.</span>
             </li>
           </ul>
         </div>

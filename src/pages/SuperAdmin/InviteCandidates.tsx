@@ -15,6 +15,8 @@ import { useToast } from "@/hooks/use-toast";
 import { testService, TestSchedule, Test } from "@/lib/test-service";
 import { candidateService, Candidate } from "@/lib/candidate-service";
 import { apiClient } from "@/lib/api-client";
+import { useAuth } from "@/lib/auth-context";
+import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { formatDateTime } from "@/lib/date-utils";
 
@@ -68,6 +70,20 @@ function InviteStatusBadge({ status }: { status: string }) {
 }
 
 export default function InviteCandidates() {
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+  const orgId = user?.organisationData?.id;
+
+  const invalidatePinQueries = () => {
+    if (orgId) {
+      queryClient.invalidateQueries({ queryKey: ["admin-nav-pin-summary", orgId] });
+      queryClient.invalidateQueries({ queryKey: ["org-admin-pins-summary", orgId] });
+      queryClient.invalidateQueries({ queryKey: ["admin-nav-pin-fy", orgId] });
+      queryClient.invalidateQueries({ queryKey: ["org-admin-pins-fy-summary", orgId] });
+      queryClient.invalidateQueries({ queryKey: ["org-admin-pins-tx", orgId] });
+    }
+  };
+
   const [schedules, setSchedules] = useState<TestSchedule[]>([]);
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [invitations, setInvitations] = useState<CandidateInvitation[]>([]);
@@ -221,6 +237,7 @@ export default function InviteCandidates() {
         candidateId: selectedCandidate.id,
         baseUrl: window.location.origin,
       });
+      invalidatePinQueries();
       toast({ title: "Invitation sent", description: `${selectedCandidate.user.name} has been invited.` });
       setIsInviteDialogOpen(false);
       setSelectedCandidate(null);
@@ -294,6 +311,10 @@ export default function InviteCandidates() {
           lastErrMsg = msg;
         }
       }
+    }
+
+    if (successCount > 0) {
+      invalidatePinQueries();
     }
 
     if (insufficientPins) {
@@ -679,7 +700,11 @@ export default function InviteCandidates() {
                               if (confirm(`Revoke invitation for ${candidate.user.name}?`)) {
                                 try {
                                   await apiClient.delete(`/candidate-invitations/${invitation.id}`);
-                                  toast({ title: "Invitation revoked", description: `${candidate.user.name}'s invite removed.` });
+                                  invalidatePinQueries();
+                                  toast({
+                                    title: "Invitation revoked",
+                                    description: "Invitation revoked. 1 PIN has been refunded to your organisation balance.",
+                                  });
                                   fetchData();
                                 } catch (err) {
                                   const e2 = err as { response?: { data?: { message?: string } }; message?: string };

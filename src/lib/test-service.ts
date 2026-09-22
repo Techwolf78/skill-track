@@ -521,6 +521,24 @@ export interface TestScheduleExtended {
   maxCandidates: number;
   status: "SCHEDULED" | "ACCEPTED" | "EXPIRED" | "LIVE" | "COMPLETED";
   createdAt?: string;
+  refundProcessedAt?: string | null;
+}
+
+export interface ManualScheduleRefundResponse {
+  scheduleId: string;
+  testId: string;
+  testTitle?: string;
+  noShowCount: number;
+  refundedPins: number;
+  refundProcessedAt?: string;
+  failed?: boolean;
+  message: string;
+}
+
+export interface ManualBatchRefundResponse {
+  totalSchedulesProcessed: number;
+  totalPinsRefunded: number;
+  scheduleResults: ManualScheduleRefundResponse[];
 }
 
 export interface CreateTestScheduleExtendedRequest {
@@ -1406,6 +1424,16 @@ export const testService = {
 
   deleteTestSchedule: async (id: string): Promise<void> => {
     await apiClient.delete(`/test-schedules/${id}`);
+  },
+
+  triggerScheduleRefund: async (scheduleId: string): Promise<ManualScheduleRefundResponse> => {
+    const response = await apiClient.post<ManualScheduleRefundResponse>(`/test-schedules/${scheduleId}/trigger-refund`);
+    return unwrapResponse(response);
+  },
+
+  triggerTestRefund: async (testId: string): Promise<ManualBatchRefundResponse> => {
+    const response = await apiClient.post<ManualBatchRefundResponse>(`/test-schedules/trigger-refund?testId=${testId}`);
+    return unwrapResponse(response);
   },
 
   // ==================== Test Session APIs ====================

@@ -11,6 +11,8 @@ import {
   CreateTestRequest,
   TestScheduleExtended,
   CreateTestScheduleExtendedRequest,
+  ManualScheduleRefundResponse,
+  ManualBatchRefundResponse,
   Question,
   CreateQuestionRequest,
   UpdateQuestionRequest,
@@ -307,6 +309,41 @@ export function useUpdateTestScheduleStatusMutation() {
     mutationFn: ({ scheduleId, status }) => testService.updateTestScheduleStatus(scheduleId, status),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["test-schedules"] });
+    },
+  });
+}
+
+export function useTriggerScheduleRefundMutation() {
+  const queryClient = useQueryClient();
+  return useMutation<ManualScheduleRefundResponse, Error, string>({
+    mutationFn: (scheduleId: string) => testService.triggerScheduleRefund(scheduleId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["test-schedules"] });
+      queryClient.invalidateQueries({ queryKey: ["candidate-invitations"] });
+      queryClient.invalidateQueries({ queryKey: ["organisation-pin-balance"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-nav-pin-summary"] });
+      queryClient.invalidateQueries({ queryKey: ["org-admin-pins-summary"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-nav-pin-fy"] });
+      queryClient.invalidateQueries({ queryKey: ["org-admin-pins-fy-summary"] });
+      queryClient.invalidateQueries({ queryKey: ["org-admin-pins-tx"] });
+    },
+  });
+}
+
+export function useTriggerTestBatchRefundMutation() {
+  const queryClient = useQueryClient();
+  return useMutation<ManualBatchRefundResponse, Error, string>({
+    mutationFn: (testId: string) => testService.triggerTestRefund(testId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["test-schedules"] });
+      queryClient.invalidateQueries({ queryKey: ["tests"] });
+      queryClient.invalidateQueries({ queryKey: ["candidate-invitations"] });
+      queryClient.invalidateQueries({ queryKey: ["organisation-pin-balance"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-nav-pin-summary"] });
+      queryClient.invalidateQueries({ queryKey: ["org-admin-pins-summary"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-nav-pin-fy"] });
+      queryClient.invalidateQueries({ queryKey: ["org-admin-pins-fy-summary"] });
+      queryClient.invalidateQueries({ queryKey: ["org-admin-pins-tx"] });
     },
   });
 }

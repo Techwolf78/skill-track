@@ -526,7 +526,7 @@ export default function NewAdminSettings() {
                 <span className="font-mono font-bold text-2xl text-rose-600 block mt-1">
                   -{isSummaryLoading ? "..." : (pinSummary?.totalUsedPins ?? 0).toLocaleString()}
                 </span>
-                <span className="text-[10px] text-slate-400 mt-0.5 block font-medium">Submissions graded</span>
+                <span className="text-[10px] text-slate-400 mt-0.5 block font-medium">Invitations & assessments</span>
               </div>
 
               <div className="bg-white border border-slate-200 rounded-lg p-3.5 shadow-2xs">
@@ -677,16 +677,21 @@ export default function NewAdminSettings() {
                               <TableCell className="py-2.5 px-2 text-right font-mono font-bold text-slate-900">
                                 {tx.balanceAfter.toLocaleString()}
                               </TableCell>
-                              <TableCell className="py-2.5 px-3 text-slate-700 max-w-[220px]">
+                              <TableCell className="py-2.5 px-3 text-slate-700 max-w-[240px]">
                                 {tx.notes && <p className="truncate font-medium">{tx.notes}</p>}
+                                {tx.scheduleId && (
+                                  <p className="text-[10px] text-slate-500 font-mono truncate">
+                                    Schedule: {tx.scheduleId.slice(0, 8)}
+                                  </p>
+                                )}
                                 {tx.candidateName && (
                                   <p className="text-[10px] text-slate-500 truncate flex items-center gap-1">
-                                    <User className="w-2.5 h-2.5" />
-                                    {tx.candidateName}
+                                    <User className="w-2.5 h-2.5 shrink-0" />
+                                    <span>{tx.candidateName}</span>
                                     {tx.candidateEmail && <span className="text-slate-400">({tx.candidateEmail})</span>}
                                   </p>
                                 )}
-                                {!tx.notes && !tx.candidateName && (
+                                {!tx.notes && !tx.scheduleId && !tx.candidateName && (
                                   <span className="text-slate-400">—</span>
                                 )}
                               </TableCell>

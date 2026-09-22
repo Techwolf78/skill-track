@@ -18,6 +18,8 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth-context";
 import { candidateService, Candidate } from "@/lib/candidate-service";
+import { organisationPinService } from "@/lib/organisation-pin-service";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
 import { apiClient } from "@/lib/api-client";
 import * as XLSX from "xlsx";
@@ -35,6 +37,7 @@ import {
   Download,
   Upload,
   ArrowRight,
+  Coins,
 } from "lucide-react";
 
 interface AddCandidatesModalProps {
@@ -58,6 +61,27 @@ export function AddCandidatesModal({
 }: AddCandidatesModalProps) {
   const { toast } = useToast();
   const { user } = useAuth();
+  const queryClient = useQueryClient();
+  const orgId = user?.organisationData?.id;
+
+  const { data: pinSummary, isLoading: isPinLoading } = useQuery({
+    queryKey: ["admin-nav-pin-summary", orgId],
+    queryFn: () => organisationPinService.getPinSummary(orgId!),
+    enabled: !!orgId && open,
+    staleTime: 10_000,
+  });
+  const pinBalance = pinSummary?.pinBalance ?? 0;
+
+  const invalidatePinQueries = () => {
+    if (orgId) {
+      queryClient.invalidateQueries({ queryKey: ["admin-nav-pin-summary", orgId] });
+      queryClient.invalidateQueries({ queryKey: ["org-admin-pins-summary", orgId] });
+      queryClient.invalidateQueries({ queryKey: ["admin-nav-pin-fy", orgId] });
+      queryClient.invalidateQueries({ queryKey: ["org-admin-pins-fy-summary", orgId] });
+      queryClient.invalidateQueries({ queryKey: ["org-admin-pins-tx", orgId] });
+    }
+  };
+
   const [activeTab, setActiveTab] = useState<"create" | "bulk">("create");
 
   // Tab 1: Create / Add Candidate Form state
@@ -109,7 +133,6 @@ export function AddCandidatesModal({
     const timer = setTimeout(async () => {
       try {
         setCheckingEmail(true);
-        const orgId = user?.organisationData?.id;
         const res = await candidateService.getCandidatesPage(0, 5, trimmedEmail, orgId);
         if (!isMounted) return;
 
@@ -140,7 +163,7 @@ export function AddCandidatesModal({
       isMounted = false;
       clearTimeout(timer);
     };
-  }, [createForm.email, user?.organisationData?.id]);
+  }, [createForm.email, orgId]);
 
   // Generate random strong password for new candidate creation
   const generateSecurePassword = () => {
@@ -212,7 +235,15 @@ export function AddCandidatesModal({
       return;
     }
 
-    const orgId = user?.organisationData?.id;
+    if (pinBalance < 1) {
+      toast({
+        title: "Insufficient PIN Balance",
+        description: `You need 1 PIN to invite this candidate, but only ${pinBalance} PINs are available. Please top up your balance.`,
+        variant: "destructive",
+      });
+      return;
+    }
+
     if (!orgId) {
       toast({
         title: "Organisation Error",
@@ -258,12 +289,14 @@ export function AddCandidatesModal({
         }
       }
 
-      // 2. Send test invitation
-      await candidateService.createInvitation({
-        scheduleId,
-        candidateId: candidateId || undefined,
-        candidateEmail: trimmedEmail,
-      });
+      // 2. Send test invitation (Backend requires exactly one of candidateId or candidateEmail)
+      await candidateService.createInvitation(
+        candidateId
+          ? { scheduleId, candidateId }
+          : { scheduleId, candidateEmail: trimmedEmail }
+      );
+
+      invalidatePinQueries();
 
       toast({
         title: isExisting ? "Existing Candidate Added & Invited" : "Candidate Created & Invited",
@@ -279,10 +312,22 @@ export function AddCandidatesModal({
       onOpenChange(false);
     } catch (error) {
       console.error("Create and invite error:", error);
-      const err = error as { response?: { data?: { message?: string } }; message?: string };
-      const errMsg = err.response?.data?.message || err.message || "An error occurred.";
+      const status = (error as { response?: { status?: number } })?.response?.status;
+      const errData = (error as { response?: { data?: { errorCode?: string; message?: string } } })?.response?.data;
+      const errorCode = errData?.errorCode;
+      const errMsg = errData?.message || (error as Error)?.message || "An error occurred.";
 
-      if (/already.*invited/i.test(errMsg) || /invitation.*already.*exists/i.test(errMsg)) {
+      if (
+        (status === 400 && (errorCode === "INSUFFICIENT_PINS" || /insufficient.*pin/i.test(errMsg) || /available.*pin/i.test(errMsg))) ||
+        status === 402 ||
+        errorCode === "INSUFFICIENT_PINS"
+      ) {
+        toast({
+          title: "Insufficient PIN Balance",
+          description: `You need 1 PIN to invite this candidate, but only ${pinBalance} PINs are available. Please top up your balance.`,
+          variant: "destructive",
+        });
+      } else if (/already.*invited/i.test(errMsg) || /invitation.*already.*exists/i.test(errMsg)) {
         toast({
           title: "Already Invited",
           description: "This candidate has already been invited to this test schedule.",
@@ -343,7 +388,6 @@ export function AddCandidatesModal({
 
   const handleProcessBulkFile = async () => {
     if (!bulkFile) return;
-    const orgId = user?.organisationData?.id;
     if (!orgId) {
       setBulkError("No organisation found.");
       return;
@@ -496,9 +540,22 @@ export function AddCandidatesModal({
 
   const handleSendBulkInvitations = async () => {
     if (parsedBulkCandidates.length === 0) return;
+    if (parsedBulkCandidates.length > pinBalance) {
+      toast({
+        title: "Insufficient PIN Balance",
+        description: `You need ${parsedBulkCandidates.length} PINs to invite these candidates, but only ${pinBalance} PINs are available. Please top up your balance.`,
+        variant: "destructive",
+      });
+      return;
+    }
+
     try {
       setInviting(true);
       let successCount = 0;
+      let failCount = 0;
+      let insufficientPins = false;
+      let lastErrMsg = "";
+
       for (const cand of parsedBulkCandidates) {
         try {
           await candidateService.createInvitation({
@@ -507,15 +564,54 @@ export function AddCandidatesModal({
           });
           successCount++;
         } catch (err) {
-          console.error("Bulk invite failure for:", cand.email, err);
+          failCount++;
+          const status = (err as { response?: { status?: number } })?.response?.status;
+          const errData = (err as { response?: { data?: { errorCode?: string; message?: string } } })?.response?.data;
+          const errorCode = errData?.errorCode;
+          const msg = errData?.message || (err as Error)?.message || "";
+
+          if (
+            (status === 400 && (errorCode === "INSUFFICIENT_PINS" || /insufficient.*pin/i.test(msg) || /available.*pin/i.test(msg))) ||
+            status === 402 ||
+            errorCode === "INSUFFICIENT_PINS"
+          ) {
+            insufficientPins = true;
+            lastErrMsg = `Insufficient PIN balance: You need ${parsedBulkCandidates.length} PINs to invite these candidates, but only ${pinBalance} PINs are available. Please top up your balance.`;
+            break;
+          } else {
+            if (!lastErrMsg) lastErrMsg = msg;
+            console.error("Bulk invite failure for:", cand.email, err);
+          }
         }
       }
-      toast({
-        title: "Bulk Invitations Dispatched",
-        description: `Successfully sent ${successCount} invitation${successCount === 1 ? "" : "s"}.`,
-      });
-      onSuccess();
-      onOpenChange(false);
+
+      if (successCount > 0) {
+        invalidatePinQueries();
+      }
+
+      if (insufficientPins) {
+        toast({
+          title: "Insufficient Organisation PINs",
+          description: lastErrMsg,
+          variant: "destructive",
+        });
+        if (successCount > 0) {
+          onSuccess();
+        }
+      } else if (failCount > 0 && successCount === 0) {
+        toast({
+          title: "Bulk Invite Failed",
+          description: lastErrMsg || "Failed to send bulk invitations.",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Bulk Invitations Dispatched",
+          description: `Successfully sent ${successCount} invitation${successCount === 1 ? "" : "s"}.${failCount > 0 ? ` (${failCount} failed)` : ""}`,
+        });
+        onSuccess();
+        onOpenChange(false);
+      }
     } catch (err) {
       toast({ title: "Invite Error", description: "Failed to send bulk invitations.", variant: "destructive" });
     } finally {
@@ -543,14 +639,33 @@ export function AddCandidatesModal({
               </span>
             </h2>
           </div>
-          <button
-            type="button"
-            onClick={() => onOpenChange(false)}
-            className="w-8 h-8 rounded-full flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
-            aria-label="Close dialog"
-          >
-            <X className="w-4 h-4" />
-          </button>
+          <div className="flex items-center gap-3">
+            {orgId && (
+              <div
+                className={cn(
+                  "flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-mono font-semibold border transition-colors",
+                  pinBalance > 0
+                    ? "bg-slate-800/90 text-slate-100 border-slate-700"
+                    : "bg-red-500/20 text-red-300 border-red-500/40"
+                )}
+                title="Available PIN balance for this organisation"
+              >
+                <Coins className="w-3.5 h-3.5 text-amber-400" />
+                <span>Available PINs:</span>
+                <span className={cn("font-bold", pinBalance === 0 && "text-red-400")}>
+                  {isPinLoading ? "..." : pinBalance.toLocaleString()}
+                </span>
+              </div>
+            )}
+            <button
+              type="button"
+              onClick={() => onOpenChange(false)}
+              className="w-8 h-8 rounded-full flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
+              aria-label="Close dialog"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
         </div>
 
         {/* Main Content: Split Grid Layout */}
@@ -597,6 +712,16 @@ export function AddCandidatesModal({
                   <p className="text-xs text-slate-500 leading-relaxed">
                     Enter candidate details below. If the candidate already exists in the system, they will be automatically linked to this test without duplication.
                   </p>
+
+                  {/* Insufficient PIN balance warning in Tab 1 */}
+                  {pinBalance < 1 && (
+                    <div className="flex items-center gap-2 p-3 rounded-lg border border-red-200 bg-red-50 text-red-700 text-xs shrink-0">
+                      <AlertTriangle className="w-4 h-4 shrink-0 text-red-600" />
+                      <span>
+                        <strong>Insufficient PIN balance:</strong> Your organisation has 0 available PINs. 1 PIN is reserved per candidate invitation. Please top up your balance.
+                      </span>
+                    </div>
+                  )}
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-1.5">
@@ -720,7 +845,7 @@ export function AddCandidatesModal({
                     </Button>
                     <Button
                       type="submit"
-                      disabled={creating || isCandidateAlreadyInvited}
+                      disabled={creating || isCandidateAlreadyInvited || pinBalance < 1}
                       className="text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg px-5 py-2 shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
                     >
                       {creating ? (
@@ -837,6 +962,17 @@ export function AddCandidatesModal({
                         <span>Parsed Candidates ({parsedBulkCandidates.length})</span>
                         <span className="text-emerald-600 font-medium">Ready to invite</span>
                       </div>
+
+                      {/* Insufficient PIN balance alert in review */}
+                      {parsedBulkCandidates.length > pinBalance && (
+                        <div className="p-3 bg-red-50 border-b border-red-200 flex items-center gap-2 text-xs text-red-700 font-medium">
+                          <AlertTriangle className="w-4 h-4 shrink-0 text-red-600" />
+                          <span>
+                            <strong>Insufficient PIN balance:</strong> You need {parsedBulkCandidates.length} PINs to invite these candidates, but only {pinBalance} PINs are available. Please top up your balance.
+                          </span>
+                        </div>
+                      )}
+
                       <div className="max-h-48 overflow-y-auto">
                         <Table>
                           <TableHeader className="bg-slate-50/50">
@@ -900,7 +1036,7 @@ export function AddCandidatesModal({
                     <Button
                       type="button"
                       onClick={handleSendBulkInvitations}
-                      disabled={inviting || parsedBulkCandidates.length === 0}
+                      disabled={inviting || parsedBulkCandidates.length === 0 || parsedBulkCandidates.length > pinBalance}
                       className="text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg px-5 py-2 shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
                     >
                       {inviting ? (

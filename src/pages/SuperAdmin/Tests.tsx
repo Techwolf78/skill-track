@@ -46,10 +46,13 @@ import {
   FileQuestion,
   FileText,
   Users,
+  RotateCcw,
+  Coins,
 } from "lucide-react";
 import { testService, TestViewModel, CreateTestRequest } from "@/lib/test-service";
 import { useToast } from "@/hooks/use-toast";
 import { useMemo } from "react";
+import { useAuth } from "@/lib/auth-context";
 import {
   useTestsQuery,
   useInactiveTestsQuery,
@@ -57,14 +60,17 @@ import {
   useUpdateTestMutation,
   useDeleteTestMutation,
   useActivateTestMutation,
+  useTriggerTestBatchRefundMutation,
 } from "@/hooks/use-query-hooks";
 
 export default function Tests() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [searchTerm, setSearchTerm] = useState("");
   const [activeTab, setActiveTab] = useState("all");
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [selectedTest, setSelectedTest] = useState<TestViewModel | null>(null);
+  const [batchRefundTest, setBatchRefundTest] = useState<TestViewModel | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string>("");
   const { toast } = useToast();
@@ -84,6 +90,7 @@ export default function Tests() {
   const createTestMutation = useCreateTestMutation();
   const updateTestMutation = useUpdateTestMutation();
   const activateTestMutation = useActivateTestMutation();
+  const triggerBatchRefundMutation = useTriggerTestBatchRefundMutation();
 
   const fetchTests = useCallback(() => {
     refetchActive();
@@ -463,6 +470,15 @@ export default function Tests() {
                             <Copy className="w-4 h-4 mr-2" />
                             Duplicate
                           </DropdownMenuItem>
+                          {user?.role === "SUPERADMIN" && (
+                            <DropdownMenuItem
+                              onClick={() => setBatchRefundTest(test)}
+                              className="text-amber-600 hover:text-amber-700 hover:bg-amber-50 font-medium cursor-pointer"
+                            >
+                              <RotateCcw className="w-4 h-4 mr-2 text-amber-600" />
+                              Batch No-Show Refund
+                            </DropdownMenuItem>
+                          )}
                         </>
                       )}
 
@@ -617,6 +633,74 @@ export default function Tests() {
               ) : (
                 "Deactivate"
               )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Batch No-Show Refund Confirmation Modal */}
+      <AlertDialog
+        open={!!batchRefundTest}
+        onOpenChange={(open) => !open && setBatchRefundTest(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <RotateCcw className="w-5 h-5 text-amber-600" />
+              Batch Trigger No-Show Refund
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3 pt-2 text-left text-sm text-muted-foreground">
+                <p>
+                  Are you sure you want to sweep and refund unstarted invitations across all completed schedules for:
+                </p>
+                <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 text-sm space-y-1 my-2">
+                  <div><strong className="text-slate-800">Test:</strong> {batchRefundTest?.name}</div>
+                  <div><strong className="text-slate-800">Difficulty:</strong> {batchRefundTest?.difficulty}</div>
+                  <div><strong className="text-slate-800">Duration:</strong> {batchRefundTest?.duration} mins</div>
+                </div>
+                <p className="text-xs text-muted-foreground block">
+                  This will sweep all completed, unrefunded schedules for this test, expire any unstarted (<code className="text-xs bg-slate-100 px-1 py-0.5 rounded">PENDING</code>) candidate invitations, and credit the reserved PINs back to the respective organisation balances.
+                </p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={triggerBatchRefundMutation.isPending}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={async (e) => {
+                e.preventDefault();
+                if (!batchRefundTest) return;
+                try {
+                  const res = await triggerBatchRefundMutation.mutateAsync(batchRefundTest.id);
+                  toast({
+                    title: "Batch Refund Completed",
+                    description: `Processed ${res.totalSchedulesProcessed} schedule(s) and refunded a total of ${res.totalPinsRefunded} PIN(s).`,
+                  });
+                  setBatchRefundTest(null);
+                  fetchTests();
+                } catch (err) {
+                  console.error("Batch refund failed:", err);
+                  const errMsg =
+                    (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
+                    (err as Error)?.message ||
+                    "Failed to process batch refund.";
+                  toast({
+                    title: "Batch Refund Failed",
+                    description: errMsg,
+                    variant: "destructive",
+                  });
+                }
+              }}
+              disabled={triggerBatchRefundMutation.isPending}
+              className="bg-amber-600 hover:bg-amber-700 text-white"
+            >
+              {triggerBatchRefundMutation.isPending && (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              )}
+              Confirm & Batch Refund
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

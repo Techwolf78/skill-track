@@ -15,8 +15,20 @@ import {
   Loader2,
   CheckCircle2,
   XCircle,
-  ClockIcon
+  ClockIcon,
+  RotateCcw,
+  Coins,
 } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { testService, TestScheduleExtended, Test } from "@/lib/test-service";
 import { apiClient } from "@/lib/api-client";
@@ -24,6 +36,7 @@ import { useAuth } from "@/lib/auth-context";
 import { organisationService } from "@/lib/organisation-service";
 import { candidateService, Candidate } from "@/lib/candidate-service";
 import { formatDateTime } from "@/lib/date-utils";
+import { useTriggerScheduleRefundMutation } from "@/hooks/use-query-hooks";
 
 interface Organisation {
   id: string;
@@ -51,6 +64,36 @@ export default function TestScheduleDetails() {
   const [organisation, setOrganisation] = useState<Organisation | null>(null);
   const [invitations, setInvitations] = useState<Invitation[]>([]);
   const [invitationsLoading, setInvitationsLoading] = useState(false);
+  const [refundConfirmOpen, setRefundConfirmOpen] = useState(false);
+
+  const triggerRefundMutation = useTriggerScheduleRefundMutation();
+
+  const handleTriggerRefund = async () => {
+    if (!schedule) return;
+    try {
+      const res = await triggerRefundMutation.mutateAsync(schedule.id);
+      toast({
+        title: "Refund Processed Successfully",
+        description:
+          res.message ||
+          `Swept ${res.noShowCount} unstarted candidate(s) and refunded ${res.refundedPins} PIN(s) to ${organisation?.name || "the organisation"}.`,
+      });
+      setRefundConfirmOpen(false);
+      setSchedule((prev) => (prev ? { ...prev, refundProcessedAt: res.refundProcessedAt || new Date().toISOString() } : null));
+      fetchScheduleDetails();
+    } catch (err) {
+      console.error("Manual schedule refund failed:", err);
+      const errMsg =
+        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
+        (err as Error)?.message ||
+        "Failed to trigger refund.";
+      toast({
+        title: "Refund Failed",
+        description: errMsg,
+        variant: "destructive",
+      });
+    }
+  };
 
   const fetchInvitations = useCallback(async () => {
     if (!id) return;
@@ -214,24 +257,50 @@ export default function TestScheduleDetails() {
   return (
     <div className="p-8 space-y-6 animate-fade-in">
       {/* Header */}
-      <div className="flex items-center gap-4">
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => navigate(user?.role === "ADMIN" ? "/admin/schedules" : "/superadmin/test-schedules")}
-        >
-          <ArrowLeft className="w-5 h-5" />
-        </Button>
-        <div>
-          <h1 className="text-3xl font-heading font-bold">Schedule Details</h1>
-          <p className="text-muted-foreground mt-1">
-            View complete information about this test schedule
-          </p>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="flex items-center gap-4">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => navigate(user?.role === "ADMIN" ? "/admin/schedules" : "/superadmin/test-schedules")}
+          >
+            <ArrowLeft className="w-5 h-5" />
+          </Button>
+          <div>
+            <h1 className="text-3xl font-heading font-bold">Schedule Details</h1>
+            <p className="text-muted-foreground mt-1">
+              View complete information about this test schedule
+            </p>
+          </div>
         </div>
+
+        {user?.role === "SUPERADMIN" && (
+          <div className="flex items-center gap-3">
+            {schedule.refundProcessedAt ? (
+              <Badge className="bg-emerald-500/10 text-emerald-600 border border-emerald-500/30 py-1.5 px-3 flex items-center gap-1.5 font-medium">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                <span>Refund Processed ({formatDateTime(schedule.refundProcessedAt)})</span>
+              </Badge>
+            ) : new Date(schedule.endTime) <= new Date() ? (
+              <Button
+                onClick={() => setRefundConfirmOpen(true)}
+                disabled={triggerRefundMutation.isPending}
+                className="bg-amber-600 hover:bg-amber-700 text-white flex items-center gap-2 shadow-xs"
+              >
+                <RotateCcw className="w-4 h-4" />
+                Trigger No-Show Refund
+              </Button>
+            ) : (
+              <Badge variant="outline" className="text-slate-500 border-slate-200 py-1.5 px-3 text-xs">
+                Refund Eligible After End Time
+              </Badge>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Schedule Info Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
         {/* Test Info */}
         <Card>
           <CardHeader className="pb-2">
@@ -240,7 +309,7 @@ export default function TestScheduleDetails() {
           <CardContent>
             <div className="flex items-center gap-2">
               <FileText className="w-4 h-4 text-primary" />
-              <span className="font-semibold">{test?.title || "Unknown Test"}</span>
+              <span className="font-semibold truncate">{test?.title || "Unknown Test"}</span>
             </div>
             <p className="text-xs text-muted-foreground mt-1">
               Duration: {test?.durationMins || 0} mins
@@ -256,7 +325,7 @@ export default function TestScheduleDetails() {
           <CardContent>
             <div className="flex items-center gap-2">
               <Building2 className="w-4 h-4 text-primary" />
-              <span className="font-semibold">{organisation?.name || "Unknown"}</span>
+              <span className="font-semibold truncate">{organisation?.name || "Unknown"}</span>
             </div>
           </CardContent>
         </Card>
@@ -268,12 +337,12 @@ export default function TestScheduleDetails() {
           </CardHeader>
           <CardContent className="space-y-1">
             <div className="flex items-center gap-2">
-              <Calendar className="w-4 h-4 text-muted-foreground" />
-              <span className="text-sm">Start: {formatDateTime(schedule.startTime)}</span>
+              <Calendar className="w-4 h-4 text-muted-foreground shrink-0" />
+              <span className="text-xs truncate">Start: {formatDateTime(schedule.startTime)}</span>
             </div>
             <div className="flex items-center gap-2">
-              <Clock className="w-4 h-4 text-muted-foreground" />
-              <span className="text-sm">End: {formatDateTime(schedule.endTime)}</span>
+              <Clock className="w-4 h-4 text-muted-foreground shrink-0" />
+              <span className="text-xs truncate">End: {formatDateTime(schedule.endTime)}</span>
             </div>
           </CardContent>
         </Card>
@@ -291,8 +360,41 @@ export default function TestScheduleDetails() {
             </div>
             <div className="flex items-center gap-2 mt-2">
               <Users className="w-4 h-4 text-muted-foreground" />
-              <span className="text-sm">Max: {schedule.maxCandidates} candidates</span>
+              <span className="text-xs">Max: {schedule.maxCandidates} candidates</span>
             </div>
+          </CardContent>
+        </Card>
+
+        {/* Refund Status */}
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Refund Status</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-1">
+            <div className="flex items-center gap-2">
+              {schedule.refundProcessedAt ? (
+                <Badge className="bg-emerald-500/10 text-emerald-600 border border-emerald-500/30 flex items-center gap-1 font-medium text-xs">
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  <span>Processed</span>
+                </Badge>
+              ) : new Date(schedule.endTime) <= new Date() ? (
+                <Badge className="bg-amber-500/10 text-amber-600 border border-amber-500/30 flex items-center gap-1 font-medium text-xs">
+                  <Clock className="w-3.5 h-3.5" />
+                  <span>Pending (Eligible)</span>
+                </Badge>
+              ) : (
+                <Badge variant="outline" className="text-slate-500 border-slate-200 text-xs">
+                  Schedule Active
+                </Badge>
+              )}
+            </div>
+            <p className="text-[11px] text-muted-foreground mt-1 truncate">
+              {schedule.refundProcessedAt
+                ? `Processed on ${formatDateTime(schedule.refundProcessedAt)}`
+                : new Date(schedule.endTime) <= new Date()
+                ? "Eligible for manual or auto sweep"
+                : "Awaiting schedule completion"}
+            </p>
           </CardContent>
         </Card>
       </div>
@@ -389,6 +491,55 @@ export default function TestScheduleDetails() {
           Back to Schedules
         </Button>
       </div>
+
+      {/* Confirmation Dialog for Triggering Refund */}
+      <AlertDialog
+        open={refundConfirmOpen}
+        onOpenChange={(open) => !open && setRefundConfirmOpen(false)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <RotateCcw className="w-5 h-5 text-amber-600" />
+              Trigger Manual No-Show Refund
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3 pt-2 text-left text-sm text-muted-foreground">
+                <p>
+                  Are you sure you want to sweep and refund unstarted invitations for:
+                </p>
+                <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 text-sm space-y-1 my-2">
+                  <div><strong className="text-slate-800">Test:</strong> {test?.title || "Test Schedule"}</div>
+                  <div><strong className="text-slate-800">Organisation:</strong> {organisation?.name || "Organisation"}</div>
+                  <div><strong className="text-slate-800">Schedule Ended:</strong> {formatDateTime(schedule.endTime)}</div>
+                  <div><strong className="text-slate-800">Total Invitations:</strong> {invitations.length} candidate(s)</div>
+                </div>
+                <p className="text-xs text-muted-foreground block">
+                  This will immediately sweep all unstarted (<code className="text-xs bg-slate-100 px-1 py-0.5 rounded">PENDING</code>) candidate invitations for this schedule, mark them as <code className="text-xs bg-slate-100 px-1 py-0.5 rounded">EXPIRED</code>, and credit 1 PIN per no-show candidate back to the organisation's PIN balance.
+                </p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={triggerRefundMutation.isPending}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault();
+                handleTriggerRefund();
+              }}
+              disabled={triggerRefundMutation.isPending}
+              className="bg-amber-600 hover:bg-amber-700 text-white"
+            >
+              {triggerRefundMutation.isPending && (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              )}
+              Confirm & Refund
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

@@ -195,7 +195,7 @@ describe("Organisation PIN Service & Validation Logic", () => {
       expect(response[0].netChange).toBe(441);
     });
 
-    it("getPinTransactions should send GET /organisations/{id}/pins/transactions with pagination", async () => {
+    it("getPinTransactions should send GET /organisations/{id}/pins/transactions with pagination and scheduleId", async () => {
       const mockPage = {
         content: [
           {
@@ -205,12 +205,24 @@ describe("Organisation PIN Service & Validation Logic", () => {
             balanceAfter: 499,
             transactionType: "DEDUCTION",
             testSessionId: "session-1",
+            scheduleId: "schedule-uuid-101",
             candidateName: "John Doe",
             candidateEmail: "john@example.com",
             createdAt: "2026-04-01T12:00:00",
           },
+          {
+            id: "tx-2",
+            organisationId: orgId,
+            amount: 1,
+            balanceAfter: 500,
+            transactionType: "REFUND",
+            testSessionId: null,
+            scheduleId: "schedule-uuid-101",
+            notes: "Automatic refund for unstarted candidate no-show",
+            createdAt: "2026-04-01T15:00:00",
+          },
         ],
-        totalElements: 1,
+        totalElements: 2,
         totalPages: 1,
         number: 0,
         size: 10,
@@ -226,9 +238,13 @@ describe("Organisation PIN Service & Validation Logic", () => {
       expect(apiClient.get).toHaveBeenCalledWith(
         `/organisations/${orgId}/pins/transactions?page=0&size=10&sort=createdAt,desc`
       );
-      expect(response.content).toHaveLength(1);
+      expect(response.content).toHaveLength(2);
       expect(response.content[0].candidateName).toBe("John Doe");
       expect(response.content[0].candidateEmail).toBe("john@example.com");
+      expect(response.content[0].scheduleId).toBe("schedule-uuid-101");
+      expect(response.content[1].transactionType).toBe("REFUND");
+      expect(response.content[1].scheduleId).toBe("schedule-uuid-101");
+      expect(response.content[1].amount).toBe(1);
     });
   });
 });

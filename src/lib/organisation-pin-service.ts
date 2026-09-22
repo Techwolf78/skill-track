@@ -57,6 +57,7 @@ export interface PinTransactionResponse {
   balanceAfter: number;
   transactionType: PinTransactionType;
   testSessionId?: string | null;
+  scheduleId?: string | null;
   candidateId?: string | null;
   candidateName?: string | null;
   candidateEmail?: string | null;

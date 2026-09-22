@@ -30,7 +30,18 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Label } from "@/components/ui/label";
 import {
   Plus,
@@ -44,8 +55,11 @@ import {
   MoreHorizontal,
   Play,
   CheckCircle,
+  CheckCircle2,
   XCircle,
   RefreshCw,
+  RotateCcw,
+  Coins,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { testService, Test, TestScheduleExtended } from "@/lib/test-service";
@@ -59,6 +73,7 @@ import {
   useOrganisationsQuery,
   useCreateTestScheduleMutation,
   useUpdateTestScheduleStatusMutation,
+  useTriggerScheduleRefundMutation,
 } from "@/hooks/use-query-hooks";
 import { formatDateTime, toBackendDateTime } from "@/lib/date-utils";
 
@@ -79,6 +94,7 @@ export default function TestSchedules() {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [updatingStatus, setUpdatingStatus] = useState<string | null>(null);
+  const [refundModalSchedule, setRefundModalSchedule] = useState<ScheduleWithOrg | null>(null);
   const [formData, setFormData] = useState({
     testId: "",
     organisationId: "",
@@ -135,6 +151,7 @@ export default function TestSchedules() {
 
   const createScheduleMutation = useCreateTestScheduleMutation();
   const updateStatusMutation = useUpdateTestScheduleStatusMutation();
+  const triggerRefundMutation = useTriggerScheduleRefundMutation();
 
   const schedules = useMemo(() => {
     const orgMap = new Map<string, string>();
@@ -296,6 +313,58 @@ export default function TestSchedules() {
     return styles[status] || styles.SCHEDULED;
   };
 
+  const getRefundBadge = (schedule: ScheduleWithOrg) => {
+    if (schedule.refundProcessedAt) {
+      return (
+        <Badge className="bg-emerald-500/10 text-emerald-600 border border-emerald-500/30 flex items-center gap-1 font-medium w-fit">
+          <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+          <span>Refunded</span>
+        </Badge>
+      );
+    }
+    const isPastEndTime = new Date(schedule.endTime) <= new Date();
+    if (isPastEndTime) {
+      return (
+        <Badge className="bg-amber-500/10 text-amber-600 border border-amber-500/30 flex items-center gap-1 font-medium w-fit">
+          <Clock className="w-3 h-3 text-amber-600" />
+          <span>Refund Eligible</span>
+        </Badge>
+      );
+    }
+    return (
+      <Badge variant="outline" className="text-slate-500 border-slate-200 text-xs w-fit">
+        Active / Pending
+      </Badge>
+    );
+  };
+
+  const handleTriggerRefund = async () => {
+    if (!refundModalSchedule) return;
+    try {
+      const res = await triggerRefundMutation.mutateAsync(refundModalSchedule.id);
+      toast({
+        title: "No-Show Refund Processed",
+        description:
+          res.message ||
+          `Successfully swept ${res.noShowCount} unstarted candidate(s) and refunded ${res.refundedPins} PIN(s) to ${refundModalSchedule.organisationName}.`,
+      });
+      setRefundModalSchedule(null);
+      refetchSchedules();
+      refetchInvitations();
+    } catch (err) {
+      console.error("Manual schedule refund failed:", err);
+      const errMsg =
+        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
+        (err as Error)?.message ||
+        "Failed to trigger refund.";
+      toast({
+        title: "Refund Failed",
+        description: errMsg,
+        variant: "destructive",
+      });
+    }
+  };
+
   // Get available actions based on current status
   const getAvailableActions = (currentStatus: string) => {
     switch (currentStatus) {
@@ -377,6 +446,7 @@ export default function TestSchedules() {
               <TableHead>End Time</TableHead>
               <TableHead>Max Candidates</TableHead>
               <TableHead>Status</TableHead>
+              <TableHead>Refund</TableHead>
               <TableHead>Invited</TableHead>
               <TableHead className="w-[100px]">Actions</TableHead>
             </TableRow>
@@ -384,14 +454,14 @@ export default function TestSchedules() {
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell colSpan={9} className="text-center py-10">
+                <TableCell colSpan={10} className="text-center py-10">
                   <Loader2 className="w-6 h-6 animate-spin mx-auto" />
                 </TableCell>
               </TableRow>
             ) : filteredSchedules.length === 0 ? (
               <TableRow>
                 <TableCell
-                  colSpan={9}
+                  colSpan={10}
                   className="text-center py-10 text-muted-foreground"
                 >
                   No schedules found. Create your first test schedule.
@@ -441,6 +511,9 @@ export default function TestSchedules() {
                       <Badge className={getStatusBadge(schedule.status)}>
                         {schedule.status}
                       </Badge>
+                    </TableCell>
+                    <TableCell>
+                      {getRefundBadge(schedule)}
                     </TableCell>
                     <TableCell>
                       <Badge variant="outline">
@@ -496,6 +569,32 @@ export default function TestSchedules() {
                               <span>{action.label}</span>
                             </DropdownMenuItem>
                           ))}
+
+                          {/* SuperAdmin Manual Refund Option */}
+                          {user?.role === "SUPERADMIN" && (
+                            <>
+                              <DropdownMenuSeparator />
+                              {schedule.refundProcessedAt ? (
+                                <DropdownMenuItem disabled className="text-muted-foreground text-xs">
+                                  <CheckCircle2 className="w-4 h-4 mr-2 text-emerald-600" />
+                                  <span>Refunded ({formatDateTime(schedule.refundProcessedAt)})</span>
+                                </DropdownMenuItem>
+                              ) : new Date(schedule.endTime) <= new Date() ? (
+                                <DropdownMenuItem
+                                  onClick={() => setRefundModalSchedule(schedule)}
+                                  className="text-amber-600 hover:text-amber-700 hover:bg-amber-50 font-medium cursor-pointer"
+                                >
+                                  <RotateCcw className="w-4 h-4 mr-2 text-amber-600" />
+                                  <span>Trigger No-Show Refund</span>
+                                </DropdownMenuItem>
+                              ) : (
+                                <DropdownMenuItem disabled className="text-muted-foreground text-xs">
+                                  <Clock className="w-4 h-4 mr-2 text-slate-400" />
+                                  <span>Refund Eligible After End Time</span>
+                                </DropdownMenuItem>
+                              )}
+                            </>
+                          )}
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </TableCell>
@@ -614,6 +713,55 @@ export default function TestSchedules() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Confirmation Dialog for Triggering Refund */}
+      <AlertDialog
+        open={!!refundModalSchedule}
+        onOpenChange={(open) => !open && setRefundModalSchedule(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <RotateCcw className="w-5 h-5 text-amber-600" />
+              Trigger Manual No-Show Refund
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3 pt-2 text-left text-sm text-muted-foreground">
+                <p>
+                  Are you sure you want to sweep and refund unstarted invitations for:
+                </p>
+                <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 text-sm space-y-1 my-2">
+                  <div><strong className="text-slate-800">Test:</strong> {refundModalSchedule?.test?.title || "Test Schedule"}</div>
+                  <div><strong className="text-slate-800">Organisation:</strong> {refundModalSchedule?.organisationName}</div>
+                  <div><strong className="text-slate-800">Schedule Ended:</strong> {refundModalSchedule ? formatDateTime(refundModalSchedule.endTime) : ""}</div>
+                  <div><strong className="text-slate-800">Total Invited:</strong> {refundModalSchedule?.invitedCount || 0} candidate(s)</div>
+                </div>
+                <p className="text-xs text-muted-foreground block">
+                  This will immediately sweep all unstarted (<code className="text-xs bg-slate-100 px-1 py-0.5 rounded">PENDING</code>) candidate invitations, mark them as <code className="text-xs bg-slate-100 px-1 py-0.5 rounded">EXPIRED</code>, and credit 1 PIN per no-show candidate back to the organisation's PIN balance.
+                </p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={triggerRefundMutation.isPending}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault();
+                handleTriggerRefund();
+              }}
+              disabled={triggerRefundMutation.isPending}
+              className="bg-amber-600 hover:bg-amber-700 text-white"
+            >
+              {triggerRefundMutation.isPending && (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              )}
+              Confirm & Refund
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
