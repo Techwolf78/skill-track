@@ -281,7 +281,7 @@ export default function NewAdminQuestionCreate() {
   // Code Templates & Drivers
   const [codeTemplates, setCodeTemplates] = useState(DEFAULT_CODE_TEMPLATES);
   const [activeCodeLang, setActiveCodeLang] = useState<"python3" | "javascript" | "java" | "cpp">("python3");
-  const [isLanguageSpecific] = useState<boolean>(Boolean(initialData.isLanguageSpecific));
+  const [isLanguageSpecific, setIsLanguageSpecific] = useState<boolean>(Boolean(initialData.isLanguageSpecific));
   const [verifiedLanguages, setVerifiedLanguages] = useState<string[]>([]);
   const [pendingLanguages, setPendingLanguages] = useState<string[]>(["python", "javascript", "java", "cpp"]);
   const [createdQuestionId, setCreatedQuestionId] = useState<string | null>(null);
@@ -347,6 +347,11 @@ export default function NewAdminQuestionCreate() {
         setIsCoding(isC);
 
         if (isC) {
+          if (q.isLanguageSpecific !== undefined && q.isLanguageSpecific !== null) {
+            setIsLanguageSpecific(Boolean(q.isLanguageSpecific));
+          } else if (q.languageTemplates && Object.keys(q.languageTemplates).length === 1) {
+            setIsLanguageSpecific(true);
+          }
           if (q.timeLimitSecs !== undefined) setTimeLimitSecs(q.timeLimitSecs);
           if (q.memoryLimitMb !== undefined) setMemoryLimitMb(q.memoryLimitMb);
           if (q.constraints) setConstraints(q.constraints);
@@ -355,6 +360,7 @@ export default function NewAdminQuestionCreate() {
           if (q.testCases && Array.isArray(q.testCases)) {
             setTestCases(
               q.testCases.map((tc: any) => ({
+                id: tc.id,
                 input: tc.input || "",
                 expectedOutput: tc.expectedOutput || "",
                 sample: Boolean(tc.sample),
@@ -371,6 +377,14 @@ export default function NewAdminQuestionCreate() {
             });
           }
           if (q.languageTemplates) {
+            const templateKeys = Object.keys(q.languageTemplates);
+            if (templateKeys.length > 0) {
+              const firstLang = templateKeys[0];
+              const feLang = (firstLang === "python" ? "python3" : firstLang) as "python3" | "javascript" | "java" | "cpp";
+              if (["python3", "javascript", "java", "cpp"].includes(feLang)) {
+                setActiveCodeLang(feLang);
+              }
+            }
             setCodeTemplates((prev) => {
               const updated = { ...prev };
               Object.entries(q.languageTemplates!).forEach(([lang, tpl]: [string, any]) => {
@@ -386,6 +400,7 @@ export default function NewAdminQuestionCreate() {
             });
           }
           if (q.verifiedLanguages) setVerifiedLanguages(q.verifiedLanguages);
+          if (q.pendingLanguages) setPendingLanguages(q.pendingLanguages);
           if (q.status) setQuestionStatus(q.status);
           setCreatedQuestionId(q.id);
         } else {
@@ -544,6 +559,7 @@ export default function NewAdminQuestionCreate() {
         hints: cleanHints.length ? cleanHints : undefined,
         testCases: validTestCases,
         tags: tags.length ? tags : undefined,
+        isLanguageSpecific,
         languageTemplates: buildLanguageTemplatesPayload(),
         signatureMetadata: {
           method_name: signature.method_name || "solve",
@@ -1449,12 +1465,18 @@ export default function NewAdminQuestionCreate() {
                   questionId={editQuestionId || createdQuestionId || undefined}
                   language={activeCodeLang}
                   driverCode={codeTemplates[activeCodeLang].driver}
-                  testCases={testCases.map((tc, idx) => ({ ...tc, id: `tc-${idx}`, codingQuestionId: editQuestionId || createdQuestionId || "" }))}
+                  testCases={testCases.map((tc, idx) => ({ ...tc, id: tc.id || `tc-${idx}`, codingQuestionId: editQuestionId || createdQuestionId || "" }))}
                   onSaveFirstRequired={handleSaveDraftForVerification}
                   onVerificationSuccess={(res) => {
                     const bLang = mapFrontendToBackendLang(activeCodeLang);
                     setVerifiedLanguages((prev) => Array.from(new Set([...prev, bLang])));
                     setPendingLanguages((prev) => prev.filter((l) => l !== bLang));
+                    if (res.verifiedLanguages) {
+                      setVerifiedLanguages(res.verifiedLanguages);
+                    }
+                    if (res.pendingLanguages) {
+                      setPendingLanguages(res.pendingLanguages);
+                    }
                     if (res.questionStatus) {
                       setQuestionStatus(res.questionStatus);
                     }
