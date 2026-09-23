@@ -68,6 +68,27 @@ export interface CreateCandidateRequest {
   extraFields?: Record<string, unknown>;
 }
 
+export interface BulkCreateInvitationRequest {
+  scheduleId: string;
+  candidateIds: string[];
+}
+
+export interface BulkInvitationRowResult {
+  candidateId: string;
+  status: "SUCCESS" | "ALREADY_INVITED" | "FAILED";
+  invitationId?: string;
+  message?: string;
+}
+
+export interface BulkInvitationResult {
+  scheduleId: string;
+  totalRequested: number;
+  successCount: number;
+  alreadyInvitedCount: number;
+  failCount: number;
+  rows: BulkInvitationRowResult[];
+}
+
 // Helper to unwrap BaseResponse
 const unwrapResponse = <T>(response: { data: BaseResponse<T> | T }): T => {
   const data = response.data;
@@ -360,6 +381,12 @@ export const candidateService = {
   // Send an invitation to a candidate for a test schedule
   createInvitation: async (dto: { scheduleId: string; candidateId?: string; candidateEmail?: string }): Promise<CandidateInvitation> => {
     const response = await apiClient.post<CandidateInvitation>("/candidate-invitations", dto);
+    return unwrapResponse(response);
+  },
+
+  // Send bulk invitations atomically to candidates for a test schedule
+  createBulkInvitations: async (dto: BulkCreateInvitationRequest): Promise<BulkInvitationResult> => {
+    const response = await apiClient.post<BulkInvitationResult>("/candidate-invitations/bulk", dto);
     return unwrapResponse(response);
   },
 

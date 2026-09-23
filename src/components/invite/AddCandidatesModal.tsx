@@ -40,6 +40,15 @@ import {
   Coins,
 } from "lucide-react";
 
+interface ParsedBulkCandidate {
+  candidateId?: string;
+  name: string;
+  email: string;
+  phoneNumber?: string;
+  status: "SUCCESS" | "FAILED";
+  errorMessage?: string;
+}
+
 interface AddCandidatesModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -98,9 +107,7 @@ export function AddCandidatesModal({
   const [bulkFile, setBulkFile] = useState<File | null>(null);
   const [processingBulkFile, setProcessingBulkFile] = useState(false);
   const [bulkError, setBulkError] = useState<string | null>(null);
-  const [parsedBulkCandidates, setParsedBulkCandidates] = useState<
-    Array<{ name: string; email: string; phoneNumber?: string; status?: "SUCCESS" | "FAILED"; errorMessage?: string }>
-  >([]);
+  const [parsedBulkCandidates, setParsedBulkCandidates] = useState<ParsedBulkCandidate[]>([]);
   const [bulkStep, setBulkStep] = useState<"upload" | "review">("upload");
   const [inviting, setInviting] = useState(false);
 
@@ -403,7 +410,7 @@ export function AddCandidatesModal({
       const rows: Record<string, unknown>[] = XLSX.utils.sheet_to_json(ws);
 
       const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      const validCandidates: Array<{ name: string; email: string; phoneNumber?: string; status: "SUCCESS" | "FAILED"; errorMessage?: string }> = [];
+      const validCandidates: ParsedBulkCandidate[] = [];
       let localOmittedCount = 0;
 
       for (const r of rows) {
@@ -528,6 +535,26 @@ export function AddCandidatesModal({
         });
       }
 
+      // Pre-resolve candidate IDs so bulk invitation can execute in a single atomic batch
+      try {
+        const orgCandidates = await candidateService.getCandidates({ organisationId: orgId });
+        const emailToIdMap = new Map<string, string>();
+        orgCandidates.forEach((c) => {
+          const email = (c.user?.email || c.email || "").toLowerCase();
+          if (email && c.id) {
+            emailToIdMap.set(email, c.id);
+          }
+        });
+        validCandidates.forEach((cand) => {
+          const id = emailToIdMap.get(cand.email.toLowerCase());
+          if (id) {
+            cand.candidateId = id;
+          }
+        });
+      } catch (err) {
+        console.warn("Could not pre-resolve candidate IDs after bulk upload:", err);
+      }
+
       setParsedBulkCandidates(validCandidates);
       setBulkStep("review");
     } catch (err) {
@@ -551,69 +578,128 @@ export function AddCandidatesModal({
 
     try {
       setInviting(true);
-      let successCount = 0;
-      let failCount = 0;
-      let insufficientPins = false;
-      let lastErrMsg = "";
 
-      for (const cand of parsedBulkCandidates) {
+      // Ensure candidate IDs are populated
+      let candidatesWithIds = parsedBulkCandidates;
+      const missingIds = parsedBulkCandidates.some((c) => !c.candidateId);
+      if (missingIds) {
         try {
-          await candidateService.createInvitation({
-            scheduleId,
-            candidateEmail: cand.email,
+          const orgCandidates = await candidateService.getCandidates({ organisationId: orgId });
+          const emailToIdMap = new Map<string, string>();
+          orgCandidates.forEach((c) => {
+            const email = (c.user?.email || c.email || "").toLowerCase();
+            if (email && c.id) {
+              emailToIdMap.set(email, c.id);
+            }
           });
-          successCount++;
-        } catch (err) {
-          failCount++;
-          const status = (err as { response?: { status?: number } })?.response?.status;
-          const errData = (err as { response?: { data?: { errorCode?: string; message?: string } } })?.response?.data;
-          const errorCode = errData?.errorCode;
-          const msg = errData?.message || (err as Error)?.message || "";
+          candidatesWithIds = parsedBulkCandidates.map((c) => ({
+            ...c,
+            candidateId: c.candidateId || emailToIdMap.get(c.email.toLowerCase()),
+          }));
+        } catch (lookupErr) {
+          console.warn("Could not refresh candidate IDs before invite:", lookupErr);
+        }
+      }
 
-          if (
-            (status === 400 && (errorCode === "INSUFFICIENT_PINS" || /insufficient.*pin/i.test(msg) || /available.*pin/i.test(msg))) ||
-            status === 402 ||
-            errorCode === "INSUFFICIENT_PINS"
-          ) {
-            insufficientPins = true;
-            lastErrMsg = `Insufficient PIN balance: You need ${parsedBulkCandidates.length} PINs to invite these candidates, but only ${pinBalance} PINs are available. Please top up your balance.`;
-            break;
-          } else {
-            if (!lastErrMsg) lastErrMsg = msg;
-            console.error("Bulk invite failure for:", cand.email, err);
+      const validCandidateIds = candidatesWithIds
+        .map((c) => c.candidateId)
+        .filter((id): id is string => Boolean(id));
+
+      if (validCandidateIds.length > 0) {
+        const result = await candidateService.createBulkInvitations({
+          scheduleId,
+          candidateIds: validCandidateIds,
+        });
+
+        const successCount = result?.successCount ?? 0;
+        const alreadyInvited = result?.alreadyInvitedCount ?? 0;
+        const failCount = result?.failCount ?? 0;
+        const failedRows = result?.rows?.filter((r) => r.status === "FAILED") ?? [];
+
+        if (successCount > 0) {
+          invalidatePinQueries();
+          queryClient.invalidateQueries({ queryKey: ["candidate-invitations"] });
+        }
+
+        if (failCount === 0) {
+          toast({
+            title: "Bulk Invitations Dispatched",
+            description: `Successfully invited ${successCount} candidate${successCount === 1 ? "" : "s"}${alreadyInvited > 0 ? ` (${alreadyInvited} already invited/skipped)` : ""}.`,
+          });
+          onSuccess();
+          onOpenChange(false);
+        } else {
+          const firstReason = failedRows[0]?.message ? ` Reason: ${failedRows[0].message}` : "";
+          toast({
+            title: successCount > 0 ? "Partial Success" : "Bulk Invite Failed",
+            description: `${successCount} invited, ${failCount} failed.${firstReason}`,
+            variant: successCount === 0 ? "destructive" : "default",
+          });
+          if (successCount > 0) {
+            onSuccess();
+            onOpenChange(false);
           }
         }
+      } else {
+        // Fallback in case ID resolution fails completely
+        let successCount = 0;
+        for (const cand of parsedBulkCandidates) {
+          try {
+            await candidateService.createInvitation({
+              scheduleId,
+              candidateEmail: cand.email,
+            });
+            successCount++;
+          } catch (e) {
+            console.error("Single invite fallback error for email:", cand.email, e);
+          }
+        }
+        if (successCount > 0) {
+          invalidatePinQueries();
+          queryClient.invalidateQueries({ queryKey: ["candidate-invitations"] });
+          toast({
+            title: "Bulk Invitations Dispatched",
+            description: `Successfully sent ${successCount} invitation${successCount === 1 ? "" : "s"}.`,
+          });
+          onSuccess();
+          onOpenChange(false);
+        } else {
+          toast({
+            title: "Bulk Invite Failed",
+            description: "Failed to send invitations.",
+            variant: "destructive",
+          });
+        }
       }
+    } catch (err: any) {
+      const status = err?.response?.status;
+      const data = err?.response?.data;
+      const msg = data?.message || data?.error || err?.message || "Failed to send bulk invitations";
+      const errorCode = data?.errorCode;
 
-      if (successCount > 0) {
-        invalidatePinQueries();
-      }
-
-      if (insufficientPins) {
+      if (
+        status === 402 ||
+        errorCode === "INSUFFICIENT_PINS" ||
+        errorCode === "PIN_DEPLETED" ||
+        /insufficient.*pin/i.test(msg) ||
+        /available pin/i.test(msg) ||
+        /pin balance.*low/i.test(msg) ||
+        /not enough.*pin/i.test(msg)
+      ) {
         toast({
           title: "Insufficient Organisation PINs",
-          description: lastErrMsg,
-          variant: "destructive",
-        });
-        if (successCount > 0) {
-          onSuccess();
-        }
-      } else if (failCount > 0 && successCount === 0) {
-        toast({
-          title: "Bulk Invite Failed",
-          description: lastErrMsg || "Failed to send bulk invitations.",
+          description:
+            msg ||
+            "The organization does not have enough available PINs to issue these invitations. Please allocate additional PINs in SuperAdmin Organisations.",
           variant: "destructive",
         });
       } else {
         toast({
-          title: "Bulk Invitations Dispatched",
-          description: `Successfully sent ${successCount} invitation${successCount === 1 ? "" : "s"}.${failCount > 0 ? ` (${failCount} failed)` : ""}`,
+          title: "Couldn't send invites",
+          description: msg,
+          variant: "destructive",
         });
-        onSuccess();
-        onOpenChange(false);
       }
-    } catch (err) {
-      toast({ title: "Invite Error", description: "Failed to send bulk invitations.", variant: "destructive" });
     } finally {
       setInviting(false);
     }
