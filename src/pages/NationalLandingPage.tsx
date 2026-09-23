@@ -55,6 +55,8 @@ import {
 } from "@/components/ui/accordion";
 import { useNavigate } from "react-router-dom";
 import { GryphonLogo } from "@/components/ui/GryphonLogo";
+import { AssessmentLifecycleSection } from "@/components/landing/AssessmentLifecycleSection";
+import { PlatformVideoPlayer } from "@/components/landing/PlatformVideoPlayer";
 
 const features = [
   {
@@ -156,35 +158,40 @@ const useCases = [
 const proctoringFaqs = [
   {
     id: "landing-faq-1",
-    question: "How does Gryphon 360 AI proctoring monitor candidate integrity during exams?",
+    question:
+      "How does Gryphon 360 AI proctoring monitor candidate integrity during exams?",
     badge: "AI Proctoring",
     answer:
       "Gryphon 360 leverages real-time client-side neural networks running directly inside the candidate's browser. It monitors 468 facial mesh landmarks, iris gaze vectors (flags sustained looking away), multi-face presence, and acoustic speech levels. Combined with our strict 3-strike tab switch policy and anti-paste clipboard protection, the platform guarantees foolproof academic integrity.",
   },
   {
     id: "landing-faq-2",
-    question: "How does Gryphon 360 protect candidate data privacy and biometric compliance?",
+    question:
+      "How does Gryphon 360 protect candidate data privacy and biometric compliance?",
     badge: "GDPR & Privacy",
     answer:
       "Gryphon 360 operates on strict data minimization principles under GDPR (Articles 9 & 32), ISO 27001, and the Indian DPDP Act 2023. Biometric telemetry (mesh landmarks and gaze vectors) is calculated ephemerally at the client edge and never permanently stored. All test session logs are encrypted end-to-end via TLS 1.3 and AES-256.",
   },
   {
     id: "landing-faq-3",
-    question: "What happens if a student's internet disconnects or laptop crashes mid-test?",
+    question:
+      "What happens if a student's internet disconnects or laptop crashes mid-test?",
     badge: "Auto-Save Resilience",
     answer:
       "Gryphon 360 features an Offline-First Resilience Engine. Every question response, essay draft, and line of code is continuously cached in local browser storage in real time. When connectivity is restored, all data automatically syncs with our servers without timer loss or progress reset.",
   },
   {
     id: "landing-faq-4",
-    question: "What are the device, browser, and hardware requirements for proctored tests?",
+    question:
+      "What are the device, browser, and hardware requirements for proctored tests?",
     badge: "Hardware & Setup",
     answer:
       "Candidates only need a standard laptop or desktop computer running Google Chrome, Microsoft Edge, Mozilla Firefox, or Apple Safari with a working webcam, microphone, and a basic internet connection (512 kbps+). An automated 15-second pre-flight diagnostic verifies all hardware before the test begins.",
   },
   {
     id: "landing-faq-5",
-    question: "Can candidates be automatically disqualified by AI without human verification?",
+    question:
+      "Can candidates be automatically disqualified by AI without human verification?",
     badge: "Human-in-the-Loop",
     answer:
       "Never. Our AI engine only acts as an intelligent assistant, flagging potential anomalies on a synchronized timestamped audit timeline. Disqualifications or score adjustments are strictly performed by authorized faculty members or organizational recruiters after inspecting the logged evidence.",
@@ -677,11 +684,7 @@ export default function NationalLandingPage() {
   const navigate = useNavigate();
   const [isScrolled, setIsScrolled] = useState(false);
   const [scrollProgress, setScrollProgress] = useState(0);
-  const [isNavTransitioning, setIsNavTransitioning] = useState(false);
   const [isVideoModalOpen, setIsVideoModalOpen] = useState(false);
-  const [activeLayout, setActiveLayout] = useState<"horizontal" | "vertical">(
-    "horizontal",
-  );
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -708,20 +711,6 @@ export default function NationalLandingPage() {
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
-  useEffect(() => {
-    setIsNavTransitioning(true);
-    const swapTimer = setTimeout(() => {
-      setActiveLayout(isScrolled ? "vertical" : "horizontal");
-    }, 200);
-    const fadeTimer = setTimeout(() => {
-      setIsNavTransitioning(false);
-    }, 850);
-    return () => {
-      clearTimeout(swapTimer);
-      clearTimeout(fadeTimer);
-    };
-  }, [isScrolled]);
-
   const handleInputChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
   ) => {
@@ -742,165 +731,72 @@ export default function NationalLandingPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Premium Floating Navigation Pill / Left Side Vertical Dock */}
-      <div className="fixed inset-0 pointer-events-none z-50">
+      {/* Premium Top Floating Glass Island Navigation (Option 1) */}
+      <div className="fixed top-3.5 sm:top-4 inset-x-0 z-50 flex justify-center pointer-events-none px-3 sm:px-4">
         <motion.nav
-          layout
-          transition={{
-            type: "tween",
-            ease: [0.76, 0, 0.24, 1],
-            duration: 0.85,
-          }}
-          className={`fixed pointer-events-auto flex items-center justify-between border text-white backdrop-blur-xl bg-slate-950 shadow-2xl rounded-full ${
+          initial={{ y: -20, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          transition={{ duration: 0.35, ease: "easeOut" }}
+          className={`pointer-events-auto flex items-center justify-between border text-white backdrop-blur-xl bg-slate-950/90 shadow-2xl rounded-full transition-all duration-300 ${
             isScrolled
-              ? "flex-col py-6 px-2 border-white/15 shadow-[0_20px_50px_rgba(0,0,0,0.5)]"
-              : "flex-row bg-slate-950/95 border-white/10 shadow-[0_12px_40px_rgba(0,0,0,0.25)] px-7 py-3.5"
+              ? "w-full max-w-4xl py-2 px-4 sm:px-6 border-white/15 shadow-[0_16px_40px_rgba(0,0,0,0.45)]"
+              : "w-full max-w-5xl py-2.5 sm:py-3 px-5 sm:px-7 border-white/10 shadow-[0_12px_36px_rgba(0,0,0,0.25)]"
           }`}
-          style={{
-            transformOrigin: "center center",
-          }}
-          animate={
-            isScrolled
-              ? {
-                  left: 24,
-                  top: "50%",
-                  y: "-50%",
-                  x: 0,
-                  width: 64,
-                  height: 380,
-                }
-              : {
-                  left: "50%",
-                  top: 16,
-                  y: 0,
-                  x: "-50%",
-                  width: "90%",
-                  maxWidth: 1024,
-                  height: 64,
-                }
-          }
         >
-          <motion.div
-            className={`flex w-full h-full items-center justify-between ${
-              activeLayout === "vertical" ? "flex-col" : "flex-row"
-            }`}
-            animate={{ opacity: isNavTransitioning ? 0 : 1 }}
-            transition={{ duration: 0.2, ease: "easeInOut" }}
+          {/* Brand Logo - Fixed shrink-0 with right padding */}
+          <div
+            className="shrink-0 flex items-center cursor-pointer hover:opacity-90 transition-opacity pr-4 sm:pr-6"
+            onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
           >
-            {/* Brand Logo / Icon */}
-            <div
-              className="flex items-center cursor-pointer hover:opacity-90 transition-opacity"
-              onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+            <GryphonLogo variant="dark" size="sm" iconOnly={false} />
+          </div>
+
+          {/* Navigation Links */}
+          <div className="hidden md:flex items-center justify-center gap-4 lg:gap-6 xl:gap-7 text-xs font-semibold text-slate-300">
+            {[
+              { id: "features", label: "Features" },
+              { id: "lifecycle-showcase", label: "Lifecycle" },
+              { id: "industries", label: "Industries" },
+              { id: "testimonials", label: "Testimonials" },
+              { id: "faq", label: "FAQs" },
+              { id: "contact", label: "Contact" },
+            ].map((item) => (
+              <a
+                key={item.id}
+                href={`#${item.id}`}
+                onClick={(e) => {
+                  e.preventDefault();
+                  document
+                    .getElementById(item.id)
+                    ?.scrollIntoView({ behavior: "smooth" });
+                }}
+                className="hover:text-white transition-colors py-1 whitespace-nowrap relative group"
+              >
+                {item.label}
+                <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-primary transition-all group-hover:w-full" />
+              </a>
+            ))}
+          </div>
+
+          {/* Right Action Buttons */}
+          <div className="shrink-0 flex items-center gap-2 sm:gap-3 pl-3 sm:pl-4">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => navigate("/login")}
+              className="text-slate-300 hover:text-white hover:bg-white/5 rounded-full px-3.5 sm:px-4 text-xs font-semibold h-8"
             >
-              <GryphonLogo
-                variant="dark"
-                size={activeLayout === "vertical" ? "sm" : "md"}
-                iconOnly={activeLayout === "vertical"}
-              />
-            </div>
-
-            {/* Center Navigation Links (Horizontal vs Vertical Icons) */}
-            {activeLayout === "vertical" ? (
-              <div className="flex flex-col gap-5 items-center my-auto">
-                {[
-                  { id: "features", label: "Features", icon: Sparkles },
-                  { id: "industries", label: "Industries", icon: Building },
-                  { id: "testimonials", label: "Testimonials", icon: Users },
-                  { id: "faq", label: "FAQs", icon: HelpCircle },
-                  { id: "contact", label: "Contact", icon: Mail },
-                ].map((item) => {
-                  const Icon = item.icon;
-                  return (
-                    <a
-                      key={item.id}
-                      href={`#${item.id}`}
-                      onClick={(e) => {
-                        e.preventDefault();
-                        document
-                          .getElementById(item.id)
-                          ?.scrollIntoView({ behavior: "smooth" });
-                      }}
-                      className="w-10 h-10 rounded-full flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-900 border border-transparent hover:border-white/10 transition-all duration-300 relative group"
-                    >
-                      <Icon className="w-4 h-4" />
-
-                      {/* Floating Tooltip Label */}
-                      <div className="absolute left-14 opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-all duration-300 transform translate-x-2 group-hover:translate-x-0 bg-slate-950 border border-white/15 px-3 py-1.5 rounded-lg text-[9px] font-bold text-white uppercase tracking-wider shadow-2xl whitespace-nowrap z-50">
-                        {item.label}
-                      </div>
-                    </a>
-                  );
-                })}
-              </div>
-            ) : (
-              <div className="hidden md:flex items-center gap-8 text-xs font-semibold text-slate-300">
-                {[
-                  { id: "features", label: "Features" },
-                  { id: "industries", label: "Industries" },
-                  { id: "testimonials", label: "Testimonials" },
-                  { id: "faq", label: "FAQs" },
-                  { id: "contact", label: "Contact" },
-                ].map((item) => (
-                  <a
-                    key={item.id}
-                    href={`#${item.id}`}
-                    onClick={(e) => {
-                      e.preventDefault();
-                      document
-                        .getElementById(item.id)
-                        ?.scrollIntoView({ behavior: "smooth" });
-                    }}
-                    className="hover:text-white transition-colors py-1 relative group"
-                  >
-                    {item.label}
-                    <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-primary transition-all group-hover:w-full" />
-                  </a>
-                ))}
-              </div>
-            )}
-
-            {/* Right CTA / Action Buttons */}
-            <div
-              className={`flex items-center ${activeLayout === "vertical" ? "flex-col" : "gap-3"}`}
+              Login
+            </Button>
+            <Button
+              size="sm"
+              onClick={() => navigate("/contact")}
+              className="bg-gradient-primary hover:opacity-95 text-white font-semibold rounded-full px-4 sm:px-5 text-xs shadow-md shadow-primary/20 hover:scale-[1.02] active:scale-[0.98] transition-all border-0 h-8 flex items-center gap-1.5 whitespace-nowrap cursor-pointer"
             >
-              {activeLayout !== "vertical" && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => navigate("/login")}
-                  className="text-slate-300 hover:text-white hover:bg-white/5 rounded-full px-4 text-xs font-semibold h-8"
-                >
-                  Login
-                </Button>
-              )}
-
-              {activeLayout === "vertical" ? (
-                <button
-                  onClick={() =>
-                    document
-                      .getElementById("contact")
-                      ?.scrollIntoView({ behavior: "smooth" })
-                  }
-                  className="w-10 h-10 rounded-full bg-gradient-primary hover:opacity-95 text-white flex items-center justify-center shadow-lg shadow-primary/20 hover:scale-105 active:scale-95 transition-all border-0"
-                  title="Get Started"
-                >
-                  <Zap className="w-4 h-4 fill-current" />
-                </button>
-              ) : (
-                <Button
-                  size="sm"
-                  onClick={() =>
-                    document
-                      .getElementById("contact")
-                      ?.scrollIntoView({ behavior: "smooth" })
-                  }
-                  className="bg-gradient-primary hover:opacity-95 text-white font-semibold rounded-full px-5 text-xs shadow-md shadow-primary/20 hover:scale-[1.02] active:scale-[0.98] transition-all border-0 h-8"
-                >
-                  Get Started
-                </Button>
-              )}
-            </div>
-          </motion.div>
+              <span>Get Started</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </Button>
+          </div>
         </motion.nav>
       </div>
 
@@ -923,19 +819,6 @@ export default function NationalLandingPage() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.6 }}
               >
-                {/* Glowing Trust Badge */}
-                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-900 text-white border border-white/10 shadow-lg shadow-slate-950/10 mb-4 text-xs font-medium tracking-wide">
-                  <span className="flex h-2 w-2 relative">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-                  </span>
-                  <Globe
-                    className="w-3.5 h-3.5 text-accent mr-1 animate-spin"
-                    style={{ animationDuration: "20s" }}
-                  />
-                  <span>Trusted by 500+ Institutions Nationwide</span>
-                </div>
-
                 <h1 className="text-3xl sm:text-4xl md:text-5xl font-heading font-extrabold text-slate-900 leading-[1.15] mb-4 tracking-tight">
                   The Intelligent Way to <br />
                   <span className="text-gradient-primary">
@@ -956,11 +839,7 @@ export default function NationalLandingPage() {
                   <Button
                     size="lg"
                     className="text-sm px-6 py-5 rounded-xl shadow-lg shadow-primary/20 hover:shadow-primary/30 hover:scale-[1.01] active:scale-[0.99] transition-all duration-200 group"
-                    onClick={() =>
-                      document
-                        .getElementById("contact")
-                        ?.scrollIntoView({ behavior: "smooth" })
-                    }
+                    onClick={() => navigate("/contact")}
                   >
                     Start Free Trial
                     <ArrowRight className="w-4.5 h-4.5 ml-2 group-hover:translate-x-1 transition-transform" />
@@ -968,11 +847,11 @@ export default function NationalLandingPage() {
                   <Button
                     size="lg"
                     variant="outline"
-                    className="text-sm px-6 py-5 rounded-xl bg-white hover:bg-slate-50 border border-slate-200 shadow-sm hover:scale-[1.01] active:scale-[0.99] transition-all duration-200 flex items-center gap-2"
-                    onClick={() => setIsVideoModalOpen(true)}
+                    className="text-sm px-6 py-5 rounded-xl bg-white hover:bg-slate-50 border border-slate-200 shadow-sm hover:scale-[1.01] active:scale-[0.99] transition-all duration-200 flex items-center gap-2 text-slate-800 font-semibold"
+                    onClick={() => navigate("/contact")}
                   >
-                    <Play className="w-4 h-4 text-primary fill-primary/20" />
-                    View Demo
+                    Book Demo
+                    <ArrowRight className="w-4 h-4 text-slate-500" />
                   </Button>
                 </div>
 
@@ -1008,6 +887,15 @@ export default function NationalLandingPage() {
           </div>
         </div>
       </section>
+
+      {/* 4-Stage Interactive Assessment Lifecycle Section */}
+      <AssessmentLifecycleSection
+        onExploreClick={() =>
+          document
+            .getElementById("contact")
+            ?.scrollIntoView({ behavior: "smooth" })
+        }
+      />
 
       {/* Features Section */}
       <section
@@ -1285,44 +1173,44 @@ export default function NationalLandingPage() {
             <BentoCard
               index={4}
               borderRadiusClass="rounded-tl-[32px] rounded-br-[32px] rounded-tr-lg rounded-bl-lg"
-              className="md:col-span-1"
+              className="md:col-span-1 p-6 flex flex-col justify-between"
             >
               <div className="flex flex-col justify-between h-full">
                 <div>
-                  <div className="w-12 h-12 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center mb-5 text-indigo-600 shadow-sm transition-transform duration-300 group-hover:scale-105">
-                    <Users className="w-6 h-6" />
+                  <div className="w-10 h-10 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center mb-3.5 text-indigo-600 shadow-sm transition-transform duration-300 group-hover:scale-105">
+                    <Users className="w-5 h-5" />
                   </div>
-                  <h3 className="font-heading font-bold text-xl text-slate-900 mb-2.5 tracking-tight group-hover:text-indigo-600 transition-colors">
+                  <h3 className="font-heading font-bold text-lg text-slate-900 mb-1.5 tracking-tight group-hover:text-indigo-600 transition-colors">
                     Multi-user Management
                   </h3>
-                  <p className="text-slate-600 leading-relaxed text-sm">
+                  <p className="text-slate-600 leading-relaxed text-xs">
                     Granular role-based access control for administrators,
                     recruiters, trainers, and candidates.
                   </p>
                 </div>
 
-                {/* Visual Mock: Clean Role-based Access Pill */}
-                <div className="mt-6 border border-slate-200/80 bg-slate-50/80 rounded-2xl p-4 flex flex-col gap-3 shadow-sm">
+                {/* Visual Mock: Clean Compact Role-based Access Pill */}
+                <div className="mt-4 border border-slate-200/80 bg-slate-50/80 rounded-xl p-3 flex flex-col gap-2.5 shadow-sm">
                   <div className="flex items-center justify-between">
-                    <div className="flex -space-x-2 overflow-hidden">
-                      <div className="h-8 w-8 rounded-full ring-2 ring-white bg-indigo-600 flex items-center justify-center text-[10px] font-bold text-white shadow-sm">
+                    <div className="flex -space-x-1.5 overflow-hidden">
+                      <div className="h-7 w-7 rounded-full ring-2 ring-white bg-indigo-600 flex items-center justify-center text-[9px] font-bold text-white shadow-sm">
                         AD
                       </div>
-                      <div className="h-8 w-8 rounded-full ring-2 ring-white bg-violet-600 flex items-center justify-center text-[10px] font-bold text-white shadow-sm">
+                      <div className="h-7 w-7 rounded-full ring-2 ring-white bg-violet-600 flex items-center justify-center text-[9px] font-bold text-white shadow-sm">
                         TR
                       </div>
-                      <div className="h-8 w-8 rounded-full ring-2 ring-white bg-slate-700 flex items-center justify-center text-[10px] font-bold text-white shadow-sm">
+                      <div className="h-7 w-7 rounded-full ring-2 ring-white bg-slate-700 flex items-center justify-center text-[9px] font-bold text-white shadow-sm">
                         ST
                       </div>
                     </div>
-                    <span className="text-[10px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200/80 px-2.5 py-0.5 rounded-full font-mono">
+                    <span className="text-[9px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200/80 px-2 py-0.5 rounded-full font-mono">
                       RBAC Active
                     </span>
                   </div>
-                  <div className="flex justify-between items-center text-[10px] font-mono text-slate-500 border-t border-slate-200/80 pt-2">
+                  <div className="flex justify-between items-center text-[9px] font-mono text-slate-500 border-t border-slate-200/80 pt-1.5">
                     <span>Admin • Trainer • Student</span>
                     <span className="text-emerald-600 font-semibold">
-                      Ready ✓
+                      Ready
                     </span>
                   </div>
                 </div>
@@ -1333,80 +1221,43 @@ export default function NationalLandingPage() {
             <BentoCard
               index={5}
               borderRadiusClass="rounded-tr-[32px] rounded-bl-[32px] rounded-tl-lg rounded-br-lg"
-              className="md:col-span-2"
+              className="md:col-span-2 p-0 overflow-hidden relative group min-h-[270px] md:min-h-[290px] flex flex-col justify-center !border-slate-800/60 !bg-slate-900 shadow-xl"
             >
-              <div className="grid md:grid-cols-2 gap-8 h-full items-center">
-                <div className="flex flex-col justify-between h-full py-1">
-                  <div>
-                    <div className="w-12 h-12 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center mb-5 text-indigo-600 shadow-sm transition-transform duration-300 group-hover:scale-105">
-                      <FileText className="w-6 h-6" />
-                    </div>
-                    <h3 className="font-heading font-bold text-xl text-slate-900 mb-2.5 tracking-tight group-hover:text-indigo-600 transition-colors">
-                      Detailed Candidate Reports
-                    </h3>
-                    <p className="text-slate-600 leading-relaxed text-sm">
-                      Generate comprehensive evaluation dossiers with automated
-                      scoring breakdowns, proctoring violation logs, and
-                      downloadable audit reports.
-                    </p>
-                  </div>
-                  <div className="mt-6 flex items-center gap-2 text-xs font-semibold text-indigo-600">
-                    <span>Audit & Reporting Suite</span>
-                    <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
-                  </div>
-                </div>
+              {/* Full Bleed Background GIF */}
+              <div className="absolute inset-0 w-full h-full overflow-hidden bg-slate-900">
+                <img
+                  src="/landing/candidate-report-demo.gif"
+                  alt="Detailed Candidate Evaluation Dossier Report"
+                  className="w-full h-full object-cover object-right md:object-center filter brightness-[0.9] contrast-[1.05] transition-transform duration-700 ease-out group-hover:scale-[1.02]"
+                  onError={(e) => {
+                    e.currentTarget.src = "/landing/analyze_illustration.jpg";
+                  }}
+                />
+                {/* Lighter, softer black shaded overlay band */}
+                <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/50 md:via-black/40 to-transparent pointer-events-none" />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/20 pointer-events-none" />
+                <div className="absolute inset-0 ring-1 ring-inset ring-white/10 rounded-[inherit] pointer-events-none" />
+              </div>
 
-                {/* Visual Mock: Clean Light Candidate Dossier Card */}
-                <div className="relative border border-slate-200/90 bg-gradient-to-br from-white to-slate-50 rounded-2xl p-4 flex flex-col justify-between shadow-md h-52">
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <span className="text-[10px] text-indigo-600 font-mono font-semibold uppercase tracking-wider block">
-                        Assessment Dossier
-                      </span>
-                      <h4 className="text-sm font-bold text-slate-900 mt-0.5">
-                        Aditya Verma
-                      </h4>
-                    </div>
-                    <span className="px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-200 text-[10px] font-mono font-bold flex items-center gap-1 shadow-sm">
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                      Score: 94.5%
-                    </span>
-                  </div>
+              {/* Minimalist Foreground Content */}
+              <div className="relative z-10 p-6 sm:p-7 md:p-8 flex flex-col justify-center h-full max-w-xl">
+                <div>
+                  {/* Minimal Eyebrow */}
+                  <span className="text-[10px] font-mono font-bold uppercase tracking-widest text-slate-300/90 mb-2 block">
+                    AUDIT & REPORTING SUITE
+                  </span>
 
-                  <div className="grid grid-cols-3 gap-2 bg-slate-100/70 border border-slate-200/70 rounded-xl p-2.5 text-center font-mono">
-                    <div>
-                      <span className="text-[8px] text-slate-400 uppercase block">
-                        Integrity
-                      </span>
-                      <span className="text-[11px] font-bold text-emerald-600">
-                        99.4%
-                      </span>
-                    </div>
-                    <div>
-                      <span className="text-[8px] text-slate-400 uppercase block">
-                        Time
-                      </span>
-                      <span className="text-[11px] font-bold text-slate-700">
-                        42m 15s
-                      </span>
-                    </div>
-                    <div>
-                      <span className="text-[8px] text-slate-400 uppercase block">
-                        Violations
-                      </span>
-                      <span className="text-[11px] font-bold text-emerald-600">
-                        0 Flags
-                      </span>
-                    </div>
-                  </div>
+                  {/* Main Bold Headline */}
+                  <h3 className="font-heading font-extrabold text-2xl sm:text-3xl text-white tracking-tight leading-[1.15] mb-2.5">
+                    Detailed Candidate Reports.
+                  </h3>
 
-                  <div className="flex justify-between items-center text-[10px] font-mono text-slate-500 border-t border-slate-200/80 pt-2">
-                    <span>ID: REP-2026-9A7F</span>
-                    <span className="text-indigo-600 font-semibold flex items-center gap-1 hover:underline cursor-pointer">
-                      <Download className="w-3 h-3" />
-                      <span>Audit PDF</span>
-                    </span>
-                  </div>
+                  {/* Minimal Subtitle */}
+                  <p className="text-slate-200/90 text-xs sm:text-sm leading-relaxed max-w-md mb-5 font-normal">
+                    Generate comprehensive evaluation dossiers with automated
+                    scoring breakdowns, proctoring violation logs, and audit
+                    reports.
+                  </p>
                 </div>
               </div>
             </BentoCard>
@@ -1978,7 +1829,8 @@ export default function NationalLandingPage() {
                 Frequently Asked Questions
               </h2>
               <p className="text-base sm:text-lg text-slate-600 max-w-2xl mx-auto mt-3">
-                Clear answers regarding AI proctoring intelligence, student data privacy, offline auto-recovery, and academic integrity.
+                Clear answers regarding AI proctoring intelligence, student data
+                privacy, offline auto-recovery, and academic integrity.
               </p>
             </motion.div>
           </div>
@@ -2059,7 +1911,7 @@ export default function NationalLandingPage() {
                   </h3>
                   <div className="space-y-4">
                     <a
-                      href="mailto:sales@gryphon360.com"
+                      href="mailto:gryphon360@gryphonacademy.co.in"
                       className="flex items-center gap-3.5 p-4 rounded-xl border border-slate-105 bg-white hover:border-primary/30 hover:shadow-sm transition-all duration-300 group"
                     >
                       <div className="w-10 h-10 rounded-lg bg-primary/10 text-primary flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
@@ -2070,7 +1922,7 @@ export default function NationalLandingPage() {
                           Email Us
                         </span>
                         <span className="text-sm font-semibold text-slate-800">
-                          sales@gryphon360.com
+                          gryphon360@gryphonacademy.co.in
                         </span>
                       </div>
                     </a>
@@ -2101,7 +1953,7 @@ export default function NationalLandingPage() {
                           Our Headquarters
                         </span>
                         <span className="text-sm font-semibold text-slate-800">
-                          Mumbai, Maharashtra
+                          Baner, Pune, Maharashtra 411045
                         </span>
                       </div>
                     </div>
@@ -2369,10 +2221,10 @@ export default function NationalLandingPage() {
                 </li>
                 <li>
                   <a
-                    href="#contact"
-                    className="hover:text-primary transition-colors duration-200"
+                    href="/contact"
+                    className="hover:text-primary transition-colors duration-200 text-primary font-semibold"
                   >
-                    Contact Sales
+                    Contact & Book Demo
                   </a>
                 </li>
               </ul>
@@ -2381,7 +2233,7 @@ export default function NationalLandingPage() {
             {/* Link column 3 */}
             <div>
               <h4 className="font-heading font-bold text-sm text-white mb-4 uppercase tracking-wider text-[10px]">
-                Support
+                Support & Contact
               </h4>
               <ul className="space-y-3 text-sm">
                 <li>
@@ -2390,14 +2242,6 @@ export default function NationalLandingPage() {
                     className="hover:text-primary transition-colors duration-200"
                   >
                     Help Center
-                  </a>
-                </li>
-                <li>
-                  <a
-                    href="/help?category=developer"
-                    className="hover:text-primary transition-colors duration-200"
-                  >
-                    Documentation
                   </a>
                 </li>
                 <li>
@@ -2415,6 +2259,14 @@ export default function NationalLandingPage() {
                   >
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
                     Platform Status
+                  </a>
+                </li>
+                <li>
+                  <a
+                    href="mailto:gryphon360@gryphonacademy.co.in"
+                    className="hover:text-primary text-slate-300 transition-colors duration-200 font-mono text-xs flex items-center gap-1.5"
+                  >
+                    gryphon360@gryphonacademy.co.in
                   </a>
                 </li>
               </ul>
@@ -2442,34 +2294,57 @@ export default function NationalLandingPage() {
         </div>
       </footer>
 
-      {/* Video Modal Popup */}
+      {/* Platform Demo & Video Tour Modal */}
       <Dialog open={isVideoModalOpen} onOpenChange={setIsVideoModalOpen}>
         <DialogContent className="max-w-4xl p-0 overflow-hidden bg-slate-950 border-slate-800 text-white rounded-2xl shadow-2xl">
-          <DialogHeader className="p-4 sm:p-5 bg-slate-900/90 border-b border-slate-800/80 flex flex-row items-center justify-between text-left pr-12">
+          <DialogHeader className="p-4 sm:p-5 bg-slate-900/95 border-b border-slate-800 flex flex-row items-center justify-between text-left pr-12">
             <div>
-              <DialogTitle className="text-base sm:text-lg font-bold text-white flex items-center gap-2">
-                <div className="w-7 h-7 rounded-lg bg-primary/20 border border-primary/30 flex items-center justify-center">
-                  <Play className="w-3.5 h-3.5 text-primary fill-primary" />
-                </div>
-                Platform Demo & Video Tour
-              </DialogTitle>
-              <DialogDescription className="text-xs text-slate-400 mt-1">
-                Explore our automated skill evaluation and proctoring platform.
-                (Placeholder video — official platform tour coming soon)
+              <div className="flex items-center gap-2 mb-1">
+                <DialogTitle className="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+                  <div className="w-7 h-7 rounded-lg bg-primary/20 border border-primary/30 flex items-center justify-center">
+                    <Play className="w-3.5 h-3.5 text-primary fill-primary" />
+                  </div>
+                  Platform Demo & Video Tour
+                </DialogTitle>
+                <span className="px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 text-[9px] font-bold font-mono">
+                  HD 1080p
+                </span>
+              </div>
+              <DialogDescription className="text-xs text-slate-300">
+                Explore our automated skill evaluation, real-time AI proctoring, and comprehensive candidate analytics platform.
               </DialogDescription>
             </div>
           </DialogHeader>
 
-          <div className="relative w-full aspect-video bg-black flex items-center justify-center">
-            {isVideoModalOpen && (
-              <iframe
-                src="https://www.youtube.com/embed/8mAITCNt70k?autoplay=1&rel=0"
-                title="Gryphon 360 Platform Video"
-                className="w-full h-full border-0"
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                allowFullScreen
-              />
-            )}
+          {/* Video Player Viewport */}
+          {isVideoModalOpen && (
+            <PlatformVideoPlayer
+              src="/landing/platform-demo.mp4"
+              poster="/landing/analyze_illustration.jpg"
+              autoPlay={true}
+            />
+          )}
+
+          {/* Modal Footer with Quick Chapter Highlights & CTA */}
+          <div className="p-3.5 sm:p-4 bg-slate-900/90 border-t border-slate-800 flex flex-wrap items-center justify-between gap-3 text-xs">
+            <div className="flex items-center gap-2 text-slate-400 font-mono text-[11px]">
+              <span className="text-slate-300 font-sans font-semibold">Features Covered:</span>
+              <span className="hidden sm:inline bg-slate-800 px-2 py-0.5 rounded text-slate-300">AI Proctoring</span>
+              <span className="hidden sm:inline bg-slate-800 px-2 py-0.5 rounded text-slate-300">Code Sandbox</span>
+              <span className="hidden sm:inline bg-slate-800 px-2 py-0.5 rounded text-slate-300">Candidate Dossier</span>
+            </div>
+
+            <Button
+              size="sm"
+              onClick={() => {
+                setIsVideoModalOpen(false);
+                document.getElementById("contact")?.scrollIntoView({ behavior: "smooth" });
+              }}
+              className="text-xs px-4 py-1.5 rounded-lg bg-primary hover:bg-primary/90 text-white font-semibold cursor-pointer shadow-md"
+            >
+              <span>Schedule Live Demo</span>
+              <ArrowRight className="w-3.5 h-3.5 ml-1.5" />
+            </Button>
           </div>
         </DialogContent>
       </Dialog>

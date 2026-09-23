@@ -708,8 +708,13 @@ export default function PublicHelpCenter() {
               <span>Contact 24/7 Technical Support</span>
             </DialogTitle>
             <DialogDescription className="text-xs text-slate-500">
-              Submit a support ticket and our technical team will respond
-              directly to your email.
+              Submit a support ticket below or email our support & customer success team directly at{" "}
+              <a
+                href="mailto:gryphon360@gryphonacademy.co.in"
+                className="text-indigo-600 font-semibold hover:underline font-mono"
+              >
+                gryphon360@gryphonacademy.co.in
+              </a>
             </DialogDescription>
           </DialogHeader>
 
@@ -884,6 +889,12 @@ export default function PublicHelpCenter() {
                 Home
               </button>
               <button
+                onClick={() => navigate("/contact")}
+                className="hover:text-white transition-colors text-primary font-semibold"
+              >
+                Contact & Demo
+              </button>
+              <button
                 onClick={() => setActiveSectionTab("faqs")}
                 className="hover:text-white transition-colors"
               >
@@ -901,12 +912,12 @@ export default function PublicHelpCenter() {
               >
                 Platform Status
               </button>
-              <button
-                onClick={() => setIsTicketModalOpen(true)}
-                className="hover:text-white transition-colors"
+              <a
+                href="mailto:gryphon360@gryphonacademy.co.in"
+                className="hover:text-white transition-colors text-indigo-400 font-mono"
               >
-                Support Desk
-              </button>
+                gryphon360@gryphonacademy.co.in
+              </a>
             </div>
           </div>
 

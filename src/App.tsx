@@ -17,6 +17,7 @@ import { lazyWithRetry } from "./lib/lazyWithRetry";
 const Login = lazyWithRetry(() => import("./pages/Login"));
 const NotFound = lazyWithRetry(() => import("./pages/NotFound"));
 const NationalLandingPage = lazyWithRetry(() => import("./pages/NationalLandingPage"));
+const ContactPage = lazyWithRetry(() => import("./pages/ContactPage"));
 const PublicHelpCenter = lazyWithRetry(() => import("./pages/PublicHelpCenter"));
 const AdminDashboard = lazyWithRetry(() => import("./pages/SuperAdmin/Dashboard"));
 const Organisations = lazyWithRetry(() => import("./pages/SuperAdmin/Organisations"));
@@ -91,6 +92,7 @@ const App = () => (
             >
               <Routes>
               <Route path="/" element={<NationalLandingPage />} />
+              <Route path="/contact" element={<ContactPage />} />
               <Route path="/login" element={<Login />} />
               <Route path="/help" element={<PublicHelpCenter />} />
               <Route path="/help-center" element={<PublicHelpCenter />} />
