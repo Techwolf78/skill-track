@@ -57,8 +57,11 @@ import * as XLSX from "xlsx";
 import { saveAs } from "file-saver";
 import { useOrganisationsQuery } from "@/hooks/use-query-hooks";
 import { formatDate, getTodayDateString } from "@/lib/date-utils";
+import { useAuth } from "@/lib/auth-context";
+import { authService } from "@/lib/auth-service";
 
 export default function Users() {
+  const { user: authUser } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState("");
@@ -81,10 +84,16 @@ export default function Users() {
   // Edit User Form State
   const [editUser, setEditUser] = useState<UserResponse | null>(null);
   const [isUpdating, setIsUpdating] = useState(false);
+  const [showOldPassword, setShowOldPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const [editForm, setEditForm] = useState({
     name: "",
     phoneNumber: "",
+    oldPassword: "",
+    newPassword: "",
+    confirmPassword: "",
   });
 
   useEffect(() => {
@@ -92,7 +101,13 @@ export default function Users() {
       setEditForm({
         name: editUser.name || "",
         phoneNumber: editUser.phoneNumber || "",
+        oldPassword: "",
+        newPassword: "",
+        confirmPassword: "",
       });
+      setShowOldPassword(false);
+      setShowNewPassword(false);
+      setShowConfirmPassword(false);
     }
   }, [editUser]);
 
@@ -183,12 +198,54 @@ export default function Users() {
     e.preventDefault();
     if (!editUser) return;
 
+    const isSelf = editUser.id === authUser?.id || editUser.email === authUser?.email;
+
+    if (isSelf && (editForm.oldPassword || editForm.newPassword || editForm.confirmPassword)) {
+      if (!editForm.oldPassword) {
+        toast({
+          title: "Validation Error",
+          description: "Please enter your current password to update password.",
+          variant: "destructive",
+        });
+        return;
+      }
+      if (!editForm.newPassword || editForm.newPassword.length < 8) {
+        toast({
+          title: "Validation Error",
+          description: "New password must be at least 8 characters long.",
+          variant: "destructive",
+        });
+        return;
+      }
+      if (editForm.newPassword !== editForm.confirmPassword) {
+        toast({
+          title: "Validation Error",
+          description: "New passwords do not match.",
+          variant: "destructive",
+        });
+        return;
+      }
+    }
+
     setIsUpdating(true);
     try {
+      // 1. Update Profile Information
       await userService.patchUser(editUser.id, {
-        name: editForm.name,
-        phoneNumber: editForm.phoneNumber,
+        name: editForm.name.trim(),
+        phoneNumber: editForm.phoneNumber.trim() || undefined,
       });
+
+      // 2. If password update requested for self, execute authService.resetPassword
+      if (isSelf && editForm.oldPassword && editForm.newPassword) {
+        await authService.resetPassword({
+          oldPassword: editForm.oldPassword,
+          newPassword: editForm.newPassword,
+        });
+        toast({
+          title: "Password Updated",
+          description: "Password has been changed successfully.",
+        });
+      }
 
       toast({
         title: "User Updated",
@@ -741,6 +798,89 @@ export default function Users() {
                     className="h-9 text-xs border-slate-200"
                   />
                 </div>
+
+                {/* Password Section (Only shown when editing self / SuperAdmin profile) */}
+                {(editUser.id === authUser?.id || editUser.email === authUser?.email) && (
+                  <div className="space-y-3 pt-2 border-t border-slate-100">
+                    <div>
+                      <h4 className="text-xs font-bold text-slate-900">Change Password (Optional)</h4>
+                      <p className="text-[11px] text-slate-400">Leave blank to keep your current password unchanged.</p>
+                    </div>
+
+                    {/* Current Password */}
+                    <div className="space-y-1">
+                      <Label className="text-[11px] font-semibold text-slate-700">Current Password</Label>
+                      <div className="relative">
+                        <Input
+                          type={showOldPassword ? "text" : "password"}
+                          value={editForm.oldPassword}
+                          onChange={(e) =>
+                            setEditForm({ ...editForm, oldPassword: e.target.value })
+                          }
+                          placeholder="Enter current password"
+                          className="h-9 text-xs border-slate-200 pr-9 font-mono"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowOldPassword(!showOldPassword)}
+                          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none cursor-pointer"
+                          tabIndex={-1}
+                        >
+                          {showOldPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* New Password & Confirm Password */}
+                    <div className="grid grid-cols-2 gap-2.5">
+                      <div className="space-y-1">
+                        <Label className="text-[11px] font-semibold text-slate-700">New Password</Label>
+                        <div className="relative">
+                          <Input
+                            type={showNewPassword ? "text" : "password"}
+                            value={editForm.newPassword}
+                            onChange={(e) =>
+                              setEditForm({ ...editForm, newPassword: e.target.value })
+                            }
+                            placeholder="Min. 8 characters"
+                            className="h-9 text-xs border-slate-200 pr-9 font-mono text-[11px]"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowNewPassword(!showNewPassword)}
+                            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none cursor-pointer"
+                            tabIndex={-1}
+                          >
+                            {showNewPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="space-y-1">
+                        <Label className="text-[11px] font-semibold text-slate-700">Confirm Password</Label>
+                        <div className="relative">
+                          <Input
+                            type={showConfirmPassword ? "text" : "password"}
+                            value={editForm.confirmPassword}
+                            onChange={(e) =>
+                              setEditForm({ ...editForm, confirmPassword: e.target.value })
+                            }
+                            placeholder="Re-enter new password"
+                            className="h-9 text-xs border-slate-200 pr-9 font-mono text-[11px]"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none cursor-pointer"
+                            tabIndex={-1}
+                          >
+                            {showConfirmPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 <div className="space-y-1.5">
                   <Label className="text-xs font-semibold text-slate-500">Organisation</Label>
