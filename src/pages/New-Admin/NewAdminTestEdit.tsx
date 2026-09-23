@@ -2459,8 +2459,11 @@ export default function NewAdminTestEdit() {
             : "Negligible");
 
         const trustScore =
-          detail?.trustScore ??
-          (detail?.riskScore !== undefined ? Math.max(0, 100 - Math.round(detail.riskScore)) : 100);
+          detail?.trustScore !== undefined
+            ? Math.max(0, Math.min(100, Math.round(detail.trustScore)))
+            : detail?.riskScore !== undefined
+            ? Math.max(0, Math.min(100, Math.round(detail.riskScore)))
+            : 100;
 
         // Problem breakdown
         const submissions: any[] = detail?.submissions || [];
@@ -4084,15 +4087,37 @@ export default function NewAdminTestEdit() {
 
                                 {/* Candidate Info */}
                                 <td className="py-3.5 px-4">
-                                  <div className="flex items-center gap-3">
-                                    <Avatar className="w-8 h-8 border border-slate-200">
-                                      <AvatarFallback className="bg-slate-100 text-slate-700 text-xs font-bold">
+                                  <div
+                                    className="flex items-center gap-3 cursor-pointer group/cand"
+                                    onClick={() => {
+                                      const scoreEntry = candidateResults[inv.id];
+                                      const sessionId =
+                                        scoreEntry?.sessionId ||
+                                        scoreEntry?.session?.id ||
+                                        scoreEntry?.detail?.systemInfo?.sessionId ||
+                                        scoreEntry?.detail?.sessionId ||
+                                        (inv as any).sessionId ||
+                                        (inv as any).testSessionId;
+                                      const candId = inv.candidateId || inv.candidate?.id;
+                                      const schedId = inv.scheduleId;
+                                      const params = new URLSearchParams();
+                                      if (sessionId) params.set("sessionId", sessionId);
+                                      if (candId) params.set("candidateId", candId);
+                                      if (schedId) params.set("scheduleId", schedId);
+                                      const query = params.toString() ? `?${params.toString()}` : "";
+                                      navigate(`/admin/tests/${id}/candidate/${inv.id}${query}`);
+                                    }}
+                                  >
+                                    <Avatar className="w-8 h-8 border border-slate-200 group-hover/cand:border-orange-400 transition-colors">
+                                      <AvatarFallback className="bg-slate-100 text-slate-700 text-xs font-bold group-hover/cand:bg-orange-50 group-hover/cand:text-orange-600 transition-colors">
                                         {name.slice(0, 2).toUpperCase()}
                                       </AvatarFallback>
                                     </Avatar>
                                     <div className="space-y-0.5">
                                       <div className="flex items-center gap-2">
-                                        <span className="font-bold text-slate-900">{name}</span>
+                                        <span className="font-bold text-slate-900 group-hover/cand:text-orange-600 transition-colors hover:underline">
+                                          {name}
+                                        </span>
                                       </div>
                                       <div className="flex items-center gap-3 text-[11px] text-slate-400 font-normal">
                                         <span className="flex items-center gap-1">
@@ -4132,6 +4157,31 @@ export default function NewAdminTestEdit() {
                                       align="end"
                                       className="w-48 bg-white border border-slate-200 shadow-xl p-1 text-xs"
                                     >
+                                      <DropdownMenuItem
+                                        onClick={() => {
+                                          const scoreEntry = candidateResults[inv.id];
+                                          const sessionId =
+                                            scoreEntry?.sessionId ||
+                                            scoreEntry?.session?.id ||
+                                            scoreEntry?.detail?.systemInfo?.sessionId ||
+                                            scoreEntry?.detail?.sessionId ||
+                                            (inv as any).sessionId ||
+                                            (inv as any).testSessionId;
+                                          const candId = inv.candidateId || inv.candidate?.id;
+                                          const schedId = inv.scheduleId;
+                                          const params = new URLSearchParams();
+                                          if (sessionId) params.set("sessionId", sessionId);
+                                          if (candId) params.set("candidateId", candId);
+                                          if (schedId) params.set("scheduleId", schedId);
+                                          const query = params.toString() ? `?${params.toString()}` : "";
+                                          navigate(`/admin/tests/${id}/candidate/${inv.id}${query}`);
+                                        }}
+                                        className="cursor-pointer py-2 px-2.5 flex items-center gap-2 text-slate-700 hover:bg-slate-50 font-medium"
+                                      >
+                                        <ExternalLink className="w-3.5 h-3.5 text-orange-500" />
+                                        <span>Candidate Details</span>
+                                      </DropdownMenuItem>
+
                                       <DropdownMenuItem
                                         onClick={() => downloadAdvancedReport(inv)}
                                         className="cursor-pointer py-2 px-2.5 flex items-center gap-2 text-slate-700 hover:bg-slate-50"

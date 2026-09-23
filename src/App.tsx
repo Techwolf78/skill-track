@@ -49,6 +49,7 @@ const NewAdminQuestionCreate = lazyWithRetry(() => import("./pages/New-Admin/New
 const NewAdminQuestionPreview = lazyWithRetry(() => import("./pages/New-Admin/NewAdminQuestionPreview"));
 const NewAdminTestEdit = lazyWithRetry(() => import("./pages/New-Admin/NewAdminTestEdit"));
 const NewAdminTestAddProblems = lazyWithRetry(() => import("./pages/New-Admin/NewAdminTestAddProblems"));
+const NewAdminCandidateDetails = lazyWithRetry(() => import("./pages/New-Admin/NewAdminCandidateDetails"));
 const NewAdminSettings = lazyWithRetry(() => import("./pages/New-Admin/NewAdminSettings"));
 
 // Test Taking
@@ -330,6 +331,56 @@ const App = () => (
                 element={
                   <ProtectedRoute requiredRoles={[ROLES.ADMIN, ROLES.SUPERADMIN]}>
                     <DSAPlayground />
+                  </ProtectedRoute>
+                }
+              />
+
+              {/* Standalone Full-Screen Candidate Details (DoSelect / Learn Style) */}
+              <Route
+                path="/admin/tests/:testId/candidate/:invitationId"
+                element={
+                  <ProtectedRoute requiredRoles={[ROLES.ADMIN, ROLES.SUPERADMIN]}>
+                    <NewAdminCandidateDetails />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/tests/:testId/candidates/:invitationId"
+                element={
+                  <ProtectedRoute requiredRoles={[ROLES.ADMIN, ROLES.SUPERADMIN]}>
+                    <NewAdminCandidateDetails />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/tests/:testId/candidate"
+                element={
+                  <ProtectedRoute requiredRoles={[ROLES.ADMIN, ROLES.SUPERADMIN]}>
+                    <NewAdminCandidateDetails />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/candidate-report/:invitationId"
+                element={
+                  <ProtectedRoute requiredRoles={[ROLES.ADMIN, ROLES.SUPERADMIN]}>
+                    <NewAdminCandidateDetails />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/superadmin/tests/:testId/candidate/:invitationId"
+                element={
+                  <ProtectedRoute requiredRoles={[ROLES.SUPERADMIN]}>
+                    <NewAdminCandidateDetails />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/superadmin/tests/:testId/candidates/:invitationId"
+                element={
+                  <ProtectedRoute requiredRoles={[ROLES.SUPERADMIN]}>
+                    <NewAdminCandidateDetails />
                   </ProtectedRoute>
                 }
               />
