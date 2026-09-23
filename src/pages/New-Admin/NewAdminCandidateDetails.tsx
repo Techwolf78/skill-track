@@ -140,6 +140,78 @@ const mapLanguageToMonaco = (lang?: string): string => {
   return "plaintext";
 };
 
+const extractSnapshotUrl = (s: any): string => {
+  if (!s) return "";
+  return (
+    s.imageUrl ||
+    (s.s3Key && s.s3Key.startsWith("http")
+      ? s.s3Key
+      : s.imageData
+      ? s.imageData.startsWith("data:")
+        ? s.imageData
+        : `data:image/jpeg;base64,${s.imageData}`
+      : s.storagePath || s.s3Key || "")
+  );
+};
+
+const preloadSingleImage = (rawUrl: string): Promise<string> => {
+  return new Promise<string>((resolve) => {
+    if (!rawUrl) return resolve("");
+    if (rawUrl.startsWith("data:") || rawUrl.startsWith("blob:")) {
+      return resolve(rawUrl);
+    }
+
+    let isDone = false;
+    const img = new Image();
+
+    // 4s timeout safety guard so slow network doesn't indefinitely hang initial load
+    const timeoutTimer = setTimeout(() => {
+      if (!isDone) {
+        isDone = true;
+        resolve(rawUrl);
+      }
+    }, 4000);
+
+    img.onload = () => {
+      if (!isDone) {
+        isDone = true;
+        clearTimeout(timeoutTimer);
+        resolve(rawUrl);
+      }
+    };
+
+    img.onerror = () => {
+      if (!rawUrl.includes("/snapshots/proxy")) {
+        const proxyUrl = `/api/admin/proctoring/snapshots/proxy?url=${encodeURIComponent(rawUrl)}`;
+        const proxyImg = new Image();
+        proxyImg.onload = () => {
+          if (!isDone) {
+            isDone = true;
+            clearTimeout(timeoutTimer);
+            resolve(proxyUrl);
+          }
+        };
+        proxyImg.onerror = () => {
+          if (!isDone) {
+            isDone = true;
+            clearTimeout(timeoutTimer);
+            resolve(rawUrl);
+          }
+        };
+        proxyImg.src = proxyUrl;
+      } else {
+        if (!isDone) {
+          isDone = true;
+          clearTimeout(timeoutTimer);
+          resolve(rawUrl);
+        }
+      }
+    };
+
+    img.src = rawUrl;
+  });
+};
+
 export default function NewAdminCandidateDetails() {
   const { testId, invitationId, candidateId } = useParams<{
     testId?: string;
@@ -171,6 +243,8 @@ export default function NewAdminCandidateDetails() {
   const [currentSnapshotIndex, setCurrentSnapshotIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [playbackSpeed, setPlaybackSpeed] = useState<number>(1); // 0.5, 1, 1.5, 2, 4
+  const [resolvedSnapshotMap, setResolvedSnapshotMap] = useState<Record<string, string>>({});
+  const [isSnapshotsPreloading, setIsSnapshotsPreloading] = useState(false);
 
   // ── Expand/Collapse State for Identity Snapshot Section ──
   const [isIdentityExpanded, setIsIdentityExpanded] = useState(false);
@@ -1007,6 +1081,44 @@ export default function NewAdminCandidateDetails() {
     // Sort chronologically by timestamp
     return snaps.sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
   }, [proctoringDetail]);
+
+  // Preload all timeline snapshots into browser image cache in background
+  useEffect(() => {
+    if (timelineSnapshots.length === 0) {
+      setIsSnapshotsPreloading(false);
+      return;
+    }
+    const unResolved = timelineSnapshots.filter((s) => !resolvedSnapshotMap[s.id]);
+    if (unResolved.length === 0) {
+      setIsSnapshotsPreloading(false);
+      return;
+    }
+
+    setIsSnapshotsPreloading(true);
+    let isMounted = true;
+    Promise.allSettled(
+      unResolved.map(async (s) => {
+        const resolvedUrl = await preloadSingleImage(s.url);
+        return { snapId: s.id, resolvedUrl };
+      })
+    ).then((results) => {
+      if (!isMounted) return;
+      setResolvedSnapshotMap((prev) => {
+        const next = { ...prev };
+        results.forEach((res) => {
+          if (res.status === "fulfilled" && res.value) {
+            next[res.value.snapId] = res.value.resolvedUrl;
+          }
+        });
+        return next;
+      });
+      setIsSnapshotsPreloading(false);
+    });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [timelineSnapshots, resolvedSnapshotMap]);
 
   // Ensure current index is valid
   useEffect(() => {
@@ -1849,13 +1961,27 @@ export default function NewAdminCandidateDetails() {
 
           <div className="p-6 flex flex-col items-center justify-center space-y-4">
             {timelineSnapshots.length > 0 ? (
-              <>
-                {/* Snapshot Image Display */}
+              isSnapshotsPreloading ? (
+                <div className="py-14 flex flex-col items-center justify-center space-y-3">
+                  <Loader2 className="w-8 h-8 animate-spin text-orange-500" />
+                  <p className="text-sm font-medium text-slate-700">Loading proctoring snapshots...</p>
+                  <span className="text-xs text-slate-400 font-mono">
+                    Preparing {timelineSnapshots.length} frames for smooth playback
+                  </span>
+                </div>
+              ) : (
+                <>
+                  {/* Snapshot Image Display */}
                 <div className="w-full max-w-xl aspect-4/3 bg-slate-900 border border-slate-200 rounded-none overflow-hidden relative flex items-center justify-center shadow-xs">
                   <img
-                    src={timelineSnapshots[currentSnapshotIndex]?.url}
+                    src={
+                      resolvedSnapshotMap[timelineSnapshots[currentSnapshotIndex]?.id] ||
+                      timelineSnapshots[currentSnapshotIndex]?.url
+                    }
                     alt={`Proctoring Snapshot ${currentSnapshotIndex + 1}`}
-                    className="w-full h-full object-cover"
+                    className="w-full h-full object-cover select-none"
+                    loading="eager"
+                    decoding="sync"
                     onError={(e) => {
                       const rawUrl = timelineSnapshots[currentSnapshotIndex]?.url;
                       if (rawUrl && !e.currentTarget.src.includes("/snapshots/proxy")) {
@@ -2009,12 +2135,13 @@ export default function NewAdminCandidateDetails() {
                   </div>
                 </div>
               </>
-            ) : (
-              <div className="py-12 text-center text-slate-400 space-y-2">
-                <Camera className="w-8 h-8 mx-auto text-slate-300" />
-                <p className="text-xs">No periodic webcam audit snapshots recorded for this session.</p>
-              </div>
-            )}
+            )
+          ) : (
+            <div className="py-12 text-center text-slate-400 space-y-2">
+              <Camera className="w-8 h-8 mx-auto text-slate-300" />
+              <p className="text-xs">No periodic webcam audit snapshots recorded for this session.</p>
+            </div>
+          )}
           </div>
         </div>
       </main>
