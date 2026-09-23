@@ -461,16 +461,80 @@ export default function NewAdminCandidateDetails() {
           let earned = 0;
 
           if (ansEntry) {
-            candidateChoice = ansEntry.selectedOption ?? ansEntry.selectedOptionId ?? ansEntry.answer ?? ansEntry.optionIndex;
-            if (ansEntry.isCorrect !== undefined) {
+            // Extract raw selected options list across all backend/frontend formats
+            let selectedList: any[] = [];
+
+            if (Array.isArray(ansEntry.selectedOptionIds) && ansEntry.selectedOptionIds.length > 0) {
+              selectedList = ansEntry.selectedOptionIds;
+            } else if (Array.isArray(ansEntry.selectedOptions) && ansEntry.selectedOptions.length > 0) {
+              selectedList = ansEntry.selectedOptions;
+            } else if (ansEntry.selectedOptionId) {
+              selectedList = [ansEntry.selectedOptionId];
+            } else if (ansEntry.selectedOption !== undefined && ansEntry.selectedOption !== null) {
+              selectedList = Array.isArray(ansEntry.selectedOption) ? ansEntry.selectedOption : [ansEntry.selectedOption];
+            } else if (ansEntry.answerText) {
+              try {
+                const parsed = JSON.parse(ansEntry.answerText);
+                if (Array.isArray(parsed)) {
+                  selectedList = parsed;
+                } else if (parsed !== null && parsed !== undefined) {
+                  selectedList = [parsed];
+                }
+              } catch {
+                if (ansEntry.answerText.includes(",")) {
+                  selectedList = ansEntry.answerText.split(",").map((s: string) => s.trim());
+                } else {
+                  selectedList = [ansEntry.answerText];
+                }
+              }
+            } else if (ansEntry.answer !== undefined && ansEntry.answer !== null) {
+              selectedList = Array.isArray(ansEntry.answer) ? ansEntry.answer : [ansEntry.answer];
+            } else if (ansEntry.optionIndex !== undefined && ansEntry.optionIndex !== null) {
+              selectedList = [ansEntry.optionIndex];
+            }
+
+            candidateChoice = selectedList.length === 1 ? selectedList[0] : (selectedList.length > 1 ? selectedList : null);
+
+            // Determine correctness
+            if (ansEntry.isCorrect !== undefined && ansEntry.isCorrect !== null) {
               isCorrect = ansEntry.isCorrect === true;
-            } else if (ansEntry.score !== undefined && ansEntry.score > 0) {
-              isCorrect = true;
-            } else if (typeof candidateChoice === "number" && opts[candidateChoice]) {
-              isCorrect = Boolean(opts[candidateChoice].isCorrect);
-            } else if (typeof candidateChoice === "string") {
-              const matchedOpt = opts.find((o: any) => o.id === candidateChoice || o.text === candidateChoice);
-              isCorrect = Boolean(matchedOpt?.isCorrect);
+            } else if (ansEntry.scoreAwarded !== undefined && ansEntry.scoreAwarded !== null) {
+              isCorrect = Number(ansEntry.scoreAwarded) >= maxMarks || Number(ansEntry.scoreAwarded) > 0;
+            } else if (ansEntry.score !== undefined && ansEntry.score !== null) {
+              isCorrect = Number(ansEntry.score) > 0;
+            } else if (selectedList.length > 0 && Array.isArray(opts) && opts.length > 0) {
+              const correctOpts = opts.filter((o: any) => Boolean(o.isCorrect));
+              if (correctOpts.length > 0) {
+                const correctIds = new Set(correctOpts.map((o: any) => String(o.id || o.text || "")));
+                const correctIndices = new Set(
+                  opts
+                    .map((o: any, oIdx: number) => (Boolean(o.isCorrect) ? oIdx : -1))
+                    .filter((idx: number) => idx !== -1)
+                );
+
+                const isMultiple = Boolean(fullQ.multipleCorrect || fullQ.mcqType === "MULTIPLE_CORRECT");
+                if (isMultiple) {
+                  const allMatched =
+                    selectedList.length === correctOpts.length &&
+                    selectedList.every(
+                      (s: any) =>
+                        correctIds.has(String(s)) || (typeof s === "number" && correctIndices.has(s))
+                    );
+                  isCorrect = allMatched;
+                } else {
+                  const chosen = selectedList[0];
+                  isCorrect =
+                    correctIds.has(String(chosen)) ||
+                    (typeof chosen === "number" && correctIndices.has(chosen)) ||
+                    opts.some(
+                      (o: any, oIdx: number) =>
+                        Boolean(o.isCorrect) &&
+                        (String(o.id) === String(chosen) ||
+                          String(o.text) === String(chosen) ||
+                          oIdx === chosen)
+                    );
+                }
+              }
             }
 
             status = isCorrect ? "ACCEPTED" : "REJECTED";
@@ -705,7 +769,7 @@ export default function NewAdminCandidateDetails() {
     if (isEvaluated) {
       return {
         label: isPassed ? "Passed" : "Failed",
-        subtext: `in the assignment (Cut-off score >= ${passCutoff}%)`,
+        subtext: `Qualifying Score: ${passCutoff}%`,
         isPassed: isPassed,
         isEvaluated: true,
       };
@@ -728,7 +792,7 @@ export default function NewAdminCandidateDetails() {
     }
     return {
       label: invitation?.status || "Pending",
-      subtext: `Cut-off score >= ${passCutoff}%`,
+      subtext: `Qualifying Score: ${passCutoff}%`,
       isPassed: false,
       isEvaluated: false,
     };
@@ -1318,31 +1382,22 @@ export default function NewAdminCandidateDetails() {
               </div>
             </div>
 
-            {/* Metric 2: Score (Based on Latest Score) */}
+            {/* Metric 2: Percentage */}
             <div className="flex items-start gap-3">
               <div className="w-8 h-8 rounded-none bg-slate-100 border border-slate-200 text-slate-700 flex items-center justify-center shrink-0 mt-0.5">
                 <Target className="w-4 h-4 stroke-[2]" />
               </div>
               <div className="space-y-0.5">
                 <p className="text-lg md:text-xl font-extrabold text-slate-900 tracking-tight">
-                  {scoreValue !== null ? (
-                    <>
-                      {scoreValue.toFixed(1)} / {maxScore}{" "}
-                      <span className="text-sm md:text-base font-bold text-slate-700">
-                        ({percentageValue}%)
-                      </span>
-                    </>
-                  ) : (
-                    `— / ${maxScore}`
-                  )}
+                  {percentageValue !== null ? `${percentageValue}%` : "—"}
                 </p>
                 <p className="text-xs text-slate-500 font-medium leading-relaxed">
-                  Based on Latest Score
+                  percentage
                 </p>
               </div>
             </div>
 
-            {/* Metric 3: Score (Based on Best Score) */}
+            {/* Metric 3: Score */}
             <div className="flex items-start gap-3">
               <div className="w-8 h-8 rounded-none bg-slate-100 border border-slate-200 text-slate-700 flex items-center justify-center shrink-0 mt-0.5">
                 <Award className="w-4 h-4 stroke-[2]" />
@@ -1352,7 +1407,7 @@ export default function NewAdminCandidateDetails() {
                   {scoreValue !== null ? `${scoreValue.toFixed(1)} / ${maxScore}` : `— / ${maxScore}`}
                 </p>
                 <p className="text-xs text-slate-500 font-medium leading-relaxed">
-                  Based on Best Score
+                  score
                 </p>
               </div>
             </div>
@@ -2342,12 +2397,23 @@ export default function NewAdminCandidateDetails() {
                     ) : (
                       <div className="space-y-2">
                         {selectedSolutionQuestion.options.map((opt, oIdx) => {
-                          const isCandidateChosen =
-                            selectedSolutionQuestion.candidateSelectedOption !== null &&
-                            selectedSolutionQuestion.candidateSelectedOption !== undefined &&
-                            (selectedSolutionQuestion.candidateSelectedOption === oIdx ||
-                              selectedSolutionQuestion.candidateSelectedOption === opt.id ||
-                              selectedSolutionQuestion.candidateSelectedOption === opt.text);
+                          const choice = selectedSolutionQuestion.candidateSelectedOption;
+                          const isCandidateChosen = Array.isArray(choice)
+                            ? choice.some(
+                                (c: any) =>
+                                  c === oIdx ||
+                                  c === opt.id ||
+                                  c === opt.text ||
+                                  (opt.id && String(c) === String(opt.id)) ||
+                                  (opt.text && String(c) === String(opt.text))
+                              )
+                            : choice !== null &&
+                              choice !== undefined &&
+                              (choice === oIdx ||
+                                choice === opt.id ||
+                                choice === opt.text ||
+                                (opt.id && String(choice) === String(opt.id)) ||
+                                (opt.text && String(choice) === String(opt.text)));
 
                           const isOptionCorrect = Boolean(opt.isCorrect);
 
