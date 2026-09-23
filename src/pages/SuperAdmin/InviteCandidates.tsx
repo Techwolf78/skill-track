@@ -278,64 +278,70 @@ export default function InviteCandidates() {
     }
     if (selectedCandidates.length === 0) return;
     setSubmitting(true);
-    let successCount = 0;
-    let failCount = 0;
-    let insufficientPins = false;
-    let lastErrMsg = "";
 
-    for (const candidateId of selectedCandidates) {
-      try {
-        await apiClient.post("/candidate-invitations", {
-          scheduleId: selectedSchedule,
-          candidateId,
-          baseUrl: window.location.origin,
-        });
-        successCount++;
-      } catch (error) {
-        failCount++;
-        const status = (error as { response?: { status?: number } }).response?.status;
-        const msg =
-          (error as { response?: { data?: { message?: string; errorCode?: string } } }).response?.data?.message ||
-          (error as { message?: string }).message ||
-          "";
-        const code = (error as { response?: { data?: { errorCode?: string } } }).response?.data?.errorCode;
-        if (
-          status === 402 ||
-          code === "INSUFFICIENT_PINS" ||
-          /insufficient.*pin/i.test(msg) ||
-          /available pin/i.test(msg)
-        ) {
-          insufficientPins = true;
-          lastErrMsg = msg;
-        } else if (!lastErrMsg) {
-          lastErrMsg = msg;
-        }
+    try {
+      const result = await candidateService.createBulkInvitations({
+        scheduleId: selectedSchedule,
+        candidateIds: selectedCandidates,
+      });
+
+      const successCount = result?.successCount ?? 0;
+      const alreadyInvited = result?.alreadyInvitedCount ?? 0;
+      const failCount = result?.failCount ?? 0;
+      const failedRows = result?.rows?.filter((r) => r.status === "FAILED") ?? [];
+
+      if (successCount > 0) {
+        invalidatePinQueries();
+        queryClient.invalidateQueries({ queryKey: ["candidate-invitations"] });
       }
-    }
 
-    if (successCount > 0) {
-      invalidatePinQueries();
-    }
+      if (failCount === 0) {
+        toast({
+          title: "Bulk invite complete",
+          description: `${successCount} invited${alreadyInvited > 0 ? `, ${alreadyInvited} already invited (skipped)` : ""}.`,
+        });
+      } else {
+        const firstReason = failedRows[0]?.message ? ` Reason: ${failedRows[0].message}` : "";
+        toast({
+          title: successCount > 0 ? "Partial success" : "Invite failed",
+          description: `${successCount} invited, ${failCount} failed.${firstReason}`,
+          variant: successCount === 0 ? "destructive" : "default",
+        });
+      }
+    } catch (error: any) {
+      const status = error?.response?.status;
+      const data = error?.response?.data;
+      const msg = data?.message || data?.error || error?.message || "Failed to send invitations";
+      const errorCode = data?.errorCode;
 
-    if (insufficientPins) {
-      toast({
-        title: "Insufficient Organisation PINs",
-        description:
-          lastErrMsg ||
-          "The organization does not have enough available PINs to issue these invitations. Please allocate additional PINs in SuperAdmin Organisations.",
-        variant: "destructive",
-      });
-    } else {
-      toast({
-        title: failCount === 0 ? "Bulk invite complete" : "Partial success",
-        description: `${successCount} invited.${failCount > 0 ? ` ${failCount} failed (${lastErrMsg || "unknown error"}).` : ""}`,
-        variant: failCount > 0 && successCount === 0 ? "destructive" : "default",
-      });
+      if (
+        status === 402 ||
+        errorCode === "INSUFFICIENT_PINS" ||
+        errorCode === "PIN_DEPLETED" ||
+        /insufficient.*pin/i.test(msg) ||
+        /available pin/i.test(msg) ||
+        /pin balance.*low/i.test(msg) ||
+        /not enough.*pin/i.test(msg)
+      ) {
+        toast({
+          title: "Insufficient Organisation PINs",
+          description:
+            msg ||
+            "The organization does not have enough available PINs to issue these invitations. Please allocate additional PINs in SuperAdmin Organisations.",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Couldn't send invites",
+          description: msg,
+          variant: "destructive",
+        });
+      }
+    } finally {
+      setSelectedCandidates([]);
+      fetchData();
+      setSubmitting(false);
     }
-
-    setSelectedCandidates([]);
-    fetchData();
-    setSubmitting(false);
   };
 
   const copyTestLink = (id: string, token?: string) => {
