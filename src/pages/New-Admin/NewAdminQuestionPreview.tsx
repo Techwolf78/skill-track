@@ -37,7 +37,6 @@ import Editor from "@monaco-editor/react";
 import { useAuth } from "@/lib/auth-context";
 import { testService, Question, McqOption, McqType } from "@/lib/test-service";
 import { apiClient } from "@/lib/api-client";
-import { unwrapResponse } from "@/lib/api/baseResponseUtils";
 import { mapFrontendToBackendLang } from "@/types/question";
 import { renderFormattedContent, decodeHtmlIfNeeded, sanitizeHtml } from "@/lib/html-utils";
 import { QuestionImage } from "@/components/ui/QuestionImage";
@@ -201,7 +200,6 @@ export default function NewAdminQuestionPreview() {
   const [consoleOutput, setConsoleOutput] = useState<string>("");
 
   const loadQuestion = useCallback((questionId: string) => {
-    if (!question) setLoading(true);
     setError(null);
     testService
       .getQuestionById(questionId)
@@ -214,15 +212,13 @@ export default function NewAdminQuestionPreview() {
       })
       .catch((err: unknown) => {
         console.error("Failed to load question preview", err);
-        if (!question) {
-          const apiErr = err as { response?: { data?: { message?: string } }; message?: string };
-          setError("Failed to load question details: " + (apiErr.response?.data?.message || apiErr.message || "Unknown error"));
-        }
+        const apiErr = err as { response?: { data?: { message?: string } }; message?: string };
+        setError("Failed to load question details: " + (apiErr.response?.data?.message || apiErr.message || "Unknown error"));
       })
       .finally(() => {
         setLoading(false);
       });
-  }, [question]);
+  }, []);
 
   useEffect(() => {
     if (id) {
@@ -250,7 +246,7 @@ export default function NewAdminQuestionPreview() {
         }
       }
     }
-  }, [question, selectedLanguage]);
+  }, [question?.id, selectedLanguage]);
 
   if (loading) {
     return (
@@ -343,11 +339,6 @@ export default function NewAdminQuestionPreview() {
   const handleRunCode = async (isVerify = false) => {
     if (!code || !question) return;
 
-    if (!question.id) {
-      toast.error("Question ID not found. Please ensure the question is saved.");
-      return;
-    }
-
     setIsExecuting(true);
     setConsoleOutput("> Compiling & executing source code on sandbox...\n");
     setOverallStatus(null);
@@ -362,18 +353,13 @@ export default function NewAdminQuestionPreview() {
         runAll: isVerify,
       };
 
-      const response = await apiClient.post<any>(
+      const response = await apiClient.post<{ data?: Record<string, unknown>[] }>(
         "/api/code/execute/playground",
         requestBody
       );
 
-      const unwrapped = unwrapResponse(response);
-      const resultsArray: Record<string, unknown>[] = Array.isArray(unwrapped)
-        ? (unwrapped as Record<string, unknown>[])
-        : Array.isArray((unwrapped as any)?.data)
-        ? (unwrapped as any).data
-        : Array.isArray((response.data as any)?.data)
-        ? (response.data as any).data
+      const resultsArray = Array.isArray(response.data?.data)
+        ? response.data.data
         : [];
 
       const sampleCases = isVerify
@@ -413,8 +399,7 @@ export default function NewAdminQuestionPreview() {
       setOverallStatus(computedStatus);
       setConsoleOutput(
         `> Execution completed with status: ${computedStatus}\n` +
-          (mappedResults[0]?.compileOutput ? `\nCompiler Logs:\n${mappedResults[0].compileOutput}` : "") +
-          (mappedResults[0]?.stderr ? `\nRuntime Stderr:\n${mappedResults[0].stderr}` : "")
+          (mappedResults[0]?.compileOutput ? `\nCompiler Logs:\n${mappedResults[0].compileOutput}` : "")
       );
 
       if (computedStatus === "ACCEPTED") {
