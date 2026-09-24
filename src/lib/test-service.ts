@@ -846,8 +846,8 @@ export const testService = {
     id: string,
     dto: UpdateQuestionRequest,
   ): Promise<Question> => {
-    // Use PATCH for partial updates as per backend
-    const response = await apiClient.patch<Question>(`/questions/${id}`, dto);
+    // Use PUT as required by backend /questions/{id} endpoint
+    const response = await apiClient.put<Question>(`/questions/${id}`, dto);
     return unwrapResponse(response);
   },
 

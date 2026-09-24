@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import {
   Search,
@@ -761,17 +761,30 @@ function ImportQuestionsDialog({
 
 export default function NewAdminLibrary() {
   const navigate = useNavigate();
+  const location = useLocation();
 
-  const [selectedLibrary, setSelectedLibrary] = useState<LibraryType>("PUBLIC");
-  const [problemType, setProblemType] = useState<ProblemType>("ALL");
-  const [searchQuery, setSearchQuery] = useState("");
-  const [techSearch, setTechSearch] = useState("");
-  const [tagSearch, setTagSearch] = useState("");
-  const [selectedLevel, setSelectedLevel] = useState<"ALL" | "EASY" | "MEDIUM" | "HARD">("ALL");
+  const [selectedLibrary, setSelectedLibrary] = useState<LibraryType>(() => {
+    const fromState = location.state?.selectedLibrary || location.state?.activeTab || location.state?.returnActiveTab;
+    if (fromState === "PUBLIC" || fromState === "ORG_OWNED") return fromState;
+    const fromSession = sessionStorage.getItem("admin_library_tab") as LibraryType;
+    if (fromSession === "PUBLIC" || fromSession === "ORG_OWNED") return fromSession;
+    return "PUBLIC";
+  });
+  const [problemType, setProblemType] = useState<ProblemType>(() => {
+    const fromState = location.state?.problemType || location.state?.returnProblemType;
+    return fromState || "ALL";
+  });
+  const [searchQuery, setSearchQuery] = useState(() => location.state?.searchQuery || location.state?.returnSearchQuery || "");
+  const [techSearch, setTechSearch] = useState(() => location.state?.techSearch || location.state?.returnTechSearch || "");
+  const [tagSearch, setTagSearch] = useState(() => location.state?.tagSearch || location.state?.returnTagSearch || "");
+  const [selectedLevel, setSelectedLevel] = useState<"ALL" | "EASY" | "MEDIUM" | "HARD">(() => {
+    const fromState = location.state?.selectedLevel || location.state?.returnDifficulty;
+    return fromState || "ALL";
+  });
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [manageSubjectsOpen, setManageSubjectsOpen] = useState(false);
-  const location = useLocation();
+
   const [currentPage, setCurrentPage] = useState<number>(() => {
     const fromState = location.state?.page || location.state?.returnPage;
     const fromSession = Number(sessionStorage.getItem("admin_library_page"));
@@ -788,6 +801,12 @@ export default function NewAdminLibrary() {
     return 10;
   });
 
+  const isFirstRender = useRef(true);
+
+  useEffect(() => {
+    sessionStorage.setItem("admin_library_tab", selectedLibrary);
+  }, [selectedLibrary]);
+
   useEffect(() => {
     sessionStorage.setItem("admin_library_page", String(currentPage));
   }, [currentPage]);
@@ -796,8 +815,12 @@ export default function NewAdminLibrary() {
     sessionStorage.setItem("admin_library_page_size", String(pageSize));
   }, [pageSize]);
 
-  // Reset page when filters change
+  // Reset page when filters change (skip initial mount to preserve navigated page)
   useEffect(() => {
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      return;
+    }
     setCurrentPage(1);
   }, [selectedLibrary, problemType, selectedLevel, techSearch, tagSearch, searchQuery, pageSize]);
 
@@ -1111,11 +1134,19 @@ export default function NewAdminLibrary() {
                             onClick={() => {
                               sessionStorage.setItem("admin_library_page", String(currentPage));
                               sessionStorage.setItem("admin_library_page_size", String(pageSize));
+                              sessionStorage.setItem("admin_library_tab", selectedLibrary);
                               navigate(`/admin/questions/edit/${q.id}`, {
                                 state: {
                                   ...q,
+                                  returnPath: "/admin/library",
                                   returnPage: currentPage,
                                   returnPageSize: pageSize,
+                                  returnActiveTab: selectedLibrary,
+                                  returnProblemType: problemType,
+                                  returnDifficulty: selectedLevel,
+                                  returnSearchQuery: searchQuery,
+                                  returnTechSearch: techSearch,
+                                  returnTagSearch: tagSearch,
                                 },
                               });
                             }}
@@ -1127,7 +1158,20 @@ export default function NewAdminLibrary() {
                         )}
                         <button
                           onClick={() => {
-                            navigate(`/admin/questions/preview/${q.id}`, { state: q });
+                            navigate(`/admin/questions/preview/${q.id}`, {
+                              state: {
+                                ...q,
+                                returnPath: "/admin/library",
+                                returnPage: currentPage,
+                                returnPageSize: pageSize,
+                                returnActiveTab: selectedLibrary,
+                                returnProblemType: problemType,
+                                returnDifficulty: selectedLevel,
+                                returnSearchQuery: searchQuery,
+                                returnTechSearch: techSearch,
+                                returnTagSearch: tagSearch,
+                              },
+                            });
                           }}
                           className="p-0.5 hover:text-slate-700 transition-colors cursor-pointer"
                           title="Preview Question"
@@ -1286,7 +1330,20 @@ export default function NewAdminLibrary() {
         onClose={() => setCreateModalOpen(false)}
         onCreate={(initialData) => {
           setCreateModalOpen(false);
-          navigate("/admin/questions/create", { state: initialData });
+          navigate("/admin/questions/create", {
+            state: {
+              ...initialData,
+              returnPath: "/admin/library",
+              returnPage: currentPage,
+              returnPageSize: pageSize,
+              returnActiveTab: selectedLibrary,
+              returnProblemType: problemType,
+              returnDifficulty: selectedLevel,
+              returnSearchQuery: searchQuery,
+              returnTechSearch: techSearch,
+              returnTagSearch: tagSearch,
+            },
+          });
         }}
         onOpenBulkUploader={() => setImportOpen(true)}
       />

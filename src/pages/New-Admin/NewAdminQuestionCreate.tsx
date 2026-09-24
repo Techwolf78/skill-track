@@ -219,15 +219,28 @@ export default function NewAdminQuestionCreate() {
     initialData.visibility || (isSuperAdminContext ? "PUBLIC" : "ORG_OWNED")
   );
 
-  const returnPath = isSuperAdminContext ? "/superadmin/questions" : "/admin/library";
+  const returnPath = initialData.returnPath || (isSuperAdminContext ? "/superadmin/questions" : "/admin/library");
   const libraryLabel = isSuperAdminContext ? "Question Bank" : "Library";
 
   const handleReturn = () => {
     navigate(returnPath, {
       state: {
         page: initialData.returnPage,
+        returnPage: initialData.returnPage,
         pageSize: initialData.returnPageSize,
+        returnPageSize: initialData.returnPageSize,
         activeTab: initialData.returnActiveTab,
+        returnActiveTab: initialData.returnActiveTab,
+        selectedLibrary: initialData.returnActiveTab,
+        selectedTab: initialData.returnActiveTab,
+        problemType: initialData.returnProblemType,
+        selectedLevel: initialData.returnDifficulty,
+        searchQuery: initialData.returnSearchQuery,
+        techSearch: initialData.returnTechSearch,
+        tagSearch: initialData.returnTagSearch,
+        searchTerm: initialData.returnSearchTerm,
+        difficultyFilter: initialData.returnDifficulty,
+        subjectFilter: initialData.returnSubject,
       },
     });
   };
@@ -235,6 +248,7 @@ export default function NewAdminQuestionCreate() {
   const [isCoding, setIsCoding] = useState(initialData.questionType === "CODING");
   const [isLoadingQuestion, setIsLoadingQuestion] = useState(Boolean(editQuestionId));
   const [isSaving, setIsSaving] = useState(false);
+  const [isSavingTestCases, setIsSavingTestCases] = useState(false);
 
   const { data: subjects = [] } = useSubjectsQuery();
   const { data: allTopics = [] } = useTopicsQuery();
@@ -529,49 +543,24 @@ export default function NewAdminQuestionCreate() {
     };
   };
 
-  // Minimal draft save for pre-flight verification execution
+  // Minimal draft save for pre-flight verification execution and test case updates
   const handleSaveDraftForVerification = async (): Promise<string | undefined> => {
     if (!title.trim() || !prompt.trim() || !subjectId) {
-      toast.error("Please fill in Problem Name, Description, and Subject before running pre-flight check.");
+      toast.error("Please fill in Problem Name, Description, and Subject before saving.");
       return undefined;
     }
 
     const avgTimeSecs = Math.max(30, Number(solvingTimeMins || 2) * 60);
     const validTestCases = testCases.filter((tc) => tc.input.trim() || tc.expectedOutput.trim());
     const cleanHints = hints.filter((h) => h.trim());
+    const langPayload = buildLanguageTemplatesPayload();
+    const declaredLangs = Object.keys(langPayload);
+    const allPassed = declaredLangs.length > 0 && declaredLangs.every((l) => verifiedLanguages.includes(l));
+    const computedStatus: QuestionBankStatus = allPassed ? "ACTIVE" : "UNDER_REVIEW";
 
     const targetId = editQuestionId || createdQuestionId;
-    if (targetId) {
-      // Sync latest test cases and templates before running pre-flight verification
-      await testService.updateQuestion(targetId, {
-        title: title.trim(),
-        prompt: prompt.trim(),
-        subject_id: subjectId,
-        topic_id: topicId || undefined,
-        subtopic_id: subtopicId || undefined,
-        difficulty,
-        marks,
-        avg_time_seconds: avgTimeSecs,
-        timeLimitSecs: Number(timeLimitSecs) || 2,
-        memoryLimitMb: Number(memoryLimitMb) || 256,
-        constraints: constraints.trim() || undefined,
-        sampleExplanation: sampleExplanation.trim() || undefined,
-        hints: cleanHints.length ? cleanHints : undefined,
-        testCases: validTestCases,
-        tags: tags.length ? tags : undefined,
-        isLanguageSpecific,
-        languageTemplates: buildLanguageTemplatesPayload(),
-        signatureMetadata: {
-          method_name: signature.method_name || "solve",
-          return_type: signature.return_type,
-          params: signature.params,
-        },
-      });
-      return targetId;
-    }
-
     const dto: CreateQuestionRequest = {
-      questionType: "CODING",
+      questionType: isCoding ? "CODING" : "MCQ",
       title: title.trim(),
       prompt: prompt.trim(),
       subject_id: subjectId,
@@ -590,17 +579,24 @@ export default function NewAdminQuestionCreate() {
       cognitiveLevel: "APPLY",
       p_value: 0.45,
       discrimination_index: 0.35,
-      status: "UNDER_REVIEW",
+      status: computedStatus,
       isLanguageSpecific,
       testCases: validTestCases,
       tags: tags.length ? tags : undefined,
-      languageTemplates: buildLanguageTemplatesPayload(),
+      imageUrl: questionImageUrl || undefined,
+      languageTemplates: langPayload,
       signatureMetadata: {
         method_name: signature.method_name || "solve",
         return_type: signature.return_type,
         params: signature.params,
       },
     };
+
+    if (targetId) {
+      // Sync latest test cases and templates before running pre-flight verification or test case save
+      await apiClient.put(`/questions/${targetId}`, dto);
+      return targetId;
+    }
 
     const saved = await createMutation.mutateAsync(dto);
     if (saved?.id) {
@@ -630,6 +626,32 @@ export default function NewAdminQuestionCreate() {
   };
   const removeTestCase = (idx: number) => {
     setTestCases((prev) => prev.filter((_, i) => i !== idx));
+  };
+
+  // Dedicated Save / Update Test Cases Handler
+  const handleSaveTestCases = async () => {
+    const validTestCases = testCases.filter((tc) => tc.input.trim() || tc.expectedOutput.trim());
+    if (validTestCases.length === 0) {
+      toast.error("Please provide at least one non-empty test case (input or expected output).");
+      return;
+    }
+
+    setIsSavingTestCases(true);
+    try {
+      const savedId = await handleSaveDraftForVerification();
+      if (savedId) {
+        toast.success(
+          editQuestionId || createdQuestionId
+            ? "Test cases updated successfully!"
+            : "Problem draft and test cases saved successfully!"
+        );
+      }
+    } catch (err: any) {
+      console.error("[SaveTestCases] Error:", err);
+      toast.error("Failed to save test cases: " + (err?.response?.data?.message || err.message || "Unknown error"));
+    } finally {
+      setIsSavingTestCases(false);
+    }
   };
 
   // Save handler
@@ -866,7 +888,7 @@ export default function NewAdminQuestionCreate() {
       <main className="max-w-7xl mx-auto px-4 md:px-8 pt-6 pb-20 w-full relative z-10">
         {/* Back to Library / Question Bank Button above title */}
         <button
-          onClick={() => navigate(returnPath)}
+          onClick={handleReturn}
           className="inline-flex items-center gap-1.5 text-xs text-slate-400 hover:text-white transition-colors cursor-pointer mb-2.5"
         >
           <ChevronLeft className="w-4 h-4" />
@@ -1491,7 +1513,7 @@ export default function NewAdminQuestionCreate() {
                     <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Test Cases</h3>
                     <p className="text-[11px] text-slate-400">Add sample cases (visible) and hidden test cases (for grading)</p>
                   </div>
-                  <div className="flex gap-2">
+                  <div className="flex items-center gap-2">
                     <button
                       type="button"
                       onClick={() => addTestCase(true)}
@@ -1505,6 +1527,19 @@ export default function NewAdminQuestionCreate() {
                       className="px-3 py-1.5 bg-slate-100 text-slate-800 border border-slate-300 text-xs font-semibold hover:bg-slate-200 transition-colors cursor-pointer"
                     >
                       + Hidden Case
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleSaveTestCases}
+                      disabled={isSavingTestCases || isSaving}
+                      className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-xs font-semibold flex items-center gap-1.5 shadow-xs transition-colors cursor-pointer"
+                    >
+                      {isSavingTestCases ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      ) : (
+                        <Save className="w-3.5 h-3.5" />
+                      )}
+                      <span>{editQuestionId || createdQuestionId ? "Update Test Cases" : "Save Test Cases"}</span>
                     </button>
                   </div>
                 </div>
