@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   X,
   Check,
@@ -14,6 +15,7 @@ import {
   Eye,
   EyeOff,
   CheckCircle,
+  Edit,
 } from "lucide-react";
 import {
   Select,
@@ -25,6 +27,7 @@ import {
 import Editor from "@monaco-editor/react";
 import { testService, Question, McqOption, McqType } from "@/lib/test-service";
 import { apiClient } from "@/lib/api-client";
+import { unwrapResponse } from "@/lib/api/baseResponseUtils";
 import { mapFrontendToBackendLang } from "@/types/question";
 import { renderFormattedContent, sanitizeHtml } from "@/lib/html-utils";
 import { QuestionImage } from "@/components/ui/QuestionImage";
@@ -184,6 +187,7 @@ export function QuestionPreviewModal({
   isAdding = false,
   isRemoving = false,
 }: QuestionPreviewModalProps) {
+  const navigate = useNavigate();
   const [question, setQuestion] = useState<Question | null>(initialQuestion);
   const [loading, setLoading] = useState(false);
 
@@ -327,6 +331,11 @@ export function QuestionPreviewModal({
   const handleRunCode = async (isVerify = false) => {
     if (!code || !question) return;
 
+    if (!question.id) {
+      toast.error("Question ID not found. Please ensure the question is saved.");
+      return;
+    }
+
     setIsExecuting(true);
     setConsoleOutput("> Compiling & executing source code on sandbox...\n");
     setOverallStatus(null);
@@ -341,13 +350,18 @@ export function QuestionPreviewModal({
         runAll: isVerify,
       };
 
-      const response = await apiClient.post<{ data?: Record<string, unknown>[] }>(
+      const response = await apiClient.post<any>(
         "/api/code/execute/playground",
         requestBody
       );
 
-      const resultsArray = Array.isArray(response.data?.data)
-        ? response.data.data
+      const unwrapped = unwrapResponse(response);
+      const resultsArray: Record<string, unknown>[] = Array.isArray(unwrapped)
+        ? (unwrapped as Record<string, unknown>[])
+        : Array.isArray((unwrapped as any)?.data)
+        ? (unwrapped as any).data
+        : Array.isArray((response.data as any)?.data)
+        ? (response.data as any).data
         : [];
 
       const sampleCases = isVerify
@@ -387,7 +401,8 @@ export function QuestionPreviewModal({
       setOverallStatus(computedStatus);
       setConsoleOutput(
         `> Execution completed with status: ${computedStatus}\n` +
-          (mappedResults[0]?.compileOutput ? `\nCompiler Logs:\n${mappedResults[0].compileOutput}` : "")
+          (mappedResults[0]?.compileOutput ? `\nCompiler Logs:\n${mappedResults[0].compileOutput}` : "") +
+          (mappedResults[0]?.stderr ? `\nRuntime Stderr:\n${mappedResults[0].stderr}` : "")
       );
 
       if (computedStatus === "ACCEPTED") {
@@ -556,6 +571,21 @@ export function QuestionPreviewModal({
                   <span className="hidden sm:inline">Add to Test</span>
                 </button>
               )
+            )}
+
+            {/* Edit Question Direct Action */}
+            {question.id && (
+              <button
+                onClick={() => {
+                  onClose();
+                  navigate(`/admin/questions/edit/${question.id}`);
+                }}
+                className="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-medium rounded transition-all inline-flex items-center gap-1.5 cursor-pointer"
+                title="Edit Question"
+              >
+                <Edit className="w-3.5 h-3.5 text-indigo-400" />
+                <span className="hidden sm:inline">Edit Question</span>
+              </button>
             )}
 
             <button
